@@ -1,5 +1,23 @@
 # MysticEgo
 
+## R3.2.4 · CloudDesk и веб-панель Audit
+
+Скачайте полный ZIP релиза через GitHub CLI. Для приватного репозитория
+один раз выполните `gh auth login --hostname github.com`.
+
+```bash
+cd ~/Downloads
+gh release download v1.0.0-beta.7-r3.2.4 -R ZeroFantom/MysticEgo \
+  -p MysticEgo_BETA7_R3.2.4.zip \
+  && unzip -o MysticEgo_BETA7_R3.2.4.zip -d MysticEgo-R3.2.4 \
+  && bash MysticEgo-R3.2.4/MysticEgo/tools/MysticEgo.CloudDesk/run.sh
+```
+
+В CloudDesk выберите **Обновление узлов → Веб-панель Audit**, чтобы
+установить портал в существующую Orchestra или развернуть его на своём
+домене на том же или другом VPS.
+[Настройка DNS, Caddy и регистрации](ops/audit-portal/README.md).
+
 ## R3.2.2 · GitHub в Orchestra и обновление CloudDesk
 
 После обновления Orchestra войдите под главным разработчиком. В **Ветки GitHub →

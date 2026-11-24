@@ -5,6 +5,7 @@ import Infrastructure,{useInfrastructure} from './Infrastructure.jsx';
 import Provision from './Provision.jsx';
 import DomainPicker from './DomainPicker.jsx';
 import DnsCleanup from './DnsCleanup.jsx';
+import AuditPortal from './AuditPortal.jsx';
 const api=window.desk;
 const names={home:'Обзор',monitor:'Инфраструктура',servers:'Облачные серверы',ssh:'SSH-консоль',deploy:'Обновление узлов',journal:'Журнал',dns:'Домены и DNS'};
 const icons={home:'◫',monitor:'⟷',servers:'▤',ssh:'›_',deploy:'◇',journal:'≡',dns:'◎'};
@@ -54,7 +55,7 @@ function App(){
  const set=(k,v)=>{H(f=>({...f,[k]:v}));};
  const changeRole=v=>{if(!['Orchestra','Global'].includes(v))return;H(f=>({...f,role:v,orchestra:v==='Global'?monitor.origin:'',domain:f.dnsZone?'':f.domain,name:`mysticego-${v.toLowerCase()}`}));};
  const add=(level,action,message)=>L(s=>[{level,action,message,at:Date.now()},...s].slice(0,100));
- async function run(action,args={},after){if(busy)return;B(action);OE('');if(['deploy','deploy.restoreOrchestra'].includes(action))setDeployment({status:'running',domain:args.domain,host:args.host,steps:[{at:Date.now(),message:'SSH подтверждён. Начинаем развёртывание.'}]});add('wait',action,'Выполняется');try{const r=await api.rpc(action,args);if(action==='server.create'&&r?.orderState==='not_sent'){const message=`Заказ VPS не отправлен. ${r.error||'Ошибка подготовки.'}`;OE(message);add('error',action,message);U(false);return;}if(action==='server.create'&&['capacity_rejected','preset_rejected','location_rejected'].includes(r?.orderState)){CB(old=>({...old,[r.blockKey]:r.until}));H(f=>({...f,zone:'',plan:'',os:''}));CE(n=>n+1);const reason=r.orderState==='preset_rejected'?`Timeweb не нашёл тариф ${r.blockKey.slice(7)}.`:r.orderState==='location_rejected'?`Timeweb не принимает заказы в ${r.blockKey}.`:`Нет свободных мощностей: ${r.blockKey.includes(':')?'конфигурация '+r.blockKey:'локация '+r.blockKey}.`;const message=`${reason} Заказ отклонён. Вариант исключён на 15 минут; каталог синхронизируется, затем будет выбран следующий подходящий тариф, если он есть. Подтверди новый заказ. ${r.error||''}`;OE(message);add('error',action,message);U(false);return;}after?.(r);if(action==='deploy.inspectOrchestra')setInstalledTarget(r);if(['deploy','deploy.restoreOrchestra'].includes(action))setDeployment(current=>({...current,status:'done'}));if(action==='deploy'){monitor.registerDeploy(args,r);if(args.serverId)J(null);}if(action==='dns.reconcile'){DS(x=>({...x,duplicates:[],at:0}));}if(action==='deploy.reserve'){J(x=>x&&String(x.id)===String(args.serverId)&&x.phase==='reserve'?{...x,phase:x.f.dnsZone?'dns':'waiting',message:'Роль и DNS-имя закреплены за VPS.'}:x);}if(r?.storageWarning||r?.warning&&action==='timeweb.disconnect')OE(r.storageWarning||r.warning);add('ok',action,action.startsWith('timeweb.')||action.startsWith('github.')?'Готово':typeof r==='string'?r:JSON.stringify(r,null,2));return r;}catch(e){
+ async function run(action,args={},after){if(busy)return;B(action);OE('');if(['deploy','deploy.restoreOrchestra','deploy.auditPortal'].includes(action))setDeployment({status:'running',domain:args.domain,host:args.host,steps:[{at:Date.now(),message:'SSH подтверждён. Начинаем развёртывание.'}]});add('wait',action,'Выполняется');try{const r=await api.rpc(action,args);if(action==='server.create'&&r?.orderState==='not_sent'){const message=`Заказ VPS не отправлен. ${r.error||'Ошибка подготовки.'}`;OE(message);add('error',action,message);U(false);return;}if(action==='server.create'&&['capacity_rejected','preset_rejected','location_rejected'].includes(r?.orderState)){CB(old=>({...old,[r.blockKey]:r.until}));H(f=>({...f,zone:'',plan:'',os:''}));CE(n=>n+1);const reason=r.orderState==='preset_rejected'?`Timeweb не нашёл тариф ${r.blockKey.slice(7)}.`:r.orderState==='location_rejected'?`Timeweb не принимает заказы в ${r.blockKey}.`:`Нет свободных мощностей: ${r.blockKey.includes(':')?'конфигурация '+r.blockKey:'локация '+r.blockKey}.`;const message=`${reason} Заказ отклонён. Вариант исключён на 15 минут; каталог синхронизируется, затем будет выбран следующий подходящий тариф, если он есть. Подтверди новый заказ. ${r.error||''}`;OE(message);add('error',action,message);U(false);return;}after?.(r);if(action==='deploy.inspectOrchestra')setInstalledTarget(r);if(['deploy','deploy.restoreOrchestra','deploy.auditPortal'].includes(action))setDeployment(current=>({...current,status:'done'}));if(action==='deploy'){monitor.registerDeploy(args,r);if(args.serverId)J(null);}if(action==='dns.reconcile'){DS(x=>({...x,duplicates:[],at:0}));}if(action==='deploy.reserve'){J(x=>x&&String(x.id)===String(args.serverId)&&x.phase==='reserve'?{...x,phase:x.f.dnsZone?'dns':'waiting',message:'Роль и DNS-имя закреплены за VPS.'}:x);}if(r?.storageWarning||r?.warning&&action==='timeweb.disconnect')OE(r.storageWarning||r.warning);add('ok',action,action.startsWith('timeweb.')||action.startsWith('github.')?'Готово':typeof r==='string'?r:JSON.stringify(r,null,2));return r;}catch(e){
    const message=friendly(e);
    if(['deploy','deploy.reserve'].includes(action)&&message.includes('На VPS уже завершено развёртывание. Повторная установка запрещена.')){
      setDeployment(null);
@@ -64,7 +65,7 @@ function App(){
      if(args.role==='Orchestra'&&args.domain&&!monitor.origin)monitor.selectSource('https://'+args.domain);
      return;
    }
-   if(['deploy','deploy.restoreOrchestra'].includes(action))setDeployment(current=>({...current,status:'failed',error:message}));OE(friendly(e));add('error',action,friendly(e));if(action==='server.create')U(true);if(action==='deploy.reserve')J(x=>x&&String(x.id)===String(args.serverId)?{...x,phase:'dns-error',message:friendly(e)}:x);}finally{B('');}}
+   if(['deploy','deploy.restoreOrchestra','deploy.auditPortal'].includes(action))setDeployment(current=>({...current,status:'failed',error:message}));OE(friendly(e));add('error',action,friendly(e));if(action==='server.create')U(true);if(action==='deploy.reserve')J(x=>x&&String(x.id)===String(args.serverId)?{...x,phase:'dns-error',message:friendly(e)}:x);}finally{B('');}}
  useEffect(()=>{let active=true;api.rpc('timeweb.restore').catch(e=>active&&OE(e.message)).finally(()=>active&&Q(true));const i=setInterval(()=>N(Date.now()),1000);return()=>{active=false;clearInterval(i)}},[]);
  const gh=usePoll('github.status',ready&&!authChanging,15000,authEpoch),tw=usePoll('timeweb.status',ready&&!authChanging,15000,authEpoch);
  const connected=gh.data?.connected===true&&tw.data?.connected===true;
@@ -120,13 +121,13 @@ function App(){
   try{
    const r=await api.rpc(action,{...sshArgs(f),...extra});if(gen!==wizardGen.current)return;
    saveStatus(f,r);
-   if(r.state==='ready'){SE(x=>x+1);W(null);VF('');PW('');add('ok','SSH',`${targetKey(f)} · ключ принят`);if(pending)await run(pending.action,pending.args);}
+   if(r.state==='ready'){SE(x=>x+1);W(null);VF('');PW('');add('ok','SSH',`${targetKey(f)} · ключ принят`);if(pending)await run(pending.action,pending.args,pending.after);}
    else W({f,pending,...r});
   }catch(e){if(gen!==wizardGen.current)return;WE(friendly(e));W(w=>({...w,state:action==='ssh.cloudKey'||action==='ssh.passwordKey'?'auth':action==='ssh.trust'?(extra.replace==='REPLACE'?'changed':'trust'):'error',fingerprint:extra.displayFingerprint??w?.fingerprint??'',message:'Операция не завершена. Выбери способ подключения.'}));}
   finally{wizardLock.current=false;WB(false);PW('');VF('');}
  }
  const beginSSH=(f,pending=null)=>wizardStep('ssh.prepare',f,pending);
- const runSSH=(action,args)=>beginSSH(args,{action,args});
+ const runSSH=(action,args,after)=>beginSSH(args,{action,args,after});
  const go=(s,dest)=>{if(busy||wizardLock.current)return;const f={...form,serverId:'',requireDual:'',host:serverIp(s),user:'root',port:'22'};H(f);T(dest);targetRef.current=targetKey(f);beginSSH(f);};
  // A single read-only poll for the selected host; stop on rejected authentication to avoid repeated failed logins.
  useEffect(()=>{if(!connected||!validTarget(form)||!['ssh','deploy'].includes(tab))return;let stopped=false,timer;
@@ -212,6 +213,8 @@ function App(){
    {!monitor.nodes.some(n=>n.role==='Global')&&<p>Подключи Orchestra, чтобы выбрать зарегистрированный Global.</p>}
    <div className="actions">{button('Открыть журнал',()=>T('journal'),'subtle')}{button('Развернуть новый узел',()=>{QM('existing');T('monitor')},'subtle')}</div>
  </section>}
+ {tab==='deploy'&&<AuditPortal monitor={monitor} servers={availableCloud.map(s=>({id:s.id,name:s.name,ip:serverIp(s)}))}
+   validTarget={validTarget} runSSH={runSSH} busy={!!busy||wizBusy||!!wizard}/>}
  {(tab==='journal'||tab==='ssh')&&<section><div className="sectiontop"><h2>Журнал операций</h2>{button('Очистить журнал',()=>L([]),'subtle')}</div>{!log.length&&<div className="empty">Ожидание операций</div>}{log.map((entry,i)=><details key={i} className={'entry '+entry.level} open={i===0}><summary>{stamp(entry.at)} · {entry.action} · {entry.level==='ok'?'Готово':entry.level==='error'?'Ошибка':'Выполняется'}</summary><pre>{entry.message}</pre></details>)}</section>}
  </div></main>{wizardView}</div>;
 }

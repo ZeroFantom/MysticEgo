@@ -23,13 +23,14 @@ sealed partial class CloudDesk {
             try{ValidateDeveloperContext(context,id);throw new Exception("Developer access regression failed.");}catch(DeveloperAccessException){}
         }
     }
-    async Task RequireDeveloper(string value, bool ownerOnly = false){
+    async Task<string> RequireDeveloper(string value, bool ownerOnly = false){
         var origin=TopologyOrigin(value);await topologyGate.WaitAsync();try{
             if(topologyOrigin!=origin||topologyAccess.Length==0||topologyRootId.Length==0)throw new DeveloperAccessException("Сначала подключите существующий Orchestra под developer.");
             if(DateTimeOffset.UtcNow>=topologyExpires.AddMinutes(-1))SetTopologySession(origin,await TopologyRequest(origin,"/api/auth/refresh",body:new{refreshToken=topologyRefresh}));
             var context=await VerifyDeveloper(origin,topologyRootId);
-            if(ownerOnly && context["owner"] is JsonValue owner && !owner.GetValue<bool>())
-                throw new DeveloperAccessException("Пароль доступен только главному разработчику.");
+            if(ownerOnly && (context["owner"] is not JsonValue owner || !owner.TryGetValue<bool>(out var isOwner) || !isOwner))
+                throw new DeveloperAccessException("Операция доступна только главному разработчику.");
+            return topologyRootId;
         }catch{ClearTopologySession();throw;}finally{topologyGate.Release();}
     }
     // The credential never leaves the VPS. The fixed script reads the installer's protected
