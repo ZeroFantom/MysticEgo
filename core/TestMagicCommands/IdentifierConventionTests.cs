@@ -26,6 +26,8 @@ public class IdentifierConventionTests
     [InlineData("audio-list",   "audio.list")]
     [InlineData("Audio List",   "audio.list")]
     [InlineData("AUDIO.LIST",   "audio.list")]
+    [InlineData(" ..Audio._/List.. ", "audio.list")]
+    [InlineData("Audio\tList", "audio.list")]
     public void Normalize_IsIdempotent(string input, string expected)
     {
         var once  = IdentifierConvention.Normalize(input);

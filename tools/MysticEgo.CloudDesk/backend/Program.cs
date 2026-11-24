@@ -24,7 +24,7 @@ async Task Handle(string line) {
     try {
         var req = JsonNode.Parse(line)!.AsObject(); id = req["id"]!.GetValue<string>();
         var action = req["action"]!.GetValue<string>();
-        var gate = action == "github.status" ? githubReads : action is "timeweb.status" or "servers" or "catalog" or "ssh.status" or "topology.poll" or "topology.login" or "topology.logout" or "deploy.preflight" or "domains.list" or "dns.check" or "topology.discover" or "dns.suggest" or "dns.inventory" ? reads : mutations;
+        var gate = action is "github.status" or "github.release" ? githubReads : action is "timeweb.status" or "servers" or "catalog" or "ssh.status" or "topology.poll" or "topology.login" or "topology.logout" or "deploy.preflight" or "domains.list" or "dns.check" or "topology.discover" or "dns.suggest" or "dns.inventory" ? reads : mutations;
         await gate.WaitAsync();
         try {
             var result = await app.Run(action, req["args"]?.AsObject() ?? new());
@@ -34,8 +34,7 @@ async Task Handle(string line) {
 }
 
 sealed partial class CloudDesk {
-    const string Repo = "ZeroFantom/MysticEgo", Tag = "v1.0.0-beta.7-r3", Asset = "MysticEgo_BETA7_Orchestra_R3.zip";
-    const string Hash = "2f410003f5c1ad68cc702f8a5d21dc0143cd1d9b92d3709be75ac08fffaf9f28";
+    const string Repo = "ZeroFantom/MysticEgo", Tag = "v1.0.0-beta.7-r3.1", Asset = "MysticEgo_BETA7_R3.1_CloudDesk.zip";
     readonly HttpClient http = new(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(60) };
     string token = "";
     readonly string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -193,6 +192,7 @@ sealed partial class CloudDesk {
     public async Task<object?> Run(string action,JsonObject a) {
         switch(action) {
             case "github.status": return await GitProfile();
+            case "github.release": return new {tag=Tag, asset=Asset, sha256=await GithubReleaseDigest()};
             case "github.selftest": return GithubSelftest();
             case "github.enable": Init(); File.Delete(GitDisabled); return new { enabled=true };
             case "github.disconnect": Init(); await File.WriteAllTextAsync(GitDisabled,"1"); return new { connected=false };
@@ -436,14 +436,15 @@ sealed partial class CloudDesk {
         else script=Path.Combine(AppContext.BaseDirectory,"profiles","orchestra-r3.sh");
         if(!File.Exists(script)) throw new Exception("Скрипт установки не найден");
         var binding=await ReserveBinding(a); var check=await DeployPreflight(a); if(!Bool(check,"ready",true)) throw new Exception(S(check,"message"));
-        await GitCheck(); await SSH(a,"test \"$(id -u)\" = 0 && test \"$(uname -m)\" = x86_64 && command -v bash",1);
+        var digest=await GithubReleaseDigest();
+        await SSH(a,"test \"$(id -u)\" = 0 && test \"$(uname -m)\" = x86_64 && command -v bash && command -v flock && . /etc/os-release && test \"$ID:$VERSION_ID\" = ubuntu:24.04",1);
         var temp=Directory.CreateTempSubdirectory("mysticego-").FullName; var remote="/root/.clouddesk-"+Guid.NewGuid().ToString("N");
         try {
             await Exec("gh",["release","download",Tag,"--repo",Repo,"--pattern",Asset,"--dir",temp]); var file=Path.Combine(temp,Asset);
-            using(var fs=File.OpenRead(file)) { if(Convert.ToHexString(await SHA256.HashDataAsync(fs)).ToLowerInvariant()!=Hash) throw new Exception("SHA-256 архива R3 не совпадает"); }
+            using(var fs=File.OpenRead(file)) { if(Convert.ToHexString(await SHA256.HashDataAsync(fs)).ToLowerInvariant()!=digest) throw new Exception("SHA-256 архива релиза не совпадает"); }
             await SSH(a,"umask 077; mkdir -m 700 "+remote,1); await Upload(a,file,remote+"/r3.zip"); await Upload(a,script,remote+"/install.sh");
             static string Q(string s)=>"'"+s.Replace("'","'\"'\"'")+"'";
-            var command="test ! -e /opt/mysticego/app && test ! -e /var/lib/mysticego && test ! -e /etc/mysticego/orchestra.env && test ! -e /etc/systemd/system/mysticego-orchestra.service && ! systemctl list-unit-files --no-legend | grep -qi mysticego && bash "+remote+"/install.sh "+Q(remote+"/r3.zip")+" "+Q(domain)+" "+Q(orchestra);
+            var command="test ! -e /opt/mysticego/app && test ! -e /var/lib/mysticego && test ! -e /etc/mysticego/orchestra.env && test ! -e /etc/systemd/system/mysticego-orchestra.service && ! systemctl list-unit-files --no-legend | grep -qi mysticego && bash "+remote+"/install.sh "+Q(remote+"/r3.zip")+" "+Q(domain)+" "+Q(orchestra)+(role=="Orchestra"?" "+Q(digest):"");
             SaveBinding(binding with {Phase="installing"});
             var output=await SSH(a,"flock -n /run/lock/mysticego-clouddesk-deploy.lock bash -c "+Q(command),25);
             SaveBinding(binding with {Phase="installed"}); await SSH(a,"rm -rf -- "+remote,1); return new {role,domain,release=Tag,output};
