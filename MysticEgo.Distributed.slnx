@@ -34,6 +34,7 @@
     <Project Path="services/Api.AuditOrchestra/Api.AuditOrchestra.csproj" />
   </Folder>
   <Folder Name="/tools/">
+    <Project Path="tools/MysticEgo.CloudDesk/backend/CloudDesk.csproj" />
     <Project Path="tools/MysticEgo.AutomationRecorder/MysticEgo.AutomationRecorder.csproj" />
     <Project Path="tools/MysticEgo.KeyGenerator/MysticEgo.KeyGenerator.csproj" />
     <Project Path="tools/MysticEgo.Installer/MysticEgo.Installer.csproj" />
