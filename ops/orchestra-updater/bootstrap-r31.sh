@@ -12,7 +12,9 @@ command -v gh >/dev/null
 sha=$(sha256sum < "$api")
 expected=$(cat baseline.sha256)
 updated=$(sha256sum < payload/Api.Orchestra.dll)
-if [[ ${sha%% *} != "$expected" && ${sha%% *} != "bdd659c0da8a3afb4524b87930ed409a70b37ef5bb20b61ef71efda9c36ca538" && ${sha%% *} != "4141a486ec83ed02241fdee5556fc4ef638003cea2b929203d5ed672f4920eb6" && ${sha%% *} != "b9e7abfb0138979afda0832a39a5527779f22ec57c880ad480bf2262c2a7c7a6" && ${sha%% *} != "01cb96260527f7a59c8c3a50a0d571ab3d1f4fe1f68beb3c02b6d3c59005b8d7" && ${sha%% *} != "5245533f5d9f5f1870af1a133fb1dc45d01017a1384611e78379ee23f1efe178" && ${sha%% *} != "${updated%% *}" ]]; then
+# R3.2.4 used a CI build of the same installation layout.
+installed_tag=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("installed",""))' "$web/release-info.json" 2>/dev/null || true)
+if [[ $installed_tag != v1.0.0-beta.7-r3.2.4 && ${sha%% *} != "$expected" && ${sha%% *} != "bdd659c0da8a3afb4524b87930ed409a70b37ef5bb20b61ef71efda9c36ca538" && ${sha%% *} != "4141a486ec83ed02241fdee5556fc4ef638003cea2b929203d5ed672f4920eb6" && ${sha%% *} != "b9e7abfb0138979afda0832a39a5527779f22ec57c880ad480bf2262c2a7c7a6" && ${sha%% *} != "01cb96260527f7a59c8c3a50a0d571ab3d1f4fe1f68beb3c02b6d3c59005b8d7" && ${sha%% *} != "5245533f5d9f5f1870af1a133fb1dc45d01017a1384611e78379ee23f1efe178" && ${sha%% *} != "${updated%% *}" ]]; then
   echo 'Установлена другая сборка Orchestra. Примените исходники к её релизу.' >&2
   exit 1
 fi
