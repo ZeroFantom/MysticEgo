@@ -22,6 +22,7 @@ import {Users} from '../pages/Users';
 import {Diagnostics} from '../pages/Diagnostics';
 import {CommandCenter} from '../pages/CommandCenter';
 import {AgentUpdates} from '../pages/AgentUpdates';
+import {OrchestraUpdate} from '../pages/OrchestraUpdate';
 import {AssistantPage} from '../pages/Assistant';
 import {AutomationPage} from '../pages/Automation';
 import {SoftwarePage} from '../pages/Software';
@@ -56,6 +57,7 @@ function navigation(mode:NodeMode,portal:boolean):Section[]{
       ]:[]),
       ...(manager?[{to:'/setup',label:mode==='local'?'Комплект Agent':'Развёртывание',icon:Rocket}]:[]),
       ...(['local','global'].includes(mode)?[{to:'/updates',label:'Обновления Agent',icon:Rocket}]:[]),
+      ...(mode==='orchestra'?[{to:'/orchestra-update',label:'Обновление Orchestra',icon:Rocket}]:[]),
       ...(mode==='audit'?[{to:'/organizations',label:'Организации',icon:Building2}]:[])
     ]},
     {name:'Личное пространство',items:[
@@ -161,6 +163,7 @@ function Workspace({logout}:{logout:()=>void}){
       <main className="content"><AnimatedArea><Routes>
         <Route path="/" element={mode==='orchestra'||mode==='global'||mode==='local'?<OrchestraOverview/>:mode==='audit'?<OrganizationRequests overview/>:<Overview/>}/>
         <Route path="/profile" element={<ProfilePage/>}/>
+        {mode==='orchestra'&&<Route path="/orchestra-update" element={<OrchestraUpdate/>}/>}
         <Route path="/collective" element={<Collective/>}/>
         {mode==='audit'&&<Route path="/organizations" element={<OrganizationRequests/>}/>}
         <Route path="/nodes" element={<NetworkPage/>}/>

@@ -61,6 +61,31 @@ except Exception:
     sys.exit(1)
 """;
     static string ShellQuote(string value)=>"'"+value.Replace("'","'\"'\"'")+"'";
+    async Task<object> RevealDeveloperPassword(JsonObject args){
+        var origin=TopologyOrigin(S(args,"origin"));
+        await RequireDeveloper(origin);
+        var health=(await TopologyRequest(origin,"/health/live")).AsObject();
+        var id=RealId(S(health,"node"));
+        if(id.Length==0||Role(S(health,"kind"))!="Orchestra"||S(health,"status")!="alive")
+            throw new DeveloperAccessException("HTTPS не подтвердил Orchestra.");
+        var host=new Uri(origin).Host;
+        using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(8));
+        var addresses=await Dns.GetHostAddressesAsync(host,timeout.Token);
+        var ipv4=addresses.Where(ip=>ip.AddressFamily==System.Net.Sockets.AddressFamily.InterNetwork)
+            .Select(ip=>ip.ToString()).Distinct().ToArray();
+        if(ipv4.Length!=1||!PublicAddress(ipv4[0],"ipv4"))
+            throw new DeveloperAccessException("Нужен один подтверждённый публичный IPv4 Orchestra.");
+        var target=new JsonObject{["host"]=ipv4[0],["user"]="root",["port"]="22"};
+        CheckLocalFiles();
+        if(!File.Exists(Key)||!File.Exists(Known)||(await KnownLines(target)).Length==0)
+            throw new DeveloperAccessException("Сначала настройте доверенный SSH к Orchestra.");
+        var script=DeveloperLoginScript.Replace(
+            "print(json.dumps({k:session[k] for k in ('accessToken','refreshToken','expiresAt')}))",
+            "print(json.dumps({'password': password}))",StringComparison.Ordinal);
+        var result=await Exec("ssh",[..SshArgs(target),"python3 -c "+ShellQuote(script)+" "+ShellQuote(id)],minutes:1,sensitive:true);
+        return new {password=JsonNode.Parse(result)?["password"]?.GetValue<string>()
+            ?? throw new DeveloperAccessException("Не удалось прочитать пароль developer.")};
+    }
     async Task TryAutoDeveloper(string origin,string id){
         if(autoAttemptOrigin!=origin){ResetAutoAttempt();autoAttemptOrigin=origin;}
         if(DateTimeOffset.UtcNow<autoRetryAt)return;

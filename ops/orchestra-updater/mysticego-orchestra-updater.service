@@ -1,0 +1,13 @@
+[Unit]
+Description=Apply developer-approved MysticEgo Orchestra release
+After=network-online.target
+
+[Service]
+Type=oneshot
+Environment=GH_PROMPT_DISABLED=1
+EnvironmentFile=-/etc/mysticego/orchestra-updater.env
+StateDirectory=mysticego-orchestra-updater
+StateDirectoryMode=0755
+ExecStart=/usr/bin/python3 /usr/local/libexec/mysticego/orchestra-updater.py
+TimeoutStartSec=20min
+UMask=0022
