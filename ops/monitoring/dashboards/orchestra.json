@@ -1,0 +1,175 @@
+{
+  "uid": "mysticego-orchestra",
+  "title": "MysticEgo · Оркестр",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "CPU Оркестра",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mysticego"
+      },
+      "targets": [
+        {
+          "expr": "mysticego_process_cpu_percent",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Память Оркестра",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mysticego"
+      },
+      "targets": [
+        {
+          "expr": "mysticego_process_memory_bytes",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Входящий трафик",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mysticego"
+      },
+      "targets": [
+        {
+          "expr": "mysticego_network_receive_bytes_per_second",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Исходящий трафик",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mysticego"
+      },
+      "targets": [
+        {
+          "expr": "mysticego_network_transmit_bytes_per_second",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Свободное место на диске",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mysticego"
+      },
+      "targets": [
+        {
+          "expr": "mysticego_disk_available_bytes",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Время работы Оркестра",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mysticego"
+      },
+      "targets": [
+        {
+          "expr": "mysticego_uptime_seconds",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+[Unit]
+Description=MysticEgo station (Audit, Global, Local or Agent)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/MysticEgo
+ExecStart=%h/MysticEgo/audit-desktop --headless %h/.config/mysticego/station.json
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

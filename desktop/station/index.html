@@ -1,0 +1,47 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>AuditDesktop</title>
+<link rel="stylesheet" href="../control/style.css"></head>
+<body>
+<div id="embedded" class="embedded-toolbar" hidden><button id="back" class="secondary">← AuditDesktop</button><strong>MysticEgo</strong></div>
+<div id="workspace">
+<header class="desktop-header"><div class="desktop-logo" aria-hidden="true">A</div><div><h1>AuditDesktop</h1><p>Личные и клубные устройства MysticEgo</p></div><span id="state" class="status">Ожидание подключения</span></header>
+<main>
+<div class="desktop-columns">
+<section class="desktop-card account-card">
+<div id="identity" hidden><div class="row"><h2 id="identity-name"></h2><button class="plain" id="logout">Выйти</button></div>
+<div class="actions"><button class="secondary" id="home">Открыть личный Audit</button><select id="global-panel" aria-label="Панель Global"><option value="">Мои организации Global</option></select></div></div>
+<div id="login-box">
+<h2 id="login-title">Войдите в MysticEgo</h2>
+<form id="login-form">
+<label>Адрес Оркестра<input id="central" type="url" required value="http://127.0.0.1:5500"></label>
+<label class="checkbox"><input type="checkbox" id="portal-lan"> Тестовый HTTP в локальной сети</label>
+<div class="desktop-columns"><label>Логин<input id="login" autocomplete="username" required></label><label>Пароль<input id="password" type="password" autocomplete="current-password" required></label></div>
+<label id="nickname-label" hidden>Игровой никнейм<input id="nickname" maxlength="60"></label>
+<div class="actions"><button id="login-button">Войти</button><button class="plain" type="button" id="register">Создать аккаунт</button></div>
+</form>
+<button class="plain" id="portal">Открыть портал Audit</button>
+</div>
+</section>
+<section class="desktop-card"><div class="row"><h2>Конфигурация устройства</h2><span id="agent-badge" class="status">● Agent</span></div>
+<p id="current">Agent подключается из комплекта Local. Для Global и Local используется конфигурация администратора.</p>
+<div class="actions"><button id="import" class="secondary">Загрузить конфигурацию</button><button id="start" disabled>Запустить</button><button id="stop" disabled class="secondary">Остановить</button></div>
+<div class="actions"><button id="panel" disabled class="plain">Открыть панель</button><button id="companion" disabled class="plain">Открыть аватар</button></div>
+</section>
+</div>
+<section class="desktop-card" id="apps" hidden><h2>Приложения для ассистента</h2>
+ <label>Псевдоним приложения<input id="app-alias" placeholder="Например, warp или notepad"></label>
+ <div class="actions"><button id="app-add" class="secondary">Выбрать установленное приложение</button><button id="app-remove" class="plain">Удалить псевдоним</button></div>
+ <p id="app-list" class="message"></p></section>
+<section class="desktop-card" id="automation" hidden>
+<h2>Автоматизация на этом ПК</h2>
+<label class="checkbox"><input type="checkbox" id="allow"> Разрешить воспроизведение в выбранных приложениях</label>
+<label>Разрешённые процессы<input id="processes" placeholder="notepad, paint"></label>
+<small>Разрешения применяются при запуске Agent или Audit на этом компьютере.</small>
+<label>Процесс для записи<input id="record-process" placeholder="notepad"></label>
+<div class="actions"><button id="record" class="secondary">Начать запись</button><button id="finish" class="secondary" disabled>Сохранить сценарий</button></div>
+</section>
+<section class="desktop-card"><div class="row"><h2>Журнал запуска</h2><button id="folder" class="plain">Открыть папку</button></div><pre id="logs"></pre></section>
+<details class="desktop-card"><summary>Оформление</summary><div id="design"></div></details>
+<p id="message" class="message" role="status"></p>
+</main></div><script type="module" src="view.js"></script></body></html>

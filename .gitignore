@@ -1,0 +1,11 @@
+.testbed/
+**/node_modules/
+**/dist/
+**/bin/
+**/obj/
+**/data/
+deploy/keys/
+deploy/.env
+*.pem
+
+.orchestrator/

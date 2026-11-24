@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ru">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'">
+<title>MysticEgo · Центральный сервер</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<header class="desktop-header"><div class="desktop-logo" aria-hidden="true">M</div><div><h1>MysticEgo</h1><p>Центральный сервер</p></div><span id="state" class="status">Запуск</span></header>
+<main>
+<section class="desktop-card">
+<h2>Службы</h2>
+<div class="services"><div><strong>Auth</strong><span id="auth">Ожидание</span></div><div><strong>Оркестр</strong><span id="orchestra">Ожидание</span></div></div>
+<div class="actions"><button id="start">Запустить</button><button id="stop" class="secondary">Остановить</button>
+<button disabled class="secondary" id="open-orchestra">Открыть Оркестр</button><button disabled class="secondary" id="open-audit">Портал Audit</button></div>
+</section>
+<div class="desktop-columns">
+<section class="desktop-card">
+<h2>Вход в Оркестр</h2>
+<label>Логин<input value="developer" readonly></label>
+<label>Пароль<input id="password" type="password" placeholder="Скрыт" readonly></label>
+<div class="actions"><button id="copy-login" class="secondary">Копировать логин</button>
+<button id="copy-password" class="secondary">Копировать пароль</button><button id="show-password" class="plain">Показать</button></div>
+</section>
+<section class="desktop-card">
+<h2>Адрес главного сервера</h2>
+<form id="settings">
+<label>DNS-имя или IPv4<input id="host" placeholder="По умолчанию 127.0.0.1"></label>
+<label class="checkbox"><input type="checkbox" id="lan"> Разрешить запуск тестовых узлов по HTTP в локальной сети</label>
+<button class="secondary">Сохранить для следующего запуска</button>
+</form>
+</section>
+</div>
+<section class="desktop-card"><div class="row"><h2>Журнал запуска</h2><button class="plain" id="logs-folder">Открыть папку</button></div><pre id="logs"></pre></section>
+<details class="desktop-card"><summary>Оформление</summary><div id="design"></div></details>
+<p id="message" class="message" role="status"></p>
+</main><script type="module" src="view.js"></script>
+</body></html>

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>AuditDesktop</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <DefineConstants>AUDIT_DESKTOP</DefineConstants>
+    <AppHostDotNetSearch>AppRelative</AppHostDotNetSearch>
+    <AppHostRelativeDotNet>runtime\win-x64</AppHostRelativeDotNet>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../Bootstrap/Program.cs" Link="Program.cs" />
+  </ItemGroup>
+</Project>

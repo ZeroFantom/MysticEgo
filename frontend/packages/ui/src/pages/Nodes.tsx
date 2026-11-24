@@ -1,0 +1,4 @@
+import {RefreshCw} from 'lucide-react';
+import {useApp,useRemote} from '../app/context';
+import {Panel,Header,Empty,Badge,ErrorBanner,spin} from '../components/primitives';
+export function Nodes(){const {api}=useApp();const rows=useRemote(()=>api.nodes(),[api]);return <><Header title="Узлы сети" description="Обнаруженные Local API и другие компоненты" action={<button className="btn secondary" onClick={rows.reload}><RefreshCw size={16}/> Обновить</button>}/><ErrorBanner text={rows.error}/><Panel title="Зарегистрированные узлы">{rows.loading?spin:!rows.value?.length?<Empty text="Пока нет зарегистрированных узлов"/>:<div className="table-wrap"><table><thead><tr><th>Название</th><th>Тип</th><th>ID</th><th>Последняя регистрация</th></tr></thead><tbody>{rows.value.map(x=><tr key={x.id}><td><strong>{x.name}</strong></td><td>{x.kind}</td><td className="mono">{x.id}</td><td>{new Date(x.seenAt).toLocaleString()}</td></tr>)}</tbody></table></div>}</Panel></>}

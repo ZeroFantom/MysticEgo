@@ -1,0 +1,44 @@
+<Solution>
+  <Folder Name="/core/">
+    <Project Path="core/Models.Commands/Models.Commands.csproj" />
+    <Project Path="core/Models.Commands.Scanner/Models.Commands.Scanner.csproj" />
+    <Project Path="core/Models.Commands.SignalR/Models.Commands.SignalR.csproj" />
+    <Project Path="core/Models.Commands.SignalR.Clients/Models.Commands.SignalR.Clients.csproj" />
+    <Project Path="core/Models.Commands.SignalR.Hub/Models.Commands.SignalR.Hub.csproj" />
+    <Project Path="core/Models.Data/Models.Data.csproj" />
+    <Project Path="core/Models.Commands.Mcp/Models.Commands.Mcp.csproj" />
+    <Project Path="core/Models.Autorization/Models.Autorization.csproj" />
+    <Project Path="core/Api.Auth/Api.Auth.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/WorldAiQueueSmoke/WorldAiQueueSmoke.csproj" />
+    <Project Path="tests/InstallerProfilesSmoke/InstallerProfilesSmoke.csproj" />
+    <Project Path="tests/NetworkRepairBeta4Smoke/NetworkRepairBeta4Smoke.csproj" />
+    <Project Path="core/Core.SmokeTests/Core.SmokeTests.csproj" />
+    <Project Path="core/TestMagicCommands/TestMagicCommands.csproj" />
+    <Project Path="tests/AuthSmoke/AuthSmoke.csproj" />
+    <Project Path="tests/UpdateSmoke/UpdateSmoke.csproj" />
+    <Project Path="tests/AvatarSmoke/AvatarSmoke.csproj" />
+    <Project Path="tests/BetaResilienceSmoke/BetaResilienceSmoke.csproj" />
+    <Project Path="tests/ApiArchitectureSmoke/ApiArchitectureSmoke.csproj" />
+  </Folder>
+  <Folder Name="/services/">
+    <Project Path="services/MysticEgo.Distributed/MysticEgo.Distributed.csproj" />
+    <Project Path="services/MysticEgo.Avatar/MysticEgo.Avatar.csproj" />
+    <Project Path="services/MysticEgo.WorldAI/MysticEgo.WorldAI.csproj" />
+    <Project Path="services/MysticEgo.Soul/MysticEgo.Soul.csproj" />
+    <Project Path="services/Api.Global/Api.Global.csproj" />
+    <Project Path="services/Api.Local/Api.Local.csproj" />
+    <Project Path="services/Api.Agent/Api.Agent.csproj" />
+    <Project Path="services/Api.Orchestra/Api.Orchestra.csproj" />
+    <Project Path="services/Api.AuditOrchestra/Api.AuditOrchestra.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/MysticEgo.AutomationRecorder/MysticEgo.AutomationRecorder.csproj" />
+    <Project Path="tools/MysticEgo.KeyGenerator/MysticEgo.KeyGenerator.csproj" />
+    <Project Path="tools/MysticEgo.Installer/MysticEgo.Installer.csproj" />
+    <Project Path="desktop/Bootstrap/MysticEgo.csproj" />
+    <Project Path="desktop/StationBootstrap/AuditDesktop.csproj" />
+    <Project Path="desktop/native/MysticEgo.DesktopGeometry.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,3 @@
+import {useApp,useRemote} from '../app/context';
+import {Panel,Header,ErrorBanner} from '../components/primitives';
+export function HierarchyPage(){const {api}=useApp();const q=useRemote(()=>api.hierarchy(),[api]);return <><Header title="Структура экосистемы" description="Уровни компонентов и границы управления"/><ErrorBanner text={q.error}/><Panel title="Контуры MysticEgo">{q.value?.tiers.slice().sort((a,b)=>b.tier-a.tier).map((t,i)=><div className="line" key={t.kind}><div className="icon-sm">{i+1}</div><div className="grow"><strong>{t.label}</strong><small>Уровень инфраструктуры {t.tier}</small></div></div>)}<p className="footnote">Уровень узла не заменяет проверку прав пользователя, полномочий службы и согласия владельца компьютера.</p></Panel></>}

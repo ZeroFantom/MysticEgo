@@ -1,0 +1,12 @@
+.git
+**/node_modules
+**/bin
+**/obj
+**/.cache
+**/.pytest_cache
+**/__pycache__
+**/*.pyc
+**/deployment
+**/avatar-data
+**/avatar-replica
+desktop/dist

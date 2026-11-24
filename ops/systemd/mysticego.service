@@ -1,0 +1,15 @@
+[Unit]
+Description=MysticEgo Auth and Orchestra
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/MysticEgo
+EnvironmentFile=-%h/.config/mysticego/center.env
+ExecStart=%h/MysticEgo/mysticego --headless
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

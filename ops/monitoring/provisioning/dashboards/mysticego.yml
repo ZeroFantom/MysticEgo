@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: MysticEgo
+    folder: MysticEgo
+    type: file
+    options:
+      path: /var/lib/mysticego-dashboards

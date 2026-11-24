@@ -1,0 +1,29 @@
+name: mysticego-monitoring
+services:
+  prometheus:
+    image: prom/prometheus:v3.8.1
+    network_mode: host
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - >
+        printf 'global:\n  scrape_interval: 5s\nscrape_configs:\n  - job_name: mysticego\n    static_configs:\n      - targets: ["127.0.0.1:${MYSTICEGO_METRICS_PORT:-5500}"]\n' >/tmp/mystic.yml;
+        exec /bin/prometheus --config.file=/tmp/mystic.yml --storage.tsdb.path=/prometheus --web.listen-address=127.0.0.1:9090
+    volumes: [prometheus_data:/prometheus]
+  grafana:
+    image: grafana/grafana:12.3.1
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      GF_SERVER_HTTP_ADDR: 127.0.0.1
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./provisioning:/etc/grafana/provisioning:ro
+      - ./dashboards:/var/lib/mysticego-dashboards:ro
+volumes:
+  prometheus_data:
+  grafana_data:

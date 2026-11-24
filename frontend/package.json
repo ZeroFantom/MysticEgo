@@ -1,0 +1,40 @@
+{
+  "name": "mysticego-frontend",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:global": "npm run dev -w @mysticego/global",
+    "dev:local": "npm run dev -w @mysticego/local",
+    "dev:agent": "npm run dev -w @mysticego/agent",
+    "build": "tsc --noEmit && node scripts/build.mjs",
+    "typecheck": "npm run typecheck -ws --if-present",
+    "dev:orchestra": "npm run dev -w @mysticego/orchestra",
+    "dev:audit": "npm run dev -w @mysticego/audit"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@types/three": "^0.180.0",
+    "@vitejs/plugin-react": "^4.5.0",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "^0.10.22",
+    "@pixiv/three-vrm": "^3.4.5",
+    "@pixiv/three-vrm-animation": "^3.5.5",
+    "lucide-react": "^0.511.0",
+    "qrcode.react": "^4.2.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^7.6.0",
+    "remark-gfm": "^4.0.1",
+    "three": "^0.180.0"
+  }
+}

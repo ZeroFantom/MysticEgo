@@ -1,0 +1,9 @@
+{
+  "name": "mysticego-deployment-center",
+  "productName": "MysticEgo",
+  "version": "1.0.0-beta.7",
+  "private": true,
+  "main": "main.mjs",
+  "type": "module",
+  "dependencies": { "ssh2": "1.17.0" }
+}
