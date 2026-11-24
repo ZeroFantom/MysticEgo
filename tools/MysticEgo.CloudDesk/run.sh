@@ -83,6 +83,7 @@ install_apparmor_profile() {
     sudo apparmor_parser -r "$profile_path"
 }
 
+bash ./ensure-hosts.sh
 ulimit -c 0 || true
 scratch=$(mktemp)
 if "$electron" --disable-setuid-sandbox . 2>"$scratch"; then

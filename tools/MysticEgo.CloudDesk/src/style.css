@@ -20,3 +20,20 @@
 
 .dns-picker{display:grid;gap:10px;border:1px solid var(--line,#33394a);border-radius:14px;padding:16px;margin:12px 0;background:rgba(124,94,186,.07);animation:pageIn .22s ease-out}.dns-picker .sectiontop{margin:0}.dns-preview{display:flex;align-items:center;gap:12px;padding:12px;border-radius:9px;background:rgba(124,94,186,.12);overflow-wrap:anywhere}.dns-preview small{color:#b8a0f5;font-weight:700}.dns-picker select{width:100%}
 .dns-record-list{display:grid;gap:8px;max-height:58vh;overflow:auto}.dns-record{display:flex!important;flex-direction:row!important;align-items:center;gap:14px;padding:12px;border:1px solid #384158;border-radius:10px;background:#191e2c}.dns-record input{width:17px;height:17px;flex:none}.dns-record>div{flex:1;min-width:0;overflow-wrap:anywhere}.dns-record small{display:block;margin-top:5px}.dns-record .pill{flex:none}
+
+.cloud-toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(460px, calc(100vw - 48px));
+  padding: 12px 16px;
+  color: #f0eaff;
+  background: #22283a;
+  border: 1px solid #596589;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px #0007;
+}

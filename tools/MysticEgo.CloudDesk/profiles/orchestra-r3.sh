@@ -10,10 +10,14 @@ checksum=${4:-2f410003f5c1ad68cc702f8a5d21dc0143cd1d9b92d3709be75ac08fffaf9f28}
 [[ $domain =~ ^[A-Za-z0-9][A-Za-z0-9.-]*\.[A-Za-z]{2,63}$ && $domain != *..* ]]
 if [[ -e /opt/mysticego/app || -e /etc/systemd/system/mysticego-orchestra.service ]]; then echo 'Existing installation; refusing to overwrite'; exit 1; fi
 if [[ -e /etc/caddy/Caddyfile ]]; then echo 'Existing Caddy config; use a fresh server'; exit 1; fi
+echo 'CLOUDDESK_STEP:checksum'
 printf '%s  %s\n' "$checksum" "$archive" | sha256sum -c -
 export DEBIAN_FRONTEND=noninteractive
+echo 'CLOUDDESK_STEP:apt-update'
 apt-get update
+echo 'CLOUDDESK_STEP:apt-install'
 apt-get install -y ca-certificates caddy curl libicu74 libssl3t64 unzip
+echo 'CLOUDDESK_STEP:unpack'
 install -d -m 0755 /opt/mysticego /etc/mysticego
 stage=$(mktemp -d /opt/mysticego/.stage.XXXXXXXX)
 trap 'rm -rf -- "$stage"' EXIT
@@ -25,6 +29,7 @@ tar -xzf "$app/runtime/linux-x64.tar.gz" -C "$app/runtime/linux-x64"
 test -x "$app/runtime/linux-x64/dotnet"
 chmod -R a+rX,go-w "$app"
 mv -T "$app" /opt/mysticego/app
+echo 'CLOUDDESK_STEP:configure'
 id -u mysticego >/dev/null 2>&1 || useradd --system --user-group --no-create-home --home-dir /var/lib/mysticego --shell /usr/sbin/nologin mysticego
 printf 'MYSTICEGO_CENTER_AUTH_URL=https://%s\nMYSTICEGO_CENTER_ORCHESTRA_URL=https://%s\n' "$domain" "$domain" > /etc/mysticego/orchestra.env
 cat > /etc/systemd/system/mysticego-orchestra.service <<'UNIT'
@@ -67,9 +72,12 @@ CADDY
 chmod 0644 /etc/caddy/Caddyfile
 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 systemctl daemon-reload
+echo 'CLOUDDESK_STEP:start'
 systemctl enable --now mysticego-orchestra.service
+echo 'CLOUDDESK_STEP:local-health'
 for ((i=0;i<60;i++)); do
   if curl -fsS --max-time 2 http://127.0.0.1:5500/health/live >/dev/null; then
+    echo 'CLOUDDESK_STEP:https'
     systemctl enable caddy.service
     systemctl restart caddy.service
     curl -fsS --retry 10 --retry-delay 5 --retry-all-errors --max-time 10 "https://$domain/health/live" >/dev/null

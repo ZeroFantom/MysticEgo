@@ -27,7 +27,8 @@ async Task Handle(string line) {
         var gate = action is "github.status" or "github.release" ? githubReads : action is "timeweb.status" or "servers" or "catalog" or "ssh.status" or "topology.poll" or "topology.login" or "topology.logout" or "deploy.preflight" or "domains.list" or "dns.check" or "topology.discover" or "dns.suggest" or "dns.inventory" ? reads : mutations;
         await gate.WaitAsync();
         try {
-            var result = await app.Run(action, req["args"]?.AsObject() ?? new());
+            var result = await app.Run(action, req["args"]?.AsObject() ?? new(),
+                message => Console.WriteLine(JsonSerializer.Serialize(new { id, progress = message })));
             Console.WriteLine(JsonSerializer.Serialize(new { id, ok = true, result }));
         } finally { gate.Release(); }
     } catch (Exception ex) { Console.WriteLine(JsonSerializer.Serialize(new { id, ok = false, error = app.Redact(ex.Message) })); }
@@ -47,19 +48,29 @@ sealed partial class CloudDesk {
     static string Need(JsonObject a, string k, string pattern) { var s = S(a,k); if (!Regex.IsMatch(s, pattern)) throw new Exception($"Некорректное поле: {k}"); return s; }
     static int Num(JsonObject a,string k) => int.TryParse(S(a,k),out var n) && n>0 ? n : throw new Exception($"Укажите ID: {k}");
     void Init() { Directory.CreateDirectory(State); File.SetUnixFileMode(State, UnixFileMode.UserRead|UnixFileMode.UserWrite|UnixFileMode.UserExecute); }
-    async Task<string> Exec(string cmd, IEnumerable<string> args, string? input = null, int minutes = 15, Dictionary<string,string>? environment = null, bool sensitive = false, int? timeoutSeconds = null) {
+    async Task<string> Exec(string cmd, IEnumerable<string> args, string? input = null, int minutes = 15, Dictionary<string,string>? environment = null, bool sensitive = false, int? timeoutSeconds = null, Action<string>? onOutput = null) {
         using var p = new Process { StartInfo = new ProcessStartInfo(cmd) { UseShellExecute=false, RedirectStandardOutput=true, RedirectStandardError=true, RedirectStandardInput=true } };
         foreach (var arg in args) p.StartInfo.ArgumentList.Add(arg);
         p.StartInfo.Environment["GH_PROMPT_DISABLED"]="1";
         p.StartInfo.Environment["LC_ALL"]="C";
         if(environment!=null) foreach(var kv in environment) p.StartInfo.Environment[kv.Key]=kv.Value;
-        p.Start(); var stdout=p.StandardOutput.ReadToEndAsync(); var stderr=p.StandardError.ReadToEndAsync();
+        p.Start();
+        var stdout = onOutput == null ? p.StandardOutput.ReadToEndAsync() : ReadOutput(p.StandardOutput, onOutput);
+        var stderr = p.StandardError.ReadToEndAsync();
         if(input!=null) await p.StandardInput.WriteAsync(input); p.StandardInput.Close();
         using var cts=new CancellationTokenSource(timeoutSeconds is int seconds ? TimeSpan.FromSeconds(seconds) : TimeSpan.FromMinutes(minutes));
         try { await p.WaitForExitAsync(cts.Token); } catch(OperationCanceledException) { if(!p.HasExited) p.Kill(true); throw new Exception($"Тайм-аут {cmd}. Проверьте состояние операции перед повтором."); }
         var o=await stdout; var e=await stderr;
         if(p.ExitCode!=0) throw new Exception(sensitive ? $"{cmd}: код {p.ExitCode} (закрытая операция авторизации)" : $"{cmd}: код {p.ExitCode}\n{Redact(e).Trim()}\n{Redact(o).Trim()}");
         return o.Trim();
+    }
+    static async Task<string> ReadOutput(StreamReader reader, Action<string> onOutput) {
+        var text = new System.Text.StringBuilder();
+        while (await reader.ReadLineAsync() is { } line) {
+            text.AppendLine(line);
+            onOutput(line);
+        }
+        return text.ToString();
     }
     async Task<JsonNode> Api(string path, object? body=null, int version=1, HttpMethod? method=null) {
         var current = Volatile.Read(ref token); if(current.Length==0) throw new Exception("Подключите Timeweb Cloud.");
@@ -86,7 +97,7 @@ sealed partial class CloudDesk {
     string[] CommonSsh(JsonObject a) => ["-F","/dev/null","-o","StrictHostKeyChecking=yes","-o","UserKnownHostsFile="+Known,"-o","GlobalKnownHostsFile=/dev/null","-o","HostKeyAlgorithms=ssh-ed25519","-o","UpdateHostKeys=no","-o","CheckHostIP=no","-o","ConnectTimeout=10","-o","ServerAliveInterval=15","-o","ServerAliveCountMax=2","-o","ForwardAgent=no","-o","ClearAllForwardings=yes"];
     string[] KeyOptions => ["-i",Key,"-o","IdentitiesOnly=yes","-o","IdentityAgent=none","-o","BatchMode=yes","-o","PreferredAuthentications=publickey"];
     string[] SshArgs(JsonObject a) => [..CommonSsh(a),..KeyOptions,"-p",Port(a),Target(a)];
-    async Task<string> SSH(JsonObject a,string command,int minutes=15) { await EnsureKey(); return await Exec("ssh",[..SshArgs(a),command],minutes:minutes); }
+    async Task<string> SSH(JsonObject a,string command,int minutes=15,Action<string>? onOutput=null) { await EnsureKey(); return await Exec("ssh",[..SshArgs(a),command],minutes:minutes,onOutput:onOutput); }
     async Task Upload(JsonObject a,string local,string remote) => await Exec("scp",[..CommonSsh(a),..KeyOptions,"-P",Port(a),"--",local,Target(a)+":"+remote]);
     void CheckLocalFiles() { foreach(var f in new[]{State,Key,Key+".pub",Known}) if((File.Exists(f)||Directory.Exists(f)) && (File.GetAttributes(f)&FileAttributes.ReparsePoint)!=0) throw new Exception("Небезопасная символическая ссылка в SSH-хранилище: "+f); }
     async Task EnsureKey() {
@@ -189,7 +200,7 @@ sealed partial class CloudDesk {
         var state=await Probe(a,true); if(S(state,"state")!="ready") throw new Exception(S(state,"message"));
         return new {args=new[]{"-e","ssh"}.Concat(SshArgs(a)).ToArray()};
     }
-    public async Task<object?> Run(string action,JsonObject a) {
+    public async Task<object?> Run(string action,JsonObject a,Action<string>? progress=null) {
         switch(action) {
             case "github.status": return await GitProfile();
             case "github.release": return new {tag=Tag, asset=Asset, sha256=await GithubReleaseDigest()};
@@ -276,7 +287,7 @@ sealed partial class CloudDesk {
             case "ssh.test": return await SSH(a,"uname -a; id; uptime",1);
             case "ssh.command": return await SSH(a,S(a,"command"),5);
             case "deploy.preflight": return await DeployPreflight(a);
-            case "deploy": return await Deploy(a);
+            case "deploy": return await Deploy(a,progress ?? (_ => {}));
             case "topology.poll": return await TopologyPoll(a);
             case "topology.login": return await TopologyLogin(a);
             case "topology.logout": return await TopologyLogout();
@@ -428,25 +439,53 @@ sealed partial class CloudDesk {
         if(dns.error!=null)return Pending((S(a,"dnsZone")!=""?"Запись подтверждена Timeweb API. ":"")+dns.error+" "+dns.detail);
         return new JsonObject{["ready"]=true,["message"]="VPS включён, публичный DNS подтверждён. "+dns.detail};
     }
-    async Task<object> Deploy(JsonObject a) {
+    async Task<object> Deploy(JsonObject a, Action<string> progress) {
+        progress("Подтверждение параметров развёртывания");
         if(S(a,"confirm")!="DEPLOY") throw new Exception("Подтвердите развёртывание");
         var role=Need(a,"role",@"^(Orchestra|Global)$"); var domain=Need(a,"domain",@"^[A-Za-z0-9](?:[A-Za-z0-9-]*\.)+[A-Za-z]{2,63}$|^[A-Za-z0-9][A-Za-z0-9.-]*\.[A-Za-z]{2,63}$"); if(domain.Contains("..")) throw new Exception("Некорректный домен");
         var orchestra=S(a,"orchestra"); var script=S(a,"script");
         if(role=="Global") { if(!Uri.TryCreate(orchestra,UriKind.Absolute,out var u)||u.Scheme!="https"||u.UserInfo!=""||u.Query!=""||u.Fragment!="") throw new Exception("Нужен HTTPS URL существующего Orchestra"); if(!File.Exists(script)) throw new Exception("Выберите проверенный bash-скрипт Global"); await RequireDeveloper(orchestra); }
         else script=Path.Combine(AppContext.BaseDirectory,"profiles","orchestra-r3.sh");
         if(!File.Exists(script)) throw new Exception("Скрипт установки не найден");
+        progress("Проверка закрепления VPS, IP и DNS");
         var binding=await ReserveBinding(a); var check=await DeployPreflight(a); if(!Bool(check,"ready",true)) throw new Exception(S(check,"message"));
+        progress("Проверка релиза и контрольной суммы в GitHub");
         var digest=await GithubReleaseDigest();
+        progress("Проверка ОС и прав на VPS через SSH");
         await SSH(a,"test \"$(id -u)\" = 0 && test \"$(uname -m)\" = x86_64 && command -v bash && command -v flock && . /etc/os-release && test \"$ID:$VERSION_ID\" = ubuntu:24.04",1);
         var temp=Directory.CreateTempSubdirectory("mysticego-").FullName; var remote="/root/.clouddesk-"+Guid.NewGuid().ToString("N");
         try {
+            progress("Загрузка ZIP-архива релиза из GitHub");
             await Exec("gh",["release","download",Tag,"--repo",Repo,"--pattern",Asset,"--dir",temp]); var file=Path.Combine(temp,Asset);
+            progress("Проверка SHA-256 скачанного архива");
             using(var fs=File.OpenRead(file)) { if(Convert.ToHexString(await SHA256.HashDataAsync(fs)).ToLowerInvariant()!=digest) throw new Exception("SHA-256 архива релиза не совпадает"); }
-            await SSH(a,"umask 077; mkdir -m 700 "+remote,1); await Upload(a,file,remote+"/r3.zip"); await Upload(a,script,remote+"/install.sh");
+            progress("Подготовка временного каталога на VPS");
+            await SSH(a,"umask 077; mkdir -m 700 "+remote,1);
+            progress("Передача ZIP-архива на VPS по SCP");
+            await Upload(a,file,remote+"/r3.zip");
+            progress("Передача установочного скрипта на VPS");
+            await Upload(a,script,remote+"/install.sh");
             static string Q(string s)=>"'"+s.Replace("'","'\"'\"'")+"'";
             var command="test ! -e /opt/mysticego/app && test ! -e /var/lib/mysticego && test ! -e /etc/mysticego/orchestra.env && test ! -e /etc/systemd/system/mysticego-orchestra.service && ! systemctl list-unit-files --no-legend | grep -qi mysticego && bash "+remote+"/install.sh "+Q(remote+"/r3.zip")+" "+Q(domain)+" "+Q(orchestra)+(role=="Orchestra"?" "+Q(digest):"");
             SaveBinding(binding with {Phase="installing"});
-            var output=await SSH(a,"flock -n /run/lock/mysticego-clouddesk-deploy.lock bash -c "+Q(command),25);
+            progress("Запуск установочного скрипта на VPS");
+            void ReportInstallerStep(string line) {
+                var message = line switch {
+                    "CLOUDDESK_STEP:checksum" => "VPS · проверка архива",
+                    "CLOUDDESK_STEP:apt-update" => "VPS · обновление списка пакетов",
+                    "CLOUDDESK_STEP:apt-install" => "VPS · установка Caddy и системных зависимостей",
+                    "CLOUDDESK_STEP:unpack" => "VPS · распаковка MysticEgo и .NET",
+                    "CLOUDDESK_STEP:configure" => "VPS · настройка systemd и Caddy",
+                    "CLOUDDESK_STEP:start" => "VPS · запуск Orchestra",
+                    "CLOUDDESK_STEP:local-health" => "VPS · ожидание локального health check",
+                    "CLOUDDESK_STEP:https" => "VPS · запуск Caddy и проверка HTTPS",
+                    _ => null
+                };
+                if (message != null) progress(message);
+            }
+            var output=await SSH(a,"flock -n /run/lock/mysticego-clouddesk-deploy.lock bash -c "+Q(command),25,
+                onOutput:role=="Orchestra"?ReportInstallerStep:null);
+            progress("Установка завершена. Удаление временных файлов на VPS");
             SaveBinding(binding with {Phase="installed"}); await SSH(a,"rm -rf -- "+remote,1); return new {role,domain,release=Tag,output};
         } catch(Exception e) { throw new Exception(e.Message+"\nЕсли каталог был создан, диагностика сохранена на сервере: "+remote); }
         finally { Directory.Delete(temp,true); }
