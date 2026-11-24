@@ -16,7 +16,7 @@ export type PersonalAccount={
 };
 export const CTX=createContext<{
   api:NodeApi;mode:NodeMode;session:Session;setSession:(x:Session)=>void;
-  personal:PersonalAccount|null;profileError:string;reloadProfile:()=>void;portal:boolean;
+  personal:PersonalAccount|null;profileError:string;reloadProfile:()=>void;portal:boolean;preferenceScope:string;
 }|null>(null);
 export function useApp(){
   const value=useContext(CTX);

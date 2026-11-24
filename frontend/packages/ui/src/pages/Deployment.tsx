@@ -193,7 +193,7 @@ export function Deployment(){
       </dl><p>{chosenApplication.description}</p><p className="footnote">После запуска Global появится в Audit создателя.</p>
     </Panel>}
     <div className="deployment-grid">
-      <Panel title="Новый узел">
+      {(mode!=='orchestra'||(context.value?.owner??developer))&&<Panel title="Новый узел">
         <form className="stack" onSubmit={create}>
           {kind==='global'&&approved.length>0&&<label>Одобренная заявка<select value={application} onChange={event=>{setApplication(event.target.value);const item=approved.find(x=>x.id===event.target.value);if(item)setName(item.name)}}>
             <option value="">Создать без заявки</option>{approved.map(item=><option key={item.id} value={item.id}>{item.name} · {item.applicant}</option>)}
@@ -216,7 +216,7 @@ export function Deployment(){
           </select></label>}
           <button className="btn" disabled={busy||!context.value}><Server size={17}/> Создать конфигурацию {kindNames[kind]}</button>
         </form>
-      </Panel>
+      </Panel>}
       <Panel title="Подготовленные узлы"><div className="deployment-node-list">
         {launchable.length===0&&!topology.loading&&<p className="footnote">Создайте профиль, чтобы загрузить его в AuditDesktop или запустить узел по SSH.</p>}
         {launchable.map(row=><button className={'deployment-node '+(selected?.node.id===row.node.id?'selected':'')} key={row.node.id} onClick={()=>setParams({node:row.node.id})}>

@@ -1,3 +1,5 @@
+import {usePanelPreference} from '../app/panelPreferences';
+import {GlobalTimeweb} from "./GlobalTimeweb";
 import {useMemo,useState,type FormEvent} from 'react';
 import {Link,useSearchParams} from 'react-router-dom';
 import {Activity,ArrowUpRight,Building2,Cloud,HardDrive,House,Laptop,Network,Plus,Rows3,ShieldCheck,UserRound} from 'lucide-react';
@@ -7,7 +9,7 @@ import {Panel,Header,ErrorBanner,Badge} from '../components/primitives';
 export type Kind='orchestra'|'global'|'local'|'agent'|'audit';
 export type NodeInfo={id:string;kind:Kind;name:string;parentId:string;ownerId?:string;publicUrl?:string;mode:string;enabled:boolean;applicationId?:string;members?:string[]};
 export type NodeStatus={node:NodeInfo;report?:{seen:string;healthy:string[];error?:string;link?:{latencyMs?:number;mbps?:number;measuredAt:string}};people:number;sites:number};
-export type NetworkContext={rootId:string;rootName:string;orchestraUrl:string;authUrl:string;developer:boolean;actor:string;lan:boolean};
+export type NetworkContext={rootId:string;rootName:string;orchestraUrl:string;authUrl:string;developer:boolean;owner?:boolean;actor:string;lan:boolean};
 export const kindNames:Record<Kind,string>={orchestra:'Оркестр',global:'Global',local:'Local',agent:'Agent',audit:'Audit'};
 const icons={orchestra:ShieldCheck,global:Cloud,local:HardDrive,agent:Laptop,audit:House};
 export const online=(row:NodeStatus)=>row.node.kind==='orchestra'||row.report?.healthy.includes(row.node.kind)===true;
@@ -28,7 +30,7 @@ export function OrchestraOverview(){
   const maximum=Math.max(1,...globals.flatMap(x=>[x.people,x.sites]));
   return <>
     <Header title="Обзор" description={mode==='orchestra'?'Организации и площадки сети MysticEgo':'Доступные организации и площадки'} action={
-      context.value?.developer&&<Link className="btn" to="/setup"><Plus size={17}/> Развернуть Global</Link>}/>
+      (context.value?.owner??context.value?.developer)&&<Link className="btn" to="/setup"><Plus size={17}/> Развернуть Global</Link>}/>
     <ErrorBanner text={topology.error}/>
     <div className="metrics summary-grid">
       {[{icon:Cloud,count:globals.length,label:'Организации Global'},{icon:UserRound,count:people,label:'Участники'},
@@ -38,7 +40,7 @@ export function OrchestraOverview(){
     <div className="overview-grid">
       <Panel title="Организации" aside={<span className="muted">{globals.length} Global</span>}>
         {globals.length===0&&!topology.loading?<div className="network-empty"><Cloud size={28}/><p>Здесь появятся созданные Global</p>
-          {context.value?.developer&&<Link to="/setup" className="btn secondary">Подготовить первую организацию</Link>}</div>:
+          {(context.value?.owner??context.value?.developer)&&<Link to="/setup" className="btn secondary">Подготовить первую организацию</Link>}</div>:
           <div className="table-wrap"><table><thead><tr><th>Название</th><th>Участники</th><th>Local</th><th>Состояние</th></tr></thead>
             <tbody>{globals.map(row=><tr key={row.node.id}><td><Link className="text-link" to={'/nodes?node='+row.node.id}><Cloud size={15}/>{row.node.name}</Link></td>
               <td>{row.people}</td><td>{row.sites}</td><td><Badge ok={online(row)} text={online(row)?'В сети':'Ожидает подключения'}/></td></tr>)}</tbody></table></div>}
@@ -101,8 +103,9 @@ export function NetworkPage(){
   const {api,mode}=useApp();
   const {context,topology}=useNetwork();
   const [params,setParams]=useSearchParams();
-  const [view,setView]=useState<'graph'|'table'>('graph');
-  const [filter,setFilter]=useState(''),[zoom,setZoom]=useState(100);
+  const [view,setView]=usePanelPreference<'graph'|'table'>('network.view','graph',(v):v is 'graph'|'table'=>v==='graph'||v==='table');
+  const [filter,setFilter]=usePanelPreference('network.filter','',(v):v is string=>typeof v==='string'&&v.length<=200);
+  const [zoom,setZoom]=usePanelPreference('network.zoom',100,(v):v is number=>typeof v==='number'&&Number.isFinite(v)&&v>=50&&v<=200);
   const [name,setName]=useState('');
   const [enabled,setEnabled]=useState<boolean|null>(null);
   const [member,setMember]=useState('');
@@ -169,6 +172,7 @@ export function NetworkPage(){
       <Panel title={selected?.node.name??'Выберите узел'}>
         {selected&&<div className="stack node-details">
           <Badge ok={online(selected)} text={online(selected)?'В сети':selected.node.enabled?'Ожидание':'Отключён'}/>
+          {mode==="orchestra"&&context.value?.developer&&selected.node.kind==="global"&&<GlobalTimeweb key={selected.node.id} nodeId={selected.node.id}/>}
           <dl><dt>Роль</dt><dd>{kindNames[selected.node.kind]}</dd><dt>ID</dt><dd className="mono">{selectedId}</dd>
             <dt>Адрес панели</dt><dd>{selected.node.publicUrl||'—'}</dd>
             {selected.report?.seen&&<><dt>Последний отчёт</dt><dd>{new Date(selected.report.seen).toLocaleString('ru-RU')}</dd></>}

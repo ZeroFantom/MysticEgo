@@ -1,5 +1,7 @@
 import {useEffect,useState} from 'react';
 import {Check,Moon,Palette,Sparkles,Sun} from 'lucide-react';
+import {useApp} from '../app/context';
+import {preferenceKey} from '../app/panelPreferences';
 import {Header,Panel} from '../components/primitives';
 
 const palettes=[
@@ -15,9 +17,8 @@ const palettes=[
 ];
 type Style={theme:'dark'|'light'|'system';palette:string;primary:string;secondary:string;ambient:boolean;wave:boolean;grid:boolean;border:boolean;intensity:number;density:'compact'|'comfortable';size:'normal'|'large'};
 const defaults:Style={theme:'dark',palette:'iris',primary:'#b49bf7',secondary:'#75d9c7',ambient:true,wave:false,grid:false,border:false,intensity:55,density:'comfortable',size:'normal'};
-const key='mysticego.design.v2';
-function current():Style{
- try{return {...defaults,palette:localStorage.getItem('mysticego.palette')||'iris',...JSON.parse(localStorage.getItem(key)||'{}')}}
+function current(scope:string):Style{
+ try{return {...defaults,...JSON.parse(localStorage.getItem(preferenceKey(scope,'appearance'))||'{}')}}
  catch{return defaults}
 }
 export function applyStyle(style:Style){
@@ -37,22 +38,23 @@ export function applyStyle(style:Style){
  root.style.setProperty('--accent-light','color-mix(in srgb,var(--accent) 70%,var(--ink))');
  root.style.setProperty('--neon-strength',String(Math.max(.05,Math.min(1,style.intensity/100))));
 }
-function save(style:Style){applyStyle(style);try{localStorage.setItem(key,JSON.stringify(style))}catch{}}
-export function initPalette(){
+function save(scope:string,style:Style){applyStyle(style);try{localStorage.setItem(preferenceKey(scope,'appearance'),JSON.stringify(style))}catch{}}
+export function initPalette(scope:string){
  const media=matchMedia('(prefers-color-scheme:light)');
- const update=()=>applyStyle(current());
+ const update=()=>applyStyle(current(scope));
  update();media.addEventListener('change',update);
  return()=>media.removeEventListener('change',update);
 }
-export function ThemeToggle(){
- const [light,setLight]=useState(()=>document.documentElement.dataset.theme==='light');
+export function ThemeToggle({scope=''}:{scope?:string}){
+ const [light,setLight]=useState(()=>{const theme=current(scope).theme;return theme==='light'||theme==='system'&&matchMedia('(prefers-color-scheme:light)').matches;});
  return <button type="button" className="icon-btn auth-theme" aria-label={light?'Тёмная тема':'Светлая тема'} onClick={()=>
-  {setLight(!light);save({...current(),theme:light?'dark':'light'})}}>{light?<Moon size={19}/>:<Sun size={19}/>}</button>
+  {setLight(!light);save(scope,{...current(scope),theme:light?'dark':'light'})}}>{light?<Moon size={19}/>:<Sun size={19}/>}</button>
 }
 export function Settings(){
- const [style,setStyle]=useState(current);
+ const {preferenceScope:scope}=useApp();
+ const [style,setStyle]=useState(()=>current(scope));
  const change=<K extends keyof Style>(field:K,value:Style[K])=>setStyle(previous=>({...previous,[field]:value}));
- useEffect(()=>save(style),[style]);
+ useEffect(()=>save(scope,style),[scope,style]);
  return <><Header title="Настройки" description="Тема, палитра и эффекты оформления" action={<button className="btn secondary" onClick={()=>setStyle({...defaults})}>Сбросить оформление</button>}/>
   <div className="two-col">
    <Panel title="Тема и интерфейс"><div className="stack">
