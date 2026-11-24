@@ -51,10 +51,7 @@ namespace Models.Commands
         {
             id = default;
 
-            if (string.IsNullOrWhiteSpace(name)) return false;
-
-            var normalized = IdentifierConvention.Normalize(name);
-            if (string.IsNullOrEmpty(normalized)) return false;
+            if (!IdentifierConvention.TryNormalize(name, out var normalized)) return false;
 
             id = new(normalized);
             return true;

@@ -37,7 +37,7 @@ JS
 for d in out dist; do if [[ -e "$target/$d" ]]; then mv -- "$target/$d" "$backup/$d"; else touch "$stage/.new-$d"; fi; mv -- "$stage/$d" "$target/$d"; done
 trap - ERR
 rm -rf -- "$stage"
-echo "Обновлено до 0.4.6. Резервная копия: $backup"
+echo "Обновлено до 0.4.7. Резервная копия: $backup"
 echo 'Electron, ключи и токены не заменялись.'
 if (( launch )); then exec npm start; fi
 echo "Запуск: cd '$target' && bash run.sh"

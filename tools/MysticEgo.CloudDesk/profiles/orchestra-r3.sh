@@ -2,13 +2,15 @@
 set -euo pipefail
 umask 077
 archive=${1:?archive}; domain=${2:?domain}
+checksum=${4:-2f410003f5c1ad68cc702f8a5d21dc0143cd1d9b92d3709be75ac08fffaf9f28}
+[[ $checksum =~ ^[a-f0-9]{64}$ ]]
 [[ $(id -u) == 0 && $(uname -m) == x86_64 ]]
 . /etc/os-release
 [[ $ID == ubuntu && $VERSION_ID == 24.04 ]] || { echo 'Required: Ubuntu 24.04 x86-64'; exit 1; }
 [[ $domain =~ ^[A-Za-z0-9][A-Za-z0-9.-]*\.[A-Za-z]{2,63}$ && $domain != *..* ]]
 if [[ -e /opt/mysticego/app || -e /etc/systemd/system/mysticego-orchestra.service ]]; then echo 'Existing installation; refusing to overwrite'; exit 1; fi
 if [[ -e /etc/caddy/Caddyfile ]]; then echo 'Existing Caddy config; use a fresh server'; exit 1; fi
-printf '%s  %s\n' 2f410003f5c1ad68cc702f8a5d21dc0143cd1d9b92d3709be75ac08fffaf9f28 "$archive" | sha256sum -c -
+printf '%s  %s\n' "$checksum" "$archive" | sha256sum -c -
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y ca-certificates caddy curl libicu74 libssl3t64 unzip

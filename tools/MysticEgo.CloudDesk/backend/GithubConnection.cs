@@ -41,7 +41,7 @@ sealed partial class CloudDesk {
             try {
                 using var request=new HttpRequestMessage(HttpMethod.Get,"https://api.github.com/"+path);
                 request.Headers.Authorization=new AuthenticationHeaderValue("Bearer",secret);
-                request.Headers.UserAgent.ParseAdd("MysticEgo-CloudDesk/0.3.8");
+                request.Headers.UserAgent.ParseAdd("MysticEgo-CloudDesk/0.4.7");
                 request.Headers.Accept.ParseAdd("application/vnd.github+json");
                 request.Headers.TryAddWithoutValidation("X-GitHub-Api-Version","2022-11-28");
                 using var response=await githubHttp.SendAsync(request);
@@ -101,6 +101,17 @@ sealed partial class CloudDesk {
         var secret=await GithubLocalToken();
         var repo=GithubRepoView(await GithubGet("repos/"+Repo,secret));
         if(!GithubPrivate(repo)) throw new Exception("Ожидался приватный репозиторий "+Repo);
+    }
+    async Task<string> GithubReleaseDigest() {
+        var secret=await GithubLocalToken();
+        var repository=GithubRepoView(await GithubGet("repos/"+Repo,secret));
+        if(!GithubPrivate(repository)) throw new Exception("Ожидался приватный репозиторий "+Repo);
+        var release=await GithubGet("repos/"+Repo+"/releases/tags/"+Tag,secret);
+        var file=(release["assets"] as JsonArray)?.OfType<JsonObject>().SingleOrDefault(item=>S(item,"name")==Asset);
+        var digest=file is null ? "" : S(file,"digest");
+        if(file is null || S(file,"state")!="uploaded" || !System.Text.RegularExpressions.Regex.IsMatch(digest,@"^sha256:[a-f0-9]{64}$"))
+            throw new Exception("В релизе "+Tag+" нет готового ZIP с SHA-256.");
+        return digest["sha256:".Length..];
     }
     static object GithubSelftest() {
         int passed=0;void Test(bool ok){if(!ok)throw new Exception("GitHub selftest #"+(passed+1));passed++;}

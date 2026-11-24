@@ -65,7 +65,7 @@ namespace Models.Commands
                 var ch = name[i];
 
                 // Явные разделители → точка (без дублей)
-                if (ch is ' ' or '-' or '_' or '/' or '\\')
+                if (char.IsWhiteSpace(ch) || ch is '.' or '-' or '_' or '/' or '\\')
                 {
                     AppendSeparator(sb);
                     continue;
@@ -129,6 +129,12 @@ namespace Models.Commands
             if (string.IsNullOrEmpty(id)) return string.Empty;
             var dot = id.LastIndexOf('.');
             return dot < 0 ? id : id[(dot + 1)..];
+        }
+
+        internal static bool TryNormalize(string? name, out string value, bool qualified = false)
+        {
+            value = name is null ? string.Empty : Normalize(name);
+            return value.Length > 0 && (!qualified || value.Contains('.'));
         }
 
         // ── Private ────────────────────────────────────────
