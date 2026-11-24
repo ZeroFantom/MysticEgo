@@ -13,6 +13,8 @@ const views:Record<string,{path:string;label:string}>={
 
 export function ReleaseStatus(){
   const {session,mode}=useApp();
+  const [revision,setRevision]=useState(0);
+  useEffect(()=>{const refresh=()=>setRevision(v=>v+1);window.addEventListener('project-github-changed',refresh);return()=>window.removeEventListener('project-github-changed',refresh);},[]);
   const [installed,setInstalled]=useState(''),[latest,setLatest]=useState<Release|null>(null),[failed,setFailed]=useState(false);
   useEffect(()=>{
     let active=true;
@@ -36,11 +38,39 @@ export function ReleaseStatus(){
     }
     void load();
     return ()=>{active=false};
-  },[session.url,session.authUrl,mode]);
+  },[session.url,session.authUrl,mode,revision]);
   return <div className="release-status" aria-label="Версии MysticEgo">
     <small>Установлено <strong>{installed||'не указано'}</strong></small>
     <small>GitHub <strong>{latest?.tag||(failed?'недоступен':'—')}</strong>{latest?.prerelease?' · предварительный':''}</small>
   </div>;
+}
+
+function GitHubConnection({onChange}:{onChange:()=>void}){
+  const {api}=useApp();
+  const path='/managed/project-github';
+  const connection=useRemote(()=>api.request<{connected:boolean;source:string}>(path),[api]);
+  const [token,setToken]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  async function update(method:'POST'|'DELETE'){
+    setBusy(true);setError('');
+    try{
+      await api.request(path,{method,...(method==='POST'?{body:JSON.stringify({token})}:{})});
+      setToken('');connection.reload();onChange();
+      window.dispatchEvent(new Event('project-github-changed'));
+    }catch(e){setError(e instanceof Error?e.message:String(e));}
+    finally{setBusy(false);}
+  }
+  if(!connection.value)return null;
+  return <Panel title="Доступ к GitHub">
+    <p>{connection.value.connected?'Токен подключён':'Токен не подключён'}</p>
+    <form className="stack" onSubmit={e=>{e.preventDefault();void update('POST');}}>
+      <label>Токен чтения Contents для ZeroFantom/MysticEgo<input type="password" autoComplete="off" value={token} onChange={e=>setToken(e.target.value)} required maxLength={300}/></label>
+      <div className="row-actions">
+        <button className="btn" disabled={busy||!token.trim()}>Проверить и подключить</button>
+        {connection.value.source==='panel'&&<button type="button" className="btn secondary" disabled={busy} onClick={()=>void update('DELETE')}>Отключить</button>}
+      </div>
+    </form>
+    <ErrorBanner text={error}/>
+  </Panel>;
 }
 
 type Branch={name:string;sha:string;isProtected:boolean};
@@ -51,6 +81,7 @@ export function ProjectBranches(){
   const branches=data.value?.branches.filter(branch=>branch.name.toLowerCase().includes(filter.toLowerCase()))??[];
   return <>
     <Header title="Ветки GitHub" description="ZeroFantom/MysticEgo" action={<button className="btn secondary" onClick={data.reload}>Обновить</button>}/>
+    <GitHubConnection onChange={data.reload}/>
     <ErrorBanner text={data.error}/>
     <Panel title="Ветки проекта">
       <label>Найти ветку<input value={filter} onChange={event=>setFilter(event.target.value)}/></label>

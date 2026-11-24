@@ -11,11 +11,30 @@ sealed partial class CloudDesk {
             throw new Exception("IPv4 больше не принадлежит указанному VPS Timeweb.");
     }
 
+    async Task<string> InstalledOrchestraDomain(JsonObject args)
+    {
+        if(S(args,"user")!="root")throw new Exception("Для проверки нужен доверенный SSH root.");
+        await VerifyReuploadTarget(args);
+        var origin=await SSH(args,"systemctl is-active --quiet mysticego-orchestra.service && sed -n 's/^MYSTICEGO_CENTER_ORCHESTRA_URL=//p' /etc/mysticego/orchestra.env",1);
+        if(!Uri.TryCreate(origin,UriKind.Absolute,out var uri)||uri.Scheme!="https"||uri.UserInfo!=""||
+            uri.Query!=""||uri.Fragment!=""||uri.AbsolutePath!="/"||!uri.IsDefaultPort||
+            !System.Text.RegularExpressions.Regex.IsMatch(uri.Host,DnsNamePattern))
+            throw new Exception("На выбранном VPS не найден действующий HTTPS-домен Orchestra.");
+        return uri.Host;
+    }
+
+    async Task<object> InspectOrchestra(JsonObject args)
+    {
+        var domain=await InstalledOrchestraDomain(args);
+        return new {domain,host=S(args,"host"),serverId=Num(args,"serverId")};
+    }
+
     async Task<object> RestoreOrchestraUpdater(JsonObject args, Action<string> progress) {
         if(S(args,"confirm")!="RESTORE_ORCHESTRA")throw new Exception("Подтвердите обновление Orchestra.");
         if(S(args,"user")!="root")throw new Exception("Для установки обновлятора нужен доверенный SSH root.");
-        await VerifyReuploadTarget(args);
-        var domain=Need(args,"domain",DnsNamePattern);
+        var domain=await InstalledOrchestraDomain(args);
+        if(!domain.Equals(S(args,"domain"),StringComparison.OrdinalIgnoreCase))
+            throw new Exception("Домен установки изменился. Проверьте VPS повторно.");
         var source=Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,"..","..","..","ops","orchestra-updater"));
         string[] required=["bootstrap-r31.sh","baseline.sha256","install-worker.sh","update-orchestra.py",
             "mysticego-orchestra-updater.service","mysticego-orchestra-updater.timer","payload/Api.Orchestra.dll",
