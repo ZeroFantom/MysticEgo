@@ -22,11 +22,26 @@ public sealed class WorldAiCluster
     readonly Dictionary<string,int> _inflight=new();
     readonly Dictionary<string,(int Failures,DateTimeOffset RetryAt)> _circuit=new();
     readonly IHttpClientFactory _http;
+    readonly Dictionary<string,string> _workerTokens=new(StringComparer.Ordinal);
+    const string ConfiguredPrefix="configured-";
+    internal static bool SupportsRole(string role)=>role is "world" or "npc" or "evaluation" or "assistant" or "panel-data";
     readonly JsonSerializerOptions _json=new(JsonSerializerDefaults.Web){WriteIndented=true};
     public WorldAiCluster(IConfiguration cfg,IHttpClientFactory factory)
     {
         _http=factory;_dir=Path.GetFullPath(cfg["WorldAI:StoragePath"]??Path.Combine(AppContext.BaseDirectory,"world-ai-data"));Directory.CreateDirectory(_dir);
         try{foreach(var w in JsonSerializer.Deserialize<Worker[]>(File.ReadAllText(Path.Combine(_dir,"workers.json")),_json)??[])_workers[w.Id]=w;}catch(IOException){}catch(JsonException){}
+        foreach(var entry in cfg.GetSection("WorldAI:RemoteWorkers").GetChildren())
+        {
+            var url=entry["Url"]??"";
+            var model=entry["Model"]??"";
+            var role=entry["Role"]??"";
+            if(!LocalNetwork(url)||model.Length is <1 or >150||!SupportsRole(role)||
+                !int.TryParse(entry["Slots"]??"1",out var slots)||slots is <1 or >32)
+                throw new ArgumentException("Invalid WorldAI:RemoteWorkers entry "+entry.Key);
+            var id=ConfiguredPrefix+entry.Key;
+            _workers[id]=new Worker(id,url.TrimEnd('/'),model,role,slots,2,true);
+            if(entry["Token"] is {Length:>0} token)_workerTokens[id]=token;
+        }
         try{_memory.AddRange(JsonSerializer.Deserialize<SharedMemoryFact[]>(File.ReadAllText(Path.Combine(_dir,"memory.json")),_json)??[]);}catch(IOException){}catch(JsonException){}
     }
     internal void SetLocalModel(string? model)
@@ -65,10 +80,10 @@ public sealed class WorldAiCluster
     }
     public async Task<Worker> Register(RegisterWorker req,CancellationToken ct)
     {
-        if(!LocalNetwork(req.Url)||req.Model.Length is <1 or >150 ||req.Role is not ("world" or "npc" or "evaluation" or "assistant") ||req.Slots is <1 or >32||req.Weight<=0||req.Weight>100)throw new ArgumentException("Invalid private LM Studio worker configuration");
+        if(!LocalNetwork(req.Url)||req.Model.Length is <1 or >150 ||!SupportsRole(req.Role) ||req.Slots is <1 or >32||req.Weight<=0||req.Weight>100)throw new ArgumentException("Invalid private LM Studio worker configuration");
         await _mutex.WaitAsync(ct);
         try {var worker=new Worker(Guid.NewGuid().ToString("N"),req.Url.TrimEnd('/'),req.Model,req.Role,req.Slots,req.Weight,true);
-            lock(_workers)_workers[worker.Id]=worker;await Save("workers.json",Workers().Where(w=>!w.Id.StartsWith("local-",StringComparison.Ordinal)).ToArray(),ct);return worker;}
+            lock(_workers)_workers[worker.Id]=worker;await Save("workers.json",Workers().Where(w=>!w.Id.StartsWith("local-",StringComparison.Ordinal)&&!w.Id.StartsWith(ConfiguredPrefix,StringComparison.Ordinal)).ToArray(),ct);return worker;}
         finally{_mutex.Release();}
     }
     public async Task<SharedMemoryFact> AddFact(string kind,string content,CancellationToken ct)
@@ -108,10 +123,12 @@ public sealed class WorldAiCluster
     }
     public async Task<object> Chat(ChatRequest request,CancellationToken ct)
     {
-        if(request.Role is not ("world" or "npc" or "evaluation" or "assistant") ||request.Prompt.Length is <1 or >5000 ||request.MaxTokens is <1 or >1200||request.ContextFacts?.Length>50)throw new ArgumentException("Invalid inference request");
+        if(!SupportsRole(request.Role) ||request.Prompt.Length is <1 or >5000 ||request.MaxTokens is <1 or >1200||request.ContextFacts?.Length>50)throw new ArgumentException("Invalid inference request");
         var context=string.Join("\n",Memory().Where(x=>x.Kind is "world" or "lore").TakeLast(20).Select(x=>x.Content));
         // Canonical facts are known to operators only. This API is restricted to the developer team.
-        var system="MysticEgo world assistant. Obey documented genre limits. Never treat generated output as canonical world history. Reference lore only if present in context.\nApproved world facts:\n"+context;
+        var system=request.Role=="panel-data"
+            ? "Process only the data supplied in the request. Describe findings and uncertainty. Do not issue commands or claim to have changed records."
+            : "MysticEgo world assistant. Obey documented genre limits. Never treat generated output as canonical world history. Reference lore only if present in context.\nApproved world facts:\n"+context;
         var messages=new object[]{new{role="system",content=system},new{role="user",content=request.Prompt+"\nRelevant supplied facts:\n"+string.Join("\n",request.ContextFacts??[])}};
         var attempted=new HashSet<string>();
         while(true)
@@ -130,6 +147,8 @@ public sealed class WorldAiCluster
                     return new { workerId = worker.Id, model = worker.Model, text = local.Text, canonical = false };
                 }
                 using var msg=new HttpRequestMessage(HttpMethod.Post,worker.Url+"/v1/chat/completions");
+                if(_workerTokens.TryGetValue(worker.Id,out var token))
+                    msg.Headers.Authorization=new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer",token);
                 msg.Content=JsonContent.Create(new {model=worker.Model,messages,temperature=.2,max_tokens=request.MaxTokens});
                 using var response=await client.SendAsync(msg,HttpCompletionOption.ResponseHeadersRead,ct);
                 response.EnsureSuccessStatusCode();

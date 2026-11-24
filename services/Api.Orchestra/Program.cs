@@ -11,6 +11,7 @@ builder.Services.AddWorldAi();
 builder.Services.AddWorldAiQueue();
 builder.Services.AddControllers().AddApplicationPart(typeof(WorldAiController).Assembly);
 builder.Services.AddHttpClient();
+builder.Services.AddHttpClient("mysticego-timeweb").ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseProxy = false });
 builder.Services.AddSingleton<StationRegistry>();
 builder.Services.AddSingleton<NativeDeploymentJobs>();
 builder.Services.AddSingleton<INativeDeploymentPlanService,NativeDeploymentPlanService>();
@@ -20,6 +21,7 @@ builder.Services.AddAvatar(AvatarNode.Orchestra);
 builder.Services.AddSocial();
 builder.Services.AddSingleton<MysticEgo.Api.Orchestra.Controllers.StickerStore>();
 builder.Services.AddSingleton<ManagedNetwork>();
+builder.Services.AddSingleton<DevelopmentTeam>();
 builder.Services.AddSingleton<ParentAuthorization>();
 builder.Services.AddAuthorizationBuilder().AddPolicy("orchestra-executor", policy => policy
     .RequireAuthenticatedUser().RequireClaim("token_use", "device").RequireRole("agent")
@@ -31,6 +33,14 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<ManagedDeployment>
 builder.Services.AddSingleton<ServerTelemetry>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<ServerTelemetry>());
 builder.Services.AddOrchestraProxy();
+builder.Services.AddSingleton<GitHubPanel>();
+builder.Services.AddHttpClient("panel-github",client=>{
+    client.Timeout=TimeSpan.FromSeconds(8);
+    client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("MysticEgo-Orchestra");
+}).ConfigurePrimaryHttpMessageHandler(()=>new HttpClientHandler{AllowAutoRedirect=false});
+builder.Services.AddHttpClient("panel-model",client=>client.Timeout=TimeSpan.FromSeconds(55))
+    .ConfigurePrimaryHttpMessageHandler(()=>new HttpClientHandler{AllowAutoRedirect=false,UseProxy=false});
 var app=builder.Build();
 app.UseDefaultFiles();
 app.UseStaticFiles();
@@ -39,7 +49,19 @@ app.MapHub<ClusterAgentHub>("/hub/agents").RequireAuthorization("orchestra-execu
 // Высший уровень — строго для команды разработки. К обычным API другие роли не допускаются.
 app.Use(async (context,next)=>
 {
-    if(context.Request.Path.StartsWithSegments("/api/v1") &&
+    var team = context.RequestServices.GetRequiredService<DevelopmentTeam>();
+    var path = context.Request.Path;
+    if (path.StartsWithSegments("/api/v1/managed") && !team.IsOwner(context.User) &&
+        await team.IsMember(context.User, context.RequestAborted))
+        context.Items[typeof(DevelopmentTeam)] = true;
+    var teamRead = HttpMethods.IsGet(context.Request.Method) &&
+        (path.Equals("/api/v1/overview", StringComparison.OrdinalIgnoreCase) ||
+         path.Equals("/api/v1/deployment", StringComparison.OrdinalIgnoreCase) ||
+         path.Equals("/api/v1/meta", StringComparison.OrdinalIgnoreCase)) &&
+        await team.IsMember(context.User, context.RequestAborted);
+    if (teamRead) context.User.AddIdentity(new System.Security.Claims.ClaimsIdentity(
+        [new System.Security.Claims.Claim("permission", "node.read")]));
+    if(path.StartsWithSegments("/api/v1") &&
        !context.Request.Path.StartsWithSegments("/api/v1/public") &&
        !context.Request.Path.StartsWithSegments("/api/v1/collective") &&
        !context.Request.Path.StartsWithSegments("/api/v1/faq") &&
@@ -52,7 +74,7 @@ app.Use(async (context,next)=>
        !context.Request.Path.Equals("/api/v1/stations/check-in",StringComparison.OrdinalIgnoreCase) &&
        !context.Request.Path.Equals("/api/v1/setup/enroll",StringComparison.OrdinalIgnoreCase) &&
        !context.Request.Path.Equals("/api/v1/nodes/announce",StringComparison.OrdinalIgnoreCase) &&
-       !EcosystemHierarchy.IsDeveloper(context.User))
+       !team.IsOwner(context.User) && !teamRead)
     {context.Response.StatusCode=403;return;}
     await next(context);
 });

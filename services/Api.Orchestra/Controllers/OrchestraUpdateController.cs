@@ -6,7 +6,7 @@ using MysticEgo.Distributed;
 namespace MysticEgo.Api.Orchestra.Controllers;
 
 [ApiController, Authorize(Policy = "operator"), Route("api/v1/orchestra/update")]
-public sealed class OrchestraUpdateController(NodeState state) : ControllerBase
+public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam team) : ControllerBase
 {
     private const string StateDirectory = "/var/lib/mysticego-orchestra-updater";
     private const string Inbox = "/var/lib/mysticego/update-inbox";
@@ -20,7 +20,7 @@ public sealed class OrchestraUpdateController(NodeState state) : ControllerBase
     [HttpGet, ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public IActionResult Status()
     {
-        if (!EcosystemHierarchy.IsDeveloper(User)) return Forbid();
+        if (!team.IsOwner(User)) return Forbid();
         var status = ReadStatus();
         return status is null ? StatusCode(503, new { error = "Служба обновления Orchestra ещё не настроена." }) : Ok(status);
     }
@@ -28,7 +28,7 @@ public sealed class OrchestraUpdateController(NodeState state) : ControllerBase
     [HttpPost, RequestSizeLimit(4096)]
     public IActionResult Approve(Approval request)
     {
-        if (!EcosystemHierarchy.IsDeveloper(User)) return Forbid();
+        if (!team.IsOwner(User)) return Forbid();
         var status = ReadStatus();
         if (!request.Confirmed || status?.Candidate is not { } candidate ||
             status.Phase is not ("ready" or "failed") || candidate.Tag != request.Tag || candidate.Digest != request.Digest)
