@@ -69,14 +69,16 @@ if [[ $1 == --same-orchestra ]]; then
     fi
   done
   backup=$(mktemp -d /opt/mysticego/.audit-portal-backup.XXXXXXXX)
-  cp -p -- "$audit/index.html" "$backup/index.html"
-  staging=$(mktemp "$audit/.index.XXXXXXXX")
-  install -m 0644 -- "$bundle/index.html" "$staging"
-  mv -f -- "$staging" "$audit/index.html"
-  if ! curl -fsS --max-time 5 http://127.0.0.1:5500/audit-portal/ | cmp -s "$bundle/index.html" -; then
-    cp -p -- "$backup/index.html" "$staging"
-    mv -f -- "$staging" "$audit/index.html"
-    echo 'Проверка портала не прошла. Страница восстановлена.' >&2
+  staging=$(mktemp -d "$root/.audit.XXXXXXXX")
+  chmod 0755 "$staging"
+  cp -R -- "$bundle/." "$staging/"
+  chmod -R a+rX,go-w "$staging"
+  mv -- "$audit" "$backup/audit"
+  if ! mv -- "$staging" "$audit" ||
+      ! curl -fsS --max-time 5 http://127.0.0.1:5500/audit-portal/ | cmp -s "$bundle/index.html" -; then
+    if [[ -d $audit ]]; then mv -- "$audit" "$backup/rejected"; fi
+    mv -- "$backup/audit" "$audit"
+    echo 'Проверка портала не прошла. Предыдущая версия восстановлена.' >&2
     exit 1
   fi
   echo "Портал /audit-portal/ обновлён. Резервная копия: $backup"
@@ -96,12 +98,24 @@ systemctl is-active --quiet caddy.service || { echo 'Запустите служ
 caddyfile=/etc/caddy/Caddyfile
 fragment="/etc/caddy/mysticego-audit-$site.caddy"
 test -f "$caddyfile" && test ! -L "$caddyfile" && test ! -L "$fragment"
-root=/var/www/mysticego-audit-portal
-install -d -m 0755 "$root"
-version=$(mktemp -d "$root/site.XXXXXXXX")
-chmod 0755 "$version"
-cp -R -- "$bundle/." "$version/"
-chmod -R a+rX,go-w "$version"
+local_web=/opt/mysticego/app/runtime/app/web/audit
+if systemctl is-active --quiet mysticego-orchestra.service &&
+    check_orchestra http://127.0.0.1:5500 2>/dev/null &&
+    [[ -r $local_web/index.html ]]; then
+  echo 'Audit и Orchestra используют общий VPS.'
+  version=$local_web
+  # Use the embedded installer so a second domain serves the same Audit version.
+  flock -u 9
+  bash "$here/install-audit-portal.sh" --same-orchestra "$node"
+  flock -n 9
+else
+  root=/var/www/mysticego-audit-portal
+  install -d -m 0755 "$root"
+  version=$(mktemp -d "$root/site.XXXXXXXX")
+  chmod 0755 "$version"
+  cp -R -- "$bundle/." "$version/"
+  chmod -R a+rX,go-w "$version"
+fi
 backup=$(mktemp -d /etc/caddy/.audit-portal-backup.XXXXXXXX)
 cp -p -- "$caddyfile" "$backup/Caddyfile"
 if [[ -e $fragment ]]; then cp -p -- "$fragment" "$backup/fragment"; fi
@@ -137,6 +151,10 @@ $site {
         respond 404
     }
     handle /assets/* {
+        file_server
+    }
+    handle /audit-portal/release-info.json {
+        rewrite * /release-info.json
         file_server
     }
     handle /audit-portal/* {

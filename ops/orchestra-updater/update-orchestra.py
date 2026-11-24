@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Root-owned worker. The web process can only approve the exact published candidate."""
+import fcntl
 import hashlib
 import json
+from datetime import datetime
 import os
 from pathlib import Path, PurePosixPath
 import re
@@ -32,24 +34,71 @@ def write(name, data):
     temporary.replace(STATE / name)
 
 
-def status(phase, current, candidate=None, message=None):
-    write("status.json", dict(phase=phase, current=current, candidate=candidate, message=message))
+WEB = Path("runtime/app/web")
+AUDIT = APP / WEB / "audit"
+PREVIOUS = {"orchestra": ROOT / ".orchestra-previous", "audit": ROOT / ".audit-previous"}
+TAG = re.compile(r"v[0-9][A-Za-z0-9._-]{0,80}")
+PROJECT_TAG = re.compile(r"v(\d+)\.(\d+)\.(\d+)-beta\.(\d+)-r(\d+(?:\.\d+)*)")
 
 
-def newest(current):
-    # Releases must provide the dedicated, platform-specific complete bundle.
+def panel_version(directory):
+    try:
+        value = json.loads((directory / "release-info.json").read_text()).get("installed", "")
+        return value if TAG.fullmatch(value) else None
+    except (OSError, ValueError, TypeError):
+        return None
+
+
+def versions():
+    return panel_version(APP / WEB / "orchestra"), panel_version(AUDIT)
+
+
+def status(phase, installed, candidate=None, targets=(), message=None, last_target=None):
+    write("status.json", dict(phase=phase, current=installed[0], currentAudit=installed[1],
+                             candidate=candidate, protocol=2, targets=list(targets),
+                             message=message, lastTarget=last_target))
+
+
+def project_version(tag):
+    match = PROJECT_TAG.fullmatch(tag or "")
+    if not match:
+        return None
+    release = tuple(map(int, match.group(5).split(".")))
+    return (*(int(match.group(i)) for i in range(1, 5)), *(release + (0,) * 8)[:8])
+
+
+def newer(tag, installed, publications):
+    if not installed or tag == installed:
+        return False
+    right = project_version(installed)
+    left = project_version(tag)
+    if left is not None and right is not None:
+        return left > right
+    return installed in publications and publications[tag] > publications[installed]
+
+
+def newest(installed):
     releases = json.loads(command("gh", "api", f"repos/{REPO}/releases?per_page=30"))
-    baseline = json.loads(command("gh", "api", f"repos/{REPO}/releases/tags/{current}"))["published_at"]
+    publications = {r["tag_name"]: datetime.fromisoformat(r["published_at"])
+                    for r in releases if not r["draft"] and r.get("published_at") and TAG.fullmatch(r["tag_name"])}
     for release in sorted(releases, key=lambda item: item.get("published_at") or "", reverse=True):
         tag = release["tag_name"]
-        if release["draft"] or not release.get("published_at") or release["published_at"] <= baseline or not re.fullmatch(r"v[0-9][A-Za-z0-9._-]{0,80}", tag):
+        if release["draft"] or tag not in publications:
+            continue
+        targets = [target for target, version in zip(("orchestra", "audit"), installed)
+                   if newer(tag, version, publications) or
+                   (target == "audit" and version is None and (AUDIT / "index.html").is_file())]
+        if not targets:
             continue
         for asset in release["assets"]:
             digest = asset.get("digest") or ""
             if (asset["name"] == "MysticEgo-Orchestra-linux-x64.zip" and asset["state"] == "uploaded"
                     and 0 < asset["size"] <= LIMIT and re.fullmatch(r"sha256:[a-f0-9]{64}", digest)):
-                return dict(tag=tag, digest=digest, asset=asset["name"], id=asset["id"], size=asset["size"])
-    return None
+                if len(targets) == 2:
+                    targets.append("both")
+                candidate = dict(tag=tag, digest=digest, asset=asset["name"], id=asset["id"], size=asset["size"])
+                return candidate, targets
+    return None, []
 
 
 def take_request():
@@ -63,7 +112,10 @@ def take_request():
             if not stat.S_ISREG(os.fstat(fd).st_mode):
                 return None
             data = os.read(fd, 4097)
-            return json.loads(data) if len(data) <= 4096 else None
+            try:
+                return json.loads(data) if len(data) <= 4096 else None
+            except (UnicodeError, ValueError):
+                return None
         finally:
             os.close(fd)
             os.unlink("pending.json", dir_fd=directory)
@@ -112,13 +164,55 @@ def health():
         return payload["node"]
 
 
-def apply(candidate, current):
-    status("downloading", current, candidate)
+def restore(component):
+    previous = PREVIOUS[component]
+    if not previous.exists():
+        return
+    live = APP if component == "orchestra" else AUDIT
+    if component == "orchestra":
+        command("systemctl", "stop", SERVICE)
+    if live.exists():
+        with tempfile.TemporaryDirectory(prefix=".mysticego-rejected-", dir=ROOT) as folder:
+            live.rename(Path(folder) / "rejected")
+            previous.rename(live)
+    else:
+        previous.rename(live)
+    if component == "orchestra":
+        command("systemctl", "start", SERVICE)
+
+
+def web_assets(audit, orchestra):
+    for source in (audit / "assets").iterdir():
+        if not source.is_file():
+            continue
+        target = orchestra / "assets" / source.name
+        if target.exists():
+            if source.read_bytes() != target.read_bytes():
+                raise ValueError("Audit asset conflicts with installed Orchestra")
+        else:
+            fd, name = tempfile.mkstemp(prefix=".audit-asset-", dir=target.parent)
+            os.close(fd)
+            temp = Path(name)
+            try:
+                shutil.copyfile(source, temp)
+                temp.chmod(0o644)
+                temp.replace(target)
+            finally:
+                temp.unlink(missing_ok=True)
+
+
+def audit_health(expected):
+    client = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    with client.open("http://127.0.0.1:5500/audit-portal/", timeout=3) as response:
+        page = response.read(256 * 1024)
+    if page != expected.read_bytes() or b'data-role="audit"' not in page:
+        raise ValueError("Audit portal did not serve the expected build")
+
+
+def apply(candidate, installed, targets, target):
+    status("downloading", installed, candidate, last_target=target)
     expected_node = health()
-    previous = ROOT / ".orchestra-previous"
-    if previous.exists():
-        raise ValueError("previous update requires administrator review")
-    with tempfile.TemporaryDirectory(prefix=".orchestra-update-", dir=ROOT) as folder:
+    with tempfile.TemporaryDirectory(prefix=".mysticego-update-", dir=ROOT) as folder:
         stage = Path(folder)
         package = stage / candidate["asset"]
         command("gh", "release", "download", candidate["tag"], "--repo", REPO,
@@ -127,76 +221,91 @@ def apply(candidate, current):
             digest = hashlib.file_digest(stream, "sha256").hexdigest()
         if package.stat().st_size != candidate["size"] or "sha256:" + digest != candidate["digest"]:
             raise ValueError("digest or size mismatch")
-        if newest(current) != candidate:
-            raise ValueError("release changed")
+        if versions() != installed or newest(installed) != (candidate, targets):
+            raise ValueError("release or installed build changed")
         app = unpack(package, stage)
-        # Keep deployment state external to the application directory.
-        status("switching", current, candidate)
-        stopped = False
-        try:
+        orchestra = app / WEB / "orchestra"
+        audit = app / WEB / "audit"
+        if panel_version(orchestra) != candidate["tag"] or panel_version(audit) != candidate["tag"]:
+            raise ValueError("release tag does not match packaged panels")
+        if target == "orchestra" and AUDIT.is_dir():
+            shutil.rmtree(audit)
+            shutil.copytree(AUDIT, audit)
+        web_assets(audit, APP / WEB / "orchestra" if target == "audit" else orchestra)
+        status("switching", installed, candidate, last_target=target)
+        if target == "audit":
+            AUDIT.rename(PREVIOUS["audit"])
+            audit.rename(AUDIT)
+            audit_health(AUDIT / "index.html")
+            if health() != expected_node:
+                raise ValueError("unexpected Orchestra ID")
+        else:
             command("systemctl", "stop", SERVICE)
-            stopped = True
-            APP.rename(previous)
+            try:
+                APP.rename(PREVIOUS["orchestra"])
+            except OSError:
+                command("systemctl", "start", SERVICE)
+                raise
             app.rename(APP)
             command("systemctl", "start", SERVICE)
             for _ in range(30):
                 try:
                     if health() == expected_node:
-                        write("current.json", candidate)
+                        audit_health(AUDIT / "index.html")
                         break
                 except (OSError, ValueError, KeyError):
                     pass
                 time.sleep(2)
             else:
-                raise RuntimeError("new Orchestra did not pass health check")
-        except Exception:
-            if previous.exists():
-                command("systemctl", "stop", SERVICE)
-                if APP.exists():
-                    APP.rename(stage / "rejected")
-                previous.rename(APP)
-            if stopped:
-                command("systemctl", "start", SERVICE)
-            raise
+                raise RuntimeError("new app did not pass health checks")
+        status("current", versions(), last_target=target)
+        previous = PREVIOUS["audit" if target == "audit" else "orchestra"]
         shutil.rmtree(previous)
-    status("current", candidate["tag"])
 
 
 def main():
-    installed = json.loads((STATE / "current.json").read_text())
-    current = installed["tag"]
+    # CloudDesk's SSH deployment and this timer share the local deployment lock.
+    with open("/run/lock/mysticego-clouddesk-deploy.lock", "a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return
+        run_locked()
+
+
+def run_locked():
+    file = STATE / "status.json"
+    last = json.loads(file.read_text()) if file.exists() else {}
+    candidate, targets, target = None, [], None
     try:
-        previous = ROOT / ".orchestra-previous"
-        if previous.exists():
-            last = json.loads((STATE / "status.json").read_text())
-            if last.get("candidate") == installed:
-                shutil.rmtree(previous)
-            else:
-                command("systemctl", "stop", SERVICE)
-                if APP.exists():
-                    with tempfile.TemporaryDirectory(prefix=".orchestra-rejected-", dir=ROOT) as folder:
-                        APP.rename(Path(folder) / "app")
-                        previous.rename(APP)
+        for component, previous in PREVIOUS.items():
+            if previous.exists():
+                if last.get("phase") == "current":
+                    shutil.rmtree(previous)
                 else:
-                    previous.rename(APP)
-                command("systemctl", "start", SERVICE)
-        candidate = newest(current)
+                    restore(component)
+        installed = versions()
+        candidate, targets = newest(installed)
         request = take_request()
         if not candidate:
-            status("current", current)
-            return
-        if request == candidate:
-            apply(candidate, current)
+            status("current", installed)
+        elif isinstance(request, dict) and request.get("candidate") == candidate and request.get("target") in targets:
+            target = request["target"]
+            apply(candidate, installed, targets, target)
+        elif last.get("phase") in ("downloading", "switching", "failed") and last.get("candidate") == candidate:
+            status("failed", installed, candidate, targets, "Обновление остановилось. Проверьте журнал службы на VPS.", last.get("lastTarget"))
         else:
-            last_file = STATE / "status.json"
-            last = json.loads(last_file.read_text()) if last_file.exists() else {}
-            if last.get("phase") in ("downloading", "switching", "failed") and last.get("candidate") == candidate:
-                status("failed", current, candidate, "Обновление остановилось. Проверьте журнал службы на VPS.")
-            else:
-                status("ready", current, candidate)
+            status("ready", installed, candidate, targets)
     except Exception as error:
-        print(f"Orchestra update failed: {type(error).__name__}: {error}", flush=True)
-        status("failed", current, locals().get("candidate"), "Проверьте журнал службы обновления на VPS.")
+        print(f"MysticEgo update failed: {type(error).__name__}: {error}", flush=True)
+        committed = target is not None and file.exists() and json.loads(file.read_text()).get("phase") == "current"
+        if not committed:
+            try:
+                for component in PREVIOUS:
+                    restore(component)
+            except Exception as rollback_error:
+                print(f"Rollback failed: {type(rollback_error).__name__}: {rollback_error}", flush=True)
+            status("failed", versions(), candidate, targets, "Проверьте журнал службы обновления на VPS.", target)
         raise SystemExit(1)
 
 

@@ -87,6 +87,12 @@ app.MapGet("/metrics", (HttpContext request, ServerTelemetry telemetry) =>
     request.Connection.RemoteIpAddress is { } address && System.Net.IPAddress.IsLoopback(address)
         ? Results.Text(telemetry.Prometheus(), "text/plain; version=0.0.4")
         : Results.NotFound());
+app.MapGet("/audit-portal/release-info.json", (IConfiguration configuration) =>
+{
+    var webRoot = configuration["Managed:AuditWebRoot"];
+    var file = webRoot is null ? null : Path.Combine(webRoot, "release-info.json");
+    return file is not null && File.Exists(file) ? Results.File(file, "application/json") : Results.NotFound();
+}).AllowAnonymous();
 app.MapGet("/audit-portal/{**route}", (IConfiguration configuration) =>
 {
     var webRoot = configuration["Managed:AuditWebRoot"];

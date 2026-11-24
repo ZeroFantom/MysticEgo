@@ -81,14 +81,34 @@ public sealed class GitHubPanel(IHttpClientFactory clients, IConfiguration confi
         finally { gate.Release(); }
     }
 
+    public sealed record Release(string Tag, string Name, string PublishedAt, string Url,
+        bool Prerelease, string Notes, bool Installable);
+
+    public async Task<Release[]> Releases(CancellationToken ct)
+    {
+        return (await List("releases",ct)).OfType<JsonObject>()
+            .Where(r=>r["draft"]?.GetValue<bool>()==false && r["published_at"]!=null &&
+                DateTimeOffset.TryParse(r["published_at"]?.ToString(),out _))
+            .OrderByDescending(r=>DateTimeOffset.Parse(r["published_at"]!.ToString()))
+            .Take(20)
+            .Select(r=>
+            {
+                var tag=r["tag_name"]?.ToString()??"";
+                var notes=r["body"]?.ToString()??"";
+                return new Release(tag,r["name"]?.ToString()??tag,r["published_at"]!.ToString(),
+                    $"https://github.com/{Repository}/releases/tag/{Uri.EscapeDataString(tag)}",
+                    r["prerelease"]?.GetValue<bool>()==true,notes[..Math.Min(notes.Length,4000)],
+                    r["assets"] is JsonArray assets && assets.OfType<JsonObject>().Any(a=>
+                        a["name"]?.ToString()=="MysticEgo-Orchestra-linux-x64.zip" &&
+                        a["state"]?.ToString()=="uploaded" &&
+                        System.Text.RegularExpressions.Regex.IsMatch(a["digest"]?.ToString()??"", @"^sha256:[a-f0-9]{64}$")));
+            }).ToArray();
+    }
+
     public async Task<object?> Latest(CancellationToken ct)
     {
-        var recent=(await List("releases",ct)).OfType<JsonObject>()
-            .Where(r=>r["draft"]?.GetValue<bool>()==false&&r["published_at"]!=null)
-            .OrderByDescending(r=>DateTimeOffset.TryParse(r["published_at"]?.ToString(),out var date)?date:DateTimeOffset.MinValue)
-            .FirstOrDefault();
-        return recent is null?null:new {tag=recent["tag_name"]?.ToString(),publishedAt=recent["published_at"]?.ToString(),
-            url=recent["html_url"]?.ToString(),prerelease=recent["prerelease"]?.GetValue<bool>()==true};
+        var latest=(await Releases(ct)).FirstOrDefault();
+        return latest is null?null:new {latest.Tag,latest.PublishedAt,latest.Url,latest.Prerelease};
     }
 
     public async Task<object> Branches(CancellationToken ct)
@@ -148,6 +168,16 @@ public sealed class GitHubPanelController(GitHubPanel github,DevelopmentTeam tea
         try{return Ok(new {latest=await github.Latest(ct)});}
         catch(Exception e) when(Unavailable(e,ct))
         {return StatusCode(503,new {error="GitHub недоступен."});}
+    }
+
+    [HttpGet("api/v1/managed/project-releases"),Authorize(Policy="operator")]
+    public async Task<IActionResult> Releases(CancellationToken ct)
+    {
+        var owner=team.IsOwner(User);
+        if(!owner&&!await team.IsMember(User,ct))return Forbid();
+        try{return Ok(new {releases=await github.Releases(ct),canUpdate=owner});}
+        catch(Exception e) when(Unavailable(e,ct))
+        {return StatusCode(503,new {error="Не удалось получить релизы GitHub."});}
     }
 
     [HttpGet("api/v1/managed/project-branches"),Authorize(Policy="operator")]

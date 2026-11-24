@@ -26,7 +26,6 @@ import {CommandCenter} from '../pages/CommandCenter';
 import {ModelWorkers} from '../pages/ModelWorkers';
 import {DevelopmentTeam} from '../pages/DevelopmentTeam';
 import {AgentUpdates} from '../pages/AgentUpdates';
-import {OrchestraUpdate} from '../pages/OrchestraUpdate';
 import {AssistantPage} from '../pages/Assistant';
 import {AutomationPage} from '../pages/Automation';
 import {SoftwarePage} from '../pages/Software';
@@ -61,7 +60,7 @@ function navigation(mode:NodeMode,portal:boolean):Section[]{
       ]:[]),
       ...(manager?[{to:'/setup',label:mode==='local'?'Комплект Agent':'Развёртывание',icon:Rocket}]:[]),
       ...(['local','global'].includes(mode)?[{to:'/updates',label:'Обновления Agent',icon:Rocket}]:[]),
-      ...(mode==='orchestra'?[{to:'/orchestra-update',label:'Обновление Orchestra',icon:Rocket},{to:'/model-workers',label:'Модели LM Studio',icon:Bot}]:[]),
+      ...(mode==='orchestra'?[{to:'/model-workers',label:'Модели LM Studio',icon:Bot}]:[]),
       ...(mode==='audit'?[{to:'/organizations',label:'Организации',icon:Building2}]:[]),
       ...(['audit','orchestra'].includes(mode)?[{to:'/development-team',label:'Команда разработки',icon:UsersRound}]:[])
     ]},
@@ -175,7 +174,7 @@ function Workspace({logout}:{logout:()=>void}){
         {mode==='orchestra'&&<Route path="/project-branches" element={<ProjectBranches/>}/>}
         {mode==='orchestra'&&<Route path="/developer-assistant" element={<DeveloperAssistant/>}/>}
         <Route path="/profile" element={<ProfilePage/>}/>
-        {mode==='orchestra'&&<Route path="/orchestra-update" element={<OrchestraUpdate/>}/>}
+        {mode==='orchestra'&&<Route path="/orchestra-update" element={<ProjectBranches/>}/>}
         <Route path="/collective" element={<Collective/>}/>
         {mode==='audit'&&<Route path="/organizations" element={<OrganizationRequests/>}/>}
         <Route path="/nodes" element={<NetworkPage/>}/>

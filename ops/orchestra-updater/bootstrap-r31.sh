@@ -51,7 +51,8 @@ systemctl start "$service"
 for ((attempt=0; attempt<40; attempt++)); do
   if [[ $(health 2>/dev/null) == "$id" ]]; then
     trap - ERR
-    bash install-worker.sh v1.0.0-beta.7-r3.1
+    tag=$(python3 -c 'import json; print(json.load(open("payload/web/release-info.json"))["installed"])')
+    bash install-worker.sh "$tag"
     echo "Orchestra отвечает. Резервная копия: $backup"
     exit 0
   fi

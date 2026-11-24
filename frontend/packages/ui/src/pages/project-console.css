@@ -1,0 +1,43 @@
+.github-console {display:grid; gap:1.25rem}
+.github-console h2,.github-console h3 {margin:0}
+.github-repo,.github-section-head,.github-release-title,.github-release-meta,.github-release-badges,
+.github-release-footer,.github-branch-list li,.github-branch-list a,.github-branch-list li span {
+  display:flex; gap:.65rem; align-items:center; flex-wrap:wrap;
+}
+.github-repo {
+  border:1px solid var(--line, #7952a866); padding:.85rem 1rem; border-radius:14px;
+  background:color-mix(in srgb, var(--accent, #a78bfa) 9%, transparent);
+}
+.github-repo a {margin-inline-start:auto}
+.github-repo a,.github-release-footer a {display:inline-flex; align-items:center; gap:.3rem}
+.github-connection summary,.github-history summary,.github-release-notes summary {cursor:pointer; font-weight:650}
+.github-section-head {margin-block-end:.75rem}
+.github-section-head p,.github-installed small {margin:.25rem 0; color:var(--muted, #a2a2b7)}
+.github-installed {display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,12.5rem),1fr)); gap:.65rem}
+.github-installed div {padding:.7rem .85rem; border:1px solid var(--line, #7952a866); border-radius:12px; overflow-wrap:anywhere}
+.github-installed small,.github-installed strong {display:block}
+.github-releases,.github-release {display:grid; gap:.8rem; min-width:0}
+.github-release {
+  padding:1rem; border:1px solid var(--line, #7952a866); border-radius:14px; overflow-wrap:anywhere;
+  background:color-mix(in srgb,var(--surface, var(--panel, #8678a6)) 8%,transparent);
+}
+.github-release-latest {border-color:color-mix(in srgb,var(--accent, #a78bfa) 65%,transparent)}
+.github-release-icon {display:grid; place-items:center; width:42px; height:42px; border-radius:12px;
+  background:color-mix(in srgb,var(--accent, #a78bfa) 16%,transparent)}
+.github-release-meta {font-size:.85rem; margin-block-start:.3rem; color:var(--muted, #a2a2b7)}
+.github-release-meta span,.github-release-footer span {display:inline-flex; align-items:center; gap:.3rem}
+.github-release-badges span {font-size:.8rem; border-radius:999px; padding:.2rem .55rem;
+  background:color-mix(in srgb,var(--accent, #a78bfa) 16%,transparent)}
+.github-release-footer {justify-content:space-between; font-size:.9rem}
+.github-release-notes {padding:.65rem 0; border-block:1px solid var(--line, #7952a866)}
+.github-release-notes p,.github-release-notes ul,.github-release-notes ol {margin-block:.6rem}
+.github-history .github-release {margin-block-start:.75rem}
+.github-branch-list {list-style:none; margin:.8rem 0 0; padding:0}
+.github-branch-list li {border-block-start:1px solid var(--line, #7952a866); padding:.7rem 0}
+.github-branch-list li a:first-child {margin-inline-end:auto; overflow-wrap:anywhere}
+.github-commit {font-size:.85rem}
+.github-branches label {display:block; max-width:28rem}
+@media (max-width:650px) {
+  .github-repo a {margin-inline-start:0}
+  .github-console .row-actions .btn {width:100%; justify-content:center}
+}
