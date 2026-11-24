@@ -4,6 +4,7 @@ cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 [[ $EUID == 0 ]]
 root=/opt/mysticego/app/runtime/app
 api="$root/bin/Api.Orchestra.dll"
+world="$root/bin/MysticEgo.WorldAI.dll"
 web="$root/web/orchestra"
 service=mysticego-orchestra.service
 systemctl is-active --quiet "$service"
@@ -11,7 +12,7 @@ command -v gh >/dev/null
 sha=$(sha256sum < "$api")
 expected=$(cat baseline.sha256)
 updated=$(sha256sum < payload/Api.Orchestra.dll)
-if [[ ${sha%% *} != "$expected" && ${sha%% *} != "${updated%% *}" ]]; then
+if [[ ${sha%% *} != "$expected" && ${sha%% *} != "b9e7abfb0138979afda0832a39a5527779f22ec57c880ad480bf2262c2a7c7a6" && ${sha%% *} != "01cb96260527f7a59c8c3a50a0d571ab3d1f4fe1f68beb3c02b6d3c59005b8d7" && ${sha%% *} != "5245533f5d9f5f1870af1a133fb1dc45d01017a1384611e78379ee23f1efe178" && ${sha%% *} != "${updated%% *}" ]]; then
   echo 'Установлена другая сборка Orchestra. Примените исходники к её релизу.' >&2
   exit 1
 fi
@@ -22,13 +23,17 @@ health() {
 id=$(health)
 backup=$(mktemp -d /opt/mysticego/.bootstrap-r31.XXXXXXXX)
 cp -p "$api" "$backup/Api.Orchestra.dll"
+cp -p "$world" "$backup/MysticEgo.WorldAI.dll"
 cp -p "$web/index.html" "$backup/index.html"
+if [[ -f "$web/release-info.json" ]]; then cp -p "$web/release-info.json" "$backup/"; fi
 rollback() {
   trap - ERR
   set +e
   systemctl stop "$service"
   cp -p "$backup/Api.Orchestra.dll" "$api"
+  cp -p "$backup/MysticEgo.WorldAI.dll" "$world"
   cp -p "$backup/index.html" "$web/index.html"
+  if [[ -f "$backup/release-info.json" ]]; then cp -p "$backup/release-info.json" "$web/"; else rm -f -- "$web/release-info.json"; fi
   systemctl start "$service"
   echo "Восстановлена прежняя сборка. Резервная копия: $backup" >&2
   exit 1
@@ -36,9 +41,12 @@ rollback() {
 trap rollback ERR
 systemctl stop "$service"
 install -m 0644 payload/Api.Orchestra.dll "$api"
+install -m 0644 payload/MysticEgo.WorldAI.dll "$world"
 install -m 0644 payload/web/assets/* "$web/assets/"
 install -m 0644 payload/web/favicon.ico "$web/favicon.ico"
+install -m 0644 payload/web/mystic-mark.png "$web/mystic-mark.png"
 install -m 0644 payload/web/index.html "$web/index.html"
+install -m 0644 payload/web/release-info.json "$web/release-info.json"
 systemctl start "$service"
 for ((attempt=0; attempt<40; attempt++)); do
   if [[ $(health 2>/dev/null) == "$id" ]]; then

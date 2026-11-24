@@ -10,7 +10,15 @@
 <div class="desktop-columns">
 <section class="desktop-card account-card">
 <div id="identity" hidden><div class="row"><h2 id="identity-name"></h2><button class="plain" id="logout">Выйти</button></div>
-<div class="actions"><button class="secondary" id="home">Открыть личный Audit</button><select id="global-panel" aria-label="Панель Global"><option value="">Мои организации Global</option></select></div></div>
+<div class="actions"><button class="secondary" id="home">Открыть личный Audit</button><select id="global-panel" aria-label="Панель Global"><option value="">Мои организации Global</option></select></div>
+<div id="team" hidden>
+  <h3>Команда разработки</h3>
+  <p id="team-status" role="status"></p>
+  <div class="actions">
+    <button id="team-apply" class="secondary" hidden>Подать заявку</button>
+    <button id="orchestra" class="secondary" hidden>Открыть Orchestra</button>
+  </div>
+</div></div>
 <div id="login-box">
 <h2 id="login-title">Войдите в MysticEgo</h2>
 <form id="login-form">

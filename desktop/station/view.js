@@ -22,6 +22,14 @@ async function refresh(){
     global.replaceChildren(new Option('Мои организации Global',''),...state.globals.map(org=>new Option(org.name,org.id)));
   }
   global.disabled=!state.globals.length;
+  const team=state.team;
+  $('team').hidden=!team;
+  if(team){
+    const labels={pending:'Заявка на рассмотрении',approved:'Доступ выдан',rejected:'Заявка отклонена',revoked:'Доступ отозван'};
+    $('team-status').textContent=team.error?'Не удалось загрузить статус команды.':team.owner?'Главный разработчик':labels[team.status]??'Можно подать заявку.';
+    $('team-apply').hidden=team.error||team.owner||['pending','approved'].includes(team.status);
+    $('orchestra').hidden=team.error||!team.owner&&team.status!=='approved';
+  }
   $('import').hidden=!authorized||node?.kind==='agent';$('start').hidden=$('stop').hidden=!authorized;
   $('start').disabled=!node||state.running||state.online;$('stop').disabled=!state.running;
   $('panel').disabled=!state.online||node?.kind!=='agent'&&!authorized;
@@ -60,6 +68,11 @@ $('start').onclick=()=>run(()=>api.start({allow:$('allow').checked,processes:$('
 $('stop').onclick=()=>run(api.stop);
 $('panel').onclick=()=>run(api.panel);
 $('home').onclick=()=>run(api.home);
+$('team-apply').onclick=async()=>{
+  $('team-apply').disabled=true;
+  try{await run(api['team-apply']);}finally{$('team-apply').disabled=false;}
+};
+$('orchestra').onclick=()=>run(api.orchestra);
 $('global-panel').onchange=event=>{const id=event.currentTarget.value;event.currentTarget.value='';if(id)void run(()=>api.global(id))};
 $('portal').onclick=()=>run(()=>api.portal($('central').value,$('portal-lan').checked));
 $('back').onclick=()=>run(api.back);

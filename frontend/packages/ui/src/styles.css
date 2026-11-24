@@ -618,3 +618,72 @@ progress::-moz-progress-bar{background:linear-gradient(95deg,var(--accent),var(-
 .personality-values dt{overflow-wrap:anywhere}.personality-values dd{margin:0;white-space:nowrap;color:var(--ink);font-variant-numeric:tabular-nums}
 @media(max-width:890px){.avatar-studio-layout,.assistant-layout{grid-template-columns:1fr}}
 @media(max-width:520px){.assistant-float-box{position:fixed;right:12px;bottom:80px}.assistant-float .assistant-scene{height:135px}}
+
+/* Shared workspace design */
+.mystic-workspace {
+  --workspace-accent: #ad91ff;
+  --workspace-soft: #ab90fa22;
+  --canvas: #0d1220;
+  --surface: #151d2d;
+  --raised: #1c273b;
+  --line: #34425a;
+  --ink: #edf2ff;
+  --subtle: #a8b5cd;
+  background: var(--canvas);
+  color: var(--ink);
+}
+.mystic-workspace[data-workspace="global"] { --workspace-accent: #70dbba; --workspace-soft: #70dbba20; }
+.mystic-workspace[data-workspace="local"] { --workspace-accent: #6ecdf8; --workspace-soft: #6ecdf820; }
+.mystic-workspace[data-workspace="agent"] { --workspace-accent: #ffd18c; --workspace-soft: #ffd18c22; }
+.mystic-workspace[data-workspace="audit"] { --workspace-accent: #f4a8d4; --workspace-soft: #f4a8d422; }
+:root[data-theme="light"] .mystic-workspace {
+  --workspace-accent: #514091;
+  --workspace-soft: #51409115;
+  --canvas: #f2f5fa;
+  --surface: #fff;
+  --raised: #e9edf5;
+  --line: #d5ddea;
+  --ink: #142038;
+  --subtle: #4a5b76;
+}
+:root .mystic-workspace .sidebar { background: var(--surface); border-color: var(--line); }
+.mystic-workspace .brand { gap: 12px; color: var(--ink); }
+.mystic-workspace .brand-mark { overflow: hidden; border: 1px solid var(--line); background: var(--raised); }
+.mystic-workspace .brand-mark img { width: 100%; height: 100%; display: block; }
+.mystic-workspace .node-label { background: var(--raised); border-color: var(--line); }
+.mystic-workspace .node-icon { color: var(--workspace-accent); background: var(--workspace-soft); }
+.mystic-workspace .nav-link { color: var(--subtle); border: 1px solid transparent; border-radius: 8px; }
+.mystic-workspace .nav-link:hover { color: var(--ink); background: var(--raised); }
+.mystic-workspace .nav-link.active {
+  background: var(--workspace-soft);
+  color: var(--ink);
+  border-color: var(--line);
+  box-shadow: inset 3px 0 var(--workspace-accent);
+}
+.mystic-workspace .nav-link.active svg { color: var(--workspace-accent); }
+.mystic-workspace .nav-title { color: var(--subtle); }
+.mystic-workspace .content { max-width: 1560px; width: 100%; margin: 0 auto; }
+.mystic-workspace :is(.panel,.metric,.network-card,.deployment-node) {
+  background: var(--surface);
+  border-color: var(--line);
+  border-radius: 12px;
+  box-shadow: none;
+}
+.mystic-workspace :is(a,button,input,select,textarea):focus-visible {
+  outline: 2px solid var(--workspace-accent);
+  outline-offset: 3px;
+}
+:root .mystic-workspace .orchestral-topbar:not([style*="url"]) {
+  background: var(--surface);
+  border-color: var(--line);
+}
+.mystic-workspace .orchestral-topbar:not([style*="url"]) .breadcrumb :is(span,strong) { color: var(--ink); }
+@media(max-width:550px) {
+  .mystic-workspace .brand { min-height: 64px; }
+  .mystic-workspace .topbar { gap: 8px; }
+  .mystic-workspace .breadcrumb { min-width: 0; }
+  .mystic-workspace .breadcrumb strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+.release-status { margin: auto 14px 16px; padding: 10px; border-top: 1px solid var(--line); color: var(--subtle); display: grid; gap: 5px; }
+.release-status strong { color: var(--ink); overflow-wrap: anywhere; }

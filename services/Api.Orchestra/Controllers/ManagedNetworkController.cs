@@ -7,27 +7,30 @@ using MysticEgo.Distributed;
 namespace MysticEgo.Api.Orchestra.Controllers;
 
 [ApiController, Authorize(Policy = "operator"), Route("api/v1/managed")]
-public sealed class ManagedNetworkController(ManagedNetwork network, ManagedDeployment deployment, NodeState state, ParentAuthorization peers) : ControllerBase
+public sealed class ManagedNetworkController(ManagedNetwork network, ManagedDeployment deployment, NodeState state, ParentAuthorization peers, DevelopmentTeam team) : ControllerBase
 {
     private Guid Actor() => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
     private string Login => User.Identity?.Name ?? "operator";
-    private bool Developer => EcosystemHierarchy.IsDeveloper(User);
+    private bool Owner => team.IsOwner(User);
+    private bool TeamMember => HttpContext.Items.ContainsKey(typeof(DevelopmentTeam));
+    private bool Developer => Owner || TeamMember;
+    private bool MayManageAsDeveloper(Guid id) => Owner || TeamMember && network.Find(id)?.Kind == "global";
 
     [HttpGet("context")]
     public IActionResult Context() => Ok(new { rootId = network.RootId, rootName = state.Options.DisplayName,
-        orchestraUrl = network.OrchestraUrl, authUrl = network.AuthUrl, developer = Developer, actor = Actor(),
+        orchestraUrl = network.OrchestraUrl, authUrl = network.AuthUrl, developer = Developer, owner = Owner, actor = Actor(),
         lan = state.Options.AllowInsecureTestHttp });
 
     [HttpGet("topology")]
     [ApiCapability("managed.topology.read", "Загрузить доступные узлы и связи между ними", "all")]
-    public IActionResult Topology() => Ok(network.Topology(Actor(), Developer));
+    public IActionResult Topology() => Ok(network.Topology(Actor(), Developer).Where(item => !TeamMember || item.Node.Kind != "audit" || item.Node.OwnerId == Actor()));
 
     [HttpGet("access/{id:guid}")]
     public IActionResult Access(Guid id)
     {
         var node = network.Find(id);
-        return node is not null && node.Enabled && network.CanRead(node, Actor(), Developer)
-            ? Ok(new { canRead = true, canManage = network.CanManage(node, Actor(), Developer) }) : NotFound();
+        return node is not null && node.Enabled && (!TeamMember || node.Kind != "audit" || node.OwnerId == Actor()) && network.CanRead(node, Actor(), Developer)
+            ? Ok(new { canRead = true, canManage = network.CanManage(node, Actor(), MayManageAsDeveloper(node.Id)) }) : NotFound();
     }
 
     [HttpGet("applications")]
@@ -47,7 +50,7 @@ public sealed class ManagedNetworkController(ManagedNetwork network, ManagedDepl
     [HttpPost("nodes")]
     [ApiCapability("managed.deployment.prepare", "Подготовить конфигурацию Global или Local", "management", RequiresConfirmation = true)]
     public Task<IActionResult> Create(NewManagedNode input, CancellationToken ct) =>
-        Run(() => network.Create(input, Actor(), Login, Developer, Parent(), Request.Headers.Authorization.ToString(), ct));
+        Run(() => network.Create(input, Actor(), Login, Owner, Parent(), Request.Headers.Authorization.ToString(), ct));
 
     [HttpPost("home/connect"), ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public Task<IActionResult> Home(HomeInput input, CancellationToken ct) =>
@@ -55,22 +58,22 @@ public sealed class ManagedNetworkController(ManagedNetwork network, ManagedDepl
 
     [HttpPost("club/assignment"), ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public Task<IActionResult> Assignment(CancellationToken ct) =>
-        Parent("local") is { } local ? Run(() => network.IssueClub(local, Actor(), Login, Developer, ct)) :
+        Parent("local") is { } local ? Run(() => network.IssueClub(local, Actor(), Login, Owner, ct)) :
             Task.FromResult<IActionResult>(Forbid());
 
     [HttpPut("nodes/{id:guid}")]
     public Task<IActionResult> Edit(Guid id, ManagedNodeEdit input, CancellationToken ct) =>
-        Run(() => network.Edit(id, input, Actor(), Login, Developer, ct));
+        Run(() => network.Edit(id, input, Actor(), Login, MayManageAsDeveloper(id), ct));
 
     [HttpPut("nodes/{id:guid}/members/{member:guid}")]
     public Task<IActionResult> Member(Guid id, Guid member, MemberInput input, CancellationToken ct) =>
-        Run(() => network.SetMember(id, member, input.Allowed, Actor(), Login, Developer, ct));
+        Run(() => network.SetMember(id, member, input.Allowed, Actor(), Login, MayManageAsDeveloper(id), ct));
 
     [HttpGet("nodes/{id:guid}/profile"), ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public IActionResult Profile(Guid id)
     {
         var node = network.Find(id);
-        if (node is null || node.Kind is "audit" or "agent" || !network.CanManage(node, Actor(), Developer) ||
+        if (node is null || node.Kind is "audit" or "agent" || !network.CanManage(node, Actor(), MayManageAsDeveloper(node.Id)) ||
             node.Kind == "local" && Parent("global") != node.ParentId || !System.IO.File.Exists(network.ProfilePath(id))) return NotFound();
         state.Log(Login, "deployment.profile.download", id.ToString(), true);
         return PhysicalFile(network.ProfilePath(id), "application/json", $"mysticego-{node.Kind}-{id:N}.json");
@@ -88,7 +91,7 @@ public sealed class ManagedNetworkController(ManagedNetwork network, ManagedDepl
 
     [HttpGet("jobs")]
     public IActionResult Jobs() => Ok(deployment.Jobs().Where(x =>
-        network.Find(x.NodeId) is { } node && network.CanManage(node, Actor(), Developer)));
+        network.Find(x.NodeId) is { } node && network.CanManage(node, Actor(), MayManageAsDeveloper(node.Id))));
 
     private Task<IActionResult> WithNode<T>(Guid id, Func<ManagedNode, Task<T>> action)
     {

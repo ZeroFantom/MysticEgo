@@ -57,7 +57,7 @@ public sealed class WorldAiJobQueue
     }
     public async Task<WorldAiJob> Enqueue(EnqueueWorldAiRequest request,CancellationToken ct)
     {
-        if(request.Role is not ("npc" or "world" or "evaluation" or "assistant") ||
+        if(!WorldAiCluster.SupportsRole(request.Role) ||
             string.IsNullOrWhiteSpace(request.Prompt) || request.Prompt.Length>5000 ||
             request.MaxTokens is <1 or >1200 || request.ContextFacts?.Length>50 ||
             (request.ContextFacts?.Any(x=>x.Length>2000) ?? false) ||

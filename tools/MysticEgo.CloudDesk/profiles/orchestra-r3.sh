@@ -3,6 +3,8 @@ set -euo pipefail
 umask 077
 archive=${1:?archive}; domain=${2:?domain}
 checksum=${4:-2f410003f5c1ad68cc702f8a5d21dc0143cd1d9b92d3709be75ac08fffaf9f28}
+method=${5:-native}
+[[ $method == native || $method == docker ]]
 [[ $checksum =~ ^[a-f0-9]{64}$ ]]
 [[ $(id -u) == 0 && $(uname -m) == x86_64 ]]
 . /etc/os-release
@@ -55,6 +57,29 @@ PrivateTmp=true
 WantedBy=multi-user.target
 UNIT
 chmod 0644 /etc/systemd/system/mysticego-orchestra.service
+if [[ $method == docker ]]; then
+  apt-get install -y docker.io
+  systemctl enable --now docker.service
+  docker build --pull --tag mysticego-orchestra-runtime:ubuntu24.04 - <<'DOCKERFILE'
+FROM ubuntu:24.04
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libicu74 libssl3t64 util-linux && rm -rf /var/lib/apt/lists/*
+DOCKERFILE
+  install -d -o mysticego -g mysticego -m 0700 /var/lib/mysticego
+  install -d -m 0755 /etc/systemd/system/mysticego-orchestra.service.d
+  uid=$(id -u mysticego)
+  gid=$(id -g mysticego)
+  cat > /etc/systemd/system/mysticego-orchestra.service.d/docker.conf <<UNIT
+[Unit]
+Requires=docker.service
+After=docker.service
+[Service]
+User=root
+Group=root
+ExecStart=
+ExecStart=/usr/bin/docker run --rm --name mysticego-orchestra --network host --user $uid:$gid --cap-drop ALL --security-opt no-new-privileges --env-file /etc/mysticego/orchestra.env --mount type=bind,src=/opt/mysticego/app,dst=/opt/mysticego/app,readonly --mount type=bind,src=/var/lib/mysticego,dst=/var/lib/mysticego --workdir /opt/mysticego/app mysticego-orchestra-runtime:ubuntu24.04 /opt/mysticego/app/mysticego --headless --no-lm --output /var/lib/mysticego
+ExecStop=/usr/bin/docker stop -t 20 mysticego-orchestra
+UNIT
+fi
 cat > /etc/caddy/Caddyfile <<CADDY
 $domain {
   @token {
