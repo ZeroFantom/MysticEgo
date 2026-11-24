@@ -1,5 +1,17 @@
 # MysticEgo
 
+## Самообновление Orchestra и пароль developer
+
+Инструкция для действующего VPS R3.1 находится в [ops/orchestra-updater/README.md](ops/orchestra-updater/README.md).
+После начальной установки службы разработчик подтверждает релиз в разделе **Обновление Orchestra** веб-панели.
+Кнопка **Показать пароль developer** находится в CloudDesk в разделе **Инфраструктура → Источник инфраструктуры** после подтверждённого входа developer.
+
+Для коммита и мерджа используйте прежний универсальный скрипт:
+
+```bash
+python3 merge-mysticego.py MysticEgo_BETA7_R3.1_Orchestra_Update.zip --merge
+```
+
 ## CloudDesk R3.1 — запуск и обновление
 
 Распакуйте полный ZIP MysticEgo в локальный каталог. CloudDesk уже собран для запуска на Windows и Linux x64.
@@ -16,7 +28,7 @@
 Из папки с файлами выполните:
 
 ```bash
-python3 merge-mysticego.py MysticEgo_BETA7_R3.1_CloudDesk_Final.zip --merge
+python3 merge-mysticego.py MysticEgo_BETA7_R3.1_Orchestra_Update.zip --merge
 ```
 
 На Windows при установленном Python Launcher замените `python3` на `py -3`.

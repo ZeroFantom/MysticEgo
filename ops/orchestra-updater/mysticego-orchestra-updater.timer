@@ -1,0 +1,9 @@
+[Unit]
+Description=Check Orchestra releases and process developer approval
+
+[Timer]
+OnBootSec=20s
+OnUnitInactiveSec=30s
+
+[Install]
+WantedBy=timers.target

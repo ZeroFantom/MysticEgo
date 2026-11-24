@@ -1,7 +1,7 @@
 const {app,BrowserWindow,ipcMain,shell,dialog}=require('electron');
 const {spawn}=require('node:child_process'); const path=require('node:path');const readline=require('node:readline');const crypto=require('node:crypto');
 let backend,win; const pending=new Map();
-const allowed=new Set(['github.status','github.release','github.enable','github.disconnect','timeweb.status','timeweb.connect','timeweb.restore','timeweb.disconnect','servers','catalog','key.info','key.register','server.create','ssh.prepare','ssh.status','ssh.trust','ssh.cloudKey','ssh.passwordKey','ssh.terminal','ssh.test','ssh.command','deploy','deploy.preflight','domains.list','dns.check','dns.prepare','topology.poll','topology.login','topology.logout','topology.discover','dns.suggest','dns.inventory','dns.delete','deploy.reserve','dns.reconcile']);
+const allowed=new Set(['github.status','github.release','github.enable','github.disconnect','timeweb.status','timeweb.connect','timeweb.restore','timeweb.disconnect','servers','catalog','key.info','key.register','server.create','ssh.prepare','ssh.status','ssh.trust','ssh.cloudKey','ssh.passwordKey','ssh.terminal','ssh.test','ssh.command','deploy','deploy.preflight','domains.list','dns.check','dns.prepare','topology.poll','topology.developerPassword','topology.login','topology.logout','topology.discover','dns.suggest','dns.inventory','dns.delete','deploy.reserve','dns.reconcile']);
 function check(e){if(!win||e.sender!==win.webContents||e.senderFrame!==win.webContents.mainFrame)throw Error('IPC denied');}
 function request(action,args){return new Promise((resolve,reject)=>{if(!backend||!backend.stdin.writable)return reject(Error('C# backend недоступен'));const id=crypto.randomUUID();pending.set(id,{resolve,reject,action});backend.stdin.write(JSON.stringify({id,action,args})+'\n',err=>{if(err){pending.delete(id);reject(err);}});});}
 if(!app.requestSingleInstanceLock()){app.quit();}else{
@@ -22,7 +22,7 @@ app.whenReady().then(()=>{
  ipcMain.handle('cloudConsole',e=>{check(e);return shell.openExternal('https://timeweb.cloud/my/');});
  ipcMain.handle('portal',e=>{check(e);return shell.openExternal('https://timeweb.cloud/my/api-keys');});
  ipcMain.handle('script',async e=>{check(e);const r=await dialog.showOpenDialog(win,{properties:['openFile'],filters:[{name:'Bash',extensions:['sh']}]});return r.canceled?'':r.filePaths[0];});
- win=new BrowserWindow({width:1320,height:900,minWidth:900,minHeight:650,backgroundColor:'#101016',webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
+ win=new BrowserWindow({width:1320,height:900,minWidth:900,minHeight:650,backgroundColor:'#101016',icon:path.join(__dirname,'icon.png'),webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
  win.webContents.setWindowOpenHandler(()=>({action:'deny'}));win.webContents.on('will-navigate',e=>e.preventDefault());win.loadFile(path.join(root,'dist','index.html'));
 });app.on('window-all-closed',()=>app.quit());app.on('before-quit',()=>{backend?.stdin.end();});
 

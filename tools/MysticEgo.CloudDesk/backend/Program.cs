@@ -286,6 +286,7 @@ sealed partial class CloudDesk {
             case "ssh.terminal": return await OpenTerminal(a);
             case "ssh.test": return await SSH(a,"uname -a; id; uptime",1);
             case "ssh.command": return await SSH(a,S(a,"command"),5);
+            case "topology.developerPassword": return await RevealDeveloperPassword(a);
             case "deploy.preflight": return await DeployPreflight(a);
             case "deploy": return await Deploy(a,progress ?? (_ => {}));
             case "topology.poll": return await TopologyPoll(a);
