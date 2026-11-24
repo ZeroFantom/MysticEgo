@@ -28,9 +28,9 @@ jobs:
           node-version: '24'
       - name: Download and verify previous full bundle
         run: |
-          gh release download v1.0.0-beta.7-r3.2.4 --pattern MysticEgo_BETA7_R3.2.4.zip
-          printf '%s  %s\n' 06cfa7cbc37c37841698633be17d93dd80182bafad759a125f41ee58a0c1fb6a MysticEgo_BETA7_R3.2.4.zip | sha256sum -c -
-          unzip -q MysticEgo_BETA7_R3.2.4.zip -d bundle
+          gh release download v1.0.0-beta.7-r3.2.2 --pattern MysticEgo_BETA7_R3.2.2_CloudDesk.zip
+          printf '%s  %s\n' c001140a2df1dda4d369cf34fe4d0a4f8687fa8f71d29a1cd3b9fdf645ca2122 MysticEgo_BETA7_R3.2.2_CloudDesk.zip | sha256sum -c -
+          unzip -q MysticEgo_BETA7_R3.2.2_CloudDesk.zip -d bundle
           git archive --format=tar HEAD | tar -xf - -C bundle/MysticEgo
       - name: Build CloudDesk and web panels
         run: |
