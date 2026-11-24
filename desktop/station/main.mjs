@@ -6,6 +6,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {launch,json} from '../control/center.mjs';
+import {developmentTeam} from './development-team.mjs';
 import {getDotnet} from '../launch-runtime.mjs';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
@@ -20,6 +21,20 @@ const ports={audit:5350,agent:5300,global:5100,local:5200};
 const dotnet=getDotnet(root);
 const execute=promisify(execFile);
 const logs=[];
+const development=developmentTeam(json);
+let teamStatus=null,teamChecked=0,teamRefresh,accountGeneration=0;
+async function refreshTeam(force=false){
+  if(!actor||assignment||current()?.kind==='agent')return;
+  if(teamRefresh||!force&&Date.now()-teamChecked<10000)return teamRefresh;
+  const generation=accountGeneration;
+  teamChecked=Date.now();
+  teamRefresh=authorized().then(development.status).then(info=>{
+    if(actor&&generation===accountGeneration)teamStatus=info;
+  }).catch(()=>{
+    if(actor&&generation===accountGeneration)teamStatus={error:true};
+  }).finally(()=>{teamRefresh=null;});
+  return teamRefresh;
+}
 let window,embedded,recording,runner,companion,closing=false,profile,profileFile,assignment,actor,refreshing,discovering=false;
 let beacon='',clubAvailable=false,playerGlobals=[],features={allow:true,processes:'notepad, mspaint, calc',apps:{}};
 
@@ -107,8 +122,11 @@ async function userSession(input){
   }
   const data=await json(base+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({login,password})});
+  accountGeneration++;
   actor={login:data.user?.login||login,token:data.accessToken,refreshToken:data.refreshToken,expiration:Date.parse(data.expiresAt),central:base,lan:input?.lan===true};
   await topology();
+  teamStatus=null;teamChecked=0;
+  void refreshTeam();
   await fs.writeFile(path.join(home,'connection.json'),JSON.stringify({central:base,lan:actor.lan}),{mode:0o600});
   return 'Вход выполнен';
 }
@@ -242,14 +260,16 @@ async function open(){
     await stop();window.close();
   });
   handle('snapshot',async()=>{
+    void refreshTeam();
     if(actor&&Date.now()-lastTopology>18000){lastTopology=Date.now();void topology().catch(()=>{})}
     return {node:current(),online:await health(),running:!!runner,recording:!!recording,features,beacon,clubAvailable,embedded:!!embedded,
-      actor:actor?.login,globals:playerGlobals.map(({id,name})=>({id,name})),central:current()?.central||assignment?.orchestraUrl||lastConnection.central,
+      actor:actor?.login,team:actor&&!assignment&&current()?.kind!=='agent'?teamStatus:null,globals:playerGlobals.map(({id,name})=>({id,name})),central:current()?.central||assignment?.orchestraUrl||lastConnection.central,
       lan:profile?.endpoints.allowLanHttp===true||assignment?.allowLanHttp===true||lastConnection.lan,platform:process.platform,logs:[...logs]};
   });
   handle('auth',userSession);
   handle('logout',async()=>{
-    const old=actor;actor=null;playerGlobals=[];closePanel();
+    accountGeneration++;
+    const old=actor;actor=null;playerGlobals=[];teamStatus=null;teamChecked=0;closePanel();
     if(recording)recording.child.stdin.end('\n');
     if(companion)companion.child.kill();
     if(current()?.kind==='audit')await stop();
@@ -279,6 +299,22 @@ async function open(){
     return openPanel(node.url);
   });
   handle('home',activateHome);
+  function personalDesktop(){
+    if(assignment||current()?.kind==='agent')throw Error('Команда разработки доступна из личного AuditDesktop.');
+  }
+  handle('team-apply',async()=>{
+    personalDesktop();const result=await development.apply(await authorized());
+    await refreshTeam(true);
+    return result;
+  });
+  handle('orchestra',async()=>{
+    personalDesktop();
+    const generation=accountGeneration;
+    const session=await authorized();
+    const target=await development.orchestra(session);
+    if(!actor||accountGeneration!==generation)throw Error('Учётная запись изменилась. Повторите действие.');
+    return openPanel(target);
+  });
   handle('global',async id=>{
     await authorized();const org=playerGlobals.find(node=>node.id===id);
     if(!org)throw Error('Организация ещё не готова.');

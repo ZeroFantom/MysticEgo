@@ -287,6 +287,8 @@ sealed partial class CloudDesk {
             case "ssh.test": return await SSH(a,"uname -a; id; uptime",1);
             case "ssh.command": return await SSH(a,S(a,"command"),5);
             case "topology.developerPassword": return await RevealDeveloperPassword(a);
+            case "deploy.restoreOrchestra": return await RestoreOrchestraUpdater(a,progress ?? (_ => {}));
+            case "deploy.reuploadGlobal": return await QueueGlobalReupload(a);
             case "deploy.preflight": return await DeployPreflight(a);
             case "deploy": return await Deploy(a,progress ?? (_ => {}));
             case "topology.poll": return await TopologyPoll(a);
@@ -445,6 +447,10 @@ sealed partial class CloudDesk {
         if(S(a,"confirm")!="DEPLOY") throw new Exception("Подтвердите развёртывание");
         var role=Need(a,"role",@"^(Orchestra|Global)$"); var domain=Need(a,"domain",@"^[A-Za-z0-9](?:[A-Za-z0-9-]*\.)+[A-Za-z]{2,63}$|^[A-Za-z0-9][A-Za-z0-9.-]*\.[A-Za-z]{2,63}$"); if(domain.Contains("..")) throw new Exception("Некорректный домен");
         var orchestra=S(a,"orchestra"); var script=S(a,"script");
+        var method=S(a,"deploymentMethod");
+        if(method=="") method="native";
+        if(method is not ("native" or "docker") || role!="Orchestra" && method=="docker")
+            throw new Exception("Выбранный способ развёртывания пока доступен только для Orchestra.");
         if(role=="Global") { if(!Uri.TryCreate(orchestra,UriKind.Absolute,out var u)||u.Scheme!="https"||u.UserInfo!=""||u.Query!=""||u.Fragment!="") throw new Exception("Нужен HTTPS URL существующего Orchestra"); if(!File.Exists(script)) throw new Exception("Выберите проверенный bash-скрипт Global"); await RequireDeveloper(orchestra); }
         else script=Path.Combine(AppContext.BaseDirectory,"profiles","orchestra-r3.sh");
         if(!File.Exists(script)) throw new Exception("Скрипт установки не найден");
@@ -467,7 +473,7 @@ sealed partial class CloudDesk {
             progress("Передача установочного скрипта на VPS");
             await Upload(a,script,remote+"/install.sh");
             static string Q(string s)=>"'"+s.Replace("'","'\"'\"'")+"'";
-            var command="test ! -e /opt/mysticego/app && test ! -e /var/lib/mysticego && test ! -e /etc/mysticego/orchestra.env && test ! -e /etc/systemd/system/mysticego-orchestra.service && ! systemctl list-unit-files --no-legend | grep -qi mysticego && bash "+remote+"/install.sh "+Q(remote+"/r3.zip")+" "+Q(domain)+" "+Q(orchestra)+(role=="Orchestra"?" "+Q(digest):"");
+            var command="test ! -e /opt/mysticego/app && test ! -e /var/lib/mysticego && test ! -e /etc/mysticego/orchestra.env && test ! -e /etc/systemd/system/mysticego-orchestra.service && ! systemctl list-unit-files --no-legend | grep -qi mysticego && bash "+remote+"/install.sh "+Q(remote+"/r3.zip")+" "+Q(domain)+" "+Q(orchestra)+(role=="Orchestra"?" "+Q(digest)+" "+Q(method):"");
             SaveBinding(binding with {Phase="installing"});
             progress("Запуск установочного скрипта на VPS");
             void ReportInstallerStep(string line) {

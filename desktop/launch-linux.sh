@@ -25,4 +25,11 @@ if [ "${1:-}" = "--headless" ]; then
     shift
     exec "$MYSTICEGO_DOTNET" "$root/runtime/app/bin/MysticEgo.Installer.dll" --join "$profile" --root "$root" "$@"
 fi
-exec "$root/runtime/electron-linux/electron" "$root/desktop/$role" "$@"
+electron="$root/runtime/electron-linux/electron"
+if [ "$role" = station ]; then
+    helper="$root/runtime/electron-linux/chrome-sandbox"
+    if [ "$(stat -c '%u:%a' -- "$helper" 2>/dev/null || true)" != "0:4755" ]; then
+        exec "$electron" --disable-setuid-sandbox "$root/desktop/$role" "$@"
+    fi
+fi
+exec "$electron" "$root/desktop/$role" "$@"
