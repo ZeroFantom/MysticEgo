@@ -39,7 +39,12 @@ sealed partial class CloudDesk {
         string[] required=["bootstrap-r31.sh","baseline.sha256","install-worker.sh","update-orchestra.py",
             "mysticego-orchestra-updater.service","mysticego-orchestra-updater.timer","payload/Api.Orchestra.dll",
             "payload/MysticEgo.WorldAI.dll","payload/MysticEgo.Installer.dll","payload/web/index.html","payload/web/release-info.json","payload/web/favicon.ico","payload/web/mystic-mark.png"];
-        if(required.Any(file=>!File.Exists(Path.Combine(source,file))))throw new Exception("Распакуйте полный архив с обновлятором Orchestra.");
+        var defaultModel=new Dictionary<string,string> {
+            ["model/install-default-model.sh"]="../panel-assistant/install-default-model.sh",
+            ["model/infrastructure/install.sh"]="../infrastructure/install.sh",
+            ["model/infrastructure/install.py"]="../infrastructure/install.py"
+        };
+        if(required.Concat(defaultModel.Values).Any(file=>!File.Exists(Path.Combine(source,file))))throw new Exception("Распакуйте полный архив с обновлятором Orchestra.");
         var assets=Directory.GetFiles(Path.Combine(source,"payload","web","assets"));
         if(assets.Length==0)throw new Exception("В архиве отсутствует собранная панель Orchestra.");
         var local=Directory.CreateTempSubdirectory("mysticego-restore-").FullName;
@@ -48,6 +53,7 @@ sealed partial class CloudDesk {
             var zip=Path.Combine(local,"updater.zip");
             using(var package=ZipFile.Open(zip,ZipArchiveMode.Create)) {
                 foreach(var file in required)package.CreateEntryFromFile(Path.Combine(source,file),file);
+                foreach(var file in defaultModel)package.CreateEntryFromFile(Path.Combine(source,file.Value),file.Key);
                 foreach(var file in assets)package.CreateEntryFromFile(file,"payload/web/assets/"+Path.GetFileName(file));
             }
             using var stream=File.OpenRead(zip);

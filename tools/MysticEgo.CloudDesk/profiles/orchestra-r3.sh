@@ -106,6 +106,10 @@ for ((i=0;i<60;i++)); do
     systemctl enable caddy.service
     systemctl restart caddy.service
     curl -fsS --retry 10 --retry-delay 5 --retry-all-errors --max-time 10 "https://$domain/health/live" >/dev/null
+    default=/opt/mysticego/app/ops/panel-assistant/install-default-model.sh
+    if [[ -f $default ]]; then
+      bash "$default" || echo 'Запуск подготовки LM Studio не удался. Проверьте журнал mysticego-default-model.'
+    fi
     echo "Orchestra ready: https://$domain/ (Audit: /audit-portal/)"
     exit 0
   fi

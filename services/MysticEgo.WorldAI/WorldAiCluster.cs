@@ -48,7 +48,7 @@ public sealed class WorldAiCluster
     {
         lock(_workers)
         {
-            foreach(var role in new[]{"world","npc","evaluation","assistant"})
+            foreach(var role in new[]{"world","npc","evaluation","assistant","panel-data"})
             {
                 var id="local-"+role;
                 if(model==null)_workers.Remove(id);
@@ -62,7 +62,7 @@ public sealed class WorldAiCluster
         await _mutex.WaitAsync(ct);
         try{return Workers().OrderBy(x=>x.Id).Select(w => (object)new {
             id=w.Id, role=w.Role, model=w.Model, enabled=w.Enabled, slots=w.Slots,
-            active=_inflight.GetValueOrDefault(w.Id),
+            active=_inflight.GetValueOrDefault(SlotKey(w.Id)),
             circuitOpen=_circuit.TryGetValue(w.Id,out var c)&&c.RetryAt>DateTimeOffset.UtcNow
         }).ToArray();}
         finally{_mutex.Release();}
@@ -98,16 +98,17 @@ public sealed class WorldAiCluster
     {
         await _mutex.WaitAsync(ct);
         try {
-            var available=Workers().Where(x=>x.Enabled&&x.Role==role&&!rejected.Contains(x.Id)&&_inflight.GetValueOrDefault(x.Id)<x.Slots &&
+            var available=Workers().Where(x=>x.Enabled&&x.Role==role&&!rejected.Contains(x.Id)&&_inflight.GetValueOrDefault(SlotKey(x.Id))<x.Slots &&
                 (!_circuit.TryGetValue(x.Id,out var c)||c.RetryAt<=DateTimeOffset.UtcNow))
-              .OrderByDescending(x=>x.Weight*(x.Slots-_inflight.GetValueOrDefault(x.Id))/(double)x.Slots).ThenBy(x=>x.Id).FirstOrDefault();
-            if(available is not null)_inflight[available.Id]=_inflight.GetValueOrDefault(available.Id)+1;
+              .OrderByDescending(x=>x.Weight*(x.Slots-_inflight.GetValueOrDefault(SlotKey(x.Id)))/(double)x.Slots).ThenBy(x=>x.Id).FirstOrDefault();
+            if(available is not null)_inflight[SlotKey(available.Id)]=_inflight.GetValueOrDefault(SlotKey(available.Id))+1;
             return available;
         }finally{_mutex.Release();}
     }
+    private static string SlotKey(string id) => id.StartsWith("local-",StringComparison.Ordinal) ? "local-model" : id;
     async Task Release(string id)
     {
-        await _mutex.WaitAsync();try{_inflight[id]=Math.Max(0,_inflight.GetValueOrDefault(id)-1);}finally{_mutex.Release();}
+        await _mutex.WaitAsync();try{_inflight[SlotKey(id)]=Math.Max(0,_inflight.GetValueOrDefault(SlotKey(id))-1);}finally{_mutex.Release();}
     }
     async Task MarkSuccess(string id)
     {

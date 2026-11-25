@@ -1,10 +1,11 @@
 import {useState,type FormEvent} from 'react';
 import {useApp,useRemote} from '../app/context';
-import {Header,Panel,ErrorBanner} from '../components/primitives';
+import {Panel,ErrorBanner} from '../components/primitives';
 import {InfrastructureSetup} from './InfrastructureSetup';
 
 type Worker={id:string;role:string;model:string;slots:number;active:number;circuitOpen:boolean};
 type Result={workerId:string;model:string;text:string};
+const labels:Record<string,string>={world:'Мир',npc:'NPC',evaluation:'Оценка',assistant:'Ассистент','panel-data':'Данные панелей'};
 export function ModelWorkers(){
   const {api}=useApp();
   const workers=useRemote(()=>api.request<Worker[]>('/world-ai/workers/status'),[api],15000);
@@ -19,14 +20,24 @@ export function ModelWorkers(){
     }catch(e){setError(e instanceof Error?e.message:String(e));}
     finally{setPending(false);}
   }
+  const local=workers.value?.filter(worker=>worker.id.startsWith('local-'))??[];
+  const remote=workers.value?.filter(worker=>!worker.id.startsWith('local-'))??[];
   return <>
-    <Header title="Модели мира и панелей" description="Статус LM Studio и ручной запрос к выбранной роли."/>
     <ErrorBanner text={error||workers.error}/>
     <Panel title="Вычислительные узлы">
-      {workers.value?.map(w=><div className="line" key={w.id}><strong>{w.model}</strong><span>{w.role} · {w.active}/{w.slots} · {w.circuitOpen?'Временно недоступен':'В пуле'}</span></div>)}
+      {local.length>0&&<div className="assistant-worker">
+        <div><small>Локальная LM Studio</small><strong>{local[0].model}</strong></div>
+        <div><small>Назначения</small><span>{local.map(w=>labels[w.role]??w.role).join(', ')}</span></div>
+        <div><small>Вычисления</small><span>{local[0].active}/{local[0].slots}</span></div>
+      </div>}
+      {remote.map(w=><div className="assistant-worker" key={w.id}>
+        <div><small>Внешняя модель</small><strong>{w.model}</strong></div>
+        <div><small>Назначение</small><span>{labels[w.role]??w.role}</span></div>
+        <div><small>{w.circuitOpen?'Временно недоступна':'Вычисления'}</small><span>{w.active}/{w.slots}</span></div>
+      </div>)}
       {workers.value?.length===0&&<p>Узлы LM Studio ещё не настроены.</p>}
     </Panel>
-    <InfrastructureSetup initial="lmstudio"/>
+    <details className="panel assistant-model-setup"><summary>Настроить или развернуть LM Studio</summary><InfrastructureSetup initial="lmstudio"/></details>
     <Panel title="Запрос к модели">
       <form className="stack" onSubmit={submit}>
         <label>Роль<select value={role} onChange={e=>setRole(e.target.value)}><option value="panel-data">Данные панелей</option><option value="world">Правила мира</option></select></label>
