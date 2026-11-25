@@ -92,7 +92,7 @@ export function AgentDesktopEntry(){
       </ol>
       <div className="row-actions">
         <a className="btn secondary" href="/">К входу Orchestra</a>
-        <a className="btn" href="https://github.com/ZeroFantom/MysticEgo/releases/tag/v1.0.0-beta.7-r3.2.10" rel="noreferrer">Скачать AuditDesktop</a>
+        <a className="btn" href="https://github.com/ZeroFantom/MysticEgo/releases/tag/v1.0.0-beta.7-r3.2.11" rel="noreferrer">Скачать AuditDesktop</a>
         <a className="btn secondary" href="/panels?kind=agent">Удалённые Agent</a>
       </div>
     </section>

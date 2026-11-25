@@ -35,7 +35,7 @@ async Task Handle(string line) {
 }
 
 sealed partial class CloudDesk {
-    const string Repo = "ZeroFantom/MysticEgo", Tag = "v1.0.0-beta.7-r3.2.10", Asset = "MysticEgo_BETA7_R3.2.10.zip";
+    const string Repo = "ZeroFantom/MysticEgo", Tag = "v1.0.0-beta.7-r3.2.11", Asset = "MysticEgo_BETA7_R3.2.11.zip";
     readonly HttpClient http = new(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(60) };
     string token = "";
     readonly string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);

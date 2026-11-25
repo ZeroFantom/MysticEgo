@@ -1,5 +1,6 @@
 import {NoticeBell,NotificationProvider,useNotice} from './notifications';
 import './workspace-rail.css';
+import {ErrorBanner} from '../components/primitives';
 import {accountScope,useBrowserSession} from './browserSession';
 import {ReleaseStatus,ProjectBranches} from '../pages/ProjectConsole';
 import {useEffect,useMemo,useRef,useState,type ReactNode} from 'react';
@@ -205,16 +206,16 @@ export function MysticApp({mode,defaultApi}:{mode:NodeMode;title:string;defaultA
   const profile=useRemote(async()=>session.token?{scope,account:await api.request<PersonalAccount>('/collective/me')}:null,[api,scope]);
   useEffect(()=>initPalette(scope),[scope]);
   if(mode==='orchestra'&&location.pathname==='/agent-desktop')return <AgentDesktopEntry/>;
-  if(restoring)return <main className="auth-experience"><section className="auth-form-side">
+  if(restoring)return <NotificationProvider><main className="auth-experience"><section className="auth-form-side">
     <div className="auth-form-card">
       <h2>Восстановление входа</h2>
-      <p role="status">{restoreError||'Проверяем сохранённую сессию…'}</p>
+      <p role="status">Проверяем сохранённую сессию…</p><ErrorBanner text={restoreError}/>
       {restoreError&&<button className="btn" onClick={retryRestore}>Повторить</button>}
       <button className="btn secondary" onClick={logout}>Войти заново</button>
     </div>
-  </section></main>;
+  </section></main><NoticeBell/></NotificationProvider>;
   if(!session.token){
-    if(mode==='agent'&&guestToken)return <GuestPortal apiUrl={session.url} token={guestToken} onExit={()=>setGuestToken('')}/>;
+    if(mode==='agent'&&guestToken)return <NotificationProvider><GuestPortal apiUrl={session.url} token={guestToken} onExit={()=>setGuestToken('')}/><NoticeBell/></NotificationProvider>;
     return <NotificationProvider><SignIn mode={mode} session={session} onLogin={setSession} onGuest={setGuestToken}/><NoticeBell/></NotificationProvider>;
   }
   return <CTX.Provider value={{mode,session,setSession,api,portal,preferenceScope:scope,personal:profile.value?.scope===scope?profile.value.account:null,profileError:profile.error,reloadProfile:profile.reload}}>
