@@ -154,7 +154,7 @@ function Workspace({logout}:{logout:()=>void}){
     {mobile&&<div className="shade" onClick={()=>setMobile(false)}/>}
     <div className="main">
       <header className="topbar orchestral-topbar" style={bannerStyle(personal?.profile.coverUrl)}>
-        <span className="topbar-light" aria-hidden="true"/>
+        <span className="topbar-light" aria-hidden="true"><span className="topbar-sweep"/></span>
         <button className="icon-btn mobile-toggle" onClick={()=>setMobile(value=>!value)} aria-label="Открыть меню"><Menu size={22}/></button>
         <div className="breadcrumb"><span>{modes[mode].name}</span><ChevronRight size={14}/><strong>{current}</strong></div>
         <div className="top-actions"><ThemeToggle scope={preferenceScope}/><AccountMenu logout={logout}/></div>
