@@ -84,11 +84,20 @@ public sealed class CollectiveController(
     {
         var id = Actor().ToString();
         var friends = (FriendRequest[])await social.Friends(id, ct);
+        var latest = ((SocialMessage[])await social.Messages(id, ct))
+            .GroupBy(message => message.Sender == id ? message.Recipient : message.Sender)
+            .ToDictionary(group => group.Key, group => group.First());
         var contacts = new List<object>();
         foreach (var friend in friends)
         {
             var partner = await social.FindProfile(friend.Sender == id ? friend.Recipient : friend.Sender, ct);
-            if (partner is not null) contacts.Add(new { friend.Id, friend.Status, incoming = friend.Recipient == id, person = Card(partner) });
+            if (partner is not null) contacts.Add(new
+            {
+                friend.Id, friend.Status, incoming = friend.Recipient == id, person = Card(partner),
+                last = friend.Status == "accepted" && latest.TryGetValue(partner.Id.ToString(), out var message)
+                    ? new { message.Text, message.At, message.StickerId, mine = message.Sender == id }
+                    : null
+            });
         }
         return Ok(contacts);
     }

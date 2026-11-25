@@ -5,6 +5,7 @@ import hashlib
 import json
 from datetime import datetime
 import os
+import pwd
 from pathlib import Path, PurePosixPath
 import re
 import shutil
@@ -22,6 +23,52 @@ INBOX = Path("/var/lib/mysticego/update-inbox")
 REPO = "ZeroFantom/MysticEgo"
 SERVICE = "mysticego-orchestra.service"
 LIMIT = 2_000_000_000
+PANEL_TOKEN = INBOX.parent / "orchestra" / "github-read-token"
+
+
+class GitHubUnavailable(RuntimeError):
+    pass
+
+
+def panel_token():
+    try:
+        uid = pwd.getpwnam("mysticego").pw_uid
+        path = PANEL_TOKEN
+        directory = os.open(path.anchor, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            for part in path.parent.parts[1:]:
+                child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory)
+                os.close(directory)
+                directory = child
+            fd = os.open(path.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
+            with os.fdopen(fd, "rb") as token_file:
+                info = os.fstat(token_file.fileno())
+                if stat.S_ISREG(info.st_mode) and info.st_uid == uid and info.st_nlink == 1 and not info.st_mode & 0o077:
+                    token = token_file.read(301).strip()
+                    if re.fullmatch(rb"[A-Za-z0-9_]{20,300}", token):
+                        return token.decode("ascii")
+        finally:
+            os.close(directory)
+    except (OSError, KeyError):
+        pass
+    return None
+
+
+def github(*args, timeout=60):
+    env = os.environ.copy()
+    env["GH_HOST"] = "github.com"
+    if not env.get("GH_TOKEN") and not env.get("GITHUB_TOKEN"):
+        token = panel_token()
+        if token:
+            env["GH_TOKEN"] = token
+    try:
+        return subprocess.check_output(("gh", *args), timeout=timeout, stderr=subprocess.PIPE, env=env)
+    except (OSError, subprocess.SubprocessError) as error:
+        detail = getattr(error, "stderr", b"") or b""
+        if any(hint in detail.lower() for hint in
+               (b"http 401", b"http 403", b"http 404", b"auth login", b"bad credentials")):
+            raise GitHubUnavailable("Проверьте токен GitHub с правом Contents: Read для ZeroFantom/MysticEgo.") from None
+        raise GitHubUnavailable("Служба обновления не смогла обратиться к GitHub. Проверьте сеть VPS и журнал службы.") from None
 
 
 def command(*args, timeout=60):
@@ -78,7 +125,7 @@ def newer(tag, installed, publications):
 
 
 def newest(installed):
-    releases = json.loads(command("gh", "api", f"repos/{REPO}/releases?per_page=30"))
+    releases = json.loads(github("api", f"repos/{REPO}/releases?per_page=30"))
     publications = {r["tag_name"]: datetime.fromisoformat(r["published_at"])
                     for r in releases if not r["draft"] and r.get("published_at") and TAG.fullmatch(r["tag_name"])}
     for release in sorted(releases, key=lambda item: item.get("published_at") or "", reverse=True):
@@ -215,7 +262,7 @@ def apply(candidate, installed, targets, target):
     with tempfile.TemporaryDirectory(prefix=".mysticego-update-", dir=ROOT) as folder:
         stage = Path(folder)
         package = stage / candidate["asset"]
-        command("gh", "release", "download", candidate["tag"], "--repo", REPO,
+        github("release", "download", candidate["tag"], "--repo", REPO,
                 "--pattern", candidate["asset"], "--dir", folder, timeout=600)
         with package.open("rb") as stream:
             digest = hashlib.file_digest(stream, "sha256").hexdigest()
@@ -305,7 +352,9 @@ def run_locked():
                     restore(component)
             except Exception as rollback_error:
                 print(f"Rollback failed: {type(rollback_error).__name__}: {rollback_error}", flush=True)
-            status("failed", versions(), candidate, targets, "Проверьте журнал службы обновления на VPS.", target)
+            message = str(error) if isinstance(error, GitHubUnavailable) else "Проверьте журнал службы обновления на VPS."
+            status("unavailable" if isinstance(error, GitHubUnavailable) else "failed",
+                   versions(), candidate, targets, message, target)
         raise SystemExit(1)
 
 
