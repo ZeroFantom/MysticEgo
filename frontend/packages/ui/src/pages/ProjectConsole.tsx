@@ -4,7 +4,8 @@ import ReactMarkdown from 'react-markdown';
 import './project-console.css';
 import {useApp,useRemote} from '../app/context';
 import {Header,Panel,ErrorBanner} from '../components/primitives';
-import {useNotice,useNoticeFeed} from '../app/notifications';
+import {useNotice} from '../app/notifications';
+import {targetLabel,useServerUpdate,type UpdateState,type UpdateTarget as Target} from '../app/serverUpdate';
 
 type Release={tag:string;publishedAt?:string;prerelease?:boolean};
 type PublishedRelease=Release&{name:string;publishedAt:string;url:string;notes:string;installable:boolean};
@@ -94,42 +95,33 @@ function GitHubConnection({onChange}:{onChange:()=>void}){
 const repository='https://github.com/ZeroFantom/MysticEgo';
 const formatDate=(value:string)=>new Date(value).toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'});
 type Branch={name:string;sha:string;isProtected:boolean};
-type Target='orchestra'|'audit'|'both';
-type Candidate={tag:string;digest:string};
-type UpdateState={phase:string;protocol:number;current?:string;currentAudit?:string;candidate?:Candidate;targets?:Target[];message?:string};
-const targetLabel:Record<Target,string>={orchestra:'Orchestra',audit:'Audit',both:'Orchestra + Audit'};
 const phases:Record<string,string>={ready:'Доступно обновление',current:'Установлены актуальные версии',
   downloading:'Скачиваем и проверяем релиз',switching:'Применяем обновление и проверяем панели',
   unavailable:'Связь службы обновления с GitHub недоступна',failed:'Обновление прервано'};
 
 function ReleaseUpdate(){
   const {api}=useApp();
-  const notify=useNoticeFeed()?.notify;
+  const update=useServerUpdate();
   const [confirmation,setConfirmation]=useState<{tag:string;digest:string;target:Target}|null>(null);
   const state=useRemote(()=>api.request<UpdateState>('/orchestra/update'),[api],4000);
-  const [approval,setApproval]=useState<{tag:string;at:number}|null>(null);
   const [error,setError]=useState('');
   const status=state.value;
   const candidate=status?.candidate;
   const canApprove=status?.phase==='ready'||status?.phase==='failed';
-  const waiting=canApprove&&!!approval&&candidate?.tag===approval.tag&&Date.now()-approval.at<90000;
+  const waiting=!!update?.pending;
   const targets=status?.protocol===2 ? status.targets??[] : ['orchestra'] as Target[];
 
   const pendingConfirmation=canApprove&&!waiting&&confirmation&&candidate&&
     confirmation.tag===candidate.tag&&confirmation.digest===candidate.digest&&targets.includes(confirmation.target)
     ?confirmation:null;
   const failed=status?.phase==='failed'||status?.phase==='unavailable';
-  useNotice(error||state.error||(failed?status?.message??phases[status?.phase??"failed"]:''));
+  useNotice(error||(!waiting?state.error:''));
 
   async function approve(){
-    if(!pendingConfirmation)return;
-    const {target,tag,digest}=pendingConfirmation;
-    setConfirmation(null);setApproval({tag,at:Date.now()});setError('');
-    try{
-      await api.request<void>('/orchestra/update',{method:'POST',
-        body:JSON.stringify({tag,digest,target,confirmed:true})});
-      notify?.(`Обновление ${targetLabel[target]} до ${tag} принято. Ожидаем службу обновления.`);
-    }catch(e){setApproval(null);setError(e instanceof Error?e.message:String(e));}
+    if(!pendingConfirmation||!update||!status)return;
+    setConfirmation(null);setError('');
+    try{await update.approve(pendingConfirmation,status)}
+    catch(e){setError(e instanceof Error?e.message:String(e));}
   }
 
   return <section className="panel github-update">
@@ -140,9 +132,9 @@ function ReleaseUpdate(){
       <div><small>Audit на этом VPS</small><strong>{status?.currentAudit??'—'}</strong></div>
       <div><small>Релиз для установки</small><strong>{candidate?.tag??'—'}</strong></div>
     </div>
-    <p role="status">{waiting?'Подтверждено. Ожидаем службу обновления.':
+    <p role="status">{update?.reloading?'Обновление проверено. Перезагружаем страницу…':waiting&&state.error?'Orchestra перезапускается. Проверяем связь…':waiting&&canApprove?'Подтверждено. Ожидаем службу обновления.':
       status?(phases[status.phase]??status.phase):state.loading?'Проверяем службу обновления…':''}</p>
-    {status?.message&&!failed&&<p>{status.message}</p>}
+    {status?.message&&(!failed||!waiting)&&<p>{status.message}</p>}
     {status&&status.protocol!==2&&<p>Обновите службу на VPS через CloudDesk, чтобы включить отдельное обновление Audit.</p>}
     {canApprove&&candidate&&<div className="row-actions">{targets.map(target=><button key={target}
       className={'btn '+(target===targets.at(-1)?'':'secondary')} disabled={waiting||!!pendingConfirmation} onClick={()=>setConfirmation({tag:candidate.tag,digest:candidate.digest,target})}>
