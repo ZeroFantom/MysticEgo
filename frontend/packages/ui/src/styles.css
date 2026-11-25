@@ -411,11 +411,11 @@ body{background:var(--canvas);color:var(--ink);accent-color:var(--accent)}
 :root[data-density=compact] .mystic-workspace tbody td{padding:8px}
 :root[data-text-size=large] .mystic-workspace :is(.footnote,.stack label,.nav-link,td){font-size:14px}
 .custom-colors{margin-top:12px;max-width:480px}
-:root[data-neon-wave=true] :is(.orchestral-topbar,.auth-visual)::before{
+:root[data-neon-wave=true] :is(.topbar-light,.auth-visual)::before{
  content:"";position:absolute;z-index:-1;inset:0;background:radial-gradient(ellipse 30% 100% at 50% 70%,var(--alt),transparent 72%);
  opacity:calc(.56 * var(--neon-strength));animation:neon-wave 9s ease-in-out infinite alternate;pointer-events:none
 }
-:root[data-neon-grid=true] :is(.orchestral-topbar,.auth-visual)::after{
+:root[data-neon-grid=true] :is(.topbar-light,.auth-visual)::after{
  content:"";position:absolute;z-index:-1;inset:0;
  background:repeating-linear-gradient(0deg,#0000 0 9px,var(--accent) 10px,#0000 11px),repeating-linear-gradient(90deg,#0000 0 21px,var(--alt) 22px,#0000 23px);
  mask-image:linear-gradient(100deg,transparent 16%,#000 45%,transparent 72%);mask-size:235% 100%;
@@ -429,8 +429,9 @@ body{background:var(--canvas);color:var(--ink);accent-color:var(--accent)}
 @keyframes neon-wave{from{transform:translateX(-44%)}to{transform:translateX(44%)}}
 @keyframes neon-grid{from{mask-position:110% 0}to{mask-position:-90% 0}}
 @keyframes neon-outline{to{background-position:0 0,250% 0}}
-.topbar-light{position:absolute;z-index:-1;inset:0;overflow:hidden;pointer-events:none}
-:root[data-ambient=true] .topbar-light::before{
+/* Clip the decorative layers without clipping header controls and their popovers. */
+.topbar-light{position:absolute;z-index:-1;inset:0;overflow:hidden;overflow:clip;contain:paint;pointer-events:none}
+:root[data-ambient=true] .topbar-sweep{
  content:"";position:absolute;inset:-35% 0;background:linear-gradient(108deg,transparent 23%,var(--accent) 45%,var(--alt) 54%,transparent 76%);
  opacity:calc(var(--neon-strength) * .22);animation:ambient-sweep 12s ease-in-out infinite alternate;
 }
@@ -500,7 +501,7 @@ body{background:var(--canvas);color:var(--ink);accent-color:var(--accent)}
 @keyframes auth-form-arrive{from{opacity:0;translate:0 9px}to{opacity:1;translate:0 0}}
 @keyframes auth-halo{from{opacity:.45;scale:.86}to{opacity:.92;scale:1.09}}
 @keyframes auth-revolve{to{transform:rotate(calc(var(--tilt) + 360deg)) scaleY(var(--flatten))}}
-@media(prefers-reduced-motion:reduce){.topbar-light::before,.orchestral-topbar::after,.orchestral-topbar::before,.auth-visual::before,.auth-visual::after,button.btn{animation:none!important}}
+@media(prefers-reduced-motion:reduce){.topbar-sweep,.topbar-light::after,.topbar-light::before,.auth-visual::before,.auth-visual::after,button.btn{animation:none!important}}
 
 .top-actions{display:flex;align-items:center;gap:9px}
 .top-actions .auth-theme{position:static}

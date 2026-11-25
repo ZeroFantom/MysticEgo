@@ -1,3 +1,17 @@
 .release-status-icon{display:none}
 .notification-preview{display:flex;align-items:center;justify-content:space-between;gap:.55rem;overflow-wrap:anywhere}
 .notification-drawer article>div,.notification-preview>p{min-width:0;overflow-wrap:anywhere}
+
+.mystic-workspace .sidebar{
+  min-height:0;
+  height:100dvh;
+  overflow-x:hidden;
+  overflow-y:auto;
+  scrollbar-width:none;
+  overscroll-behavior-y:contain;
+}
+.mystic-workspace .sidebar::-webkit-scrollbar{display:none}
+.mystic-workspace .sidebar > *{flex-shrink:0}
+.mystic-workspace .sidebar nav{overflow:visible}
+.mystic-workspace .nav-link > svg{flex-shrink:0}
+.mystic-workspace .nav-link > span{min-width:0;overflow-wrap:anywhere}
