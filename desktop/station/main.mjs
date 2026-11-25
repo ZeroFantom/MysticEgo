@@ -3,6 +3,7 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import fs from 'node:fs/promises';
+import {mkdirSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {launch,json} from '../control/center.mjs';
@@ -11,7 +12,15 @@ import {getDotnet} from '../launch-runtime.mjs';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
 const root=path.resolve(here,'../..');
-const home=path.join((process.env.LOCALAPPDATA||process.env.XDG_DATA_HOME||path.join(app.getPath('home'),'.local','share')),'MysticEgo','AuditDesktop');
+const isAgent=process.argv.includes('--agent-desktop');
+const product=isAgent?'AgentDesktop':'AuditDesktop';
+const dataRoot=path.join((process.env.LOCALAPPDATA||process.env.XDG_DATA_HOME||path.join(app.getPath('home'),'.local','share')),'MysticEgo');
+const legacyHome=path.join(dataRoot,'AuditDesktop');
+const home=path.join(dataRoot,product);
+const userData=path.join(home,'electron');
+mkdirSync(userData,{recursive:true,mode:0o700});
+app.setPath('userData',userData);
+app.setName(product);
 const runtime=path.join(root,'runtime','app','bin');
 const installer=path.join(runtime,'MysticEgo.Installer.dll');
 const layout=path.join(here,'index.html');
@@ -122,6 +131,7 @@ async function userSession(input){
   const login=String(input?.login??'').trim(),password=String(input?.password??'');
   if(login.length<2||login.length>100||password.length<1||password.length>128)throw Error('Проверьте логин и пароль.');
   if(input.register===true){
+    if(isAgent)throw Error('Регистрация доступна в AuditDesktop.');
     const nickname=String(input?.nickname??'').trim();
     await json(base+'/api/auth/audit/register',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({login,password,nickname})});
@@ -130,10 +140,11 @@ async function userSession(input){
     body:JSON.stringify({login,password})});
   accountGeneration++;
   actor={login:data.user?.login||login,token:data.accessToken,refreshToken:data.refreshToken,expiration:Date.parse(data.expiresAt),central:base,lan:input?.lan===true};
-  await topology();
+  if(!isAgent)await topology().catch(()=>{});
   teamStatus=null;teamChecked=0;
   void refreshTeam();
   await fs.writeFile(path.join(home,'connection.json'),JSON.stringify({central:base,lan:actor.lan}),{mode:0o600});
+  if(!isAgent)await activateHome();
   return 'Вход выполнен';
 }
 async function start(options={},passive=false){
@@ -151,7 +162,7 @@ async function start(options={},passive=false){
   started.done.catch(error=>log(error.message)).finally(()=>{if(runner===started)runner=null});
 }
 function launchStation(node,file,{sharedModel=false}={}){
-  const argv=[installer,'--join',file,'--parent-stdin','--root',root,'--output',path.join(home,node.id)];
+  const argv=[installer,'--join',file,'--parent-stdin','--root',root,'--output',path.join(node.kind==='agent'&&file.startsWith(legacyHome+path.sep)?legacyHome:home,node.id)];
   if(sharedModel)argv.push('--no-lm');
   return launch(dotnet,argv,root,line=>log(node.kind+': '+line),{
     MYSTICEGO_DOTNET:dotnet,MYSTICEGO_GUI_SESSION:'1',
@@ -199,6 +210,7 @@ async function openPanel(url,role=''){
   catch(error){if(embedded===view)closePanel();throw error}
 }
 function activateHome(){
+  if(isAgent)throw Error('Для личного профиля запустите AuditDesktop.');
   if(openingAudit)return openingAudit;
   openingAudit=openPersonal().finally(()=>{openingAudit=null});
   return openingAudit;
@@ -235,7 +247,7 @@ async function openPersonal(){
   return openPanel(node.url,'audit');
 }
 async function followClub(){
-  if(discovering||closing)return;
+  if(!isAgent||discovering||closing)return;
   discovering=true;
   try{
     if(current()?.kind==='agent'){
@@ -271,15 +283,19 @@ async function open(){
   Menu.setApplicationMenu(null);
   await fs.mkdir(home,{recursive:true,mode:0o700});
   const local=path.join(home,'station.json');
-  try{profile=await readProfile(local);profileFile=local}catch(error){if(error.code!=='ENOENT')log(error.message)}
+  if(isAgent)for(const file of [local,path.join(legacyHome,'station.json')]){
+    try{const entry=await readProfile(file);if(entry.credentials[0].kind==='agent'){profile=entry;profileFile=file;break;}}
+    catch(error){if(error.code!=='ENOENT')log(error.message)}
+  }
   try{features={...features,...JSON.parse(await fs.readFile(path.join(home,'preferences.json'),'utf8'))}}catch{}
   let lastConnection={central:'',lan:false};
   try{lastConnection=JSON.parse(await fs.readFile(path.join(home,'connection.json'),'utf8'))}catch{}
-  try{
-    assignment=JSON.parse(await fs.readFile(path.join(root,'club-assignment.json'),'utf8'));
+  if(isAgent)try{
+    const kit=await fs.readFile(path.join(home,'club-assignment.json'),'utf8').catch(()=>fs.readFile(path.join(root,'club-assignment.json'),'utf8'));
+    assignment=JSON.parse(kit);
     beacon='Ищем Local · '+assignment.name;
   }catch{}
-  window=new BrowserWindow({title:'AuditDesktop · MysticEgo',width:1090,height:795,minWidth:670,minHeight:620,backgroundColor:'#15131e',
+  window=new BrowserWindow({title:product+' · MysticEgo',icon:path.join(here,isAgent?'agent-icon.png':'audit-icon.png'),width:1090,height:795,minWidth:670,minHeight:620,backgroundColor:'#15131e',
     webPreferences:{preload:path.join(here,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
   window.on('resize',fitPanel);
   window.webContents.setWindowOpenHandler(()=>({action:'deny'}));
@@ -295,7 +311,7 @@ async function open(){
     void refreshTeam();
     if(actor&&Date.now()-lastTopology>18000){lastTopology=Date.now();void topology().catch(()=>{})}
     const [online,personalOnline]=await Promise.all([health(),personalProfile?health(current(personalProfile)):false]);
-    return {node:current(),online,running:!!runner,personalOnline,personalRunning:!!personalRunner,recording:!!recording,features,beacon,clubAvailable,embedded:!!embedded,
+    return {isAgent,node:current(),online,running:!!runner,personalOnline,personalRunning:!!personalRunner,recording:!!recording,features,beacon,clubAvailable,embedded:!!embedded,
       actor:actor?.login,team:actor?teamStatus:null,globals:playerGlobals.map(({id,name})=>({id,name})),central:current()?.central||assignment?.orchestraUrl||lastConnection.central,
       lan:profile?.endpoints.allowLanHttp===true||assignment?.allowLanHttp===true||lastConnection.lan,platform:process.platform,logs:[...logs]};
   });
@@ -312,19 +328,20 @@ async function open(){
       body:JSON.stringify({refreshToken:old.refreshToken}),signal:AbortSignal.timeout(3000)}).catch(()=>{});
   });
   handle('import',async()=>{
-    const account=await authorized();
-    if(runner)throw Error('Остановите текущую роль перед сменой конфигурации.');
-    if(assignment||current()?.kind==='agent')throw Error('Этот экземпляр AuditDesktop закреплён за ПК клуба.');
-    const pick=await dialog.showOpenDialog(window,{properties:['openFile'],filters:[{name:'Конфигурация MysticEgo',extensions:['json']}]});
+    if(!isAgent||runner||current())throw Error('Комплект можно загрузить в ещё не подключённом AgentDesktop.');
+    const pick=await dialog.showOpenDialog(window,{properties:['openFile'],filters:[{name:'Комплект Local',extensions:['json']}]});
     if(pick.canceled)return '';
-    const entry=await readProfile(pick.filePaths[0]);
-    if(!['local','global'].includes(entry.credentials[0].kind)||entry.endpoints.orchestraUrl!==account.central)
-      throw Error('Выберите конфигурацию Global или Local из этого Оркестра.');
-    const rights=await json(account.central+'/api/v1/managed/access/'+entry.credentials[0].identityId,{
-      headers:{Authorization:'Bearer '+account.token}});
-    if(!rights.canManage)throw Error('Нужны полномочия владельца организации.');
-    await storeProfile(entry,local);profile=entry;profileFile=local;
-    return 'Конфигурация '+roles[current().kind]+' принята.';
+    const file=pick.filePaths[0];
+    if((await fs.stat(file)).size>65536)throw Error('Выберите комплект Local до 64 КиБ.');
+    const kit=JSON.parse(await fs.readFile(file,'utf8'));
+    if(!kit.localUrl||!kit.globalId||!kit.localId||!kit.invitationId||!/^[a-f0-9]{64}$/i.test(kit.code??''))
+      throw Error('Выберите комплект Agent, выданный администратором Local.');
+    address(kit.localUrl,kit.allowLanHttp===true);
+    address(kit.orchestraUrl,kit.allowLanHttp===true);
+    await storeProfile(kit,path.join(home,'club-assignment.json'));
+    assignment=kit;
+    void followClub();
+    return 'Комплект принят. Проверяем Local.';
   });
   handle('start',options=>start(options));
   handle('stop',async()=>{await authorized();return stop()});
@@ -406,7 +423,8 @@ async function open(){
 if(!app.requestSingleInstanceLock())app.quit();
 else{
   app.on('second-instance',()=>window?.focus());
-  app.whenReady().then(open).catch(error=>{dialog.showErrorBox('AuditDesktop',error.message);app.quit()});
+  app.whenReady().then(open).catch(error=>{dialog.showErrorBox(product,error.message);app.quit()});
   app.on('window-all-closed',()=>app.quit());
 }
+
 

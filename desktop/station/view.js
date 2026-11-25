@@ -6,15 +6,24 @@ initEffects($('design'));
 async function refresh(){
   const state=await api.snapshot();
   const node=state.node,authorized=Boolean(state.actor);
+  document.body.dataset.product=state.isAgent?'agent':'audit';
+  $('product-title').textContent=state.isAgent?'AgentDesktop':'AuditDesktop';
+  $('product-subtitle').textContent=state.isAgent?'Клубная рабочая станция':'Личный профиль MysticEgo';
+  const icon=state.isAgent?'agent-icon.png':'audit-icon.png';
+  if($('product-icon').getAttribute('src')!==icon)$('product-icon').src=icon;
+  $('device-card').hidden=!state.isAgent;
+  $('register').hidden=state.isAgent;
+  $('portal').hidden=state.isAgent;
+  $('home').hidden=$('audit-companion').hidden=$('audit-stop').hidden=state.isAgent;
   if(!initialized){$('allow').checked=state.features.allow;$('processes').value=state.features.processes;initialized=true}
   if(!centralEdited&&state.central){$('central').value=state.central;$('portal-lan').checked=state.lan}
   $('embedded').hidden=!state.embedded;$('workspace').hidden=state.embedded;
   $('identity').hidden=!authorized;$('login-box').hidden=authorized;$('identity-name').textContent=state.actor??'';
-  $('state').textContent=state.online?'Узел в сети':state.running?'Узел запускается':node?'Узел остановлен':'Ожидание подключения';
+  $('state').textContent=(state.online||state.personalOnline)?'В сети':state.running?'Узел запускается':node?'Узел остановлен':'Ожидание подключения';
   $('state').classList.toggle('online',state.online);
   $('agent-badge').classList.toggle('online',state.clubAvailable);
   $('agent-badge').textContent=state.beacon?'● '+state.beacon:'○ Agent';
-  $('current').textContent=node?node.name+' · '+node.kind+' · '+node.url:'Agent подключается из комплекта Local. Для Global и Local используется конфигурация администратора.';
+  $('current').textContent=node?node.name+' · '+node.kind+' · '+node.url:'Загрузите комплект Agent от администратора Local.';
   const global=$('global-panel');
   const tag=JSON.stringify(state.globals);
   if(global.dataset.options!==tag){
@@ -30,7 +39,7 @@ async function refresh(){
     $('team-apply').hidden=team.error||team.owner||['pending','approved'].includes(team.status);
     $('orchestra').hidden=team.error||!team.owner&&team.status!=='approved';
   }
-  $('import').hidden=!authorized||node?.kind==='agent';$('start').hidden=$('stop').hidden=!authorized;
+  $('import').hidden=!state.isAgent||node?.kind==='agent';$('start').hidden=$('stop').hidden=!authorized;
   $('start').disabled=!node||state.running||state.online;$('stop').disabled=!state.running;
   $('panel').disabled=!state.online||node?.kind!=='agent'&&!authorized;
   $('companion').disabled=!state.online||!['audit','agent'].includes(node?.kind)||node?.kind==='audit'&&!authorized;
@@ -89,4 +98,5 @@ $('record').onclick=()=>run(()=>api.record($('record-process').value));
 $('finish').onclick=()=>run(api['finish-record']);
 $('folder').onclick=()=>run(api.folder);
 refresh();window.setInterval(()=>refresh().catch(()=>{}),1600);
+
 

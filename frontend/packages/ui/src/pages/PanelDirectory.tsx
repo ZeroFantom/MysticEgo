@@ -75,7 +75,7 @@ export function PanelLoginLinks(){
 
 function LocalAgent(){
   return <a className="panel-directory-link" href="/agent-desktop">
-    <span>Подключить Agent через AuditDesktop</span><ArrowRight size={15} aria-hidden="true"/>
+    <span>Подключить Agent через AgentDesktop</span><ArrowRight size={15} aria-hidden="true"/>
   </a>;
 }
 
@@ -84,15 +84,15 @@ export function AgentDesktopEntry(){
     <section className="panel">
       <Monitor size={27} aria-hidden="true"/>
       <h1>Вход в Agent</h1>
-      <p>Для входа на рабочую станцию нужен запущенный AuditDesktop. Приложение открывает клубный Agent и личный Audit.</p>
+      <p>Для входа на рабочую станцию нужен запущенный AgentDesktop.</p>
       <ol>
-        <li>Если AuditDesktop ещё не установлен, скачайте полный архив MysticEgo.</li>
-        <li>Запустите <code>AuditDesktop.exe</code> на Windows или <code>./audit-desktop</code> на Linux.</li>
-        <li>Для клубного Agent используйте комплект, выданный администратором Local. Откройте «Панель роли» в AuditDesktop.</li>
+        <li>Если AgentDesktop ещё не установлен, скачайте полный архив MysticEgo.</li>
+        <li>Запустите <code>AgentDesktop.cmd</code> на Windows или <code>./agent-desktop</code> на Linux.</li>
+        <li>Для клубного Agent используйте комплект, выданный администратором Local. Откройте «Панель роли» в AgentDesktop.</li>
       </ol>
       <div className="row-actions">
         <a className="btn secondary" href="/">К входу Orchestra</a>
-        <a className="btn" href="https://github.com/ZeroFantom/MysticEgo/releases/tag/v1.0.0-beta.7-r3.2.11" rel="noreferrer">Скачать AuditDesktop</a>
+        <a className="btn" href="https://github.com/ZeroFantom/MysticEgo/releases/tag/v1.0.0-beta.7-r3.2.13" rel="noreferrer">Скачать AgentDesktop</a>
         <a className="btn secondary" href="/panels?kind=agent">Удалённые Agent</a>
       </div>
     </section>
@@ -121,11 +121,12 @@ export function PanelDirectory(){
         {kind==='audit'&&<a className="panel-directory-link" href="/audit-portal/"><span>Открыть Audit</span><ArrowRight size={15} aria-hidden="true"/></a>}
         {entryLinks(rows)}
         {kind!=='audit'&&rows.length===0&&<p className="footnote">{managed.loading?'Загружаем доступные панели…':
-          kind==='agent'?'У доступных вам Agent пока нет HTTPS-адреса. Локальный Agent открывается через AuditDesktop.':'Для этого аккаунта пока нет Global с настроенным HTTPS-адресом.'}</p>}
+          kind==='agent'?'У доступных вам Agent пока нет HTTPS-адреса. Локальный Agent открывается через AgentDesktop.':'Для этого аккаунта пока нет Global с настроенным HTTPS-адресом.'}</p>}
         {kind==='agent'&&<LocalAgent/>}
       </Panel>;
     })}
     {managed.value?.truncated&&<p className="footnote">Показаны первые 500 доступных панелей.</p>}
   </div>;
 }
+
 
