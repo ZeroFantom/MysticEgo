@@ -106,6 +106,10 @@ for ((i=0;i<60;i++)); do
     systemctl enable caddy.service
     systemctl restart caddy.service
     curl -fsS --retry 10 --retry-delay 5 --retry-all-errors --max-time 10 "https://$domain/health/live" >/dev/null
+    local_setup=/opt/mysticego/app/ops/infrastructure/install-local.sh
+    if [[ -f $local_setup ]]; then
+      bash "$local_setup" || echo 'Не удалось запустить локальный установщик.'
+    fi
     default=/opt/mysticego/app/ops/panel-assistant/install-default-model.sh
     if [[ -f $default ]]; then
       bash "$default" || echo 'Запуск подготовки LM Studio не удался. Проверьте журнал mysticego-default-model.'
@@ -117,3 +121,4 @@ for ((i=0;i<60;i++)); do
 done
 journalctl -u mysticego-orchestra -n 30 --no-pager >&2
 exit 1
+

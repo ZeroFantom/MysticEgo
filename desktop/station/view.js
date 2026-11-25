@@ -34,11 +34,14 @@ async function refresh(){
   $('start').disabled=!node||state.running||state.online;$('stop').disabled=!state.running;
   $('panel').disabled=!state.online||node?.kind!=='agent'&&!authorized;
   $('companion').disabled=!state.online||!['audit','agent'].includes(node?.kind)||node?.kind==='audit'&&!authorized;
-  $('home').disabled=node?.kind==='agent';
+  $('home').disabled=!authorized;
+  $('home').textContent=state.personalOnline?'Открыть Audit':state.personalRunning?'Audit запускается…':'Запустить и открыть Audit';
+  $('audit-companion').disabled=!state.personalOnline;
+  $('audit-stop').disabled=!state.personalRunning;
   $('folder').hidden=!authorized;
-  $('allow').disabled=$('processes').disabled=state.running;$('record').disabled=state.recording;$('finish').disabled=!state.recording;
+  $('allow').disabled=$('processes').disabled=state.running||state.personalRunning;$('record').disabled=state.recording;$('finish').disabled=!state.recording;
   $('apps').hidden=!authorized||Boolean(node&&!['audit','agent'].includes(node.kind));
-  $('app-add').disabled=$('app-remove').disabled=state.running;
+  $('app-add').disabled=$('app-remove').disabled=state.running||state.personalRunning;
   $('app-list').textContent=Object.keys(state.features.apps||{}).join(' · ');
   $('automation').hidden=!authorized||state.platform!=='win32'||Boolean(node&&!['audit','agent'].includes(node.kind));
   const logs=state.logs.join('\n');if($('logs').textContent!==logs){$('logs').textContent=logs;$('logs').scrollTop=$('logs').scrollHeight}
@@ -77,10 +80,13 @@ $('global-panel').onchange=event=>{const id=event.currentTarget.value;event.curr
 $('portal').onclick=()=>run(()=>api.portal($('central').value,$('portal-lan').checked));
 $('back').onclick=()=>run(api.back);
 $('logout').onclick=()=>run(api.logout);
-$('companion').onclick=()=>run(api.companion);
+$('companion').onclick=()=>run(()=>api.companion('device'));
+$('audit-companion').onclick=()=>run(()=>api.companion('audit'));
+$('audit-stop').onclick=()=>run(api['audit-stop']);
 $('app-add').onclick=()=>run(()=>api.app($('app-alias').value,false));
 $('app-remove').onclick=()=>run(()=>api.app($('app-alias').value,true));
 $('record').onclick=()=>run(()=>api.record($('record-process').value));
 $('finish').onclick=()=>run(api['finish-record']);
 $('folder').onclick=()=>run(api.folder);
 refresh();window.setInterval(()=>refresh().catch(()=>{}),1600);
+

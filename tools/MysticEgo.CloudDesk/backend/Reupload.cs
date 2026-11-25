@@ -42,7 +42,9 @@ sealed partial class CloudDesk {
         var defaultModel=new Dictionary<string,string> {
             ["model/install-default-model.sh"]="../panel-assistant/install-default-model.sh",
             ["model/infrastructure/install.sh"]="../infrastructure/install.sh",
-            ["model/infrastructure/install.py"]="../infrastructure/install.py"
+            ["model/infrastructure/install.py"]="../infrastructure/install.py",
+            ["model/infrastructure/install-local.sh"]="../infrastructure/install-local.sh",
+            ["model/infrastructure/local-runner.py"]="../infrastructure/local-runner.py"
         };
         if(required.Concat(defaultModel.Values).Any(file=>!File.Exists(Path.Combine(source,file))))throw new Exception("Распакуйте полный архив с обновлятором Orchestra.");
         var assets=Directory.GetFiles(Path.Combine(source,"payload","web","assets"));
@@ -103,3 +105,4 @@ sealed partial class CloudDesk {
         } finally { topologyGate.Release(); }
     }
 }
+

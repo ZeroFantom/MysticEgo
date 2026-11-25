@@ -1,9 +1,21 @@
-.panel-login-picker {margin-block:1rem; color:var(--ink); border:1px solid var(--line); border-radius:14px; padding:.65rem .85rem}
-.panel-login-picker summary {cursor:pointer; font-weight:650}
-.panel-login-picker details[open] summary {margin-bottom:.6rem}
-.panel-directory-grid,.panel-directory-group,.panel-directory {display:grid;gap:.6rem}
+.panel-login-picker {margin-block:1rem; color:var(--ink)}
+.panel-directory-grid,.panel-directory {display:grid;gap:.55rem}
 .panel-directory {gap:1rem}
-.panel-directory-grid {grid-template-columns:repeat(auto-fit,minmax(min(100%,130px),1fr));align-items:start}
+.panel-directory-grid {grid-template-columns:repeat(2,minmax(0,1fr))}
+.panel-login-card {display:flex;align-items:center;gap:.55rem;min-width:0;padding:.6rem;border-radius:12px;background:var(--raised);border:1px solid var(--line);color:var(--ink);text-decoration:none;transition:background .18s,border-color .18s}
+.panel-login-card svg {flex:none;color:var(--accent)}
+.panel-login-card strong,.panel-login-card small {display:block;line-height:1.25}
+.panel-login-card small {font-size:.72rem;color:var(--subtle);overflow-wrap:anywhere;margin-top:.15rem}
+.panel-login-card:hover,.panel-login-card[aria-current] {border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--raised))}
+.panel-login-card:focus-visible {outline:2px solid var(--accent);outline-offset:2px}
+.panel-published-links {margin-top:.45rem}
+.panel-published-links summary {cursor:pointer;color:var(--subtle);font-size:.83rem}
+.panel-published-links>div {display:grid;gap:.4rem;margin-top:.4rem}
+.agent-desktop-entry {min-height:100dvh;display:grid;place-items:center;padding:1rem;background:var(--canvas);color:var(--ink)}
+.agent-desktop-entry .panel {max-width:43rem;padding:1.2rem}
+.agent-desktop-entry li {margin-block:.35rem}
+@media(max-width:350px) {.panel-login-card {gap:.35rem;padding:.45rem}.panel-login-card svg {width:14px}}
+@media(prefers-reduced-motion:reduce) {.panel-login-card{transition:none}}
 .panel-directory-link {
   min-height:40px; display:flex; gap:.55rem; align-items:center; padding:.55rem .7rem; text-decoration:none;
   border:1px solid var(--line); border-radius:11px; color:var(--ink); background:var(--raised); overflow-wrap:anywhere;
@@ -16,3 +28,4 @@
 .panel-directory-link:hover {border-color:var(--accent); background:color-mix(in srgb,var(--accent) 12%,var(--raised)); transform:translateY(-1px)}
 .panel-directory-link:focus-visible {outline:2px solid var(--accent); outline-offset:2px}
 @media (prefers-reduced-motion:reduce) {.panel-directory-link{transition:none} .panel-directory-link:hover{transform:none}}
+

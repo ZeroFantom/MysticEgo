@@ -75,7 +75,7 @@ public sealed class GitHubPanel(IHttpClientFactory clients, IConfiguration confi
         {
             if (cache.TryGetValue(kind,out var saved) && saved.Until > DateTimeOffset.UtcNow) return saved.Data;
             var data = await Fetch(kind, Token(), ct);
-            cache[kind] = (DateTimeOffset.UtcNow.AddMinutes(2), data);
+            cache[kind] = (DateTimeOffset.UtcNow.AddSeconds(kind == "releases" ? 20 : 120), data);
             return data;
         }
         finally { gate.Release(); }
@@ -161,7 +161,7 @@ public sealed class GitHubPanelController(GitHubPanel github,DevelopmentTeam tea
 
     public sealed record ConnectInput(string Token);
 
-    [AllowAnonymous,HttpGet("api/v1/public/project-release")]
+    [AllowAnonymous,HttpGet("api/v1/public/project-release"), ResponseCache(NoStore=true, Location=ResponseCacheLocation.None)]
     public async Task<IActionResult> Latest(CancellationToken ct)
     {
         Response.Headers.AccessControlAllowOrigin="*";
@@ -189,3 +189,4 @@ public sealed class GitHubPanelController(GitHubPanel github,DevelopmentTeam tea
         {return StatusCode(503,new {error="Не удалось получить ветки GitHub."});}
     }
 }
+

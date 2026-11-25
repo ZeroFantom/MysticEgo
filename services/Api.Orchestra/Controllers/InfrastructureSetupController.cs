@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Net.Sockets;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authorization;
@@ -10,6 +12,7 @@ namespace MysticEgo.Api.Orchestra.Controllers;
 [ApiController, Authorize(Policy = "operator"), Route("api/v1/managed/infrastructure-setup")]
 public sealed class InfrastructureSetupController(IConfiguration config, DevelopmentTeam team, NodeState state) : ControllerBase
 {
+    private const string LocalSocket = "/var/lib/mysticego/local-setup.sock";
     private const string Install = "/opt/mysticego-infrastructure/runner/run-web.sh";
     private static readonly Regex SafeHost = new(@"\A[A-Za-z0-9][A-Za-z0-9.-]{0,252}\z");
     private static readonly SemaphoreSlim Gate = new(1, 1);
@@ -21,7 +24,7 @@ public sealed class InfrastructureSetupController(IConfiguration config, Develop
     public IActionResult Status()
     {
         if (!team.IsOwner(User)) return Forbid();
-        return Ok(new { targets = Targets.GetChildren().Where(t => SafeHost.IsMatch(t["Host"] ?? "")).Select(t => t.Key),
+        return Ok(new { localAvailable = OperatingSystem.IsLinux() && System.IO.File.Exists(LocalSocket), targets = Targets.GetChildren().Where(t => SafeHost.IsMatch(t["Host"] ?? "")).Select(t => t.Key),
             run = Volatile.Read(ref current) });
     }
 
@@ -31,6 +34,7 @@ public sealed class InfrastructureSetupController(IConfiguration config, Develop
         if (!team.IsOwner(User)) return Forbid();
         if (!input.Confirmed || input.Component is not ("monitoring" or "metrics-source" or "docker" or "postgres" or "auth-postgres" or "lmstudio" or "model-connect"))
             return BadRequest(new { error = "Выберите компонент и подтвердите установку." });
+        if (input.Target == "@local") return StartLocal(input);
         var target = Targets.GetChildren().FirstOrDefault(t => t.Key == input.Target);
         var host = target?["Host"] ?? "";
         var key = config["InfrastructureSetup:IdentityFile"];
@@ -47,6 +51,52 @@ public sealed class InfrastructureSetupController(IConfiguration config, Develop
         _ = Task.Run(() => Execute(input, host, port, key, known, actor));
         return Accepted();
     }
+
+    private IActionResult StartLocal(SetupInput input)
+    {
+        var request = input.Component switch
+        {
+            "docker" => "docker\n",
+            "lmstudio" when input.Role is "panel-data" or "world" => "lmstudio " + input.Role + "\n",
+            _ => null
+        };
+        if (request is null)
+            return BadRequest(new { error = "На VPS Orchestra напрямую доступны Docker и LM Studio." });
+        if (!OperatingSystem.IsLinux() || !System.IO.File.Exists(LocalSocket))
+            return Conflict(new { error = "Локальная служба установки не найдена. Обновите Orchestra из CloudDesk." });
+        if (!Gate.Wait(0)) return Conflict(new { error = "Установка уже выполняется." });
+        var actor = User.Identity?.Name ?? "developer";
+        const string target = "Этот VPS Orchestra";
+        Volatile.Write(ref current, new SetupRun(target, input.Component, "running", "Запускаем установку на VPS Orchestra."));
+        _ = Task.Run(async () =>
+        {
+            var success = false;
+            var message = "Локальный установщик недоступен. Проверьте службу mysticego-local-setup.socket.";
+            try
+            {
+                using var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+                using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(46));
+                await socket.ConnectAsync(new UnixDomainSocketEndPoint(LocalSocket), deadline.Token);
+                using var stream = new NetworkStream(socket);
+                await stream.WriteAsync(Encoding.UTF8.GetBytes(request), deadline.Token);
+                using var reader = new StreamReader(stream);
+                var result = await reader.ReadLineAsync(deadline.Token);
+                if (result is { Length: <= 16000 } && JsonSerializer.Deserialize<LocalResult>(result, Json) is { } reply)
+                { success = reply.Ok; message = reply.Message; }
+            }
+            catch (Exception e) when (e is SocketException or IOException or JsonException or OperationCanceledException)
+            { if (e is OperationCanceledException) message = "Истёк тайм-аут локальной установки."; }
+            finally
+            {
+                Volatile.Write(ref current, new SetupRun(target, input.Component, success ? "done" : "failed", message));
+                try { state.Log(actor, "infrastructure.setup", input.Component + " " + target, success); }
+                finally { Gate.Release(); }
+            }
+        });
+        return Accepted();
+    }
+
+    private sealed record LocalResult(bool Ok, string Message);
 
     private async Task Execute(SetupInput input, string host, int port, string key, string known, string actor)
     {
@@ -107,3 +157,4 @@ public sealed class InfrastructureSetupController(IConfiguration config, Develop
         string? Url, string? Bind, string? Cidr, string? Role, string? Secret);
     private sealed record SetupRun(string Target, string Component, string Status, string Message);
 }
+

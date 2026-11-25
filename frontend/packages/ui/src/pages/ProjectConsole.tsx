@@ -14,33 +14,52 @@ export function ReleaseStatus(){
   useEffect(()=>{const refresh=()=>setRevision(v=>v+1);window.addEventListener('project-github-changed',refresh);return()=>window.removeEventListener('project-github-changed',refresh);},[]);
   const [installed,setInstalled]=useState(''),[latest,setLatest]=useState<Release|null>(null),[failed,setFailed]=useState(false);
   useEffect(()=>{
-    let active=true;
-    const signal=AbortSignal.timeout(12000);
+    const lifecycle=new AbortController();
+    let timer:number|undefined;
+    let running=false;
     async function load(){
-      const info:ReleaseInfo=await fetch(portal?'/audit-portal/release-info.json':'/release-info.json',{signal})
-        .then(r=>r.ok&&r.headers.get('content-type')?.includes('json')?r.json():null).catch(()=>null)
-        ?? await fetch('/release-info.json',{signal}).then(r=>r.ok?r.json():{}).catch(()=>({}));
-      if(!active)return;
-      setInstalled(info.installed??'');setLatest(null);setFailed(false);
-      const origins=[mode==='orchestra'?session.url:session.authUrl,info.releaseOrigin].filter((x):x is string=>!!x);
-      for(const origin of new Set(origins)){
-        try{
-          const url=new URL('/api/v1/public/project-release',origin);
-          const response=await fetch(url,{signal,credentials:'omit',redirect:'error'});
-          if(!response.ok)continue;
-          const data=await response.json() as {latest:Release|null};
-          if(active)setLatest(data.latest);
-          return;
-        }catch{/* try the central release authority */}
+      if(running||lifecycle.signal.aborted)return;
+      running=true;
+      const signal=AbortSignal.any([lifecycle.signal,AbortSignal.timeout(12000)]);
+      const settings={signal,cache:'no-store' as const};
+      try{
+        const info:ReleaseInfo=await fetch(portal?'/audit-portal/release-info.json':'/release-info.json',settings)
+          .then(r=>r.ok&&r.headers.get('content-type')?.includes('json')?r.json():null).catch(()=>null)
+          ?? await fetch('/release-info.json',settings).then(r=>r.ok?r.json():{}).catch(()=>({}));
+        if(lifecycle.signal.aborted)return;
+        setInstalled(info.installed??'');
+        const origins=[mode==='orchestra'?session.url:session.authUrl,info.releaseOrigin].filter((x):x is string=>!!x);
+        for(const origin of new Set(origins)){
+          try{
+            const url=new URL('/api/v1/public/project-release',origin);
+            const response=await fetch(url,{...settings,credentials:'omit',redirect:'error'});
+            if(!response.ok)continue;
+            const data=await response.json() as {latest:Release|null};
+            if(!lifecycle.signal.aborted){setLatest(data.latest);setFailed(false)}
+            return;
+          }catch{/* try the central release authority */}
+        }
+        if(!lifecycle.signal.aborted)setFailed(true);
+      }finally{
+        running=false;
+        if(!lifecycle.signal.aborted)timer=window.setTimeout(()=>{if(document.hidden)timer=undefined;else void load()},15000);
       }
-      if(active)setFailed(true);
+    }
+    function refresh(){
+      if(document.hidden)return;
+      window.clearTimeout(timer);
+      void load();
     }
     void load();
-    return ()=>{active=false};
+    document.addEventListener('visibilitychange',refresh);
+    window.addEventListener('focus',refresh);
+    return ()=>{lifecycle.abort();window.clearTimeout(timer);document.removeEventListener('visibilitychange',refresh);window.removeEventListener('focus',refresh)};
   },[session.url,session.authUrl,mode,portal,revision]);
-  return <div className="release-status" aria-label="Версии MysticEgo">
+  return <div className="release-status" aria-label="Версии MysticEgo"
+    title={`Установлено: ${installed||'—'} · GitHub: ${latest?.tag??'—'}`}>
+    <Tag className="release-status-icon" size={17} aria-hidden="true"/>
     <small>Установлено <strong>{installed||'не указано'}</strong></small>
-    <small>GitHub <strong>{latest?.tag||(failed?'недоступен':'—')}</strong>{latest?.prerelease?' · предварительный':''}</small>
+    <small>GitHub <strong>{latest?.tag||(failed?'недоступен':'—')}</strong>{failed&&latest?' · данные устарели':latest?.prerelease?' · предварительный':''}</small>
   </div>;
 }
 
@@ -189,4 +208,5 @@ export function ProjectBranches(){
     </section>
   </div>;
 }
+
 

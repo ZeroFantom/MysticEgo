@@ -1,3 +1,5 @@
+import {NoticeBell,NotificationProvider,useNotice} from './notifications';
+import './workspace-rail.css';
 import {accountScope,useBrowserSession} from './browserSession';
 import {ReleaseStatus,ProjectBranches} from '../pages/ProjectConsole';
 import {useEffect,useMemo,useRef,useState,type ReactNode} from 'react';
@@ -19,7 +21,7 @@ import {Audit} from '../pages/Audit';
 import {AgentSystem} from '../pages/AgentSystem';
 import {Settings,initPalette,ThemeToggle} from '../pages/Settings';
 import {SignIn} from '../pages/SignIn';
-import {PanelDirectory} from '../pages/PanelDirectory';
+import {AgentDesktopEntry,PanelDirectory} from '../pages/PanelDirectory';
 import {Identities} from '../pages/Identities';
 import {Users} from '../pages/Users';
 import {Diagnostics} from '../pages/Diagnostics';
@@ -108,27 +110,14 @@ function AccountMenu({logout}:{logout:()=>void}){
 type Notification={id:string;text:string;read:boolean;at:string};
 function NotificationsFloat(){
   const {api}=useApp();
-  const [open,setOpen]=useState(false);
   const data=useRemote(()=>api.request<Notification[]>('/collective/notifications'),[api],10000);
-  const unread=data.value?.filter(x=>!x.read).length??0;
   const [problem,setProblem]=useState('');
+  useNotice(problem||data.error);
   async function read(id:string){
-    try{await api.request('/collective/notifications/'+id+'/read',{method:'POST'});data.reload()}
+    try{await api.request('/collective/notifications/'+id+'/read',{method:'POST'});setProblem('');data.reload()}
     catch(error){setProblem(String(error))}
   }
-  return <div className="notification-float">
-    {open&&<section className="notification-drawer" aria-label="Уведомления">
-      <header><h2>Уведомления</h2><button className="icon-btn" onClick={()=>setOpen(false)} aria-label="Закрыть уведомления"><X size={20}/></button></header>
-      {(problem||data.error)&&<p className="error-banner">{problem||data.error}</p>}
-      {!data.value?.length&&!data.loading&&!data.error&&<p className="footnote">Новых уведомлений нет.</p>}
-      {data.value?.map(item=><article key={item.id}><div><p>{item.text}</p><time>{new Date(item.at).toLocaleString('ru-RU')}</time></div>
-        {!item.read&&<button className="icon-btn" onClick={()=>void read(item.id)} aria-label="Отметить прочитанным">✓</button>}
-      </article>)}
-    </section>}
-    <button className="bell-button" aria-label={'Уведомления'+(unread?' · '+unread+' непрочитанных':'')} aria-expanded={open} onClick={()=>setOpen(value=>!value)}>
-      <Bell size={22}/>{unread>0&&<span>{unread>99?'99+':unread}</span>}
-    </button>
-  </div>;
+  return <NoticeBell server={data.value??[]} onRead={id=>void read(id)}/>;
 }
 
 function AnimatedArea({children}:{children:ReactNode}){
@@ -140,19 +129,18 @@ function Workspace({logout}:{logout:()=>void}){
   const {mode,portal,personal,preferenceScope}=useApp();
   const {pathname}=useLocation();
   const nav=navigation(mode,portal);
-  if(mode==='orchestra')nav[0].items.push({to:'/panels',label:'Вход в панели',icon:Cloud},
-    {to:'/project-branches',label:'Ветки GitHub',icon:Network});
+  if(mode==='orchestra')nav[0].items.push({to:'/project-branches',label:'Ветки GitHub',icon:Network});
   const current=nav.flatMap(section=>section.items).find(item=>item.to===pathname)?.label??(pathname==='/profile'?'Мой профиль':modes[mode].name);
   const [mobile,setMobile]=useState(false);
   const emblem=modes[mode].icon;
   const ModeIcon=emblem;
   return <div className="app-shell mystic-workspace" data-workspace={mode}>
     <aside className={'sidebar '+(mobile?'open':'')}>
-      <Link to="/" className="brand" onClick={()=>setMobile(false)}><div className="brand-mark"><img src={"/mystic-mark.png"} alt=""/></div><strong>MysticEgo</strong></Link>
+      <Link to="/" className="brand" aria-label="MysticEgo" onClick={()=>setMobile(false)}><div className="brand-mark"><img src={"/mystic-mark.png"} alt=""/></div><strong>MysticEgo</strong></Link>
       <div className="node-label"><span className="node-icon"><ModeIcon size={18}/></span><div><strong>{modes[mode].name}</strong><small>{modes[mode].subtitle}</small></div></div>
       <nav aria-label="Главная навигация">{nav.map(section=><div className="nav-section" key={section.name}>
         <div className="nav-title">{section.name}</div>
-        {section.items.map(item=><NavLink key={item.to} to={item.to} end={item.to==='/'} onClick={()=>setMobile(false)} className={({isActive})=>'nav-link '+(isActive?'active':'')}>
+        {section.items.map(item=><NavLink key={item.to} to={item.to} aria-label={item.label} title={item.label} end={item.to==='/'} onClick={()=>setMobile(false)} className={({isActive})=>'nav-link '+(isActive?'active':'')}>
           <item.icon size={17}/><span>{item.label}</span>
         </NavLink>)}
       </div>)}</nav>
@@ -216,6 +204,7 @@ export function MysticApp({mode,defaultApi}:{mode:NodeMode;title:string;defaultA
   const scope=accountScope(session,mode,portal);
   const profile=useRemote(async()=>session.token?{scope,account:await api.request<PersonalAccount>('/collective/me')}:null,[api,scope]);
   useEffect(()=>initPalette(scope),[scope]);
+  if(mode==='orchestra'&&location.pathname==='/agent-desktop')return <AgentDesktopEntry/>;
   if(restoring)return <main className="auth-experience"><section className="auth-form-side">
     <div className="auth-form-card">
       <h2>Восстановление входа</h2>
@@ -226,9 +215,10 @@ export function MysticApp({mode,defaultApi}:{mode:NodeMode;title:string;defaultA
   </section></main>;
   if(!session.token){
     if(mode==='agent'&&guestToken)return <GuestPortal apiUrl={session.url} token={guestToken} onExit={()=>setGuestToken('')}/>;
-    return <SignIn mode={mode} session={session} onLogin={setSession} onGuest={setGuestToken}/>;
+    return <NotificationProvider><SignIn mode={mode} session={session} onLogin={setSession} onGuest={setGuestToken}/><NoticeBell/></NotificationProvider>;
   }
   return <CTX.Provider value={{mode,session,setSession,api,portal,preferenceScope:scope,personal:profile.value?.scope===scope?profile.value.account:null,profileError:profile.error,reloadProfile:profile.reload}}>
-    <BrowserRouter basename={portal?'/audit-portal':undefined}><Workspace key={scope} logout={logout}/></BrowserRouter>
+    <BrowserRouter basename={portal?'/audit-portal':undefined}><NotificationProvider key={scope}><Workspace logout={logout}/></NotificationProvider></BrowserRouter>
   </CTX.Provider>;
 }
+

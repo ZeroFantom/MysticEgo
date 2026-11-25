@@ -10,7 +10,7 @@
 <div class="desktop-columns">
 <section class="desktop-card account-card">
 <div id="identity" hidden><div class="row"><h2 id="identity-name"></h2><button class="plain" id="logout">Выйти</button></div>
-<div class="actions"><button class="secondary" id="home">Открыть личный Audit</button><select id="global-panel" aria-label="Панель Global"><option value="">Мои организации Global</option></select></div>
+<div class="actions"><button class="secondary" id="home">Открыть личный Audit</button><button class="plain" id="audit-companion" disabled>Аватар Audit</button><button class="plain" id="audit-stop" disabled>Остановить Audit</button><select id="global-panel" aria-label="Панель Global"><option value="">Мои организации Global</option></select></div>
 <div id="team" hidden>
   <h3>Команда разработки</h3>
   <p id="team-status" role="status"></p>
@@ -22,7 +22,7 @@
 <div id="login-box">
 <h2 id="login-title">Войдите в MysticEgo</h2>
 <form id="login-form">
-<label>Адрес Оркестра<input id="central" type="url" required value="http://127.0.0.1:5500"></label>
+<label>Адрес Оркестра<input id="central" type="url" required value="https://orchestra.isdarkline.ru"></label>
 <label class="checkbox"><input type="checkbox" id="portal-lan"> Тестовый HTTP в локальной сети</label>
 <div class="desktop-columns"><label>Логин<input id="login" autocomplete="username" required></label><label>Пароль<input id="password" type="password" autocomplete="current-password" required></label></div>
 <label id="nickname-label" hidden>Игровой никнейм<input id="nickname" maxlength="60"></label>
@@ -31,10 +31,10 @@
 <button class="plain" id="portal">Открыть портал Audit</button>
 </div>
 </section>
-<section class="desktop-card"><div class="row"><h2>Конфигурация устройства</h2><span id="agent-badge" class="status">● Agent</span></div>
+<section class="desktop-card"><div class="row"><h2>Роль устройства</h2><span id="agent-badge" class="status">● Agent</span></div>
 <p id="current">Agent подключается из комплекта Local. Для Global и Local используется конфигурация администратора.</p>
 <div class="actions"><button id="import" class="secondary">Загрузить конфигурацию</button><button id="start" disabled>Запустить</button><button id="stop" disabled class="secondary">Остановить</button></div>
-<div class="actions"><button id="panel" disabled class="plain">Открыть панель</button><button id="companion" disabled class="plain">Открыть аватар</button></div>
+<div class="actions"><button id="panel" disabled class="plain">Открыть панель роли</button><button id="companion" disabled class="plain">Открыть аватар</button></div>
 </section>
 </div>
 <section class="desktop-card" id="apps" hidden><h2>Приложения для ассистента</h2>
@@ -53,3 +53,4 @@
 <details class="desktop-card"><summary>Оформление</summary><div id="design"></div></details>
 <p id="message" class="message" role="status"></p>
 </main></div><script type="module" src="view.js"></script></body></html>
+
