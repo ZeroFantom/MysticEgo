@@ -5,6 +5,7 @@ import {useRemote} from '../app/context';
 import {GuestEntry} from './GuestPortal';
 import {ErrorBanner} from '../components/primitives';
 import {ThemeToggle} from './Settings';
+import {PanelLoginLinks} from './PanelDirectory';
 
 export type AuthLogin={accessToken:string;refreshToken:string;user?:{login?:string};expiresAt:string};
 export async function signIn(authUrl:string,login:string,password:string):Promise<AuthLogin>{
@@ -52,6 +53,7 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
    <div className="auth-form-card">
     <p className="auth-eyeline"><Sparkles size={17}/> {title}</p>
     <h2>{guest?'Гостевой сеанс':register?'Создать аккаунт':'Войти в MysticEgo'}</h2>
+    {mode==='orchestra'&&<PanelLoginLinks/>}
     {mode==='audit'&&<div className="auth-tabs" role="group" aria-label="Режим авторизации" data-register={register}>
       <button type="button" aria-pressed={!register} onClick={()=>selectMode(false)}>Вход</button>
       <button type="button" aria-pressed={register} onClick={()=>selectMode(true)}>Регистрация</button>

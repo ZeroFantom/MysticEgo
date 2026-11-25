@@ -19,6 +19,7 @@ import {Audit} from '../pages/Audit';
 import {AgentSystem} from '../pages/AgentSystem';
 import {Settings,initPalette,ThemeToggle} from '../pages/Settings';
 import {SignIn} from '../pages/SignIn';
+import {PanelDirectory} from '../pages/PanelDirectory';
 import {Identities} from '../pages/Identities';
 import {Users} from '../pages/Users';
 import {Diagnostics} from '../pages/Diagnostics';
@@ -141,7 +142,8 @@ function Workspace({logout}:{logout:()=>void}){
   const {mode,portal,personal,preferenceScope}=useApp();
   const {pathname}=useLocation();
   const nav=navigation(mode,portal);
-  if(mode==='orchestra')nav[0].items.push({to:'/project-branches',label:'Ветки GitHub',icon:Network},
+  if(mode==='orchestra')nav[0].items.push({to:'/panels',label:'Вход в панели',icon:Cloud},
+    {to:'/project-branches',label:'Ветки GitHub',icon:Network},
     {to:'/developer-assistant',label:'Помощник разработчика',icon:Bot});
   const current=nav.flatMap(section=>section.items).find(item=>item.to===pathname)?.label??(pathname==='/profile'?'Мой профиль':modes[mode].name);
   const [mobile,setMobile]=useState(false);
@@ -171,6 +173,7 @@ function Workspace({logout}:{logout:()=>void}){
         <Route path="/" element={mode==='orchestra'||mode==='global'||mode==='local'?<OrchestraOverview/>:mode==='audit'?<OrganizationRequests overview/>:<Overview/>}/>
         {['audit','orchestra'].includes(mode)&&<Route path="/development-team" element={<DevelopmentTeam/>}/>}
         {mode==='orchestra'&&<Route path="/model-workers" element={<ModelWorkers/>}/>}
+        {mode==='orchestra'&&<Route path="/panels" element={<PanelDirectory/>}/>}
         {mode==='orchestra'&&<Route path="/project-branches" element={<ProjectBranches/>}/>}
         {mode==='orchestra'&&<Route path="/developer-assistant" element={<DeveloperAssistant/>}/>}
         <Route path="/profile" element={<ProfilePage/>}/>
