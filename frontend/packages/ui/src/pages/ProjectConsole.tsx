@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import './project-console.css';
 import {useApp,useRemote} from '../app/context';
 import {Header,Panel,ErrorBanner} from '../components/primitives';
+import {useNotice,useNoticeFeed} from '../app/notifications';
 
 type Release={tag:string;publishedAt?:string;prerelease?:boolean};
 type PublishedRelease=Release&{name:string;publishedAt:string;url:string;notes:string;installable:boolean};
@@ -103,6 +104,8 @@ const phases:Record<string,string>={ready:'Доступно обновление
 
 function ReleaseUpdate(){
   const {api}=useApp();
+  const notify=useNoticeFeed()?.notify;
+  const [confirmation,setConfirmation]=useState<{tag:string;digest:string;target:Target}|null>(null);
   const state=useRemote(()=>api.request<UpdateState>('/orchestra/update'),[api],4000);
   const [approval,setApproval]=useState<{tag:string;at:number}|null>(null);
   const [error,setError]=useState('');
@@ -112,13 +115,20 @@ function ReleaseUpdate(){
   const waiting=canApprove&&!!approval&&candidate?.tag===approval.tag&&Date.now()-approval.at<90000;
   const targets=status?.protocol===2 ? status.targets??[] : ['orchestra'] as Target[];
 
-  async function approve(target:Target){
-    if(!canApprove||waiting||!candidate||
-      !window.confirm(`Установить ${candidate.tag} для ${targetLabel[target]}?${target==='audit'?'':' Orchestra кратковременно перезапустится.'}`))return;
-    setApproval({tag:candidate.tag,at:Date.now()});setError('');
+  const pendingConfirmation=canApprove&&!waiting&&confirmation&&candidate&&
+    confirmation.tag===candidate.tag&&confirmation.digest===candidate.digest&&targets.includes(confirmation.target)
+    ?confirmation:null;
+  const failed=status?.phase==='failed'||status?.phase==='unavailable';
+  useNotice(error||state.error||(failed?status?.message??phases[status?.phase??"failed"]:''));
+
+  async function approve(){
+    if(!pendingConfirmation)return;
+    const {target,tag,digest}=pendingConfirmation;
+    setConfirmation(null);setApproval({tag,at:Date.now()});setError('');
     try{
-      await api.request('/orchestra/update',{method:'POST',
-        body:JSON.stringify({tag:candidate.tag,digest:candidate.digest,target,confirmed:true})});
+      await api.request<void>('/orchestra/update',{method:'POST',
+        body:JSON.stringify({tag,digest,target,confirmed:true})});
+      notify?.(`Обновление ${targetLabel[target]} до ${tag} принято. Ожидаем службу обновления.`);
     }catch(e){setApproval(null);setError(e instanceof Error?e.message:String(e));}
   }
 
@@ -132,12 +142,19 @@ function ReleaseUpdate(){
     </div>
     <p role="status">{waiting?'Подтверждено. Ожидаем службу обновления.':
       status?(phases[status.phase]??status.phase):state.loading?'Проверяем службу обновления…':''}</p>
-    {status?.message&&<p>{status.message}</p>}
+    {status?.message&&!failed&&<p>{status.message}</p>}
     {status&&status.protocol!==2&&<p>Обновите службу на VPS через CloudDesk, чтобы включить отдельное обновление Audit.</p>}
     {canApprove&&candidate&&<div className="row-actions">{targets.map(target=><button key={target}
-      className={'btn '+(target===targets.at(-1)?'':'secondary')} disabled={waiting} onClick={()=>void approve(target)}>
+      className={'btn '+(target===targets.at(-1)?'':'secondary')} disabled={waiting||!!pendingConfirmation} onClick={()=>setConfirmation({tag:candidate.tag,digest:candidate.digest,target})}>
       <ArrowDownToLine size={16}/> Обновить {targetLabel[target]}</button>)}</div>}
-    <ErrorBanner text={error||state.error}/>
+    {pendingConfirmation&&<div className="stack">
+      <p>Установить {pendingConfirmation.tag} для {targetLabel[pendingConfirmation.target]}?
+        {pendingConfirmation.target!=='audit'&&' Orchestra кратковременно перезапустится.'}</p>
+      <div className="row-actions">
+        <button type="button" className="btn" onClick={()=>void approve()}>Подтвердить обновление</button>
+        <button type="button" className="btn secondary" onClick={()=>setConfirmation(null)}>Отмена</button>
+      </div>
+    </div>}
   </section>;
 }
 
@@ -208,5 +225,6 @@ export function ProjectBranches(){
     </section>
   </div>;
 }
+
 
 

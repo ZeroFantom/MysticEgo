@@ -52,7 +52,7 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
             catch (IOException) when (System.IO.File.Exists(path))
             { return Conflict(new { error = "Обновление уже ожидает запуска." }); }
             state.Log(User.Identity?.Name ?? "developer", "orchestra.update.approved", candidate.Tag + " " + target, true);
-            return Accepted();
+            return Accepted(new { accepted = true, target, tag = candidate.Tag });
         }
         finally { System.IO.File.Delete(temporary); }
     }
@@ -63,3 +63,4 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
     public sealed record UpdateStatus(string Phase, string? Current, Candidate? Candidate, string? Message,
         int Protocol = 0, string? CurrentAudit = null, string[]? Targets = null, string? LastTarget = null);
 }
+
