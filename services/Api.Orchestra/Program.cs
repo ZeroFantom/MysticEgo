@@ -84,9 +84,25 @@ app.Use(async (context,next)=>
 
 
 app.MapGet("/metrics", (HttpContext request, ServerTelemetry telemetry) =>
-    request.Connection.RemoteIpAddress is { } address && System.Net.IPAddress.IsLoopback(address)
+    request.Connection.RemoteIpAddress is { } address && System.Net.IPAddress.IsLoopback(address) &&
+    request.Request.Host.Host is "localhost" or "127.0.0.1" or "[::1]"
         ? Results.Text(telemetry.Prometheus(), "text/plain; version=0.0.4")
-        : Results.NotFound());
+        : Results.NotFound()).AllowAnonymous();
+app.MapGet("/api/v1/public/metrics-scrape", (HttpContext request, ServerTelemetry telemetry, NodeState state) =>
+{
+    var supplied = request.Request.Headers.Authorization.ToString();
+    if (!supplied.StartsWith("Bearer ", StringComparison.Ordinal) || supplied.Length != 71)
+        return Results.Unauthorized();
+    var tokenPath = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(state.Options.DataPath))!, "monitoring-token");
+    string token;
+    try { token = File.ReadAllText(tokenPath).Trim(); }
+    catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return Results.Unauthorized(); }
+    if (token.Length != 64 || !System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+        System.Text.Encoding.UTF8.GetBytes(token), System.Text.Encoding.UTF8.GetBytes(supplied[7..])))
+        return Results.Unauthorized();
+    request.Response.Headers.CacheControl = "no-store";
+    return Results.Text(telemetry.Prometheus(), "text/plain; version=0.0.4");
+}).AllowAnonymous();
 app.MapGet("/audit-portal/release-info.json", (IConfiguration configuration) =>
 {
     var webRoot = configuration["Managed:AuditWebRoot"];

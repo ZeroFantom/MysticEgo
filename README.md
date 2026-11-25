@@ -1,5 +1,11 @@
 # MysticEgo
 
+## R3.2.7 · Диагностика и инфраструктура
+
+CloudDesk и веб-панель Orchestra устанавливают Prometheus и Grafana,
+Docker, сервер LM Studio с моделью и PostgreSQL на выбранном VPS.
+[Размещение, настройка SSH, модели и базы данных](ops/infrastructure/README.md).
+
 ## R3.2.6 · Коллектив и обновления из GitHub
 
 «Коллектив» открывает список чатов с последними сообщениями и отдельным

@@ -170,6 +170,47 @@
         },
         "overrides": []
       }
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Доступность метрик Orchestra",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mysticego"
+      },
+      "targets": [
+        {
+          "expr": "up{job=\"mysticego\"}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Недоступно",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "Сбор работает",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      }
     }
   ]
 }

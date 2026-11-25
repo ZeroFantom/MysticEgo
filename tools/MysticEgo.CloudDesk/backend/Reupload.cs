@@ -38,7 +38,7 @@ sealed partial class CloudDesk {
         var source=Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,"..","..","..","ops","orchestra-updater"));
         string[] required=["bootstrap-r31.sh","baseline.sha256","install-worker.sh","update-orchestra.py",
             "mysticego-orchestra-updater.service","mysticego-orchestra-updater.timer","payload/Api.Orchestra.dll",
-            "payload/MysticEgo.WorldAI.dll","payload/web/index.html","payload/web/release-info.json","payload/web/favicon.ico","payload/web/mystic-mark.png"];
+            "payload/MysticEgo.WorldAI.dll","payload/MysticEgo.Installer.dll","payload/web/index.html","payload/web/release-info.json","payload/web/favicon.ico","payload/web/mystic-mark.png"];
         if(required.Any(file=>!File.Exists(Path.Combine(source,file))))throw new Exception("Распакуйте полный архив с обновлятором Orchestra.");
         var assets=Directory.GetFiles(Path.Combine(source,"payload","web","assets"));
         if(assets.Length==0)throw new Exception("В архиве отсутствует собранная панель Orchestra.");
