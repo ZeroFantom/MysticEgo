@@ -60,9 +60,8 @@ public sealed class ClubDeploymentController(NodeOptions node, IdentityTokenSour
                 var includes = new List<string> { "desktop/station", "desktop/control/center.mjs", "desktop/control/style.css", "desktop/control/effects.js",
                     "desktop/launch-runtime.mjs", "desktop/main.mjs", "desktop/preload.cjs", "desktop/package.json", "desktop/dist",
                     "runtime/app/bin", "runtime/app/settings", "runtime/app/web/agent", "runtime/app/web/audit", "runtime/vision", "runtime/avatars" };
-                if (platform == "windows") includes.AddRange(["AuditDesktop.exe", "AuditDesktop.dll", "AuditDesktop.runtimeconfig.json",
-                    "AuditDesktop.deps.json", "runtime/electron", "runtime/win-x64"]);
-                else includes.AddRange(["audit-desktop", "desktop/launch-linux.sh", "runtime/electron-linux", "runtime/linux-x64.tar.gz"]);
+                if (platform == "windows") includes.AddRange(["AgentDesktop.cmd", "runtime/electron", "runtime/win-x64"]);
+                else includes.AddRange(["agent-desktop", "desktop/launch-linux.sh", "runtime/electron-linux", "runtime/linux-x64.tar.gz"]);
                 foreach (var include in includes)
                 {
                     var path = Path.Combine(root!, include);
@@ -76,7 +75,7 @@ public sealed class ClubDeploymentController(NodeOptions node, IdentityTokenSour
                     var relative = Path.GetRelativePath(root!, file).Replace('\\', '/');
                     var entry = archive.CreateEntry(relative, relative.EndsWith(".gz") ? CompressionLevel.NoCompression : CompressionLevel.Fastest);
                     if (!OperatingSystem.IsWindows()) entry.ExternalAttributes = ((int)System.IO.File.GetUnixFileMode(file) & 511) << 16;
-                    else if (relative is "audit-desktop" or "desktop/launch-linux.sh" || relative.StartsWith("runtime/electron-linux/"))
+                    else if (relative is "agent-desktop" or "desktop/launch-linux.sh" || relative.StartsWith("runtime/electron-linux/"))
                         entry.ExternalAttributes = 0x81ed << 16;
                     await using var from = System.IO.File.OpenRead(file);
                     await using var to = entry.Open();
@@ -90,3 +89,4 @@ public sealed class ClubDeploymentController(NodeOptions node, IdentityTokenSour
         catch { if (System.IO.File.Exists(temp)) System.IO.File.Delete(temp); throw; }
     }
 }
+

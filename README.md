@@ -1,5 +1,10 @@
 # MysticEgo
 
+## R3.2.13 · AuditDesktop и AgentDesktop
+
+Личный Audit открывается после входа в AuditDesktop. На Linux запустите `./audit-desktop`, на Windows — `AuditDesktop.exe`.
+Клубная станция запускается отдельно через `./agent-desktop` или `AgentDesktop.cmd`. Для подключения загрузите комплект от администратора Local.
+
 ## R3.2.11 · Установка с VPS, AuditDesktop и уведомления
 
 На Ubuntu 24.04 главный разработчик может установить Docker или LM Studio
@@ -272,4 +277,5 @@ MysticEgo объединяет администрирование компьют
 Проект находится в бета-тестировании. Игровые анкеты описывают стиль игры, а квесты и распределение очков развивают навыки персонажа. Локальный ассистент использует LM Studio.
 
 [Развёртывание и проверки CloudDesk](tools/MysticEgo.CloudDesk/DEPLOYMENT.md)
+
 

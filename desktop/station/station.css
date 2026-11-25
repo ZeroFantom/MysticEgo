@@ -1,0 +1,10 @@
+[hidden]{display:none!important}
+body{background:#10141d;color:#eef2f7}
+.desktop-header{background:#141b26;border-bottom:1px solid #283649}
+.product-icon{width:52px;height:52px;border-radius:14px}
+.desktop-card{background:#17212e;border:1px solid #2b394b;border-radius:16px;padding:18px}
+main{max-width:1080px;margin:0 auto}
+body[data-product=audit] .desktop-columns:has(>.account-card){grid-template-columns:minmax(0,560px);justify-content:center}
+body[data-product=agent] .desktop-columns:has(>.account-card){grid-template-columns:1fr 1fr}
+button,input,select{border-radius:9px}
+@media(max-width:760px){body[data-product=agent] .desktop-columns:has(>.account-card){grid-template-columns:1fr}}
