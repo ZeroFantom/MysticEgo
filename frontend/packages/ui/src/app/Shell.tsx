@@ -1,3 +1,4 @@
+import {CloudDeskDownloads,PublicDesktopDownloads} from '../pages/DesktopDownloads';
 import {NoticeBell,NotificationProvider,useNotice} from './notifications';
 import './workspace-rail.css';
 import {ErrorBanner} from '../components/primitives';
@@ -127,10 +128,13 @@ function AnimatedArea({children}:{children:ReactNode}){
 }
 
 function Workspace({logout}:{logout:()=>void}){
-  const {mode,portal,personal,preferenceScope}=useApp();
+  const {mode,portal,personal,preferenceScope,api}=useApp();
+  const developer=useRemote(()=>mode==='orchestra'?api.request<{owner:boolean;membership?:{status:string}}>('/managed/development-team'):Promise.resolve(null),[api,mode]);
+  const cloudDownloads=mode==='orchestra'&&(developer.value?.owner||developer.value?.membership?.status==='approved');
   const {pathname}=useLocation();
   const nav=navigation(mode,portal);
   if(mode==='orchestra')nav[0].items.push({to:'/project-branches',label:'Ветки GitHub',icon:Network});
+  if(cloudDownloads)nav[0].items.push({to:'/clouddesk-downloads',label:'Скачать CloudDesk',icon:Cloud});
   const current=nav.flatMap(section=>section.items).find(item=>item.to===pathname)?.label??(pathname==='/profile'?'Мой профиль':modes[mode].name);
   const [mobile,setMobile]=useState(false);
   const emblem=modes[mode].icon;
@@ -159,6 +163,8 @@ function Workspace({logout}:{logout:()=>void}){
         <Route path="/" element={mode==='orchestra'||mode==='global'||mode==='local'?<OrchestraOverview/>:mode==='audit'?<OrganizationRequests overview/>:<Overview/>}/>
         {['audit','orchestra'].includes(mode)&&<Route path="/development-team" element={<DevelopmentTeam/>}/>}
         {mode==='orchestra'&&<Route path="/model-workers" element={<Navigate to="/assistant?tab=models" replace/>}/>}
+        {mode==='orchestra'&&<Route path="/clouddesk-downloads" element={cloudDownloads?<CloudDeskDownloads/>:
+          <p role="status">{developer.loading?'Проверяем доступ…':'Скачивание CloudDesk доступно команде разработки.'}</p>}/>}
         {mode==='orchestra'&&<Route path="/panels" element={<PanelDirectory/>}/>}
         {mode==='orchestra'&&<Route path="/project-branches" element={<ProjectBranches/>}/>}
         {mode==='orchestra'&&<Route path="/developer-assistant" element={<Navigate to="/assistant?tab=developer" replace/>}/>}
@@ -205,6 +211,7 @@ export function MysticApp({mode,defaultApi}:{mode:NodeMode;title:string;defaultA
   const scope=accountScope(session,mode,portal);
   const profile=useRemote(async()=>session.token?{scope,account:await api.request<PersonalAccount>('/collective/me')}:null,[api,scope]);
   useEffect(()=>initPalette(scope),[scope]);
+  if(mode==='orchestra'&&location.pathname.replace(/\/$/,'')==='/desktop-downloads')return <PublicDesktopDownloads/>;
   if(mode==='orchestra'&&location.pathname==='/agent-desktop')return <AgentDesktopEntry/>;
   if(restoring)return <NotificationProvider><main className="auth-experience"><section className="auth-form-side">
     <div className="auth-form-card">

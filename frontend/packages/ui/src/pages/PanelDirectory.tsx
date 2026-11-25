@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {ArrowRight,Building2,ExternalLink,Monitor,ShieldCheck,UserRound} from 'lucide-react';
+import {ArrowRight,Building2,Download,ExternalLink,Monitor,ShieldCheck,UserRound} from 'lucide-react';
 import {Link,useSearchParams} from 'react-router-dom';
 import {useApp,useRemote} from '../app/context';
 import {ErrorBanner,Header,Panel} from '../components/primitives';
@@ -69,6 +69,7 @@ export function PanelLoginLinks(){
         <Icon size={17} aria-hidden="true"/><span><strong>{name}</strong><small>{description}</small></span>
       </a>)}
     </nav>
+    <a className="panel-directory-link" href="/desktop-downloads"><span>Скачать приложения</span><Download size={16} aria-hidden="true"/></a>
     {entries.length>0&&<details className="panel-published-links"><summary>Прямые ссылки</summary><div>{entryLinks(entries)}</div></details>}
   </section>;
 }
@@ -86,13 +87,13 @@ export function AgentDesktopEntry(){
       <h1>Вход в Agent</h1>
       <p>Для входа на рабочую станцию нужен запущенный AgentDesktop.</p>
       <ol>
-        <li>Если AgentDesktop ещё не установлен, скачайте полный архив MysticEgo.</li>
+        <li>Если AgentDesktop ещё не установлен, скачайте комплект приложений MysticEgo.</li>
         <li>Запустите <code>AgentDesktop.cmd</code> на Windows или <code>./agent-desktop</code> на Linux.</li>
         <li>Для клубного Agent используйте комплект, выданный администратором Local. Откройте «Панель роли» в AgentDesktop.</li>
       </ol>
       <div className="row-actions">
         <a className="btn secondary" href="/">К входу Orchestra</a>
-        <a className="btn" href="https://github.com/ZeroFantom/MysticEgo/releases/tag/v1.0.0-beta.7-r3.2.13" rel="noreferrer">Скачать AgentDesktop</a>
+        <a className="btn" href="/desktop-downloads" rel="noreferrer">Скачать AgentDesktop</a>
         <a className="btn secondary" href="/panels?kind=agent">Удалённые Agent</a>
       </div>
     </section>
