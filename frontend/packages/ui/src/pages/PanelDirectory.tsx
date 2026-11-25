@@ -54,32 +54,49 @@ function entryLinks(rows:Entry[]){
 export function PanelLoginLinks(){
   const entries=usePublicEntries();
   const requested=new URLSearchParams(location.search).get('kind');
-  return <div className="panel-login-picker">
+  const roleCards=[
+    {name:'Orchestra',icon:ShieldCheck,href:'/',description:'Управление сетью',kind:null},
+    {name:'Audit',icon:UserRound,href:'/audit-portal/',description:'Личный профиль',kind:'audit'},
+    {name:'Global',icon:Building2,href:'/panels?kind=global',description:'Панель организации',kind:'global'},
+    {name:'Agent',icon:Monitor,href:'/agent-desktop',description:'Рабочая станция',kind:'agent'},
+  ] as const;
+  return <section className="panel-login-picker" aria-label="Выбор панели">
     {location.pathname==='/panels'&&(requested==='global'||requested==='agent')&&
       <p className="footnote">Войдите, чтобы увидеть доступные вам панели {requested==='global'?'Global':'Agent'}.</p>}
-    <details>
-      <summary>Выбрать панель входа</summary>
-      <nav aria-label="Вход в панели" className="panel-directory-grid">
-        <a className="panel-directory-link" href="/"><ShieldCheck size={17} aria-hidden="true"/><span>Orchestra</span><ArrowRight size={15} aria-hidden="true"/></a>
-        <a className="panel-directory-link" href="/audit-portal/"><UserRound size={17} aria-hidden="true"/><span>Audit</span><ArrowRight size={15} aria-hidden="true"/></a>
-        {categories.filter(row=>row.kind!=='audit').map(({kind,name,icon:Icon})=>{
-          const listed=entries.filter(row=>row.kind===kind);
-          return <div className="panel-directory-group" key={kind}>
-            <a className="panel-directory-link" href={'/panels?kind='+kind}><Icon size={17} aria-hidden="true"/><span>{name}</span><ArrowRight size={15} aria-hidden="true"/></a>
-            {entryLinks(listed)}
-            {kind==='agent'&&<LocalAgent/>}
-          </div>;
-        })}
-        {entryLinks(entries.filter(row=>row.kind==='audit'))}
-      </nav>
-    </details>
-  </div>;
+    <nav aria-label="Вход в панели" className="panel-directory-grid">
+      {roleCards.map(({name,icon:Icon,href,description,kind})=><a key={name} className="panel-login-card" href={href}
+        aria-current={kind===null&&location.pathname==='/'?'page':undefined}>
+        <Icon size={17} aria-hidden="true"/><span><strong>{name}</strong><small>{description}</small></span>
+      </a>)}
+    </nav>
+    {entries.length>0&&<details className="panel-published-links"><summary>Прямые ссылки</summary><div>{entryLinks(entries)}</div></details>}
+  </section>;
 }
 
 function LocalAgent(){
-  return <a className="panel-directory-link" href="http://127.0.0.1:5300/" rel="noreferrer">
-    <span>Agent на этом компьютере</span><ExternalLink size={15} aria-hidden="true"/>
+  return <a className="panel-directory-link" href="/agent-desktop">
+    <span>Подключить Agent через AuditDesktop</span><ArrowRight size={15} aria-hidden="true"/>
   </a>;
+}
+
+export function AgentDesktopEntry(){
+  return <main className="agent-desktop-entry">
+    <section className="panel">
+      <Monitor size={27} aria-hidden="true"/>
+      <h1>Вход в Agent</h1>
+      <p>Для входа на рабочую станцию нужен запущенный AuditDesktop. Приложение открывает клубный Agent и личный Audit.</p>
+      <ol>
+        <li>Если AuditDesktop ещё не установлен, скачайте полный архив MysticEgo.</li>
+        <li>Запустите <code>AuditDesktop.exe</code> на Windows или <code>./audit-desktop</code> на Linux.</li>
+        <li>Для клубного Agent используйте комплект, выданный администратором Local. Откройте «Панель роли» в AuditDesktop.</li>
+      </ol>
+      <div className="row-actions">
+        <a className="btn secondary" href="/">К входу Orchestra</a>
+        <a className="btn" href="https://github.com/ZeroFantom/MysticEgo/releases/tag/v1.0.0-beta.7-r3.2.10" rel="noreferrer">Скачать AuditDesktop</a>
+        <a className="btn secondary" href="/panels?kind=agent">Удалённые Agent</a>
+      </div>
+    </section>
+  </main>;
 }
 
 export function PanelDirectory(){
@@ -104,10 +121,11 @@ export function PanelDirectory(){
         {kind==='audit'&&<a className="panel-directory-link" href="/audit-portal/"><span>Открыть Audit</span><ArrowRight size={15} aria-hidden="true"/></a>}
         {entryLinks(rows)}
         {kind!=='audit'&&rows.length===0&&<p className="footnote">{managed.loading?'Загружаем доступные панели…':
-          kind==='agent'?'У доступных вам Agent пока нет HTTPS-адреса. Локальный Agent открывается на своём компьютере.':'Для этого аккаунта пока нет Global с настроенным HTTPS-адресом.'}</p>}
+          kind==='agent'?'У доступных вам Agent пока нет HTTPS-адреса. Локальный Agent открывается через AuditDesktop.':'Для этого аккаунта пока нет Global с настроенным HTTPS-адресом.'}</p>}
         {kind==='agent'&&<LocalAgent/>}
       </Panel>;
     })}
     {managed.value?.truncated&&<p className="footnote">Показаны первые 500 доступных панелей.</p>}
   </div>;
 }
+

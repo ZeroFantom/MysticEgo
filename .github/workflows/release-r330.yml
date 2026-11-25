@@ -1,0 +1,106 @@
+name: MysticEgo R3.2.10 release
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/release-r330.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency: mysticego-release-r330
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: v1.0.0-beta.7-r3.2.10
+      ASSET: MysticEgo_BETA7_R3.2.10.zip
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Download and verify previous full bundle
+        run: |
+          gh release download v1.0.0-beta.7-r3.2.2 --pattern MysticEgo_BETA7_R3.2.2_CloudDesk.zip
+          printf '%s  %s\n' c001140a2df1dda4d369cf34fe4d0a4f8687fa8f71d29a1cd3b9fdf645ca2122 MysticEgo_BETA7_R3.2.2_CloudDesk.zip | sha256sum -c -
+          unzip -q MysticEgo_BETA7_R3.2.2_CloudDesk.zip -d bundle
+          git archive --format=tar HEAD | tar -xf - -C bundle/MysticEgo
+      - name: Build CloudDesk and web panels
+        run: |
+          dotnet publish tools/MysticEgo.CloudDesk/backend/CloudDesk.csproj -c Release -o "$RUNNER_TEMP/clouddesk"
+          npm --prefix tools/MysticEgo.CloudDesk install --ignore-scripts --no-audit
+          npm --prefix tools/MysticEgo.CloudDesk run build
+          npm --prefix frontend ci --ignore-scripts --no-audit
+          npm --prefix frontend run build
+          dotnet build services/Api.Orchestra/Api.Orchestra.csproj -c Release
+          dotnet build tools/MysticEgo.Installer/MysticEgo.Installer.csproj -c Release
+          bash -n ops/infrastructure/install.sh
+          bash -n ops/infrastructure/run-web.sh
+          bash -n ops/infrastructure/install-local.sh
+          PYTHONPYCACHEPREFIX="$RUNNER_TEMP/pycache" python3 -m py_compile ops/infrastructure/local-runner.py
+          PYTHONPYCACHEPREFIX="$RUNNER_TEMP/pycache" python3 tests/InfrastructureLocalSocketSmoke.py
+          node --check desktop/station/main.mjs
+          node --check desktop/station/view.js
+          bash -n ops/panel-assistant/install-default-model.sh
+          PYTHONPYCACHEPREFIX="$RUNNER_TEMP/pycache" python3 -m py_compile ops/infrastructure/install.py
+      - name: Assemble and verify release
+        run: |
+          root="$PWD/bundle/MysticEgo"
+          desk="$root/tools/MysticEgo.CloudDesk"
+          rm -rf "$desk/dist" "$desk/out"
+          cp -a tools/MysticEgo.CloudDesk/dist "$desk/dist"
+          mkdir -p "$desk/out"
+          cp "$RUNNER_TEMP"/clouddesk/CloudDesk.{dll,deps.json,runtimeconfig.json} "$desk/out/"
+          cp -a "$RUNNER_TEMP/clouddesk/profiles" "$desk/out/"
+          api=services/Api.Orchestra/bin/Release/net10.0/Api.Orchestra.dll
+          sha256sum "$root/runtime/app/bin/Api.Orchestra.dll" | cut -d ' ' -f 1 > "$root/ops/orchestra-updater/baseline.sha256"
+          cp "$api" "$root/runtime/app/bin/"
+          cp "$api" "$root/ops/orchestra-updater/payload/"
+          world=services/MysticEgo.WorldAI/bin/Release/net10.0/MysticEgo.WorldAI.dll
+          cp "$world" "$root/runtime/app/bin/"
+          cp "$world" "$root/ops/orchestra-updater/payload/"
+          installer=tools/MysticEgo.Installer/bin/Release/net10.0/MysticEgo.Installer.dll
+          cp "$installer" "$root/runtime/app/bin/"
+          cp "$installer" "$root/ops/orchestra-updater/payload/"
+          for panel in agent audit global local orchestra; do
+            rm -rf "$root/runtime/app/web/$panel"
+            cp -a "frontend/apps/$panel/dist" "$root/runtime/app/web/$panel"
+          done
+          rm -rf "$root/ops/orchestra-updater/payload/web"
+          cp -a "$root/runtime/app/web/orchestra" "$root/ops/orchestra-updater/payload/web"
+          stage=$(mktemp -d)
+          ln -s "$root/runtime/app/web/audit" "$stage/web"
+          cp "$root/ops/audit-portal/install-audit-portal.sh" "$stage/"
+          bash "$stage/install-audit-portal.sh" --check
+          dotnet "$desk/out/CloudDesk.dll" </dev/null
+          (cd bundle && zip -qr "../$ASSET" MysticEgo)
+          unzip -tq "$ASSET"
+          PYTHONPYCACHEPREFIX="$RUNNER_TEMP/pycache" python3 -m py_compile ops/orchestra-updater/update-orchestra.py
+          python3 ops/orchestra-updater/prepare-release.py "$ASSET"
+          unzip -tq MysticEgo-Orchestra-linux-x64.zip
+          python3 - <<'PY'
+          import runpy, tempfile
+          from pathlib import Path
+          worker = runpy.run_path("ops/orchestra-updater/update-orchestra.py")
+          with tempfile.TemporaryDirectory() as temporary:
+              app = worker["unpack"](Path("MysticEgo-Orchestra-linux-x64.zip"), Path(temporary))
+              for component in ("orchestra", "audit"):
+                  assert worker["panel_version"](app / worker["WEB"] / component) == "v1.0.0-beta.7-r3.2.10"
+          PY
+      - name: Publish prerelease
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists."
+            exit 0
+          fi
+          gh release create "$TAG" "$ASSET" MysticEgo-Orchestra-linux-x64.zip --target "$GITHUB_SHA" --prerelease \
+            --title 'MysticEgo BETA7 R3.2.10' \
+            --notes 'Local Docker and LM Studio installation from Orchestra, separate personal Audit and club Agent in AuditDesktop, redesigned sign-in selector, compact sidebar, live release polling and notification center.'
+

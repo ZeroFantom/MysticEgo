@@ -4,6 +4,7 @@ import {Panel,ErrorBanner} from '../components/primitives';
 
 type Setup={
   targets:string[];
+  localAvailable?:boolean;
   run?:{target:string;component:string;status:'running'|'done'|'failed';message:string};
 };
 const items=[
@@ -22,11 +23,13 @@ export function InfrastructureSetup({initial='monitoring'}:{initial?:string}){
   const [role,setRole]=useState('panel-data'),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const needsSecret=component==='metrics-source'||component==='auth-postgres'||component==='monitoring'&&!!url.trim();
   const showSecret=needsSecret||component==='postgres';
-  const selected=state.value?.targets.includes(target)?target:state.value?.targets[0]??'';
+  const candidates=[...(state.value?.localAvailable&&['docker','lmstudio'].includes(component)?['@local']:[]),...(state.value?.targets??[])];
+  const selected=candidates.includes(target)?target:candidates[0]??'';
+  const targetName=(value:string)=>value==='@local'?'Этот VPS Orchestra':value;
 
   async function install(event:FormEvent){
     event.preventDefault();
-    if(!selected||busy||!window.confirm(`Установить «${items.find(([id])=>id===component)?.[1]}» на ${selected}?`))return;
+    if(!selected||busy||!window.confirm(`Установить «${items.find(([id])=>id===component)?.[1]}» на ${targetName(selected)}?`))return;
     setBusy(true);setError('');
     try {
       await api.request(endpoint,{method:'POST',body:JSON.stringify({
@@ -42,12 +45,15 @@ export function InfrastructureSetup({initial='monitoring'}:{initial?:string}){
   </Panel>:null;
 
   return <Panel title="Развёртывание инфраструктуры">
-    {!state.value.targets.length?<p>Добавьте доверенный SSH-сервер в конфигурацию Orchestra или запустите установку из CloudDesk.</p>:
     <form className="stack" onSubmit={install}>
-      <label>Сервер<select value={selected} onChange={e=>setTarget(e.target.value)}>
-        {state.value.targets.map(host=><option key={host}>{host}</option>)}</select></label>
       <label>Компонент<select value={component} onChange={e=>{setComponent(e.target.value);setSecret('')}}>
         {items.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label>
+      <label>Сервер<select value={selected} onChange={e=>setTarget(e.target.value)} disabled={!candidates.length}>
+        {!candidates.length&&<option value="">Нет доступного сервера</option>}
+        {candidates.map(host=><option key={host} value={host}>{targetName(host)}</option>)}</select></label>
+      {!candidates.length&&<p className="footnote">{['docker','lmstudio'].includes(component)
+        ?'Обновите Orchestra через CloudDesk, чтобы включить локальную установку.'
+        :'Добавьте доверенный SSH-сервер для этого компонента.'}</p>}
       {['monitoring','model-connect'].includes(component)&&<label>{component==='monitoring'?'HTTPS-адрес Orchestra':'Локальный адрес или SSH-туннель к LM Studio'}
         <input type="url" placeholder={component==='monitoring'?'Пусто для Orchestra на том же сервере':'http://127.0.0.1:1234'} value={url} onChange={e=>setUrl(e.target.value)}/>
       </label>}
@@ -64,11 +70,12 @@ export function InfrastructureSetup({initial='monitoring'}:{initial?:string}){
         <input type="password" autoComplete="off" pattern="[a-f0-9]{64}" placeholder="64 строчных hex-символа"
           required={needsSecret} value={secret} onChange={e=>setSecret(e.target.value)}/>
       </label>}
-      <button className="btn" disabled={busy||state.loading||state.value.run?.status==='running'}>Подтвердить установку</button>
-    </form>}
+      <button className="btn" disabled={!selected||busy||state.loading||state.value.run?.status==='running'}>Подтвердить установку</button>
+    </form>
     {state.value.run&&<div role="status"><p>{state.value.run.target} · {{
       running:'Установка выполняется',done:'Установлено',failed:'Ошибка установки',
     }[state.value.run.status]}</p><pre className="output">{state.value.run.message}</pre></div>}
     <ErrorBanner text={error||state.error}/>
   </Panel>;
 }
+

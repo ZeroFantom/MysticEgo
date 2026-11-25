@@ -1,0 +1,19 @@
+.release-status-icon{display:none}
+.notification-preview{display:flex;align-items:center;justify-content:space-between;gap:.55rem;overflow-wrap:anywhere}
+.notification-drawer article>div,.notification-preview>p{min-width:0;overflow-wrap:anywhere}
+@media (min-width:851px){
+  .app-shell.mystic-workspace>.sidebar{position:fixed;z-index:31;inset:0 auto 0 0;width:68px;min-width:0;height:100dvh;overflow:hidden;transition:width .2s ease}
+  .app-shell.mystic-workspace>.main{margin-inline-start:68px}
+  .app-shell.mystic-workspace>.sidebar:is(:hover,:focus-within){width:224px;box-shadow:8px 0 22px #0004}
+  .mystic-workspace .sidebar .brand,.mystic-workspace .sidebar .node-label,.mystic-workspace .sidebar .nav-link{white-space:nowrap}
+  .mystic-workspace .sidebar:not(:hover,:focus-within) :is(.brand strong,.node-label>div,.nav-link>span,.nav-title,.release-status>small){visibility:hidden}
+  .mystic-workspace .sidebar:not(:hover,:focus-within) .brand{padding-inline:15px}
+  .mystic-workspace .sidebar:not(:hover,:focus-within) .node-label{padding-inline:8px;margin-inline:10px}
+  .mystic-workspace .sidebar:not(:hover,:focus-within) .nav-link{gap:0;padding-inline:9px}
+  .mystic-workspace .sidebar .nav-link svg,.mystic-workspace .sidebar .brand-mark{flex:none}
+  .mystic-workspace .sidebar nav{min-height:0;overflow:auto;scrollbar-width:thin}
+  .mystic-workspace .sidebar:not(:hover,:focus-within) .release-status-icon{display:block}
+  .mystic-workspace .sidebar:not(:hover,:focus-within) .release-status{gap:0}
+  .mystic-workspace .sidebar:not(:hover,:focus-within) .release-status>small{height:0;overflow:hidden}
+}
+@media (prefers-reduced-motion:reduce){.app-shell.mystic-workspace>.sidebar{transition:none}}
