@@ -20,14 +20,15 @@
 .notification-drawer{max-height:min(430px,calc(100dvh - 100px));overscroll-behavior:contain}
 @media(max-width:650px){
   .mystic-workspace .content{padding:17px 12px calc(86px + env(safe-area-inset-bottom))}
-  .mystic-workspace .panel{padding:15px;border-radius:14px}
+  :root:not([data-density=compact]) .mystic-workspace .panel{padding:16px;border-radius:14px}
   .mystic-workspace .page-header{gap:12px;margin-bottom:16px}
   .mystic-workspace .page-header h1{font-size:clamp(20px,6vw,24px);overflow-wrap:anywhere}
   .mystic-workspace .page-header p{line-height:1.5;overflow-wrap:anywhere}
   .mystic-workspace .orchestral-topbar{min-height:60px;padding:8px 10px}
   .mystic-workspace .breadcrumb>span,.mystic-workspace .breadcrumb>svg{display:none}
-  .mystic-workspace .row-actions{gap:8px}
+  .mystic-workspace .row-actions{gap:10px}
   .mystic-workspace .row-actions>.btn{min-height:42px;white-space:normal}
+  .mystic-workspace :is(.two-col,.overview-grid,.telemetry-grid){gap:14px}
   .mystic-workspace .form-pair{grid-template-columns:minmax(0,1fr)}
   .notification-float{right:12px;bottom:calc(12px + env(safe-area-inset-bottom))}
   .notification-drawer{width:min(360px,calc(100vw - 24px))}
