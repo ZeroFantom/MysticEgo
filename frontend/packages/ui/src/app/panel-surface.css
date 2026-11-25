@@ -1,0 +1,38 @@
+/* Retain normal scrolling without the browser gutter. */
+:root{scrollbar-width:none}
+:root::-webkit-scrollbar{display:none}
+:root{--panel-shadow:0 3px 10px #08071725,0 14px 35px #08071722}
+:root[data-theme=light]{--panel-shadow:0 3px 8px #251a4010,0 12px 27px #2d164513}
+:is(.mystic-workspace .panel,.mystic-workspace .metric,.mystic-workspace .stat-tile,.auth-form-card,.desktop-download-card){
+  box-shadow:var(--panel-shadow)
+}
+.notification-drawer [data-tone],.notification-preview{--notice-accent:#81a6fc}
+[data-tone=success]{--notice-accent:#39b997!important}
+[data-tone=warning]{--notice-accent:#dfa44b!important}
+[data-tone=error]{--notice-accent:#ea718b!important}
+.notification-drawer.notification-preview{
+  border-inline-start:4px solid var(--notice-accent);
+  background:color-mix(in srgb,var(--notice-accent) 13%,var(--surface));
+}
+.notification-preview>svg{color:var(--notice-accent);flex:none}
+.notification-preview>p{flex:1}
+.notification-drawer article[data-tone]{border-inline-start:2px solid var(--notice-accent);padding-inline-start:10px}
+.notification-drawer{max-height:min(430px,calc(100dvh - 100px));overscroll-behavior:contain}
+@media(max-width:650px){
+  .mystic-workspace .content{padding:17px 12px calc(86px + env(safe-area-inset-bottom))}
+  .mystic-workspace .panel{padding:15px;border-radius:14px}
+  .mystic-workspace .page-header{gap:12px;margin-bottom:16px}
+  .mystic-workspace .page-header h1{font-size:clamp(20px,6vw,24px);overflow-wrap:anywhere}
+  .mystic-workspace .page-header p{line-height:1.5;overflow-wrap:anywhere}
+  .mystic-workspace .orchestral-topbar{min-height:60px;padding:8px 10px}
+  .mystic-workspace .breadcrumb>span,.mystic-workspace .breadcrumb>svg{display:none}
+  .mystic-workspace .row-actions{gap:8px}
+  .mystic-workspace .row-actions>.btn{min-height:42px;white-space:normal}
+  .mystic-workspace .form-pair{grid-template-columns:minmax(0,1fr)}
+  .notification-float{right:12px;bottom:calc(12px + env(safe-area-inset-bottom))}
+  .notification-drawer{width:min(360px,calc(100vw - 24px))}
+}
+@media(max-width:390px){
+  .mystic-workspace .page-header .btn{width:100%}
+  .mystic-workspace .metrics,.mystic-workspace .info-grid{grid-template-columns:minmax(0,1fr)}
+}

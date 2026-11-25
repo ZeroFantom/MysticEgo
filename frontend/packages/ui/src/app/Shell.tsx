@@ -1,3 +1,5 @@
+import './panel-surface.css';
+import {ServerUpdateProvider,useServerUpdate} from './serverUpdate';
 import {CloudDeskDownloads,PublicDesktopDownloads} from '../pages/DesktopDownloads';
 import {NoticeBell,NotificationProvider,useNotice} from './notifications';
 import './workspace-rail.css';
@@ -114,7 +116,8 @@ function NotificationsFloat(){
   const {api}=useApp();
   const data=useRemote(()=>api.request<Notification[]>('/collective/notifications'),[api],10000);
   const [problem,setProblem]=useState('');
-  useNotice(problem||data.error);
+  const pending=useServerUpdate()?.pending;
+  useNotice(problem||(!pending?data.error:''));
   async function read(id:string){
     try{await api.request('/collective/notifications/'+id+'/read',{method:'POST'});setProblem('');data.reload()}
     catch(error){setProblem(String(error))}
@@ -216,7 +219,7 @@ export function MysticApp({mode,defaultApi}:{mode:NodeMode;title:string;defaultA
   if(restoring)return <NotificationProvider><main className="auth-experience"><section className="auth-form-side">
     <div className="auth-form-card">
       <h2>Восстановление входа</h2>
-      <p role="status">Проверяем сохранённую сессию…</p><ErrorBanner text={restoreError}/>
+      <p role="status">Проверяем сохранённую сессию. Если сервер ещё запускается, вход восстановится автоматически.</p><ErrorBanner text={restoreError}/>
       {restoreError&&<button className="btn" onClick={retryRestore}>Повторить</button>}
       <button className="btn secondary" onClick={logout}>Войти заново</button>
     </div>
@@ -226,7 +229,7 @@ export function MysticApp({mode,defaultApi}:{mode:NodeMode;title:string;defaultA
     return <NotificationProvider><SignIn mode={mode} session={session} onLogin={setSession} onGuest={setGuestToken}/><NoticeBell/></NotificationProvider>;
   }
   return <CTX.Provider value={{mode,session,setSession,api,portal,preferenceScope:scope,personal:profile.value?.scope===scope?profile.value.account:null,profileError:profile.error,reloadProfile:profile.reload}}>
-    <BrowserRouter basename={portal?'/audit-portal':undefined}><NotificationProvider key={scope}><Workspace logout={logout}/></NotificationProvider></BrowserRouter>
+    <BrowserRouter basename={portal?'/audit-portal':undefined}><NotificationProvider key={scope}><ServerUpdateProvider><Workspace logout={logout}/></ServerUpdateProvider></NotificationProvider></BrowserRouter>
   </CTX.Provider>;
 }
 

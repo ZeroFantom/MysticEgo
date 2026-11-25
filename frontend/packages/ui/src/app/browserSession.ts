@@ -53,6 +53,8 @@ export function useBrowserSession(key:string,initial:Session){
  useEffect(()=>{
   if(!session.refreshToken)return;
   let active=true;
+  const restoreStarted=Date.now();
+  let failures=0;
   let timer:number;
   const schedule=(delay:number)=>{timer=window.setTimeout(refresh,delay);};
   async function refresh(){
@@ -75,8 +77,12 @@ export function useBrowserSession(key:string,initial:Session){
     setSession(next);
    }catch{
     if(!active||current.current!==session)return;
-    if(!session.token)setRestoreError('Не удалось восстановить вход. Проверьте соединение и повторите.');
-    else schedule(30000);
+    if(session.token){schedule(30000);return;}
+    if(Date.now()-restoreStarted<120000){
+     schedule(Math.min(10000,2000*2**failures++));
+     return;
+    }
+    setRestoreError('Не удалось восстановить вход за две минуты. Повторите проверку, когда сервер будет доступен.');
    }
   }
   setRestoreError('');
