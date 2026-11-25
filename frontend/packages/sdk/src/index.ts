@@ -27,7 +27,8 @@ export class NodeApi {
         throw new ApiError(response.status,description||('HTTP '+response.status));
       }
       if(response.status===204)return undefined as T;
-      return await response.json() as T;
+      const body=await response.text();
+      return body.trim()?JSON.parse(body) as T:undefined as T;
     }catch(error){ if(error instanceof DOMException && (error.name==='AbortError'||error.name==='TimeoutError'))throw new Error(timeoutMessage);throw error; }finally{clearTimeout(timer)}
   }
   deployment=()=>this.request<{mode:string;label:string;description?:string;node:string;kind:string;auth:string;global?:string;local?:string}>('/deployment');
@@ -69,3 +70,4 @@ export const collections = [
   {id:'profiles',label:'Профили',scope:['global','local','agent']},
   {id:'alerts',label:'Оповещения',scope:['global','local','agent']},
 ] as const;
+
