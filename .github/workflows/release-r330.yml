@@ -45,6 +45,7 @@ jobs:
           bash -n ops/infrastructure/run-web.sh
           bash -n ops/infrastructure/install-local.sh
           PYTHONPYCACHEPREFIX="$RUNNER_TEMP/pycache" python3 -m py_compile ops/infrastructure/local-runner.py
+          PYTHONPYCACHEPREFIX="$RUNNER_TEMP/pycache" python3 tests/InfrastructureLocalSocketSmoke.py
           node --check desktop/station/main.mjs
           node --check desktop/station/view.js
           bash -n ops/panel-assistant/install-default-model.sh
