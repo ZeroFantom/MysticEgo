@@ -1,0 +1,18 @@
+.panel-login-picker {margin-block:1rem; color:var(--ink); border:1px solid var(--line); border-radius:14px; padding:.65rem .85rem}
+.panel-login-picker summary {cursor:pointer; font-weight:650}
+.panel-login-picker details[open] summary {margin-bottom:.6rem}
+.panel-directory-grid,.panel-directory-group,.panel-directory {display:grid;gap:.6rem}
+.panel-directory {gap:1rem}
+.panel-directory-grid {grid-template-columns:repeat(auto-fit,minmax(min(100%,130px),1fr));align-items:start}
+.panel-directory-link {
+  min-height:40px; display:flex; gap:.55rem; align-items:center; padding:.55rem .7rem; text-decoration:none;
+  border:1px solid var(--line); border-radius:11px; color:var(--ink); background:var(--raised); overflow-wrap:anywhere;
+  transition:border-color .2s, background-color .2s, transform .2s;
+}
+.panel-directory .panel-directory-link {max-width:36rem}
+.panel-directory .panel-directory-link+.panel-directory-link {margin-top:.5rem}
+.panel-directory-link span {flex:1}
+.panel-directory-link svg {flex:none}
+.panel-directory-link:hover {border-color:var(--accent); background:color-mix(in srgb,var(--accent) 12%,var(--raised)); transform:translateY(-1px)}
+.panel-directory-link:focus-visible {outline:2px solid var(--accent); outline-offset:2px}
+@media (prefers-reduced-motion:reduce) {.panel-directory-link{transition:none} .panel-directory-link:hover{transform:none}}

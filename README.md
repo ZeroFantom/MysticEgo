@@ -1,5 +1,25 @@
 # MysticEgo
 
+## R3.2.8 · Вход в панели MysticEgo
+
+Откройте адрес Orchestra и нажмите **Выбрать панель входа**. Встроенный Audit
+открывается сразу. Global и Agent с HTTPS-адресами видны в разделе **Вход в
+панели** после входа, если у аккаунта есть доступ к узлу. Локальный Agent
+можно открыть с компьютера, на котором он запущен.
+
+Чтобы показать конкретный сервер до входа, администратор может добавить
+прямую HTTPS-ссылку в `/etc/mysticego/orchestra.env` и перезапустить Orchestra:
+
+```text
+PanelDirectory__Public__Organization__Kind=global
+PanelDirectory__Public__Organization__Name=Global организации
+PanelDirectory__Public__Organization__Url=https://global.example.org
+```
+
+Для отдельного домена Audit используйте `Kind=audit`, для Agent — `Kind=agent`.
+Встроенный Audit всегда доступен по `/audit-portal/`. Ссылки ведут к формам
+входа самих панелей и не передают пароль, токен или сессию.
+
 ## R3.2.7 · Диагностика и инфраструктура
 
 CloudDesk и веб-панель Orchestra устанавливают Prometheus и Grafana,
