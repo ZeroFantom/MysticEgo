@@ -23,9 +23,11 @@ Auth остаются вне каталога приложения. Перед �
 
 Перенесите на VPS каталог `ops/orchestra-updater` из готового архива.
 На сервере нужны Python 3, GitHub CLI, curl и действующий
-`mysticego-orchestra.service`. Для приватного репозитория подготовьте токен
+`mysticego-orchestra.service`. Для приватного репозитория подключите токен через «Ветки GitHub → Доступ к GitHub».
+Служба на штатной установке Linux использует этот же токен. Для отдельной
+серверной настройки подготовьте токен
 GitHub с правом **Contents: Read** только к `ZeroFantom/MysticEgo`.
-Запишите переменную `GH_TOKEN` в `/etc/mysticego/orchestra-updater.env`
+Если нужен отдельный токен для службы, запишите переменную `GH_TOKEN` в `/etc/mysticego/orchestra-updater.env`
 с владельцем root и правами 0600. Затем из перенесённого каталога:
 
 ```bash

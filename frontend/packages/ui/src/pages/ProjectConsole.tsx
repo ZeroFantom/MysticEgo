@@ -1,6 +1,6 @@
 import {useEffect,useState,type FormEvent} from 'react';
 import {useNavigate} from 'react-router-dom';
-import {ArrowDownToLine, ArrowUpRight, Braces, CalendarDays, GitBranch, GitPullRequest, RefreshCw, ShieldCheck, Tag} from 'lucide-react';
+import {ArrowDownToLine, ArrowUpRight, Braces, CalendarDays, GitBranch, GitPullRequest, RefreshCw, Search, ShieldCheck, Tag, X} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import './project-console.css';
 import {useApp,useRemote} from '../app/context';
@@ -87,7 +87,7 @@ type UpdateState={phase:string;protocol:number;current?:string;currentAudit?:str
 const targetLabel:Record<Target,string>={orchestra:'Orchestra',audit:'Audit',both:'Orchestra + Audit'};
 const phases:Record<string,string>={ready:'Доступно обновление',current:'Установлены актуальные версии',
   downloading:'Скачиваем и проверяем релиз',switching:'Применяем обновление и проверяем панели',
-  failed:'Обновление прервано'};
+  unavailable:'Связь службы обновления с GitHub недоступна',failed:'Обновление прервано'};
 
 function ReleaseUpdate(){
   const {api}=useApp();
@@ -179,7 +179,10 @@ export function ProjectBranches(){
     </section>
     <section className="panel github-branches">
       <div className="github-section-head"><GitBranch size={21}/><h2>Ветки проекта</h2></div>
-      <label>Найти ветку<input value={filter} placeholder="Имя ветки" onChange={event=>setFilter(event.target.value)}/></label>
+      <div className="mystic-search"><Search size={18} aria-hidden="true"/>
+        <input type="search" aria-label="Найти ветку" value={filter} placeholder="Найти ветку" onChange={event=>setFilter(event.target.value)}/>
+        {filter&&<button type="button" aria-label="Очистить поиск" onClick={()=>setFilter('')}><X size={17}/></button>}
+      </div>
       <ErrorBanner text={data.error}/>
       <ul className="github-branch-list">{branches.map(branch=><li key={branch.name}>
         <a href={repository+'/tree/'+encodeURIComponent(branch.name)} target="_blank" rel="noreferrer">
