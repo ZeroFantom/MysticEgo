@@ -58,11 +58,11 @@ WantedBy=multi-user.target
 UNIT
 chmod 0644 /etc/systemd/system/mysticego-orchestra.service
 if [[ $method == docker ]]; then
-  apt-get install -y docker.io
+  if ! command -v docker >/dev/null; then apt-get install -y docker.io; fi
   systemctl enable --now docker.service
   docker build --pull --tag mysticego-orchestra-runtime:ubuntu24.04 - <<'DOCKERFILE'
 FROM ubuntu:24.04
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libicu74 libssl3t64 util-linux && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libicu74 libssl3t64 openssh-client util-linux && rm -rf /var/lib/apt/lists/*
 DOCKERFILE
   install -d -o mysticego -g mysticego -m 0700 /var/lib/mysticego
   install -d -m 0755 /etc/systemd/system/mysticego-orchestra.service.d

@@ -144,9 +144,16 @@ internal sealed class LabHost(Dictionary<string,string> flags)
         var avatarPath = Path.Combine(data, "avatar-key.txt");
         if (!File.Exists(avatarPath)) WritePrivate(avatarPath, Convert.ToHexString(RandomNumberGenerator.GetBytes(32)));
         var ownerPassword = File.ReadAllText(passwordPath).Trim();
+        var sqlite = Path.Combine(data, "auth.db");
+        var external = Path.Combine(data, "auth-postgres.connection");
+        if (File.Exists(external) && File.Exists(sqlite))
+            throw new InvalidOperationException("Auth уже использует SQLite. Сначала выполните отдельную миграцию данных.");
+        var authConnection = File.Exists(external) ? File.ReadAllText(external).Trim() : "Data Source=" + sqlite;
+        if (File.Exists(external) && !authConnection.StartsWith("Host=", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Ожидается строка подключения PostgreSQL для Auth.");
         await Start("auth", new()
         {
-            ["Urls__Http"] = Bind("auth"), ["Authorization__ConnectionString"] = "Data Source=" + Path.Combine(data, "auth.db"),
+            ["Urls__Http"] = Bind("auth"), ["Authorization__ConnectionString"] = authConnection,
             ["Authorization__Jwt__PrivateKeyPath"] = signing, ["Authorization__Bootstrap__Login"] = "developer",
             ["Authorization__Bootstrap__Password"] = ownerPassword
         });

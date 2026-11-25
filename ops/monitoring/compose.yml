@@ -4,24 +4,28 @@ services:
     image: prom/prometheus:v3.8.1
     network_mode: host
     restart: unless-stopped
-    entrypoint: ["/bin/sh", "-ec"]
     command:
-      - >
-        printf 'global:\n  scrape_interval: 5s\nscrape_configs:\n  - job_name: mysticego\n    static_configs:\n      - targets: ["127.0.0.1:${MYSTICEGO_METRICS_PORT:-5500}"]\n' >/tmp/mystic.yml;
-        exec /bin/prometheus --config.file=/tmp/mystic.yml --storage.tsdb.path=/prometheus --web.listen-address=127.0.0.1:9090
-    volumes: [prometheus_data:/prometheus]
+      - --config.file=/etc/prometheus/mysticego.json
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --web.listen-address=127.0.0.1:9090
+    volumes:
+      - prometheus_data:/prometheus
+      - ./prometheus.json:/etc/prometheus/mysticego.json:ro
+      - ./metrics-token:/etc/prometheus/metrics-token:ro
   grafana:
     image: grafana/grafana:12.3.1
     network_mode: host
     restart: unless-stopped
     environment:
       GF_SERVER_HTTP_ADDR: 127.0.0.1
-      GF_AUTH_ANONYMOUS_ENABLED: "true"
-      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
-      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_SERVER_HTTP_PORT: "3000"
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana-password
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./grafana-password:/run/secrets/grafana-password:ro
       - ./provisioning:/etc/grafana/provisioning:ro
       - ./dashboards:/var/lib/mysticego-dashboards:ro
 volumes:

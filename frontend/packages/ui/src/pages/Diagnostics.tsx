@@ -2,6 +2,7 @@ import {useState} from 'react';
 import {Activity,Cpu,HardDrive,MemoryStick,Network} from 'lucide-react';
 import {useApp,useRemote} from '../app/context';
 import {Header,Panel,Badge,ErrorBanner} from '../components/primitives';
+import {InfrastructureSetup} from './InfrastructureSetup';
 
 type Sample={at:string;cpuPercent:number;memoryBytes:number;managedBytes:number;memoryLimitBytes:number;rxBytesPerSecond:number;txBytesPerSecond:number;
   diskFreeBytes:number;diskTotalBytes:number;uptimeSeconds:number;hostCpuPercent?:number;hostMemoryUsedBytes?:number;hostMemoryTotalBytes?:number};
@@ -27,16 +28,7 @@ export function Diagnostics(){
   const {api,mode}=useApp();
   const data=useRemote(()=>mode==='orchestra'?api.request<Telemetry>('/orchestra/telemetry'):Promise.resolve(null),[api,mode],5000);
   const basic=useRemote(()=>mode!=='orchestra'?api.links():Promise.resolve([]),[api,mode],6000);
-  const [error,setError]=useState('');
-  const [busy,setBusy]=useState(false);
   const [range,setRange]=useState(5);
-  const [started,setStarted]=useState(false);
-  async function launch(){
-    setBusy(true);setError('');
-    try{await api.request('/orchestra/telemetry/monitoring',{method:'POST'});setStarted(true)}
-    catch(error){setError(String(error))}
-    finally{setBusy(false)}
-  }
   const samples=(data.value?.samples??[]).slice(-range*12);
   const last=samples.at(-1);
   const graphs=last?[
@@ -49,7 +41,7 @@ export function Diagnostics(){
   ]:[];
   return <>
     <Header title="Диагностика" description={mode==='orchestra'?'Состояние сервера и связь между узлами сети':'Доступность подключений этого узла'}/>
-    <ErrorBanner text={error||data.error||basic.error}/>
+    <ErrorBanner text={data.error||basic.error}/>
     {mode==='orchestra'&&<>
       {last&&<div className="diag-summary">
         <label className="chart-range">Интервал<select value={range} onChange={event=>setRange(Number(event.target.value))}>
@@ -74,10 +66,7 @@ export function Diagnostics(){
         </tbody></table></div>
         {!data.value?.links.length&&<p className="footnote">Замеры появятся после подключения узлов.</p>}
       </Panel>
-      {data.value?.observabilityAvailable&&<Panel title="Prometheus и Grafana">
-        <div className="row-actions"><button className="btn secondary" disabled={busy} onClick={()=>void launch()}>{busy?'Запускаем…':'Запустить на сервере'}</button>
-          {started&&<span className="success">Prometheus · 9090, Grafana · 3000 на главном сервере</span>}</div>
-      </Panel>}
+      <InfrastructureSetup/>
     </>}
     {mode!=='orchestra'&&<Panel title="Подключения">{basic.value?.map(link=><div className="line" key={link.name}>
       <div className="grow"><strong>{link.name}</strong><small>{link.url}</small></div><Badge ok={link.reachable} text={link.reachable?format(link.ms)+' мс':'Недоступно'}/>

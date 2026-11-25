@@ -1,6 +1,7 @@
 import {useState,type FormEvent} from 'react';
 import {useApp,useRemote} from '../app/context';
 import {Header,Panel,ErrorBanner} from '../components/primitives';
+import {InfrastructureSetup} from './InfrastructureSetup';
 
 type Worker={id:string;role:string;model:string;slots:number;active:number;circuitOpen:boolean};
 type Result={workerId:string;model:string;text:string};
@@ -25,6 +26,7 @@ export function ModelWorkers(){
       {workers.value?.map(w=><div className="line" key={w.id}><strong>{w.model}</strong><span>{w.role} · {w.active}/{w.slots} · {w.circuitOpen?'Временно недоступен':'В пуле'}</span></div>)}
       {workers.value?.length===0&&<p>Узлы LM Studio ещё не настроены.</p>}
     </Panel>
+    <InfrastructureSetup initial="lmstudio"/>
     <Panel title="Запрос к модели">
       <form className="stack" onSubmit={submit}>
         <label>Роль<select value={role} onChange={e=>setRole(e.target.value)}><option value="panel-data">Данные панелей</option><option value="world">Правила мира</option></select></label>

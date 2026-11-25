@@ -35,7 +35,7 @@ async Task Handle(string line) {
 }
 
 sealed partial class CloudDesk {
-    const string Repo = "ZeroFantom/MysticEgo", Tag = "v1.0.0-beta.7-r3.1", Asset = "MysticEgo_BETA7_R3.1_CloudDesk.zip";
+    const string Repo = "ZeroFantom/MysticEgo", Tag = "v1.0.0-beta.7-r3.2.7", Asset = "MysticEgo_BETA7_R3.2.7.zip";
     readonly HttpClient http = new(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(60) };
     string token = "";
     readonly string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -289,6 +289,7 @@ sealed partial class CloudDesk {
             case "topology.developerPassword": return await RevealDeveloperPassword(a);
             case "deploy.inspectOrchestra": return await InspectOrchestra(a);
             case "deploy.restoreOrchestra": return await RestoreOrchestraUpdater(a,progress ?? (_ => {}));
+            case "deploy.infrastructure": return await ProvisionInfrastructure(a,progress ?? (_ => {}));
             case "deploy.auditPortal": return await DeployAuditPortal(a,progress ?? (_ => {}));
             case "deploy.reuploadGlobal": return await QueueGlobalReupload(a);
             case "deploy.preflight": return await DeployPreflight(a);

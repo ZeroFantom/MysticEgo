@@ -143,7 +143,7 @@ public sealed class ServerTelemetry(NodeOptions node, ILogger<ServerTelemetry> l
 }
 
 [ApiController, Authorize, Route("api/v1/orchestra/telemetry")]
-public sealed class TelemetryController(ServerTelemetry telemetry, ManagedNetwork network, IConfiguration config, NodeState state) : ControllerBase
+public sealed class TelemetryController(ServerTelemetry telemetry, ManagedNetwork network, NodeState state) : ControllerBase
 {
     [HttpGet]
     public IActionResult Get() => EcosystemHierarchy.IsDeveloper(User)
@@ -158,32 +158,8 @@ public sealed class TelemetryController(ServerTelemetry telemetry, ManagedNetwor
             }).ToArray(), observabilityAvailable = OperatingSystem.IsLinux() }) : Forbid();
 
     [HttpPost("monitoring")]
-    public async Task<IActionResult> StartMonitoring(CancellationToken ct)
+    public IActionResult StartMonitoring() => StatusCode(410, new
     {
-        if (!EcosystemHierarchy.IsDeveloper(User)) return Forbid();
-        var root = config["Managed:PackageRoot"];
-        var path = root is null ? null : Path.Combine(root, "ops", "monitoring", "compose.yml");
-        if (!OperatingSystem.IsLinux() || path is null || !System.IO.File.Exists(path))
-            return Conflict(new { error = "Встроенный запуск Prometheus и Grafana требует Linux и полного пакета MysticEgo." });
-        try
-        {
-            var start = new ProcessStartInfo("docker") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
-            var metricsPort = new Uri(network.OrchestraUrl).Port;
-            start.Environment["MYSTICEGO_METRICS_PORT"] = metricsPort.ToString(CultureInfo.InvariantCulture);
-            foreach (var arg in new[] { "compose", "-f", path, "up", "-d" }) start.ArgumentList.Add(arg);
-            using var child = Process.Start(start)!;
-            var output = child.StandardOutput.ReadToEndAsync(ct);
-            var error = child.StandardError.ReadToEndAsync(ct);
-            await child.WaitForExitAsync(ct);
-            await output;
-            var message = await error;
-            state.Log(User.Identity?.Name ?? "operator", "monitoring.start", state.Options.NodeId, child.ExitCode == 0, message);
-            if (child.ExitCode != 0) return Conflict(new { error = "Docker Compose завершился с ошибкой. Откройте журнал действий." });
-            return Ok(new { started = true, grafana = "http://127.0.0.1:3000", prometheus = "http://127.0.0.1:9090" });
-        }
-        catch (System.ComponentModel.Win32Exception)
-        {
-            return Conflict(new { error = "Docker недоступен на сервере Оркестра." });
-        }
-    }
+        error = "Откройте «Диагностика → Развёртывание инфраструктуры» или установите через CloudDesk."
+    });
 }
