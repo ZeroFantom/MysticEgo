@@ -31,7 +31,7 @@ export function Collective(){
   const text=selected?drafts[selected.id]??'':'';
   const setText=(next:string|((current:string)=>string))=>{
     if(!selected)return;
-    setDrafts(items=>({...items,[selected.id]:typeof next==='string'?next(items[selected.id]??''):next}));
+    setDrafts(items=>({...items,[selected.id]:typeof next==='string'?next:next(items[selected.id]??'')}));
   };
   const activePeer=useRef<string|null>(null);
   const nearBottom=useRef(true);
@@ -49,12 +49,13 @@ export function Collective(){
   const central=useRemote(()=>api.request<{orchestraUrl:string}>('/managed/context'),[api]);
   const messages=useRemote(()=>selected?api.request<Message[]>('/collective/messages/'+selected.id):Promise.resolve([]),[api,selected?.id],3000);
   const mine=personal?.game.id;
-  const lastId=messages.value?.at(-1)?.id;
+  const newest=messages.value?.at(-1);
+  const lastId=newest&&(newest.sender===selected?.id||newest.recipient===selected?.id)?newest.id:undefined;
   function scrollDown(){
     if(listRef.current)listRef.current.scrollTop=listRef.current.scrollHeight;
     nearBottom.current=true;setJump(false);
   }
-  useEffect(()=>{if(lastId){if(nearBottom.current)scrollDown();else setJump(true)}},[lastId,selected?.id]);
+  useEffect(()=>{if(lastId){if(nearBottom.current)scrollDown();else setJump(true)}},[lastId]);
   useEffect(()=>{if(!notice)return;const timer=setTimeout(()=>setNotice(''),3500);return()=>clearTimeout(timer)},[notice]);
   useEffect(()=>{
     const id=params.get('add');
@@ -136,7 +137,9 @@ export function Collective(){
     setEmojiOpen(false);
     requestAnimationFrame(()=>{composer.current?.focus();composer.current?.setSelectionRange(start+symbol.length,start+symbol.length)});
   }
-  const thread=[...new Map([...older,...(messages.value??[])].map(item=>[item.id,item])).values()];
+  const thread=selected?[...new Map([...older,...(messages.value??[])]
+    .filter(item=>item.sender===selected.id||item.recipient===selected.id)
+    .map(item=>[item.id,item])).values()]:[];
   const rows=contacts.value??[];
   const chats=rows.filter(row=>row.status==='accepted')
     .sort((a,b)=>(b.last?Date.parse(b.last.at):0)-(a.last?Date.parse(a.last.at):0));
@@ -203,7 +206,7 @@ export function Collective(){
           {!selected&&<div className="empty chat-idle"><MessageCircle size={34}/><p>Выбери чат, чтобы открыть переписку.</p></div>}
           {selected&&more&&(older.length>0||messages.value?.length===60)&&<button className="btn secondary tiny" onClick={()=>void previous()}>Предыдущие сообщения</button>}
           {selected&&!thread.length&&!messages.loading&&!messages.error&&<div className="empty chat-idle"><p>Отправь первое сообщение.</p></div>}
-          {selected&&thread.filter(item=>item.sender===selected.id||item.recipient===selected.id).map((item,index,items)=><div key={item.id} className="chat-message-row">
+          {selected&&thread.map((item,index,items)=><div key={item.id} className="chat-message-row">
             {(index===0||dayKey(items[index-1].at)!==dayKey(item.at))&&<div className="chat-day">{dateLabel(item.at)}</div>}
             <div className={'chat-message '+(item.sender===mine?'mine':'')}>
               {item.stickerId&&<StickerImage id={item.stickerId}/>} {item.text&&<p>{item.text}</p>}
