@@ -3,7 +3,7 @@
 :root::-webkit-scrollbar{display:none}
 :root{--panel-shadow:0 3px 10px #08071725,0 14px 35px #08071722}
 :root[data-theme=light]{--panel-shadow:0 3px 8px #251a4010,0 12px 27px #2d164513}
-:is(.mystic-workspace .panel,.mystic-workspace .metric,.mystic-workspace .stat-tile,.auth-form-card,.desktop-download-card){
+:root :is(.mystic-workspace .panel,.mystic-workspace .metric,.mystic-workspace .stat-tile,.auth-form-card,.desktop-download-card){
   box-shadow:var(--panel-shadow)
 }
 .notification-drawer [data-tone],.notification-preview{--notice-accent:#81a6fc}

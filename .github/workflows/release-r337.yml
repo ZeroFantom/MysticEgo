@@ -1,4 +1,4 @@
-name: MysticEgo R3.2.17 release
+name: MysticEgo R3.2.18 release
 on:
   push:
     branches: [main]
@@ -8,7 +8,9 @@ on:
 permissions:
   contents: write
 
-concurrency: mysticego-release-r337
+concurrency:
+  group: mysticego-release-r337
+  cancel-in-progress: true
 
 jobs:
   release:
@@ -16,8 +18,8 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       GH_TOKEN: ${{ github.token }}
-      TAG: v1.0.0-beta.7-r3.2.17
-      ASSET: MysticEgo_BETA7_R3.2.17.zip
+      TAG: v1.0.0-beta.7-r3.2.18
+      ASSET: MysticEgo_BETA7_R3.2.18.zip
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -103,7 +105,7 @@ jobs:
           with tempfile.TemporaryDirectory() as temporary:
               app = worker["unpack"](Path("MysticEgo-Orchestra-linux-x64.zip"), Path(temporary))
               for component in ("orchestra", "audit"):
-                  assert worker["panel_version"](app / worker["WEB"] / component) == "v1.0.0-beta.7-r3.2.17"
+                  assert worker["panel_version"](app / worker["WEB"] / component) == "v1.0.0-beta.7-r3.2.18"
           PY
       - name: Package desktop downloads
         run: bash ops/desktop-releases/package.sh "$PWD/bundle/MysticEgo" "$PWD"
@@ -115,7 +117,7 @@ jobs:
           fi
           gh release create "$TAG" "$ASSET" MysticEgo-Orchestra-linux-x64.zip \
             MysticEgo-Desktop-{win,linux}-x64.zip MysticEgo-CloudDesk-{win,linux}-x64.zip --target "$GITHUB_SHA" --prerelease \
-            --title 'MysticEgo BETA7 R3.2.17' \
+            --title 'MysticEgo BETA7 R3.2.18' \
             --notes "Recover from server restarts during updates and refine shared notifications and mobile layouts."
 
 
