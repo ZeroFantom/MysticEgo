@@ -3,42 +3,60 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MysticEgo.Distributed;
 
 namespace MysticEgo.Api.Orchestra;
 
 [ApiController, Authorize(Policy="operator"), RequestSizeLimit(16384)]
 public sealed class PanelAssistant(DevelopmentTeam team,ManagedNetwork network,GitHubPanel github,
-    IConfiguration settings,IHttpClientFactory clients) : ControllerBase
+    IConfiguration settings,IHttpClientFactory clients,ILmStudioClient localModel) : ControllerBase
 {
     private static readonly Dictionary<string,string> Views=new()
     {
         ["overview"]="/",["nodes"]="/nodes",["deployment"]="/setup",["branches"]="/project-branches",
-        ["team"]="/development-team",["models"]="/model-workers"
+        ["team"]="/development-team",["models"]="/assistant?tab=models"
     };
 
     private async Task<bool> CanUse(CancellationToken ct)=>team.IsOwner(User)||await team.IsMember(User,ct);
+
+    private const string Instructions = """
+        Помогай разработчику работать с панелью MysticEgo Orchestra. Отвечай на языке запроса.
+        Ты не выполняешь изменения на серверах. Для чтения реальных данных верни tool из списка
+        panel_overview, panel_latest_release или panel_branches. Верни JSON с полем text и
+        необязательными tool и view. Допустимые view: overview, nodes, deployment, branches, team,
+        models. Пользователь подтвердит переход. Не выдумывай результаты операций. /no_think
+        """;
+
+    [HttpGet("api/v1/managed/panel-assistant/access")]
+    public async Task<IActionResult> Access(CancellationToken ct) =>
+        Ok(new { developer = await CanUse(ct), owner = team.IsOwner(User) });
 
     [HttpPost("api/v1/managed/panel-assistant")]
     public async Task<IActionResult> Chat(Prompt input,CancellationToken ct)
     {
         if(!await CanUse(ct))return Forbid();
         if(string.IsNullOrWhiteSpace(input.Text)||input.Text.Length>3000)return BadRequest(new {error="Введите запрос до 3000 символов."});
-        if(settings["PanelAssistant:Model"] is not {Length:>0} model)
-            return StatusCode(503,new {error="На сервере Orchestra ещё не настроена локальная модель."});
         try
         {
-            using var client=clients.CreateClient("panel-model");
-            using var reply=await client.PostAsJsonAsync("http://127.0.0.1:1236/v1/chat/completions",new {
-                model,stream=false,temperature=0.2,max_tokens=600,messages=new[]{
-                    new {role="system",content="Помогай разработчику работать с панелью MysticEgo Orchestra. Отвечай на языке запроса. Ты не выполняешь изменения на серверах. Для запроса открыть раздел предложи действие. Для чтения реальных данных верни tool из списка panel_overview, panel_latest_release или panel_branches. Верни JSON с полем text и необязательными tool и view. Допустимые view: overview, nodes, deployment, branches, team, models. Пользователь подтвердит переход. Не выдумывай результаты операций."},
-                    new {role="user",content=input.Text}
-                }
-            },ct);
-            reply.EnsureSuccessStatusCode();
-            var raw=(await reply.Content.ReadFromJsonAsync<JsonNode>(cancellationToken:ct))?["choices"]?[0]?["message"]?["content"]?.ToString();
+            string? raw;
+            if (settings["PanelAssistant:Model"] is { Length: > 0 } model)
+            {
+                using var client=clients.CreateClient("panel-model");
+                using var reply=await client.PostAsJsonAsync("http://127.0.0.1:1236/v1/chat/completions",new {
+                    model,stream=false,temperature=0.2,max_tokens=600,messages=new[]{
+                        new {role="system",content=Instructions},new {role="user",content=input.Text}
+                    }
+                },ct);
+                reply.EnsureSuccessStatusCode();
+                raw=(await reply.Content.ReadFromJsonAsync<JsonNode>(cancellationToken:ct))?["choices"]?[0]?["message"]?["content"]?.ToString();
+            }
+            else
+                raw=await localModel.TextAsync(input.Text, Instructions, ct);
             if(string.IsNullOrWhiteSpace(raw))return StatusCode(502,new{error="Модель не вернула ответ."});
             JsonObject? parsed=null;
-            try{parsed=JsonNode.Parse(raw) as JsonObject;}catch(JsonException){}
+            var first=raw.IndexOf('{'); var last=raw.LastIndexOf('}');
+            if(first>=0&&last>=first)
+                try{parsed=JsonNode.Parse(raw[first..(last+1)]) as JsonObject;}catch(JsonException){}
             var view=parsed?["view"]?.ToString();
             var text=parsed?["text"]?.ToString()??raw;
             var toolResult=parsed?["tool"]?.ToString() switch
@@ -50,6 +68,7 @@ public sealed class PanelAssistant(DevelopmentTeam team,ManagedNetwork network,G
             };
             return Ok(new {text,view=view is not null&&Views.ContainsKey(view)?view:null,toolResult});
         }
+        catch(AssistantApiException e) { return StatusCode(e.StatusCode, new { error=e.Message }); }
         catch(Exception e) when(e is HttpRequestException or IOException or JsonException or InvalidOperationException || e is TaskCanceledException&&!ct.IsCancellationRequested)
         {return StatusCode(502,new {error="Локальная модель Orchestra недоступна."});}
     }

@@ -306,6 +306,12 @@ def apply(candidate, installed, targets, target):
             else:
                 raise RuntimeError("new app did not pass health checks")
         status("current", versions(), last_target=target)
+        default_model = APP / "ops/panel-assistant/install-default-model.sh"
+        if target != "audit" and default_model.is_file():
+            try:
+                print(command("bash", str(default_model), timeout=20), flush=True)
+            except (OSError, subprocess.SubprocessError):
+                print("Could not schedule the default LM Studio model.", flush=True)
         previous = PREVIOUS["audit" if target == "audit" else "orchestra"]
         shutil.rmtree(previous)
 
@@ -360,3 +366,4 @@ def run_locked():
 
 if __name__ == "__main__":
     main()
+

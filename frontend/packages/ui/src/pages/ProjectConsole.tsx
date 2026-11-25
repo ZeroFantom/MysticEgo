@@ -1,5 +1,4 @@
-import {useEffect,useState,type FormEvent} from 'react';
-import {useNavigate} from 'react-router-dom';
+import {useEffect,useState} from 'react';
 import {ArrowDownToLine, ArrowUpRight, Braces, CalendarDays, GitBranch, GitPullRequest, RefreshCw, Search, ShieldCheck, Tag, X} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import './project-console.css';
@@ -9,12 +8,6 @@ import {Header,Panel,ErrorBanner} from '../components/primitives';
 type Release={tag:string;publishedAt?:string;prerelease?:boolean};
 type PublishedRelease=Release&{name:string;publishedAt:string;url:string;notes:string;installable:boolean};
 type ReleaseInfo={installed?:string;releaseOrigin?:string};
-const views:Record<string,{path:string;label:string}>={
-  overview:{path:'/',label:'Обзор'},nodes:{path:'/nodes',label:'Узлы сети'},
-  deployment:{path:'/setup',label:'Развёртывание'},branches:{path:'/project-branches',label:'Ветки GitHub'},
-  team:{path:'/development-team',label:'Команда разработки'},models:{path:'/model-workers',label:'Модели LM Studio'}
-};
-
 export function ReleaseStatus(){
   const {session,mode,portal}=useApp();
   const [revision,setRevision]=useState(0);
@@ -197,31 +190,3 @@ export function ProjectBranches(){
   </div>;
 }
 
-type AssistantReply={text:string;view?:string;toolResult?:string};
-export function DeveloperAssistant(){
-  const {api}=useApp();
-  const navigate=useNavigate();
-  const [prompt,setPrompt]=useState(''),[reply,setReply]=useState<AssistantReply|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
-  async function submit(event:FormEvent){
-    event.preventDefault();setBusy(true);setError('');setReply(null);
-    try{
-      setReply(await api.request<AssistantReply>('/managed/panel-assistant',{method:'POST',body:JSON.stringify({text:prompt}),signal:AbortSignal.timeout(60000)}));
-    }catch(e){setError(e instanceof Error?e.message:String(e));}
-    finally{setBusy(false);}
-  }
-  const view=reply?.view&&Object.hasOwn(views,reply.view)?views[reply.view]:null;
-  return <>
-    <Header title="Помощник разработчика" description="Локальная модель на сервере Orchestra"/>
-    <ErrorBanner text={error}/>
-    <Panel title="Запрос">
-      <form className="stack" onSubmit={submit}>
-        <label>Что нужно сделать?<textarea required maxLength={3000} value={prompt} onChange={event=>setPrompt(event.target.value)}/></label>
-        <button className="btn" disabled={busy||!prompt.trim()}>{busy?'Обработка…':'Отправить'}</button>
-      </form>
-      {reply&&<div className="stack"><p style={{whiteSpace:'pre-wrap'}}>{reply.text}</p>
-        {reply.toolResult&&<pre className="output">{reply.toolResult}</pre>}
-        {view&&<button className="btn secondary" onClick={()=>navigate(view.path)}>Открыть «{view.label}»</button>}
-      </div>}
-    </Panel>
-  </>;
-}

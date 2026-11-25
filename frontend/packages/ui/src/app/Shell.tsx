@@ -1,5 +1,5 @@
 import {accountScope,useBrowserSession} from './browserSession';
-import {ReleaseStatus,ProjectBranches,DeveloperAssistant} from '../pages/ProjectConsole';
+import {ReleaseStatus,ProjectBranches} from '../pages/ProjectConsole';
 import {useEffect,useMemo,useRef,useState,type ReactNode} from 'react';
 import {BrowserRouter,Link,NavLink,Navigate,Route,Routes,useLocation} from 'react-router-dom';
 import {
@@ -24,7 +24,6 @@ import {Identities} from '../pages/Identities';
 import {Users} from '../pages/Users';
 import {Diagnostics} from '../pages/Diagnostics';
 import {CommandCenter} from '../pages/CommandCenter';
-import {ModelWorkers} from '../pages/ModelWorkers';
 import {DevelopmentTeam} from '../pages/DevelopmentTeam';
 import {AgentUpdates} from '../pages/AgentUpdates';
 import {AssistantPage} from '../pages/Assistant';
@@ -61,7 +60,6 @@ function navigation(mode:NodeMode,portal:boolean):Section[]{
       ]:[]),
       ...(manager?[{to:'/setup',label:mode==='local'?'Комплект Agent':'Развёртывание',icon:Rocket}]:[]),
       ...(['local','global'].includes(mode)?[{to:'/updates',label:'Обновления Agent',icon:Rocket}]:[]),
-      ...(mode==='orchestra'?[{to:'/model-workers',label:'Модели LM Studio',icon:Bot}]:[]),
       ...(mode==='audit'?[{to:'/organizations',label:'Организации',icon:Building2}]:[]),
       ...(['audit','orchestra'].includes(mode)?[{to:'/development-team',label:'Команда разработки',icon:UsersRound}]:[])
     ]},
@@ -143,8 +141,7 @@ function Workspace({logout}:{logout:()=>void}){
   const {pathname}=useLocation();
   const nav=navigation(mode,portal);
   if(mode==='orchestra')nav[0].items.push({to:'/panels',label:'Вход в панели',icon:Cloud},
-    {to:'/project-branches',label:'Ветки GitHub',icon:Network},
-    {to:'/developer-assistant',label:'Помощник разработчика',icon:Bot});
+    {to:'/project-branches',label:'Ветки GitHub',icon:Network});
   const current=nav.flatMap(section=>section.items).find(item=>item.to===pathname)?.label??(pathname==='/profile'?'Мой профиль':modes[mode].name);
   const [mobile,setMobile]=useState(false);
   const emblem=modes[mode].icon;
@@ -172,10 +169,10 @@ function Workspace({logout}:{logout:()=>void}){
       <main className="content"><AnimatedArea><Routes>
         <Route path="/" element={mode==='orchestra'||mode==='global'||mode==='local'?<OrchestraOverview/>:mode==='audit'?<OrganizationRequests overview/>:<Overview/>}/>
         {['audit','orchestra'].includes(mode)&&<Route path="/development-team" element={<DevelopmentTeam/>}/>}
-        {mode==='orchestra'&&<Route path="/model-workers" element={<ModelWorkers/>}/>}
+        {mode==='orchestra'&&<Route path="/model-workers" element={<Navigate to="/assistant?tab=models" replace/>}/>}
         {mode==='orchestra'&&<Route path="/panels" element={<PanelDirectory/>}/>}
         {mode==='orchestra'&&<Route path="/project-branches" element={<ProjectBranches/>}/>}
-        {mode==='orchestra'&&<Route path="/developer-assistant" element={<DeveloperAssistant/>}/>}
+        {mode==='orchestra'&&<Route path="/developer-assistant" element={<Navigate to="/assistant?tab=developer" replace/>}/>}
         <Route path="/profile" element={<ProfilePage/>}/>
         {mode==='orchestra'&&<Route path="/orchestra-update" element={<ProjectBranches/>}/>}
         <Route path="/collective" element={<Collective/>}/>
