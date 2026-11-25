@@ -111,6 +111,35 @@ public sealed class GitHubPanel(IHttpClientFactory clients, IConfiguration confi
         return latest is null?null:new {latest.Tag,latest.PublishedAt,latest.Url,latest.Prerelease};
     }
 
+    public sealed record DesktopDownload(string Tag, string Url);
+
+    public async Task<Dictionary<string, DesktopDownload>> DesktopDownloads(bool cloudDesk, CancellationToken ct)
+    {
+        var downloads = new Dictionary<string, DesktopDownload>();
+        var product = cloudDesk ? "CloudDesk" : "Desktop";
+        var releases = (await List("releases", ct)).OfType<JsonObject>()
+            .Where(release => release["draft"]?.GetValue<bool>() == false)
+            .Select(release => (Release: release, Published: DateTimeOffset.TryParse(release["published_at"]?.ToString(), out var published)
+                ? published : DateTimeOffset.MinValue))
+            .Where(item => item.Published != DateTimeOffset.MinValue)
+            .OrderByDescending(item => item.Published);
+        foreach (var (release, _) in releases)
+        {
+            var tag = release["tag_name"]?.ToString();
+            if (string.IsNullOrWhiteSpace(tag) || release["assets"] is not JsonArray assets) continue;
+            foreach (var (platform, suffix) in new[] { ("windows", "win-x64"), ("linux", "linux-x64") })
+            {
+                var name = $"MysticEgo-{product}-{suffix}.zip";
+                if (downloads.ContainsKey(platform) || !assets.OfType<JsonObject>().Any(asset =>
+                    asset["name"]?.ToString() == name && asset["state"]?.ToString() == "uploaded")) continue;
+                downloads.Add(platform, new DesktopDownload(tag,
+                    $"https://github.com/{Repository}/releases/download/{Uri.EscapeDataString(tag)}/{name}"));
+            }
+            if (downloads.Count == 2) break;
+        }
+        return downloads;
+    }
+
     public async Task<object> Branches(CancellationToken ct)
     {
         var data=await List("branches",ct);
@@ -168,6 +197,25 @@ public sealed class GitHubPanelController(GitHubPanel github,DevelopmentTeam tea
         try{return Ok(new {latest=await github.Latest(ct)});}
         catch(Exception e) when(Unavailable(e,ct))
         {return StatusCode(503,new {error="GitHub недоступен."});}
+    }
+
+    [AllowAnonymous, HttpGet("api/v1/public/desktop-downloads")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> PublicDesktops(CancellationToken ct)
+    {
+        try { return Ok(await github.DesktopDownloads(false, ct)); }
+        catch (Exception e) when (Unavailable(e, ct))
+        { return StatusCode(503, new { error = "Не удалось загрузить ссылки GitHub." }); }
+    }
+
+    [HttpGet("api/v1/managed/clouddesk-downloads"), Authorize(Policy = "operator")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> CloudDeskDownloads(CancellationToken ct)
+    {
+        if (!team.IsOwner(User) && !await team.IsMember(User, ct)) return Forbid();
+        try { return Ok(await github.DesktopDownloads(true, ct)); }
+        catch (Exception e) when (Unavailable(e, ct))
+        { return StatusCode(503, new { error = "Не удалось загрузить ссылки GitHub." }); }
     }
 
     [HttpGet("api/v1/managed/project-releases"),Authorize(Policy="operator")]

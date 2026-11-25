@@ -1,0 +1,23 @@
+.desktop-downloads{display:grid;gap:20px}
+.desktop-downloads-public{max-width:1160px;margin:auto;padding:clamp(20px,5vw,56px)}
+.desktop-download-back,.desktop-download-hero{display:flex;align-items:center;gap:10px}
+.desktop-download-back{width:fit-content}
+.desktop-download-hero{display:grid;gap:8px;padding:clamp(20px,4vw,36px);border:1px solid color-mix(in srgb,currentColor 16%,transparent);border-radius:22px;background:linear-gradient(120deg,#5078e622,#269c9220 58%,transparent)}
+.desktop-download-hero h1,.desktop-download-card h2{margin:0}
+.desktop-download-hero p,.desktop-download-card p{margin:0;line-height:1.55}
+.desktop-download-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.desktop-download-card{--card-accent:#5083ed;display:flex;flex-direction:column;gap:12px;border:1px solid color-mix(in srgb,currentColor 16%,transparent);border-top:3px solid var(--card-accent);border-radius:18px;padding:20px;background:linear-gradient(165deg,color-mix(in srgb,var(--card-accent) 11%,transparent),transparent 48%);transition:border-color .2s,box-shadow .2s}
+.desktop-download-card:focus-within,.desktop-download-card:hover{box-shadow:0 10px 30px #17203c22}
+.desktop-download-card[data-product=agent]{--card-accent:#9b63df}
+.desktop-download-card[data-product=local]{--card-accent:#249e8a}
+.desktop-download-card[data-product=cloud]{--card-accent:#4e8bd4;max-width:710px}
+.desktop-download-icon{display:grid;place-items:center;width:48px;height:48px;border-radius:15px;background:color-mix(in srgb,var(--card-accent) 20%,transparent)}
+.desktop-download-card ul{padding-inline-start:20px;margin:0 0 6px;line-height:1.65}
+.desktop-download-platforms{margin-top:auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.desktop-download-platforms div{display:grid;align-content:start;gap:6px;min-width:0}
+.desktop-download-platforms code{overflow-wrap:anywhere;font-size:.82rem}
+.desktop-download-platforms a,.desktop-download-os{font-size:.88rem;font-weight:650}
+.desktop-download-footnote{font-size:.9rem}
+@media(max-width:980px){.desktop-download-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:670px){.desktop-download-grid{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.desktop-download-card{transition:none}}

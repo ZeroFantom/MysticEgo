@@ -38,7 +38,10 @@ public sealed class ClubDeploymentController(NodeOptions node, IdentityTokenSour
         if (!access.Admin(User) || !node.Managed) return Forbid();
         if (platform is not ("windows" or "linux" or "assignment")) return BadRequest();
         var root = config["Managed:PackageRoot"];
-        if (platform != "assignment" && (root is null || !System.IO.File.Exists(Path.Combine(root, "AuditDesktop.exe"))))
+        var launcher = platform == "windows" ? "AgentDesktop.cmd" : "agent-desktop";
+        var executable = platform == "windows" ? "runtime/electron/electron.exe" : "runtime/electron-linux/electron";
+        if (platform != "assignment" && (root is null ||
+            !System.IO.File.Exists(Path.Combine(root, launcher)) || !System.IO.File.Exists(Path.Combine(root, executable))))
             return Conflict(new { error = "Установите полный комплект MysticEgo на сервере Local или скачайте конфигурацию отдельно." });
         using var client = clients.CreateClient("mysticego-logged-api");
         using var request = new HttpRequestMessage(HttpMethod.Post, node.OrchestraUrl!.TrimEnd('/') + "/api/v1/managed/club/assignment");
