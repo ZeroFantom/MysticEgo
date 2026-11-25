@@ -247,7 +247,7 @@ async function openPersonal(){
   return openPanel(node.url,'audit');
 }
 async function followClub(){
-  if(!isAgent||discovering||closing)return;
+  if(!isAgent||discovering||closing||savingInvitation)return;
   discovering=true;
   try{
     if(current()?.kind==='agent'){
@@ -268,10 +268,39 @@ async function followClub(){
       body:JSON.stringify({invitationId:assignment.invitationId,code:assignment.code,machine:await fingerprint(),name:os.hostname()})}));
     if(entry.credentials[0].kind!=='agent'||entry.endpoints.localId!==assignment.localId||entry.endpoints.globalId!==assignment.globalId)
       throw Error('Ответ площадки относится к другой конфигурации.');
+    if(address(entry.endpoints.localUrl,assignment.allowLanHttp===true)!==local||closing)
+      throw Error('Local вернул профиль с другим адресом.');
     const file=path.join(home,'station.json');await storeProfile(entry,file);profile=entry;profileFile=file;
+    assignment=undefined;
+    await fs.rm(path.join(home,'club-assignment.json'),{force:true}).catch(()=>{});
     await start({},true);log('Agent зарегистрирован · '+info.name);
-  }catch(error){clubAvailable=false;beacon=String(error.message).includes('HTTP')?error.message:'Ожидает Local клуба';}
+  }catch(error){clubAvailable=false;beacon='Local: '+error.message;}
   finally{discovering=false}
+}
+function parseInvitation(text){
+  if(typeof text!=='string'||Buffer.byteLength(text)>65536)throw Error('Приглашение Local должно быть меньше 64 КиБ.');
+  let kit;
+  try{kit=JSON.parse(text)}catch{throw Error('Вставьте приглашение Local целиком.')}
+  const id=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
+  if(!kit||![kit.localId,kit.globalId,kit.invitationId].every(value=>typeof value==='string'&&id.test(value))
+    ||!/^[a-f0-9]{64}$/i.test(kit.code??'')||!(Date.parse(kit.validUntil)>Date.now()))
+    throw Error('Приглашение Local недействительно или истекло.');
+  const url=new URL(address(kit.localUrl,kit.allowLanHttp===true));
+  if(url.protocol==='http:'&&!/^(?:10[.]|192[.]168[.]|172[.](?:1[6-9]|2[0-9]|3[01])[.])/.test(url.hostname))
+    throw Error('Для HTTP укажите частный IPv4 Local. Для DNS-имени используйте HTTPS.');
+  return kit;
+}
+let savingInvitation=false;
+async function acceptInvitation(text){
+  if(!isAgent||runner||current()||discovering||savingInvitation)throw Error('Дождитесь завершения подключения Agent.');
+  const kit=parseInvitation(text);
+  savingInvitation=true;
+  try{
+    await storeProfile(kit,path.join(home,'club-assignment.json'));
+    assignment=kit;
+  }finally{savingInvitation=false}
+  void followClub();
+  return 'Приглашение принято. Получаем конфигурацию у Local.';
 }
 function handle(name,action){
   ipcMain.handle('station:'+name,(event,...args)=>{
@@ -292,9 +321,9 @@ async function open(){
   try{lastConnection=JSON.parse(await fs.readFile(path.join(home,'connection.json'),'utf8'))}catch{}
   if(isAgent)try{
     const kit=await fs.readFile(path.join(home,'club-assignment.json'),'utf8').catch(()=>fs.readFile(path.join(root,'club-assignment.json'),'utf8'));
-    assignment=JSON.parse(kit);
+    assignment=parseInvitation(kit);
     beacon='Ищем Local · '+assignment.name;
-  }catch{}
+  }catch(error){if(error.code!=='ENOENT')log(error.message)}
   window=new BrowserWindow({title:product+' · MysticEgo',icon:path.join(here,isAgent?'agent-icon.png':'audit-icon.png'),width:1090,height:795,minWidth:670,minHeight:620,backgroundColor:'#15131e',
     webPreferences:{preload:path.join(here,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
   window.on('resize',fitPanel);
@@ -333,16 +362,9 @@ async function open(){
     if(pick.canceled)return '';
     const file=pick.filePaths[0];
     if((await fs.stat(file)).size>65536)throw Error('Выберите комплект Local до 64 КиБ.');
-    const kit=JSON.parse(await fs.readFile(file,'utf8'));
-    if(!kit.localUrl||!kit.globalId||!kit.localId||!kit.invitationId||!/^[a-f0-9]{64}$/i.test(kit.code??''))
-      throw Error('Выберите комплект Agent, выданный администратором Local.');
-    address(kit.localUrl,kit.allowLanHttp===true);
-    address(kit.orchestraUrl,kit.allowLanHttp===true);
-    await storeProfile(kit,path.join(home,'club-assignment.json'));
-    assignment=kit;
-    void followClub();
-    return 'Комплект принят. Проверяем Local.';
+    return acceptInvitation(await fs.readFile(file,'utf8'));
   });
+  handle('club-join',acceptInvitation);
   handle('start',options=>start(options));
   handle('stop',async()=>{await authorized();return stop()});
   handle('panel',async()=>{

@@ -23,7 +23,7 @@ async function refresh(){
   $('state').classList.toggle('online',state.online);
   $('agent-badge').classList.toggle('online',state.clubAvailable);
   $('agent-badge').textContent=state.beacon?'● '+state.beacon:'○ Agent';
-  $('current').textContent=node?node.name+' · '+node.kind+' · '+node.url:'Загрузите комплект Agent от администратора Local.';
+  $('current').textContent=node?node.name+' · '+node.kind+' · '+node.url:'Вставьте приглашение от Local. ПК должен находиться в сети клуба.';
   const global=$('global-panel');
   const tag=JSON.stringify(state.globals);
   if(global.dataset.options!==tag){
@@ -39,6 +39,7 @@ async function refresh(){
     $('team-apply').hidden=team.error||team.owner||['pending','approved'].includes(team.status);
     $('orchestra').hidden=team.error||!team.owner&&team.status!=='approved';
   }
+  $('join-form').hidden=!state.isAgent||!!node;
   $('import').hidden=!state.isAgent||node?.kind==='agent';$('start').hidden=$('stop').hidden=!authorized;
   $('start').disabled=!node||state.running||state.online;$('stop').disabled=!state.running;
   $('panel').disabled=!state.online||node?.kind!=='agent'&&!authorized;
@@ -74,6 +75,11 @@ $('login-form').onsubmit=event=>{
     try{return await api.auth({login:$('login').value,password:$('password').value,register,nickname:$('nickname').value,central:$('central').value,lan:$('portal-lan').checked})}
     finally{$('password').value='';$('login-button').disabled=false}
   });
+};
+$('join-form').onsubmit=event=>{
+  event.preventDefault();
+  const text=$('invitation');
+  void run(async()=>{const result=await api['club-join'](text.value);text.value='';return result});
 };
 $('import').onclick=()=>run(api.import);
 $('start').onclick=()=>run(()=>api.start({allow:$('allow').checked,processes:$('processes').value}));

@@ -92,7 +92,9 @@ function RemoteLaunch({selected,refresh}:{selected:NodeStatus;refresh:()=>void})
     <ErrorBanner text={error||check.error}/>
     <div className="deployment-methods">
       {node.mode==='native'&&<div className="stack install-option">
-        <h3>Через AuditDesktop</h3><p className="footnote">Откройте конфигурацию на целевом компьютере и войдите как администратор роли.</p>
+        <h3>{node.kind==='local'?'Через LocalDesktop':'Профиль для нативного запуска'}</h3><p className="footnote">{node.kind==='local'?
+          'На компьютере площадки откройте LocalDesktop, укажите HTTPS-адрес этого Global и выберите площадку. Адрес Local должен быть доступен из сети клуба.':
+          'Передайте конфигурацию на целевой компьютер для нативного запуска.'}</p>
         <button className="btn secondary" disabled={busy} onClick={()=>void download()}><Download size={17}/> Скачать конфигурацию узла</button>
       </div>}
       {node.kind==='global'&&<form className="stack install-option" onSubmit={deploy}>
@@ -242,12 +244,16 @@ function ClubDistribution(){
   const {topology}=useNetwork();
   const [platform,setPlatform]=useState('windows'),[busy,setBusy]=useState(false),[error,setError]=useState(''),[status,setStatus]=useState('');
   const agents=topology.value?.filter(item=>item.node.kind==='agent'&&item.node.parentId===runtime.value?.nodeId)??[];
-  async function download(){
+  const [invitation,setInvitation]=useState('');
+  async function download(network=false){
+    const format=network?'assignment':platform;
+    setInvitation('');
     setBusy(true);setError('');setStatus('Формируем комплект Agent…');
     try{
-      const response=await fetch(session.url.replace(/\/$/,'')+'/api/v1/club/distribution/'+platform,{
+      const response=await fetch(session.url.replace(/\/$/,'')+'/api/v1/club/distribution/'+format,{
         method:'POST',headers:{Authorization:'Bearer '+session.token}});
       if(!response.ok){const details=await response.json().catch(()=>({}));throw Error(details.error||'Не удалось подготовить комплект, HTTP '+response.status)}
+      if(network){setInvitation(await response.text());setStatus('Приглашение готово.');return;}
       const url=URL.createObjectURL(await response.blob());
       const link=document.createElement('a');link.href=url;link.download=platform==='assignment'?'club-assignment.json':'MysticEgo-Agent-'+platform+'.zip';
       link.click();setTimeout(()=>URL.revokeObjectURL(url),5000);setStatus('Комплект готов.');
@@ -259,9 +265,11 @@ function ClubDistribution(){
     <div className="two-col">
       <Panel title="Распространить по ПК клуба"><div className="stack">
         <label>Комплект<select value={platform} onChange={event=>setPlatform(event.target.value)}><option value="windows">Windows x64</option>
-          <option value="linux">Linux x64</option><option value="assignment">Конфигурация для готовых копий AuditDesktop</option></select></label>
-        <p className="footnote">Распакуйте комплект на гостевой ПК и откройте AuditDesktop. Он проверит доступность этого Local и запустит Agent без входа в Audit.</p>
+          <option value="linux">Linux x64</option><option value="assignment">Файл приглашения для AgentDesktop</option></select></label>
+        <p className="footnote">На ПК в сети клуба откройте AgentDesktop и вставьте приглашение. Приложение получит профиль у Local и запустит Agent.</p>
         <button className="btn" disabled={busy} onClick={()=>void download()}><Download size={17}/>{busy?'Подготовка…':'Скачать комплект'}</button>
+        <button className="btn secondary" disabled={busy} onClick={()=>void download(true)}>Создать сетевое приглашение</button>
+        {invitation&&<label>Приглашение для AgentDesktop<textarea readOnly rows={3} value={invitation} onFocus={event=>event.currentTarget.select()}/></label>}
         {status&&<span className="success" role="status">{status}</span>}
       </div></Panel>
       <Panel title="Рабочие места" aside={<span className="muted">{agents.length}</span>}>

@@ -8,3 +8,6 @@ body[data-product=audit] .desktop-columns:has(>.account-card){grid-template-colu
 body[data-product=agent] .desktop-columns:has(>.account-card){grid-template-columns:1fr 1fr}
 button,input,select{border-radius:9px}
 @media(max-width:760px){body[data-product=agent] .desktop-columns:has(>.account-card){grid-template-columns:1fr}}
+
+#join-form textarea{width:100%;resize:vertical;background:#101a27;color:inherit;border:1px solid #34465c;border-radius:9px;padding:10px;font:inherit}
+body:has(#provision) main{display:grid;gap:14px}
