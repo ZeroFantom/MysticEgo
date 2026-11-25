@@ -33,7 +33,8 @@
 </section>
 <section id="device-card" class="desktop-card"><div class="row"><h2>Клубная станция</h2><span id="agent-badge" class="status">● Agent</span></div>
 <p id="current">Agent подключается из комплекта Local. Для Global и Local используется конфигурация администратора.</p>
-<div class="actions"><button id="import" class="secondary">Загрузить комплект Local</button><button id="start" disabled>Запустить</button><button id="stop" disabled class="secondary">Остановить</button></div>
+<form id="join-form" hidden><label>Приглашение из панели Local<textarea id="invitation" rows="3" maxlength="65536" required spellcheck="false" autocomplete="off"></textarea></label><button>Получить профиль по сети</button></form>
+<div class="actions"><button id="import" class="secondary">Открыть файл приглашения</button><button id="start" disabled>Запустить</button><button id="stop" disabled class="secondary">Остановить</button></div>
 <div class="actions"><button id="panel" disabled class="plain">Открыть панель роли</button><button id="companion" disabled class="plain">Открыть аватар</button></div>
 </section>
 </div>
