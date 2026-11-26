@@ -1,6 +1,6 @@
 # MysticEgo appearance system
 
-Two independent preferences: dark/light/system color mode and immersive/simplified interface style. Simplified dark is the default; existing stored themes and custom palettes are retained. Four artwork combinations use generated design-board crops, cinematic frames and a clean abstract SVG. Web simplified dark uses the SVG instead of the WebP crop containing stray lettering; desktop still retains the original crop pending its own review. All 17 unique original PNG boards and 6 original GIF animations are archived in docs/design/generated, outside runtime bundles. No externally hosted images. Motion: normal, low, off; flow, fade, slide, scale. System reduced-motion always wins. No fake telemetry or new actions.
+Two independent preferences: dark/light/system color mode and immersive/simplified interface style. Simplified dark is the default; existing stored themes and custom palettes are retained. Four artwork combinations use generated design-board crops, cinematic frames and a clean abstract SVG. All graphical clients use the clean SVG for simplified dark instead of the WebP crop containing stray lettering. All 17 unique original PNG boards and 6 original GIF animations are archived in docs/design/generated, outside runtime bundles. No externally hosted images. Motion: normal, low, off; flow, fade, slide, scale. System reduced-motion always wins. No fake telemetry or new actions.
 
 ## Coverage
 - React shared UI: Orchestra, Global, Local, Agent, Audit, public share, studio, developer and download surfaces.
@@ -23,3 +23,9 @@ Social cards use 1200×630 PNG composites of the generated dark landscape with r
 - The mobile navigation opens at up to 850px, uses a dedicated close control, traps keyboard focus, closes on Escape/navigation or desktop resize, restores focus and body scrolling, and makes the background inert while open. Motion preferences disable the drawer transition.
 - The session recovery screen uses a centered single-column layout instead of inheriting an empty artwork column.
 - Source checks protect these contracts, but are not screenshot comparisons. Browser QA should cover 390/768/1440px, light/dark and both styles, keyboard navigation, closing and resizing the drawer, long translated labels, user covers, and reduced motion.
+
+## Desktop and CloudDesk polish
+- Central control, LocalDesktop and AgentDesktop/AuditDesktop share artwork preview buttons with stable 16:9 containers, explicit pressed state, validated settings and a reset that does not depend on select order.
+- CloudDesk keeps appearance controls accessible in narrow windows and scrolls its sidebar independently; topology keeps a readable minimum canvas width. Its portable updater copies the clean SVG and the existing AuditPortal component.
+- Avatar overlay controls use rounded, theme-aware focus/hover states; the transparent avatar canvas and model behavior remain unchanged.
+- Native QA: resize windows, switch four combinations, change system theme, edit custom palettes, reset, reopen and verify persistence, check keyboard focus, motion-off/reduced-motion, long logs and topology, and test portable update/rollback on a disposable installation. Source-contract tests and builds do not replace Electron visual checks.

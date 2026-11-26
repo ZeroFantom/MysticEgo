@@ -12,7 +12,7 @@ for(const [css,assets,settings] of groups){
  for(const color of ['dark','light'])for(const style of ['immersive','simplified']){
   const name=style+'-'+color+'.webp';
   assert(styles.includes('[data-interface="'+style+'"][data-theme="'+color+'"]'),css+' missing '+style+'/'+color);
-  const runtimeName=css.includes('/ui/')&&style==='simplified'&&color==='dark'?'simplified-dark.svg':name;
+  const runtimeName=style==='simplified'&&color==='dark'?'simplified-dark.svg':name;
   assert(styles.includes(runtimeName),css+' asset missing');
   if(runtimeName.endsWith('.svg'))assert(read(assets+'/'+runtimeName).includes('<svg'));
   const art=bytes(assets+'/'+name);assert.equal(art.subarray(0,4).toString(),'RIFF');assert.equal(art.subarray(8,12).toString(),'WEBP');assert(art.length>4000);
@@ -65,3 +65,16 @@ assert(profileCss.includes('background-size:cover')&&profileCss.includes('dialog
 assert(collective.includes('chat-compose-tools')&&collective.includes('draftSnapshot.current')&&collective.includes('historyRequest.current!==request'));
 assert(chatCss.includes('grid-template-columns:auto minmax(0,1fr) auto')&&chatCss.includes('chat-compose-tools:has(.voice-draft)'));
 assert(chatCss.includes('data-ui-motion=off')&&chatCss.includes('prefers-reduced-motion:reduce'));
+
+const desktopCss=read('desktop/control/style.css'),desktopEffects=read('desktop/control/effects.js');
+const cloudCss=read('tools/MysticEgo.CloudDesk/src/style.css'),cloudControls=read('tools/MysticEgo.CloudDesk/src/Appearance.jsx');
+const overlay=read('desktop/renderer/src/overlay.css'),updater=read('tools/MysticEgo.CloudDesk/update.sh');
+assert(desktopEffects.includes('styleButtons.set(key,button)')&&desktopEffects.includes("button.setAttribute('aria-pressed'"));
+assert(desktopEffects.includes('state={...defaults}')&&desktopEffects.includes('sync();'));
+assert(cloudControls.includes('aria-pressed={look.interfaceStyle===value}')&&cloudControls.includes('useLayoutEffect'));
+for(const css of [desktopCss,cloudCss]){
+ assert(css.includes('aspect-ratio:16/9')&&css.includes('background-size:contain')&&css.includes('simplified-dark.svg'));
+}
+assert(desktopCss.includes('object-fit:contain')&&cloudCss.includes('aside .bottom{display:block'));
+assert(overlay.includes('simplified-dark.svg')&&overlay.includes('border-radius:50%'));
+assert(updater.includes('src/appearance-art/simplified-dark.svg')&&updater.includes('src/AuditPortal.jsx'));
