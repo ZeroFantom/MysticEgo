@@ -44,10 +44,10 @@ button.plain{color:var(--ink)}
 @media(max-width:760px){#design{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(prefers-reduced-motion:reduce){.desktop-header::before,.desktop-header::after,button{animation:none!important}}
 
-:root[data-interface="immersive"][data-theme="dark"]{--mystic-art:url("./appearance-art/immersive-dark.webp")}
-:root[data-interface="immersive"][data-theme="light"]{--mystic-art:url("./appearance-art/immersive-light.webp")}
-:root[data-interface="simplified"][data-theme="dark"]{--mystic-art:url("./appearance-art/simplified-dark.svg")}
-:root[data-interface="simplified"][data-theme="light"]{--mystic-art:url("./appearance-art/simplified-light.webp")}
+:root[data-interface="immersive"][data-theme="dark"]{--mystic-art:url("./appearance-art/immersive-dark-hero.webp")}
+:root[data-interface="immersive"][data-theme="light"]{--mystic-art:url("./appearance-art/immersive-light-hero.webp")}
+:root[data-interface="simplified"][data-theme="dark"]{--mystic-art:url("./appearance-art/simplified-dark-hero.webp")}
+:root[data-interface="simplified"][data-theme="light"]{--mystic-art:url("./appearance-art/simplified-light-hero.webp")}
 :root{--mystic-time:220ms;--mystic-page-time:300ms;--mystic-ease:cubic-bezier(.2,.78,.22,1);--mystic-reveal:mystic-flow}
 :root[data-interface=immersive]{--mystic-time:300ms;--mystic-page-time:420ms}
 :root[data-transition=fade]{--mystic-reveal:mystic-fade}
@@ -75,7 +75,8 @@ button.plain{color:var(--ink)}
 
 :root[data-interface=immersive][data-theme=dark]{--mystic-entry-art:url("./appearance-art/immersive-dark-entry.webp")}
 :root[data-interface=immersive][data-theme=light]{--mystic-entry-art:url("./appearance-art/immersive-light-entry.webp")}
-:root[data-interface=simplified]{--mystic-entry-art:var(--mystic-art)}
+:root[data-interface=simplified][data-theme=dark]{--mystic-entry-art:url("./appearance-art/simplified-dark-entry.webp")}
+:root[data-interface=simplified][data-theme=light]{--mystic-entry-art:url("./appearance-art/simplified-light-entry.webp")}
 
 :root[data-interface=immersive] .desktop-header{background:linear-gradient(90deg,var(--body) 0%,color-mix(in srgb,var(--body) 92%,transparent) 27%,transparent 135%),var(--mystic-art) right center/cover}
 :root[data-interface=simplified] .desktop-header{background:linear-gradient(90deg,var(--panel) 35%,transparent 160%),var(--mystic-art) right center/auto 100% no-repeat,var(--panel)}
@@ -84,7 +85,7 @@ button.plain{color:var(--ink)}
 
 /* Desktop control surfaces use the same visual roles as the web panels. */
 :root[data-interface] .desktop-header{gap:clamp(10px,2vw,18px);padding:clamp(16px,3vw,28px) clamp(16px,4vw,34px);min-height:104px}
-:root[data-interface=immersive] .desktop-header{background:linear-gradient(90deg,var(--body) 16%,color-mix(in srgb,var(--body) 85%,transparent) 48%,transparent 90%),var(--mystic-art) right center/auto 175% no-repeat,var(--body)}
+:root[data-interface=immersive] .desktop-header{background:linear-gradient(90deg,var(--body) 16%,color-mix(in srgb,var(--body) 85%,transparent) 48%,transparent 90%),var(--mystic-art) right center/auto 100% no-repeat,var(--body)}
 :root[data-interface] .desktop-header>div:not(.desktop-logo){min-width:0}
 :root[data-interface] .desktop-header h1{font-size:clamp(19px,3vw,26px);overflow-wrap:anywhere}
 :root[data-interface] .desktop-header .status{max-width:40%;text-align:end;overflow-wrap:anywhere}
@@ -101,11 +102,11 @@ button.plain{color:var(--ink)}
 .desktop-style-options{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 :root[data-interface] .desktop-style-option{display:grid;gap:8px;align-content:start;text-align:start;border-radius:12px;padding:8px;background:var(--panel);border-color:var(--border);color:var(--ink);min-width:0;animation:none}
 :root[data-interface] .desktop-style-option[aria-pressed=true]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
-.desktop-art-preview{display:block;width:100%;aspect-ratio:16/9;background-size:contain;background-position:center;background-repeat:no-repeat;background-color:var(--input);border-radius:8px}
-.desktop-style-option[data-preview=simplified] .desktop-art-preview{background-image:url("./appearance-art/simplified-dark.svg")}
-.desktop-style-option[data-preview=immersive] .desktop-art-preview{background-image:url("./appearance-art/immersive-dark.webp")}
-:root[data-theme=light] .desktop-style-option[data-preview=simplified] .desktop-art-preview{background-image:url("./appearance-art/simplified-light.webp")}
-:root[data-theme=light] .desktop-style-option[data-preview=immersive] .desktop-art-preview{background-image:url("./appearance-art/immersive-light.webp")}
+.desktop-art-preview{display:block;width:100%;aspect-ratio:21/9;background-size:contain;background-position:center;background-repeat:no-repeat;background-color:var(--input);border-radius:8px}
+.desktop-style-option[data-preview=simplified] .desktop-art-preview{background-image:url("./appearance-art/simplified-dark-hero.webp")}
+.desktop-style-option[data-preview=immersive] .desktop-art-preview{background-image:url("./appearance-art/immersive-dark-hero.webp")}
+:root[data-theme=light] .desktop-style-option[data-preview=simplified] .desktop-art-preview{background-image:url("./appearance-art/simplified-light-hero.webp")}
+:root[data-theme=light] .desktop-style-option[data-preview=immersive] .desktop-art-preview{background-image:url("./appearance-art/immersive-light-hero.webp")}
 @media(max-width:740px){:root[data-interface] .desktop-columns{grid-template-columns:minmax(0,1fr)}:root[data-interface] .desktop-header{flex-wrap:wrap}:root[data-interface] .desktop-header .status{max-width:100%;margin-left:0}:root[data-interface] .services{flex-wrap:wrap}:root[data-interface] .services>div{flex-basis:140px}}
 @media(max-width:420px){#design{grid-template-columns:minmax(0,1fr)}.desktop-style-options{grid-template-columns:minmax(0,1fr)}}
 :root[data-ui-motion=off] button:is(:hover,:active){translate:none}
