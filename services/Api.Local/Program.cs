@@ -13,6 +13,7 @@ builder.Services.Configure<AgentUpdateOptions>(builder.Configuration.GetSection(
 builder.Services.AddSingleton(sp=>sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<AgentUpdateOptions>>().Value);
 builder.Services.AddSingleton<IAgentReleaseService, AgentReleaseService>();
 var app=builder.Build();
+app.UsePanelSocialPreviews();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseNode();

@@ -1,4 +1,6 @@
 import './panel-surface.css';
+import './cinematic.css';
+import {SharePage} from '../pages/SharePage';
 import {ServerUpdateProvider,useServerUpdate} from './serverUpdate';
 import {CloudDeskDownloads,PublicDesktopDownloads} from '../pages/DesktopDownloads';
 import {NoticeBell,NotificationProvider,useNotice} from './notifications';
@@ -221,6 +223,7 @@ export function MysticApp({mode,defaultApi}:{mode:NodeMode;title:string;defaultA
   useEffect(()=>initPalette(scope),[scope]);
   // Public pages work with or without a session, including during service recovery.
   const publicPath = location.pathname.replace(/\/$/, '');
+  if (publicPath === '/share' || (portal && publicPath === '/audit-portal/share')) return <SharePage mode={portal?'audit':mode} portal={portal}/>;
   if (mode === 'orchestra') {
     if (publicPath === '/studio') return <StudioPage/>;
     if (publicPath === '/developer') return <DeveloperPage/>;
