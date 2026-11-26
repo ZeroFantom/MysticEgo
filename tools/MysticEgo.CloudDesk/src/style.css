@@ -40,10 +40,10 @@
 
 :root{--desk-ink:#eeeaf8;--desk-bg:#101019;--desk-panel:#191824;--desk-raised:#252235;--desk-line:#393348;--desk-muted:#b2abc5;--desk-accent:#c0a8ff;--desk-selected:#302544;--desk-accent-line:#66518c;--desk-on:#191124;--desk-good:#7ee1b4;--desk-good-bg:#16352c;--desk-warn:#ffc28e;--desk-warn-bg:#33251e;--desk-warn-line:#70513e;--desk-blue:#91d5ff;--desk-blue-bg:#183549;--desk-good-line:#285844;--desk-veil:#101019eb}
 :root[data-theme=light]{color-scheme:light;--desk-ink:#231d38;--desk-bg:#f7f6fc;--desk-panel:#fff;--desk-raised:#efebf8;--desk-line:#dcd5e9;--desk-muted:#5e5671;--desk-accent:#6842b9;--desk-selected:#eae0fb;--desk-accent-line:#ab96d3;--desk-on:#fff;--desk-good:#176b48;--desk-good-bg:#e7f5ed;--desk-warn:#8a4a12;--desk-warn-bg:#fff1e3;--desk-warn-line:#e6c7a7;--desk-blue:#245e96;--desk-blue-bg:#e3effd;--desk-good-line:#b1d8c3;--desk-veil:#faf8ffed}
-:root[data-interface="immersive"][data-theme="dark"]{--mystic-art:url("./appearance-art/immersive-dark.svg")}
-:root[data-interface="immersive"][data-theme="light"]{--mystic-art:url("./appearance-art/immersive-light.svg")}
-:root[data-interface="simplified"][data-theme="dark"]{--mystic-art:url("./appearance-art/simplified-dark.svg")}
-:root[data-interface="simplified"][data-theme="light"]{--mystic-art:url("./appearance-art/simplified-light.svg")}
+:root[data-interface="immersive"][data-theme="dark"]{--mystic-art:url("./appearance-art/immersive-dark.webp")}
+:root[data-interface="immersive"][data-theme="light"]{--mystic-art:url("./appearance-art/immersive-light.webp")}
+:root[data-interface="simplified"][data-theme="dark"]{--mystic-art:url("./appearance-art/simplified-dark.webp")}
+:root[data-interface="simplified"][data-theme="light"]{--mystic-art:url("./appearance-art/simplified-light.webp")}
 :root{--mystic-time:220ms;--mystic-page-time:300ms;--mystic-ease:cubic-bezier(.2,.78,.22,1);--mystic-reveal:mystic-flow}
 :root[data-interface=immersive]{--mystic-time:300ms;--mystic-page-time:420ms}
 :root[data-transition=fade]{--mystic-reveal:mystic-fade}
@@ -73,3 +73,14 @@ aside{overflow-y:auto}
 :root[data-interface] .auth-wrap{animation:var(--mystic-reveal) var(--mystic-page-time) var(--mystic-ease) backwards}
 :root[data-interface=simplified] :is(.dot,.sync i){animation:none}
 :root[data-ui-motion=low] :is(.dot,.sync i){animation:none}
+
+:root[data-interface=immersive][data-theme=dark]{--mystic-entry-art:url("./appearance-art/immersive-dark-entry.webp")}
+:root[data-interface=immersive][data-theme=light]{--mystic-entry-art:url("./appearance-art/immersive-light-entry.webp")}
+:root[data-interface=simplified]{--mystic-entry-art:var(--mystic-art)}
+
+:root[data-theme=dark]{--desk-bg:#0e0b17;--desk-panel:#181323;--desk-raised:#231b32;--desk-line:#3e3154;--desk-veil:#100d1de8;--desk-accent:#c4a3fa}
+:root[data-theme=light]{--desk-bg:#f8f5fc;--desk-panel:#fffdfd;--desk-raised:#f0ebfa;--desk-line:#dfd3ef;--desk-veil:#fcf9ffeb}
+:root[data-interface=immersive] main>header{background:linear-gradient(90deg,var(--desk-bg) 0%,var(--desk-veil) 25%,transparent 150%),var(--mystic-art) right center/cover}
+:root[data-interface=simplified] main>header{background:linear-gradient(90deg,var(--desk-panel) 40%,transparent 160%),var(--mystic-art) right center/auto 100% no-repeat,var(--desk-panel)}
+:root[data-interface=immersive] .auth-intro{background:linear-gradient(150deg,var(--desk-veil),transparent 200%),var(--mystic-entry-art) center/cover}
+:root[data-interface=immersive] .nav.active{background:linear-gradient(100deg,var(--desk-selected),var(--desk-panel));border-color:var(--desk-accent-line)}

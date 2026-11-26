@@ -1,3 +1,4 @@
+import {readFile} from 'node:fs/promises';
 import {deflateSync} from 'node:zlib';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
@@ -115,5 +116,5 @@ export function auditCaddyHtml(template,page='root'){
 }
 export async function writeSocialAssets(root){
   const folder=join(root,'og');await mkdir(folder,{recursive:true});
-  for(const role of Object.keys(roles))await writeFile(join(folder,role+'.png'),coverPng(role));
+  for(const role of Object.keys(roles))await writeFile(join(folder,role+'.png'),await readFile(new URL('./social-art/'+role+'.png',import.meta.url)));
 }

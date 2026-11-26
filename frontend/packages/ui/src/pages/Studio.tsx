@@ -1,5 +1,6 @@
 import {useEffect} from 'react';
 import {ThemeToggle} from './Settings';
+import {CinematicPreview} from '../app/CinematicPreview';
 import {
   ArrowDownRight, ArrowUpRight, Box, Building2, Compass, Github, Send, Users,
   Server, ShieldCheck, Workflow,
@@ -95,6 +96,7 @@ export function StudioPage({scope=''}:{scope?:string}={}) {
 
       </section>
 
+      <CinematicPreview/>
       <section className="studio-section" aria-labelledby="studio-direction">
         <h2 id="studio-direction">Над чем работаем</h2>
         <div className="studio-grid two">

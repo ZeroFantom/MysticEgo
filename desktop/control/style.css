@@ -44,10 +44,10 @@ button.plain{color:var(--ink)}
 @media(max-width:760px){#design{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(prefers-reduced-motion:reduce){.desktop-header::before,.desktop-header::after,button{animation:none!important}}
 
-:root[data-interface="immersive"][data-theme="dark"]{--mystic-art:url("./appearance-art/immersive-dark.svg")}
-:root[data-interface="immersive"][data-theme="light"]{--mystic-art:url("./appearance-art/immersive-light.svg")}
-:root[data-interface="simplified"][data-theme="dark"]{--mystic-art:url("./appearance-art/simplified-dark.svg")}
-:root[data-interface="simplified"][data-theme="light"]{--mystic-art:url("./appearance-art/simplified-light.svg")}
+:root[data-interface="immersive"][data-theme="dark"]{--mystic-art:url("./appearance-art/immersive-dark.webp")}
+:root[data-interface="immersive"][data-theme="light"]{--mystic-art:url("./appearance-art/immersive-light.webp")}
+:root[data-interface="simplified"][data-theme="dark"]{--mystic-art:url("./appearance-art/simplified-dark.webp")}
+:root[data-interface="simplified"][data-theme="light"]{--mystic-art:url("./appearance-art/simplified-light.webp")}
 :root{--mystic-time:220ms;--mystic-page-time:300ms;--mystic-ease:cubic-bezier(.2,.78,.22,1);--mystic-reveal:mystic-flow}
 :root[data-interface=immersive]{--mystic-time:300ms;--mystic-page-time:420ms}
 :root[data-transition=fade]{--mystic-reveal:mystic-fade}
@@ -72,3 +72,12 @@ button.plain{color:var(--ink)}
 :root[data-interface] button:hover:not(:disabled){translate:0 -1px}
 :root[data-ui-motion=off] *, :root[data-ui-motion=off] .desktop-header::before,:root[data-ui-motion=off] .desktop-header::after{animation:none!important;transition:none!important}
 @media(prefers-reduced-motion:reduce){:root[data-interface] *, :root[data-interface] .desktop-header::before,:root[data-interface] .desktop-header::after{animation:none!important;transition:none!important}}
+
+:root[data-interface=immersive][data-theme=dark]{--mystic-entry-art:url("./appearance-art/immersive-dark-entry.webp")}
+:root[data-interface=immersive][data-theme=light]{--mystic-entry-art:url("./appearance-art/immersive-light-entry.webp")}
+:root[data-interface=simplified]{--mystic-entry-art:var(--mystic-art)}
+
+:root[data-interface=immersive] .desktop-header{background:linear-gradient(90deg,var(--body) 0%,color-mix(in srgb,var(--body) 92%,transparent) 27%,transparent 135%),var(--mystic-art) right center/cover}
+:root[data-interface=simplified] .desktop-header{background:linear-gradient(90deg,var(--panel) 35%,transparent 160%),var(--mystic-art) right center/auto 100% no-repeat,var(--panel)}
+:root[data-interface=immersive] .desktop-card{border-radius:14px}
+:root[data-interface=immersive] .desktop-logo{box-shadow:0 0 20px color-mix(in srgb,var(--accent) 25%,transparent)}
