@@ -7,9 +7,45 @@ import {
 } from 'lucide-react';
 import {StudioEconomics} from './StudioEconomics';
 import editorialImage from './media/club-editorial.webp';
+import officeConcept from './media/studio-office.webp';
+import clubConcept from './media/studio-club.webp';
+import barConcept from './media/studio-bar.webp';
 import './studio.css';
 
 const repository = 'https://github.com/ZeroFantom/MysticEgo';
+
+const spaces = [
+  {id:'office', number:'01', title:'MysticEgo Development Studio', type:'Студия разработки', image:officeConcept, alt:'Концепт рабочего места разработчика с изогнутым монитором и видом на Москва-Сити', description:'Пространство для разработки программного обеспечения и игр: удобные рабочие места, большие экраны, отдельные зоны для обсуждения проектов и отдыха.', details:'Изогнутые мониторы от 32″ · мыши Logitech · клавиатуры с макроклавишами и управлением медиа'},
+  {id:'club', number:'02', title:'MysticEgo PC Club', type:'Компьютерный клуб', image:clubConcept, alt:'Концепт компьютерного клуба с рядами игровых станций и панорамными окнами на Москва-Сити', description:'Игровое пространство в едином стиле MysticEgo. Комфортные станции для одиночных и командных игр, локальные турниры и управление оборудованием средствами собственной платформы.', details:'Изогнутые мониторы от 32″ · мыши Logitech · клавиатуры с макро- и медиаклавишами'},
+  {id:'bar', number:'03', title:'MysticEgo Lounge Bar', type:'Бар и лаунж', image:barConcept, alt:'Концепт лаунж-бара с тёплым освещением, фиолетовыми акцентами и видом на Москву', description:'Место для встреч, общения и отдыха после работы или игры. Тёмные материалы, мягкий свет, спокойные зоны посадки и отсылки к dark fantasy и sci-fi.', details:'Лаунж-зоны · барная стойка · встречи сообщества'},
+] as const;
+
+function StudioSpaces(){
+ return <section id="spaces" className="studio-section landing-spaces" aria-labelledby="spaces-title">
+   <div className="studio-section-heading">
+     <p className="landing-kicker">Видение / Пространства</p>
+     <h2 id="spaces-title">MysticEgo за пределами экрана</h2>
+     <p>Три направления будущего пространства студии: разработка, игры и отдых. Реальные материалы и техника, эстетика тёмного фэнтези и научной фантастики.</p>
+     <p className="studio-note">Концептуальные визуализации, созданные ИИ. Это не фотографии действующих заведений; адрес, сроки открытия и оснащение пока не утверждены.</p>
+   </div>
+   <div className="landing-space-list">
+     {spaces.map(space=><article className="landing-space" key={space.id} data-space={space.id}>
+       <figure className="landing-space-figure">
+         <a href={space.image} target="_blank" rel="noreferrer" aria-label={'Открыть концепт: '+space.type}>
+           <img src={space.image} alt={space.alt} width={1672} height={941} loading="lazy" decoding="async"/>
+         </a>
+         <figcaption>Концепт интерьера · {space.type}</figcaption>
+       </figure>
+       <div className="landing-space-copy">
+         <p className="landing-kicker">{space.number} / {space.type}</p>
+         <h3>{space.title}</h3>
+         <p>{space.description}</p>
+         <p className="landing-space-details">{space.details}</p>
+       </div>
+     </article>)}
+   </div>
+ </section>;
+}
 
 const roles = [
   {
@@ -91,6 +127,7 @@ export function StudioPage({scope=''}:{scope?:string}={}) {
           <div className="studio-actions">
             <a className="studio-button primary" href="#join">Присоединиться к проекту <ArrowDownRight size={17} aria-hidden="true"/></a>
             <a className="studio-button" href="#partners">Предложить партнёрство</a>
+            <a className="studio-button" href="#spaces">Будущие пространства</a>
           </div>
           <a className="landing-scroll" href="#projects">Исследовать проекты <ArrowDownRight size={19} aria-hidden="true"/></a>
         </div>
@@ -122,6 +159,8 @@ export function StudioPage({scope=''}:{scope?:string}={}) {
           </article>
         </div>
       </section>
+
+      <StudioSpaces/>
 
       <section className="studio-section landing-scene" aria-labelledby="scene-title">
         <div className="studio-section-heading">

@@ -133,3 +133,11 @@ const landingCss=read('frontend/packages/ui/src/pages/studio.css');
 assert(landing.includes('data-landing="studio"')&&landing.includes('data-landing="developer"')&&landing.includes('id="experience"')&&landing.includes('<StudioEconomics/>'));
 assert(landingCss.includes('min-height:calc(100svh - 76px)')&&landingCss.includes('max-width:none;width:100%;padding:0'));
 assert(web.includes('background:transparent;color:#fff9ff;text-shadow:')&&web.includes('--landing-art:var(--mystic-profile-art)'));
+
+for(const name of ['studio-office','studio-club','studio-bar']){
+ const art=bytes('frontend/packages/ui/src/pages/media/'+name+'.webp');
+ assert.equal(art.subarray(0,4).toString(),'RIFF');assert.equal(art.subarray(8,12).toString(),'WEBP');
+ assert.equal(art.readUInt16LE(26)&0x3fff,1672);assert.equal(art.readUInt16LE(28)&0x3fff,941);
+ assert(landing.includes(name+'.webp'));
+}
+assert(landing.includes('Концептуальные визуализации, созданные ИИ')&&landing.includes('id="spaces"'));

@@ -252,7 +252,15 @@ try{
             await hero.locator('a[href="#'+target+'"]').click();
             assert.equal(new URL(page.url()).hash,'#'+target);
             await visible(page.locator('#'+target));
-            if(route==='studio'){await visible(page.locator('#model'));await visible(page.locator('#partners'))}
+            if(route==='studio'){
+              await visible(page.locator('#model'));await visible(page.locator('#partners'));
+              const spaces=page.locator('#spaces .landing-space-figure img');assert.equal(await spaces.count(),3);
+              const images=await spaces.evaluateAll(async items=>Promise.all(items.map(async img=>{await img.decode();const r=img.getBoundingClientRect();return {src:img.currentSrc,width:img.naturalWidth,height:img.naturalHeight,ratio:r.width/r.height,fit:getComputedStyle(img).objectFit}})));
+              assert.equal(new Set(images.map(i=>i.src)).size,3);
+              for(const img of images){assert.deepEqual([img.width,img.height],[1672,941]);assert(Math.abs(img.ratio-1672/941)<.02);assert.equal(img.fit,'contain')}
+              await hero.locator('a[href="#spaces"]').click();assert.equal(new URL(page.url()).hash,'#spaces');
+              await capture(page,prefix+'-studio-spaces');
+            }
             else await visible(page.locator('#developer-contact'));
           });
           if(role==='orchestra'&&viewport.width===1440)await check(page,prefix+'-cinematic',async()=>{

@@ -231,3 +231,23 @@ button.studio-button { background: transparent; color: inherit; }
 }
 :root[data-ui-motion=off] .studio-landing :is(.landing-hero-copy,.studio-card,.economics-track>span){animation:none!important;transition:none!important;translate:none!important}
 @media(prefers-reduced-motion:reduce){.studio-landing :is(.landing-hero-copy,.studio-card,.economics-track>span){animation:none!important;transition:none!important;translate:none!important}}
+
+/* Concept interiors remain separate from product art, shown in native
+   aspect ratio, with quiet editorial captions and alternating layouts. */
+.studio-landing .landing-spaces{background:var(--studio-bg)}
+.studio-landing .landing-space-list{display:grid;gap:clamp(36px,7vw,100px)}
+.studio-landing .landing-space{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:clamp(20px,4vw,70px);align-items:center}
+.studio-landing .landing-space:nth-child(even){grid-template-columns:minmax(0,1fr) minmax(0,1.6fr)}
+.studio-landing .landing-space:nth-child(even) .landing-space-figure{grid-column:2;grid-row:1}
+.studio-landing .landing-space:nth-child(even) .landing-space-copy{grid-column:1;grid-row:1}
+.studio-landing .landing-space-figure{margin:0;min-width:0}
+.studio-landing .landing-space-figure>a{display:block;overflow:hidden;border-radius:12px;border:1px solid var(--studio-line)}
+.studio-landing .landing-space-figure img{display:block;width:100%;height:auto;aspect-ratio:1672/941;object-fit:contain}
+.studio-landing .landing-space-figure figcaption{margin-top:9px;color:var(--studio-muted);font-size:.78rem}
+.studio-landing .landing-space-copy{min-width:0}
+.studio-landing .landing-space-copy h3{font:400 clamp(26px,3.4vw,54px)/1.08 Georgia,serif;letter-spacing:-.04em;overflow-wrap:anywhere;margin:0}
+.studio-landing .landing-space-copy .landing-space-details{border-top:1px solid var(--studio-line);padding-top:16px;color:var(--studio-text);font-size:.88rem;line-height:1.7}
+@media(max-width:900px){
+ .studio-landing .landing-space,.studio-landing .landing-space:nth-child(even){grid-template-columns:minmax(0,1fr)}
+ .studio-landing .landing-space:nth-child(even) .landing-space-figure,.studio-landing .landing-space:nth-child(even) .landing-space-copy{grid-column:auto;grid-row:auto}
+}

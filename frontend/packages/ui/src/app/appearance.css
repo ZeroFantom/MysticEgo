@@ -103,7 +103,7 @@
 :root[data-interface=immersive] .mystic-workspace :is(.panel,.metric,.network-card,.deployment-node){border-radius:14px;box-shadow:0 6px 22px #25134222}
 :root[data-interface=immersive] .studio-site :is(.studio-hero,.developer-hero){background:linear-gradient(90deg,var(--mystic-bg) 0%,var(--mystic-veil) 24%,transparent 155%),var(--mystic-art) center/cover}
 :root[data-interface=simplified] .studio-site :is(.studio-hero,.developer-hero){background:linear-gradient(90deg,var(--mystic-bg) 20%,transparent 150%),var(--mystic-art) right center/cover}
-:root[data-interface] .studio-hero-cover{min-height:clamp(360px,45vw,560px)}
+:root[data-interface] .studio-hero-cover:not(.landing-hero){min-height:clamp(360px,45vw,560px)}
 
 .cinematic-preview{margin:0 0 28px;border:1px solid var(--mystic-line);border-radius:16px;background:var(--mystic-surface);padding:16px;display:grid;gap:12px;max-width:760px}
 .cinematic-preview>div{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
