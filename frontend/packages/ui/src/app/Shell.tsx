@@ -105,7 +105,7 @@ function AccountMenu({logout}:{logout:()=>void}){
   },[open]);
   const name=personal?.profile.displayName||personal?.game.nickname||session.username||'Аккаунт';
   return <div className="account-menu" ref={box}>
-    <button className="account-trigger" type="button" aria-expanded={open} onClick={()=>setOpen(value=>!value)}>
+    <button className="account-trigger" type="button" aria-label={'Меню аккаунта: '+name} aria-expanded={open} onClick={()=>setOpen(value=>!value)}>
       <ProfileAvatar url={personal?.profile.avatarUrl} name={name}/><span>{name}</span><ChevronDown size={15}/>
     </button>
     {open&&<div className="account-popover">
