@@ -694,3 +694,11 @@ progress::-moz-progress-bar{background:linear-gradient(95deg,var(--accent),var(-
 
 .release-status { margin: auto 14px 16px; padding: 10px; border-top: 1px solid var(--line); color: var(--subtle); display: grid; gap: 5px; }
 .release-status strong { color: var(--ink); overflow-wrap: anywhere; }
+
+.avatar-generator,.sticker-workshop{margin-block:10px;padding:10px;border:1px solid var(--line);border-radius:10px}
+.avatar-generator summary,.sticker-workshop summary{cursor:pointer}
+.sticker-workshop summary svg{margin-inline-end:4px;vertical-align:middle;color:var(--accent)}
+.sticker-workshop > .stack{gap:9px;margin-block-start:10px}
+.sticker-workshop .stack input,.sticker-workshop select{width:100%;min-width:0;padding:7px}
+.sticker-options{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:8px}
+.sticker-picker{max-height:min(480px,calc(100dvh - 120px));overflow:auto}

@@ -4,6 +4,8 @@ import {Bot,Download,Play,Sparkles} from 'lucide-react';
 import {Panel,Header,ErrorBanner} from '../components/primitives';
 import {useApp,useRemote} from '../app/context';
 import {AvatarStage,type AvatarMotion} from '../avatar/AvatarStage';
+import {createWaveVrma} from '../avatar/createWaveVrma';
+import {createStarterVrm} from '../avatar/createStarterVrm';
 import {inferVisualMood,useAvatarVoice,useMusicBeat} from '../avatar/avatarAudio';
 import {startVoiceInput} from '../avatar/avatarSpeechInput';
 import {useFaceTracking} from '../avatar/faceTracking';
@@ -15,9 +17,13 @@ const sliders=[['zoom','Масштаб',.75,1.35,.01],['yaw','Поворот',-1
 const idleMotions=Object.entries(motions).filter(([id])=>!['wave','talk','bump'].includes(id));
 const assetName=(item:AvatarAsset)=>item.name||item.extension.slice(1).toUpperCase()+' · '+item.id.slice(0,8);
 
-function saveJson(value:unknown,name:string){
- const url=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));
+function saveFile(file:Blob,name:string){
+ const url=URL.createObjectURL(file);
  const anchor=document.createElement('a');anchor.href=url;anchor.download=name;anchor.click();setTimeout(()=>URL.revokeObjectURL(url),5000);
+}
+
+function saveJson(value:unknown,name:string){
+ saveFile(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}),name);
 }
 
 export function AvatarStudio(){
@@ -63,14 +69,15 @@ export function AvatarStudio(){
    const content=await response.json().catch(()=>({}));if(!response.ok)throw Error(content.error||'Не удалось импортировать файл.');
    return content as AvatarAsset;
  }
- async function upload(file:File|undefined,kind:'model'|'animation'){
-   if(!file)return;
+ async function upload(file:File|undefined|(()=>Promise<File>),kind:'model'|'animation',slot=motion){
+   if(!file||busy)return;
    setBusy(true);setError('');setStatus('');
    try{
-     const asset=await postAsset(file,file.name,kind);setAdded(previous=>[...previous,asset]);
+     const source=typeof file==='function'?await file():file;
+     const asset=await postAsset(source,source.name,kind);setAdded(previous=>[...previous,asset]);
      if(kind==='model')setSelection(asset.id);
-     else setMapping(previous=>({...previous,[motion]:asset.id}));
-     setStatus(kind==='model'?'Модель добавлена в предпросмотр. Сохраните настройки.':`Клип назначен на «${motions[motion]}». Сохраните настройки.`);
+     else setMapping(previous=>({...previous,[slot]:asset.id}));
+     setStatus(kind==='model'?'Модель добавлена в предпросмотр. Сохраните настройки.':`Клип назначен на «${motions[slot]}». Сохраните настройки.`);
    }catch(problem){setError(String(problem))}
    finally{setBusy(false)}
  }
@@ -167,9 +174,35 @@ export function AvatarStudio(){
            </select></label>)}</div></details>
          <button className="btn" disabled={busy||!library||!selection||selection==='org'}>{organization?'Опубликовать тему':'Сохранить аватар'}</button>
        </form>
+       <details className="avatar-generator">
+         <summary>Локальная модель «Скаут»</summary>
+         <p className="footnote">Базовый стилизованный робот с гуманоидными суставами. Собирается в браузере из шаблона.</p>
+         <div className="row-actions motion-actions">
+           <button className="btn secondary" disabled={busy||!library}
+             onClick={()=>void upload(createStarterVrm,'model')}><Sparkles size={16}/> Создать VRM</button>
+           <button className="btn secondary" disabled={busy} onClick={async()=>{
+             setBusy(true);setError('');setStatus('');
+             try{const file=await createStarterVrm();saveFile(file,file.name);}
+             catch(problem){setError(String(problem))}
+             finally{setBusy(false)}
+           }}><Download size={16}/> Скачать VRM</button>
+         </div>
+       </details>
+       <details className="avatar-generator">
+         <summary>Локальная анимация «Приветствие»</summary>
+         <p className="footnote">Создаёт клип VRMA в браузере. Для применения нужен гуманоидный VRM.</p>
+         <div className="row-actions motion-actions">
+           {!organization&&<button className="btn secondary" disabled={busy||!library||selection==='org'} onClick={()=>{
+             setMotion('wave');void upload(createWaveVrma(),'animation','wave');
+           }}><Sparkles size={16}/> Добавить в приветствие</button>}
+           <button className="btn secondary" onClick={()=>{
+             const file=createWaveVrma();saveFile(file,file.name);
+           }}><Download size={16}/> Скачать VRMA</button>
+         </div>
+       </details>
        <div className="row-actions avatar-export">
          {legacy&&<button className="btn secondary" disabled={busy} onClick={()=>void migrate()}>Скопировать в аккаунт Audit</button>}
-         <button className="btn secondary" disabled={busy||!library} onClick={()=>void generate()}><Download size={16}/> Скачать пакет движений</button>
+         <button className="btn secondary" disabled={busy||!library} onClick={()=>void generate()}><Download size={16}/> Скачать описание движений (JSON)</button>
          <button className="btn secondary" onClick={()=>saveJson({version:'mysticego-motion-1',model:selection,style,appearance,motions:assignments()},'MysticEgo-avatar.json')}>Экспорт настроек</button>
        </div>
      </Panel>
