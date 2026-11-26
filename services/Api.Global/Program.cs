@@ -15,6 +15,7 @@ builder.Services.AddSocial();
 builder.Services.AddControllers();
 builder.Services.AddVpnServices();
 var app=builder.Build();
+app.UsePanelSocialPreviews();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseNode();

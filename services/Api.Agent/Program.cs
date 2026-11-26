@@ -21,6 +21,7 @@ builder.Services.AddSingleton<IVendorInstallationService,VendorInstallationServi
 builder.Services.AddSingleton<GuestSessions>();
 builder.Services.AddAvatar(AvatarNode.Agent);
 var app=builder.Build();
+app.UsePanelSocialPreviews();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseNode(hub:false);

@@ -28,7 +28,12 @@ declare global {
 const service=window.mysticDesktop;
 const decode=<T,>(result:Reply):T=>JSON.parse(new TextDecoder().decode(result.data)) as T;
 
+type OverlayLook={theme:'dark'|'light'|'system';interfaceStyle:'simplified'|'immersive';uiMotion:'normal'|'low'|'off';transition:'flow'|'fade'|'slide'|'scale'};
+const overlayDefaults:OverlayLook={theme:'dark',interfaceStyle:'simplified',uiMotion:'normal',transition:'flow'};
+function readOverlayLook():OverlayLook{try{return {...overlayDefaults,...JSON.parse(localStorage.getItem('mysticego.overlay.appearance')||'{}')}}catch{return overlayDefaults}}
 function Overlay(){
+ const [look,setLook]=useState<OverlayLook>(readOverlayLook);
+ useEffect(()=>{const media=matchMedia('(prefers-color-scheme:light)');const apply=()=>{const root=document.documentElement;root.dataset.theme=look.theme==='system'?(media.matches?'light':'dark'):look.theme;root.dataset.interface=look.interfaceStyle;root.dataset.uiMotion=look.uiMotion;root.dataset.transition=look.transition;};apply();media.addEventListener('change',apply);try{localStorage.setItem('mysticego.overlay.appearance',JSON.stringify(look))}catch{}return()=>media.removeEventListener('change',apply)},[look]);
  const [scope,setScope]=useState<Service>('audit'),[api,setApi]=useState('http://127.0.0.1:5350');
  const [login,setLogin]=useState(''),[password,setPassword]=useState(''),[token,setToken]=useState(''),[guest,setGuest]=useState('');
  const [model,setModel]=useState<{url?:string;mime:string}>({mime:'.vrm'});
@@ -160,6 +165,7 @@ function Overlay(){
   <AvatarStage url={model.url} mime={model.mime} motion={motion==='talk'&&!voice.speaking?appearance?.idleMotion??'idle':motion} mood={inferVisualMood(answer)} speech={voice.speech} viseme={voice.viseme}
    beat={music.beat} gaze={face.motion} animations={animations} appearance={appearance} intensity={motionStyle==='lively'?1.1:motionStyle==='calm'?.5:.75}/>
   {settings&&<section className="settings">
+   <details className="overlay-appearance"><summary>Оформление</summary><label>Тема<select value={look.theme} onChange={e=>setLook(v=>({...v,theme:e.target.value as OverlayLook['theme']}))}><option value="dark">Тёмная</option><option value="light">Светлая</option><option value="system">Системная</option></select></label><label>Стиль<select value={look.interfaceStyle} onChange={e=>setLook(v=>({...v,interfaceStyle:e.target.value as OverlayLook['interfaceStyle']}))}><option value="simplified">Упрощённый</option><option value="immersive">Насыщенный</option></select></label><label>Анимации<select value={look.uiMotion} onChange={e=>setLook(v=>({...v,uiMotion:e.target.value as OverlayLook['uiMotion']}))}><option value="normal">Обычные</option><option value="low">Минимальные</option><option value="off">Выкл.</option></select></label><label>Переход<select value={look.transition} onChange={e=>setLook(v=>({...v,transition:e.target.value as OverlayLook['transition']}))}><option value="flow">Мягкий</option><option value="fade">Растворение</option><option value="slide">Скольжение</option><option value="scale">Масштаб</option></select></label></details>
    {!token&&!guest?<><label>Логин<input value={login} onChange={event=>setLogin(event.target.value)} autoComplete="username"/></label>
    <label>Пароль<input type="password" value={password} onChange={event=>setPassword(event.target.value)} autoComplete="current-password"/></label>
    <div className="line"><button onClick={()=>void signIn()}>Войти</button>{scope==='agent'&&<button onClick={()=>void connectGuest()}>Гость клуба</button>}</div></>:

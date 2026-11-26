@@ -1,3 +1,4 @@
+import {ThemeToggle} from './Settings';
 import {LicenseLink} from './Studio';
 import {useEffect,useState} from 'react';
 import {ArrowLeft,CloudCog,Download,Laptop,Monitor,Server,ShieldCheck} from 'lucide-react';
@@ -39,7 +40,7 @@ function AppCard({app,downloads,loading}:{app:typeof cloudDesk;downloads?:Downlo
   </article>;
 }
 
-export function PublicDesktopDownloads(){
+export function PublicDesktopDownloads({scope=''}:{scope?:string}={}){
   const [downloads,setDownloads]=useState<Downloads>();
   const [error,setError]=useState(false);
   const [revision,retry]=useState(0);
@@ -56,6 +57,7 @@ export function PublicDesktopDownloads(){
     return ()=>controller.abort();
   },[revision]);
   return <main className="desktop-downloads desktop-downloads-public">
+    <div className="appearance-public-bar"><ThemeToggle scope={scope}/></div>
     <a className="desktop-download-back" href="/"><ArrowLeft size={17} aria-hidden="true"/> К авторизации</a>
     <header className="desktop-download-hero"><Laptop size={29} aria-hidden="true"/><h1>Приложения MysticEgo</h1>
       <p>Один комплект для каждой ОС включает AuditDesktop, AgentDesktop и LocalDesktop. Распакуйте ZIP и запустите нужное приложение.</p>

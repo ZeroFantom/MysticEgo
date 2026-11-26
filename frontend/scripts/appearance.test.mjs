@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const bytes=p=>readFileSync(new URL('../../'+p,import.meta.url));
+const read=p=>bytes(p).toString('utf8');
+const groups=[
+ ['frontend/packages/ui/src/app/appearance.css','frontend/packages/ui/src/app/appearance-art','frontend/packages/ui/src/pages/Settings.tsx'],
+ ['desktop/control/style.css','desktop/control/appearance-art','desktop/control/effects.js'],
+ ['tools/MysticEgo.CloudDesk/src/style.css','tools/MysticEgo.CloudDesk/src/appearance-art','tools/MysticEgo.CloudDesk/src/Appearance.jsx']
+];
+for(const [css,assets,settings] of groups){
+ const styles=read(css),controls=read(settings);
+ for(const color of ['dark','light'])for(const style of ['immersive','simplified']){
+  const name=style+'-'+color+'.webp';
+  assert(styles.includes('[data-interface="'+style+'"][data-theme="'+color+'"]'),css+' missing '+style+'/'+color);
+  assert(styles.includes(name),css+' asset missing');
+  const art=bytes(assets+'/'+name);assert.equal(art.subarray(0,4).toString(),'RIFF');assert.equal(art.subarray(8,12).toString(),'WEBP');assert(art.length>4000);
+ }
+ for(const option of ['interfaceStyle','uiMotion','transition','system','simplified','immersive'])assert(controls.includes(option),settings+' missing '+option);
+ assert(styles.includes('prefers-reduced-motion')&&styles.includes('data-ui-motion=off'),css+' motion override missing');
+}
+assert(read('desktop/local/index.html').includes('type="module" src="view.js"'));
+assert(read('desktop/local/view.js').includes("initEffects($('design'))"));
+assert(read('desktop/station/view.js').includes("initEffects($('design'))"));
+assert(read('desktop/control/view.js').includes("initEffects($('design'))"));
+assert(read('desktop/renderer/src/main.tsx').includes('overlay-appearance'));
+assert(read('tools/MysticEgo.CloudDesk/update.sh').includes('src/appearance-art/simplified-light.webp'));
+console.log('Appearance source contracts: four combinations, settings, motion, assets and desktop entrypoints');
+
+for(const name of ['immersive-dark','immersive-light','simplified-light']){const media=bytes('frontend/packages/ui/src/app/appearance-art/'+name+'.webm');assert.equal(media.subarray(0,4).toString('hex'),'1a45dfa3');assert(media.length>10000)}
+for(const role of ['orchestra','global','local','agent','audit']){const png=bytes('frontend/scripts/social-art/'+role+'.png');assert.equal(png.subarray(0,8).toString('hex'),'89504e470d0a1a0a');assert.equal(png.readUInt32BE(16),1200);assert.equal(png.readUInt32BE(20),630)}

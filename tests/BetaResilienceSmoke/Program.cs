@@ -24,3 +24,27 @@ if(gate.Status("account-login").Open)throw new Exception("Failure must not affec
 gate.Success("avatar-generation");
 if(gate.Status("avatar-generation").Open)throw new Exception("Reset must recover capability");
 Console.WriteLine("PASS: core circuit isolation");
+
+
+const string socialHtml = """
+<html><head><!-- mysticego-social-start -->
+<link rel="canonical" href="/"/>
+<meta property="og:url" content="/"/>
+<meta property="og:image" content="/og/audit.png"/>
+<!-- mysticego-social-end --></head><body><a href="/private">Link</a></body></html>
+""";
+void SocialCheck(bool condition, string message)
+{
+    if (!condition) throw new Exception(message);
+    Console.WriteLine("PASS: " + message);
+}
+var renderedSocial = PanelSocialPreviews.Render(socialHtml, "https://orchestra.example.test");
+SocialCheck(renderedSocial.Contains("content=\"https://orchestra.example.test/og/audit.png\""), "absolute public image");
+SocialCheck(renderedSocial.Contains("href=\"https://orchestra.example.test/\""), "absolute canonical");
+SocialCheck(renderedSocial.Contains("href=\"/private\""), "HTML outside metadata unchanged");
+var embeddedSocial = PanelSocialPreviews.Render(socialHtml, "https://orchestra.example.test", true);
+SocialCheck(embeddedSocial.Contains("content=\"https://orchestra.example.test/audit-portal/og/audit.png\""), "embedded Audit image");
+SocialCheck(embeddedSocial.Contains("href=\"https://orchestra.example.test/audit-portal/\""), "embedded Audit canonical");
+SocialCheck(PanelSocialPreviews.Render(socialHtml, "https://user:password@example.test") == socialHtml, "unsafe origin ignored");
+SocialCheck(PanelSocialPreviews.Render(socialHtml, "javascript:alert(1)") == socialHtml, "non-HTTP origin ignored");
+SocialCheck(PanelSocialPreviews.Render("<html>old build</html>", "https://example.test") == "<html>old build</html>", "old panel untouched");

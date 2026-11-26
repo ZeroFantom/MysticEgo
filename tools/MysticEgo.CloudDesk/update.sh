@@ -12,13 +12,13 @@ target=$(cd -- "$target" && pwd)
 [[ "$target" != "$here" ]] || { echo 'Укажите прежнюю установку CloudDesk.' >&2; exit 1; }
 [[ $(node -p 'require(process.argv[1]).name' "$target/package.json") == mysticego-clouddesk ]] || { echo 'Это не CloudDesk.' >&2; exit 1; }
 if command -v dotnet >/dev/null; then export CLOUDDESK_DOTNET=$(command -v dotnet); elif [[ -x $HOME/.dotnet/dotnet ]]; then export CLOUDDESK_DOTNET=$HOME/.dotnet/dotnet; else echo 'Нет .NET SDK 10' >&2; exit 1; fi
-files=(backend/DnsDeletion.cs backend/DeploymentBinding.cs backend/PublicDns.cs github-network-check.sh backend/GithubConnection.cs backend/Locations.cs backend/OrderSafety.cs backend/Program.cs backend/TimewebDiagnostics.cs backend/Monitor.cs backend/DeveloperSession.cs backend/Domains.cs backend/Discovery.cs backend/DnsManagement.cs desktop/main.cjs desktop/preload.cjs src/main.jsx src/Infrastructure.jsx src/Provision.jsx src/DomainPicker.jsx src/DnsCleanup.jsx src/style.css run.sh run-windows.cmd ensure-hosts.sh ensure-hosts.ps1 orchestra-host.txt PORTABLE.md package.json README.md index.html)
+files=(backend/DnsDeletion.cs backend/DeploymentBinding.cs backend/PublicDns.cs github-network-check.sh backend/GithubConnection.cs backend/Locations.cs backend/OrderSafety.cs backend/Program.cs backend/TimewebDiagnostics.cs backend/Monitor.cs backend/DeveloperSession.cs backend/Domains.cs backend/Discovery.cs backend/DnsManagement.cs desktop/main.cjs desktop/preload.cjs src/main.jsx src/Infrastructure.jsx src/Provision.jsx src/DomainPicker.jsx src/DnsCleanup.jsx src/style.css src/Appearance.jsx src/appearance-art/immersive-dark.webp src/appearance-art/immersive-light.webp src/appearance-art/simplified-dark.webp src/appearance-art/simplified-light.webp src/appearance-art/immersive-dark-entry.webp src/appearance-art/immersive-light-entry.webp run.sh run-windows.cmd ensure-hosts.sh ensure-hosts.ps1 orchestra-host.txt PORTABLE.md package.json README.md index.html)
 backup=$(mktemp -d "$target/.backup-v046-XXXXXXXX")
 for f in "${files[@]}"; do mkdir -p -- "$backup/$(dirname "$f")"; [[ ! -e "$target/$f" ]] || cp -a -- "$target/$f" "$backup/$f"; done
 stage=$(mktemp -d "$target/.build-v046-XXXXXXXX")
 rollback(){ local rc=$?; trap - ERR; echo "Обновление прервано. Восстанавливаем из $backup" >&2; for f in "${files[@]}"; do if [[ -e "$backup/$f" ]]; then cp -a -- "$backup/$f" "$target/$f"; else rm -f -- "$target/$f"; fi; done; for d in out dist; do if [[ -e "$backup/$d" ]]; then rm -rf -- "$target/$d"; mv -- "$backup/$d" "$target/$d"; elif [[ -e "$stage/.new-$d" ]]; then rm -rf -- "$target/$d"; fi; done; rm -rf -- "$stage"; exit "$rc"; }
 trap rollback ERR
-for f in "${files[@]}"; do cp -- "$here/$f" "$target/$f"; done
+for f in "${files[@]}"; do mkdir -p -- "$target/$(dirname "$f")"; cp -- "$here/$f" "$target/$f"; done
 chmod +x "$target/run.sh" "$target/github-network-check.sh"
 cd -- "$target"
 if [[ -f "$here/out/CloudDesk.dll" && -f "$here/dist/index.html" ]]; then

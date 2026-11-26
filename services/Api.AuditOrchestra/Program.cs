@@ -20,6 +20,7 @@ builder.Services.AddAvatar(AvatarNode.Audit);
 builder.Services.AddSoul();
 builder.Services.AddHomeAssessment();
 var app=builder.Build();
+app.UsePanelSocialPreviews();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseNode(hub:false);

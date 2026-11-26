@@ -1,0 +1,107 @@
+:root[data-interface="immersive"][data-theme="dark"]{--mystic-art:url("./appearance-art/immersive-dark.webp")}
+:root[data-interface="immersive"][data-theme="light"]{--mystic-art:url("./appearance-art/immersive-light.webp")}
+:root[data-interface="simplified"][data-theme="dark"]{--mystic-art:url("./appearance-art/simplified-dark.webp")}
+:root[data-interface="simplified"][data-theme="light"]{--mystic-art:url("./appearance-art/simplified-light.webp")}
+:root{--mystic-time:220ms;--mystic-page-time:300ms;--mystic-ease:cubic-bezier(.2,.78,.22,1);--mystic-reveal:mystic-flow}
+:root[data-interface=immersive]{--mystic-time:300ms;--mystic-page-time:420ms}
+:root[data-transition=fade]{--mystic-reveal:mystic-fade}
+:root[data-transition=slide]{--mystic-reveal:mystic-slide}
+:root[data-transition=scale]{--mystic-reveal:mystic-scale}
+:root[data-ui-motion=low]{--mystic-time:140ms;--mystic-page-time:180ms}
+@keyframes mystic-flow{from{opacity:0;translate:0 7px;scale:.99}to{opacity:1;translate:0 0;scale:1}}
+@keyframes mystic-fade{from{opacity:0}to{opacity:1}}
+@keyframes mystic-slide{from{opacity:0;translate:8px 0}to{opacity:1;translate:0 0}}
+@keyframes mystic-scale{from{opacity:0;scale:.975}to{opacity:1;scale:1}}
+@keyframes mystic-mesh-drift{from{background-position:0 50%,right center}to{background-position:0 50%,85% center}}
+
+:root[data-theme=dark]{--mystic-ink:#f0edf8;--mystic-bg:#101019;--mystic-surface:#191824;--mystic-raised:#232132;--mystic-line:#383348;--mystic-muted:#b5aec6;--mystic-veil:#101019e8;--mystic-primary:#c0a8ff;--mystic-on-primary:#191124}
+:root[data-theme=light]{--mystic-ink:#231d38;--mystic-bg:#f7f6fc;--mystic-surface:#ffffff;--mystic-raised:#efebf8;--mystic-line:#dcd5e9;--mystic-muted:#5e5671;--mystic-veil:#faf8ffeb;--mystic-primary:#6842b9;--mystic-on-primary:#fff}
+:root[data-interface] :is(.mystic-workspace,.auth-experience,.desktop-downloads-public){--canvas:var(--mystic-bg);--surface:var(--mystic-surface);--raised:var(--mystic-raised);--line:var(--mystic-line);--ink:var(--mystic-ink);--subtle:var(--mystic-muted);--auth-input:var(--mystic-raised);background:var(--canvas);color:var(--ink)}
+:root[data-interface] .mystic-workspace .content{background:var(--canvas)}
+:root[data-interface] .mystic-workspace .sidebar{background:var(--surface)}
+:root[data-interface] .mystic-workspace .orchestral-topbar:not([style*="url"]){background:linear-gradient(90deg,var(--mystic-veil) 18%,transparent 160%),var(--mystic-art) right center/cover;background-color:var(--surface)}
+:root[data-interface] .mystic-workspace :is(.panel,.metric,.network-card,.deployment-node,.stat-tile:not(.locked)){background:var(--surface);border-color:var(--line);box-shadow:none}
+:root[data-interface] .mystic-workspace .stat-tile:not(.locked) :is(span,strong){color:var(--ink)}
+:root[data-interface=simplified] .mystic-workspace .stat-tile:not(.locked){animation:none}
+:root[data-interface=immersive] .mystic-workspace :is(.panel,.metric,.network-card,.deployment-node){background:linear-gradient(145deg,color-mix(in srgb,var(--surface) 92%,var(--accent)),var(--surface) 65%);box-shadow:0 8px 24px #160e3520;border-color:color-mix(in srgb,var(--line) 80%,var(--accent))}
+:root[data-interface=immersive] .mystic-workspace .sidebar{background:linear-gradient(180deg,var(--surface) 32%,var(--mystic-veil) 74%,transparent 170%),var(--mystic-art) center bottom/auto 65% no-repeat,var(--surface)}
+:root[data-interface=immersive] .mystic-workspace .stat-tile:not(.locked){background:linear-gradient(120deg,var(--mystic-veil),transparent 180%),var(--mystic-art) center/cover;animation:none}
+:root[data-interface] .auth-experience .auth-visual,:root[data-interface] .mystic-share{background:linear-gradient(140deg,var(--mystic-veil),transparent 135%),var(--mystic-art) center/cover;color:var(--mystic-ink)}
+:root[data-interface] .auth-experience :is(.auth-brand,.auth-role,.auth-role span,.auth-role h1){color:var(--mystic-ink);text-shadow:none}
+:root[data-interface=simplified] .auth-orbit{opacity:.65}
+:root[data-interface] .mystic-share-card{background:var(--mystic-surface);color:var(--mystic-ink);border-color:var(--mystic-line);box-shadow:0 16px 42px #29195020}
+:root[data-interface] .mystic-share-card :is(p,small){color:var(--mystic-muted)}
+:root[data-interface] .mystic-share-card .mystic-share-open{color:var(--mystic-on-primary);background:var(--mystic-primary)}
+:root[data-interface] .studio-site{--studio-bg:var(--mystic-bg);--studio-panel:var(--mystic-surface);--studio-text:var(--mystic-ink);--studio-muted:var(--mystic-muted);--studio-line:var(--mystic-line);--studio-accent:var(--mystic-primary)}
+:root[data-interface] .studio-site :is(.studio-hero,.developer-hero){background:linear-gradient(100deg,var(--mystic-veil),transparent 190%),var(--mystic-art) center/cover;color:var(--mystic-ink)}
+:root[data-interface] .studio-site .studio-hero-cover::after{background:none}
+:root[data-interface] .studio-site .studio-hero-image{display:none}
+:root[data-interface] .studio-site .developer-links a{background:var(--mystic-surface)}
+:root[data-interface] .studio-site .studio-button.primary{background:var(--mystic-primary);color:var(--mystic-on-primary)}
+:root[data-interface] :is(.btn:not(.secondary):not(.danger),.mystic-share-open){--mystic-button:var(--mystic-primary)}
+.appearance-quick{display:inline-flex;gap:4px;align-items:center}
+.auth-form-side>.appearance-quick{position:absolute;top:16px;right:18px}
+.appearance-quick button[aria-pressed=true]{color:var(--mystic-primary);background:var(--mystic-raised)}
+.appearance-style-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.appearance-style-option{display:grid;gap:7px;text-align:start;padding:9px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;min-width:0}
+.appearance-style-option[aria-pressed=true]{border-color:var(--mystic-primary);box-shadow:inset 0 0 0 1px var(--mystic-primary)}
+.appearance-style-option>span{height:64px;border-radius:7px;background-position:center;background-size:cover}
+.appearance-style-option small{color:var(--subtle)}
+.appearance-style-option[data-preview=immersive]>span{background-image:url('./appearance-art/immersive-dark.webp')}
+.appearance-style-option[data-preview=simplified]>span{background-image:url('./appearance-art/simplified-dark.webp')}
+:root[data-theme=light] .appearance-style-option[data-preview=immersive]>span{background-image:url('./appearance-art/immersive-light.webp')}
+:root[data-theme=light] .appearance-style-option[data-preview=simplified]>span{background-image:url('./appearance-art/simplified-light.webp')}
+:root[data-interface] :is(.mystic-workspace .page-motion,.studio-site .studio-hero>div,.mystic-share-card,.auth-form-card){animation:var(--mystic-reveal) var(--mystic-page-time) var(--mystic-ease) both}
+:root[data-interface] :is(.account-popover,.notification-drawer,.chat-action-menu,.emoji-menu,.modal,.auth-field-new,.panel-login-card,.row-actions>button,.row-actions>a.btn){animation:var(--mystic-reveal) var(--mystic-time) var(--mystic-ease) backwards}
+:root[data-interface] :is(.btn,.icon-btn,.nav-link,.panel-login-card){transition-duration:var(--mystic-time)}
+:root[data-interface=simplified] :is(.topbar-sweep,.auth-orbit i,.auth-orbit::before,.stat-tile){animation:none!important}
+:root[data-interface=immersive][data-ui-motion=normal] .auth-visual{animation:mystic-mesh-drift 14s ease-in-out infinite alternate}
+:root[data-ui-motion=off] :is(.mystic-workspace,.auth-experience,.mystic-share,.studio-site,.desktop-downloads) *, :root[data-ui-motion=off] :is(.auth-visual,.auth-orbit)::before,:root[data-ui-motion=off] :is(.auth-visual,.topbar-light)::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+@media(prefers-reduced-motion:reduce){:root[data-interface] :is(.mystic-workspace,.auth-experience,.mystic-share,.studio-site,.desktop-downloads) *, :root[data-interface] :is(.auth-visual,.auth-orbit,.topbar-light)::before,:root[data-interface] :is(.auth-visual,.topbar-light)::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+@media(max-width:420px){.appearance-style-options{grid-template-columns:1fr}.appearance-quick{gap:1px}}
+
+:root[data-theme] body{background:var(--mystic-bg);color:var(--mystic-ink)}
+.appearance-public-bar{display:flex;justify-content:flex-end}
+:root[data-interface] .agent-desktop-entry{background:var(--mystic-bg);color:var(--mystic-ink);--surface:var(--mystic-surface);--ink:var(--mystic-ink);--subtle:var(--mystic-muted);--line:var(--mystic-line)}
+:root[data-interface] .agent-desktop-entry .panel{background:var(--surface);border-color:var(--line);color:var(--ink)}
+:root[data-interface] .desktop-download-hero{background:linear-gradient(90deg,var(--mystic-veil),transparent 160%),var(--mystic-art) center/cover}
+:root[data-interface=simplified] .desktop-download-card{background:var(--mystic-surface)}
+:root[data-interface=immersive] .desktop-download-card{background:linear-gradient(145deg,color-mix(in srgb,var(--mystic-surface) 91%,var(--mystic-primary)),var(--mystic-surface) 75%)}
+:root[data-theme=light][data-interface]:not([data-neon-border=true]) :is(.mystic-workspace,.auth-experience,.desktop-downloads-public,.agent-desktop-entry) .btn:not(.secondary):not(.danger){color:#fff;background:color-mix(in srgb,var(--accent) 72%,#38205d);border-color:var(--accent)}
+:root[data-theme=light][data-interface]:not([data-neon-border=true]) :is(.mystic-workspace,.auth-experience,.desktop-downloads-public,.agent-desktop-entry) .btn:not(.secondary):not(.danger):hover:not(:disabled){background:color-mix(in srgb,var(--accent) 84%,#38205d)}
+:root[data-ui-motion=low] :is(.auth-orbit i,.auth-orbit::before,.topbar-sweep,.stat-tile){animation:none!important}
+
+/* A short mesh-light sweep for navigation in immersive flow mode; no input blocking. */
+:root[data-interface=immersive][data-transition=flow][data-ui-motion=normal] .page-motion{position:relative;animation-fill-mode:backwards}
+:root[data-interface=immersive][data-transition=flow][data-ui-motion=normal] .page-motion::before{content:"";position:absolute;pointer-events:none;z-index:1;inset:0 0 auto;height:2px;background:linear-gradient(90deg,transparent,var(--mystic-primary),transparent);transform-origin:left;animation:mystic-flow-trace 420ms var(--mystic-ease) both}
+@keyframes mystic-flow-trace{from{opacity:.65;scale:0 1}to{opacity:0;scale:1 1}}
+@media(prefers-reduced-motion:reduce){:root[data-interface] .page-motion::before{display:none!important}}
+
+:root[data-interface=immersive][data-theme=dark]{--mystic-entry-art:url("./appearance-art/immersive-dark-entry.webp")}
+:root[data-interface=immersive][data-theme=light]{--mystic-entry-art:url("./appearance-art/immersive-light-entry.webp")}
+:root[data-interface=simplified]{--mystic-entry-art:var(--mystic-art)}
+
+/* Generated artwork: retain real UI, text and telemetry above decorative art. */
+:root[data-theme=dark]{--mystic-bg:#0e0b17;--mystic-surface:#181323;--mystic-raised:#231b32;--mystic-line:#3e3154;--mystic-veil:#100d1de8;--mystic-primary:#c4a3fa}
+:root[data-theme=light]{--mystic-bg:#f8f5fc;--mystic-surface:#fffdfd;--mystic-raised:#f0ebfa;--mystic-line:#dfd3ef;--mystic-veil:#fcf9ffeb;--mystic-primary:#6842b9}
+:root[data-interface] .mystic-workspace .orchestral-topbar:not([style*="url"]){background:linear-gradient(90deg,var(--mystic-veil) 24%,var(--mystic-bg) 0%,transparent 160%),var(--mystic-art) right 48%/cover}
+:root[data-interface=simplified] .mystic-workspace .orchestral-topbar:not([style*="url"]){background:linear-gradient(90deg,var(--mystic-surface) 35%,transparent 170%),var(--mystic-art) right center/auto 100% no-repeat,var(--mystic-surface)}
+:root[data-interface=immersive] .mystic-workspace .orchestral-topbar:not([style*="url"]){background:linear-gradient(90deg,var(--mystic-bg) 0%,var(--mystic-veil) 24%,transparent 128%),var(--mystic-art) center 48%/cover}
+:root[data-interface=immersive] .auth-experience .auth-visual{background:linear-gradient(180deg,var(--mystic-veil) 0%,transparent 37%,transparent 65%,var(--mystic-veil) 100%),var(--mystic-entry-art) center/cover;animation:none}
+:root[data-interface=simplified] .auth-experience .auth-visual{background:linear-gradient(145deg,var(--mystic-bg) 10%,transparent 140%),var(--mystic-art) center/cover}
+:root[data-interface=immersive] .auth-orbit{opacity:0;animation:none!important}
+:root[data-interface=immersive] .auth-brand,:root[data-interface=immersive] .auth-role{position:relative;z-index:2}
+:root[data-interface=immersive] .mystic-share{background:linear-gradient(130deg,var(--mystic-veil),transparent 150%),var(--mystic-entry-art) center/cover}
+:root[data-interface=immersive] .mystic-workspace .nav-link.active{background:linear-gradient(110deg,color-mix(in srgb,var(--accent) 22%,var(--raised)),var(--raised));border-color:color-mix(in srgb,var(--accent) 52%,var(--line));box-shadow:0 3px 16px #754bc72a}
+:root[data-interface] .mystic-workspace .brand-mark{border-color:color-mix(in srgb,var(--accent) 40%,var(--line))}
+:root[data-interface=immersive] .mystic-workspace :is(.panel,.metric,.network-card,.deployment-node){border-radius:14px;box-shadow:0 6px 22px #25134222}
+:root[data-interface=immersive] .studio-site :is(.studio-hero,.developer-hero){background:linear-gradient(90deg,var(--mystic-bg) 0%,var(--mystic-veil) 24%,transparent 155%),var(--mystic-art) center/cover}
+:root[data-interface=simplified] .studio-site :is(.studio-hero,.developer-hero){background:linear-gradient(90deg,var(--mystic-bg) 20%,transparent 150%),var(--mystic-art) right center/cover}
+:root[data-interface] .studio-hero-cover{min-height:clamp(360px,45vw,560px)}
+:root[data-interface=immersive] .appearance-style-option>span{height:92px}
+.cinematic-preview{margin:0 0 28px;border:1px solid var(--mystic-line);border-radius:16px;background:var(--mystic-surface);padding:16px;display:grid;gap:12px;max-width:760px}
+.cinematic-preview>div{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.cinematic-preview video{width:100%;height:auto;max-height:440px;object-fit:contain;border-radius:12px;background:var(--mystic-bg)}
+.cinematic-preview p{margin:0;font-size:.85rem}
+:root[data-interface] .cinematic-preview button{font:inherit;border:1px solid var(--mystic-line);background:var(--mystic-raised);color:var(--mystic-ink);border-radius:8px;padding:8px 12px;cursor:pointer}
+@media(prefers-reduced-motion:reduce){.cinematic-preview video{display:none}}

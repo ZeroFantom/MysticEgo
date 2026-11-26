@@ -15,67 +15,75 @@ const palettes=[
  {id:'coral',name:'Коралл',colors:['#ffa99a','#985047','#ffe2ab']},
  {id:'steel',name:'Сталь',colors:['#c6d5eb','#53657c','#a5cccf']}
 ];
-type Style={theme:'dark'|'light'|'system';palette:string;primary:string;secondary:string;ambient:boolean;wave:boolean;grid:boolean;border:boolean;intensity:number;density:'compact'|'comfortable';size:'normal'|'large'};
-const defaults:Style={theme:'dark',palette:'iris',primary:'#b49bf7',secondary:'#75d9c7',ambient:true,wave:false,grid:false,border:false,intensity:55,density:'comfortable',size:'normal'};
+export type Style={interfaceStyle:'immersive'|'simplified';transition:'flow'|'fade'|'slide'|'scale';uiMotion:'off'|'low'|'normal';theme:'dark'|'light'|'system';palette:string;primary:string;secondary:string;ambient:boolean;wave:boolean;grid:boolean;border:boolean;intensity:number;density:'compact'|'comfortable';size:'normal'|'large'};
+const volatileStyles=new Map<string,Style>();
+const defaults:Style={interfaceStyle:'simplified',transition:'flow',uiMotion:'normal',theme:'dark',palette:'iris',primary:'#b49bf7',secondary:'#75d9c7',ambient:true,wave:false,grid:false,border:false,intensity:55,density:'comfortable',size:'normal'};
 function current(scope:string):Style{
- try{return {...defaults,...JSON.parse(localStorage.getItem(preferenceKey(scope,'appearance'))||'{}')}}
+ if(volatileStyles.has(scope))return volatileStyles.get(scope)!;
+ try{const saved={...defaults,...JSON.parse(localStorage.getItem(preferenceKey(scope,'appearance'))??localStorage.getItem(preferenceKey('','appearance'))??'{}')};return {...saved,theme:['dark','light','system'].includes(saved.theme)?saved.theme:defaults.theme,interfaceStyle:saved.interfaceStyle==='immersive'?'immersive':'simplified',transition:['flow','fade','slide','scale'].includes(saved.transition)?saved.transition:'flow',uiMotion:['off','low','normal'].includes(saved.uiMotion)?saved.uiMotion:'normal'}}
  catch{return defaults}
 }
 export function applyStyle(style:Style){
  const root=document.documentElement;
  root.dataset.theme=style.theme==='system'?(matchMedia('(prefers-color-scheme:light)').matches?'light':'dark'):style.theme;
+ root.dataset.interface=style.interfaceStyle;root.dataset.transition=style.transition;root.dataset.uiMotion=style.uiMotion;
  root.dataset.palette=style.palette;
- root.dataset.ambient=String(style.ambient);
- root.dataset.neonWave=String(style.wave);root.dataset.neonGrid=String(style.grid);root.dataset.neonBorder=String(style.border);
+ root.dataset.ambient=String(style.ambient&&style.uiMotion==='normal'&&style.interfaceStyle==='immersive');
+ const effects=style.uiMotion==='normal'&&style.interfaceStyle==='immersive';root.dataset.neonWave=String(style.wave&&effects);root.dataset.neonGrid=String(style.grid&&effects);root.dataset.neonBorder=String(style.border&&effects);
  root.dataset.density=style.density;root.dataset.textSize=style.size;
  const palette=palettes.find(item=>item.id===style.palette);
  const safe=(value:string,fallback:string)=>/^#[\da-f]{6}$/i.test(value)?value:fallback;
  const accent=palette?.colors[0]??safe(style.primary,defaults.primary);
  const alt=palette?.colors[2]??safe(style.secondary,defaults.secondary);
- root.style.setProperty('--accent',accent);
+ root.style.setProperty('--accent',root.dataset.theme==='light'?`color-mix(in srgb,${accent} 54%,#39206e)`:accent);
  root.style.setProperty('--accent-deep',palette?.colors[1]??'color-mix(in srgb,var(--accent) 62%,var(--canvas))');
  root.style.setProperty('--alt',alt);
  root.style.setProperty('--accent-light','color-mix(in srgb,var(--accent) 70%,var(--ink))');
  root.style.setProperty('--neon-strength',String(Math.max(.05,Math.min(1,style.intensity/100))));
 }
-function save(scope:string,style:Style){applyStyle(style);try{localStorage.setItem(preferenceKey(scope,'appearance'),JSON.stringify(style))}catch{}}
+function save(scope:string,style:Style){applyStyle(style);try{localStorage.setItem(preferenceKey(scope,'appearance'),JSON.stringify(style));volatileStyles.delete(scope)}catch{volatileStyles.set(scope,style)}window.dispatchEvent(new Event('mystic-appearance'));}
 export function initPalette(scope:string){
  const media=matchMedia('(prefers-color-scheme:light)');
  const update=()=>applyStyle(current(scope));
- update();media.addEventListener('change',update);
- return()=>media.removeEventListener('change',update);
+ update();media.addEventListener('change',update);window.addEventListener('storage',update);
+ return()=>{media.removeEventListener('change',update);window.removeEventListener('storage',update)};
 }
 export function ThemeToggle({scope=''}:{scope?:string}){
- const [light,setLight]=useState(()=>{const theme=current(scope).theme;return theme==='light'||theme==='system'&&matchMedia('(prefers-color-scheme:light)').matches;});
- return <button type="button" className="icon-btn auth-theme" aria-label={light?'Тёмная тема':'Светлая тема'} onClick={()=>
-  {setLight(!light);save(scope,{...current(scope),theme:light?'dark':'light'})}}>{light?<Moon size={19}/>:<Sun size={19}/>}</button>
+ const [style,setStyle]=useState(()=>current(scope));
+ useEffect(()=>{const sync=()=>setStyle(current(scope));sync();window.addEventListener('mystic-appearance',sync);window.addEventListener('storage',sync);const media=matchMedia('(prefers-color-scheme:light)');media.addEventListener('change',sync);return()=>{window.removeEventListener('mystic-appearance',sync);window.removeEventListener('storage',sync);media.removeEventListener('change',sync)}},[scope]);
+ const light=style.theme==='light'||style.theme==='system'&&matchMedia('(prefers-color-scheme:light)').matches;
+ return <span className="appearance-quick"><button type="button" className="icon-btn" title={light?'Тёмная тема':'Светлая тема'} aria-label={light?'Тёмная тема':'Светлая тема'} onClick={()=>save(scope,{...current(scope),theme:light?'dark':'light'})}>{light?<Moon size={19}/>:<Sun size={19}/>}</button>
+ <button type="button" className="icon-btn" title="Насыщенный стиль" aria-label="Насыщенный стиль" aria-pressed={style.interfaceStyle==='immersive'} onClick={()=>save(scope,{...current(scope),interfaceStyle:style.interfaceStyle==='immersive'?'simplified':'immersive'})}><Sparkles size={19}/></button></span>;
 }
 export function Settings(){
  const {preferenceScope:scope}=useApp();
  const [style,setStyle]=useState(()=>current(scope));
- const change=<K extends keyof Style>(field:K,value:Style[K])=>setStyle(previous=>({...previous,[field]:value}));
- useEffect(()=>save(scope,style),[scope,style]);
- return <><Header title="Настройки" description="Тема, палитра и эффекты оформления" action={<button className="btn secondary" onClick={()=>setStyle({...defaults})}>Сбросить оформление</button>}/>
+ useEffect(()=>{const sync=()=>setStyle(current(scope));sync();window.addEventListener('mystic-appearance',sync);window.addEventListener('storage',sync);return()=>{window.removeEventListener('mystic-appearance',sync);window.removeEventListener('storage',sync)}},[scope]);
+ const update=<K extends keyof Style>(field:K,value:Style[K])=>{const next={...current(scope),[field]:value};save(scope,next);setStyle(next)};
+ return <><Header title="Настройки" description="Тема, палитра и эффекты оформления" action={<button className="btn secondary" onClick={()=>{save(scope,{...defaults});setStyle({...defaults})}}>Сбросить оформление</button>}/>
   <div className="two-col">
    <Panel title="Тема и интерфейс"><div className="stack">
-    <label>Тема<select aria-label="Тема" value={style.theme} onChange={event=>change('theme',event.target.value as Style['theme'])}><option value="dark">Тёмная</option><option value="light">Светлая</option><option value="system">Как в системе</option></select></label>
-    <label>Плотность<select value={style.density} onChange={event=>change('density',event.target.value as Style['density'])}><option value="comfortable">Комфортная</option><option value="compact">Компактная</option></select></label>
-    <label>Текст<select value={style.size} onChange={event=>change('size',event.target.value as Style['size'])}><option value="normal">Обычный</option><option value="large">Крупный</option></select></label>
+    <label>Тема<select aria-label="Тема" value={style.theme} onChange={event=>update('theme',event.target.value as Style['theme'])}><option value="dark">Тёмная</option><option value="light">Светлая</option><option value="system">Как в системе</option></select></label>
+    <div className="appearance-style-options" role="group" aria-label="Стиль интерфейса">{(['simplified','immersive'] as const).map(item=><button key={item} type="button" className="appearance-style-option" data-preview={item} aria-pressed={style.interfaceStyle===item} onClick={()=>update('interfaceStyle',item)}><span aria-hidden="true"/><strong>{item==='immersive'?'Насыщенный':'Упрощённый'}</strong><small>{item==='immersive'?'Пейзажи, глубина и мягкое свечение':'Чистые поверхности и спокойная сетка'}</small></button>)}</div>
+    <label>Анимации<select value={style.uiMotion} onChange={event=>update('uiMotion',event.target.value as Style['uiMotion'])}><option value="normal">Обычные</option><option value="low">Минимальные</option><option value="off">Выключены</option></select></label>
+    <label>Переходы<select value={style.transition} onChange={event=>update('transition',event.target.value as Style['transition'])}><option value="flow">Мягкое появление</option><option value="fade">Растворение</option><option value="slide">Скольжение</option><option value="scale">Масштабирование</option></select></label>
+    <label>Плотность<select value={style.density} onChange={event=>update('density',event.target.value as Style['density'])}><option value="comfortable">Комфортная</option><option value="compact">Компактная</option></select></label>
+    <label>Текст<select value={style.size} onChange={event=>update('size',event.target.value as Style['size'])}><option value="normal">Обычный</option><option value="large">Крупный</option></select></label>
    </div></Panel>
-   <Panel title="Неоновые эффекты" aside={<Sparkles size={18}/>}><div className="stack">
+   <Panel title="Неоновые эффекты (насыщенный стиль)" aside={<Sparkles size={18}/>}><div className="stack">
     {([['ambient','Анимация фонового свечения'],['wave','Неоновая волна'],['grid','Градиент по затухающей сетке'],['border','Свет по контуру кнопок']] as const).map(([field,label])=>
-     <label className="check-row" key={field}><input type="checkbox" checked={style[field]} onChange={event=>change(field,event.target.checked)}/>{label}</label>)}
-    <label>Яркость · {style.intensity}%<input type="range" min={10} max={100} value={style.intensity} onChange={event=>change('intensity',Number(event.target.value))}/></label>
+     <label className="check-row" key={field}><input type="checkbox" checked={style[field]} onChange={event=>update(field,event.target.checked)}/>{label}</label>)}
+    <label>Яркость · {style.intensity}%<input type="range" min={10} max={100} value={style.intensity} onChange={event=>update('intensity',Number(event.target.value))}/></label>
     <button type="button" className="btn neon-preview">Предпросмотр кнопки</button>
    </div></Panel>
   </div>
   <Panel title="Палитра" aside={<Palette size={18}/>}>
    <div className="palette-options">{[...palettes,{id:'custom',name:'Своя палитра',colors:[style.primary,'#444057',style.secondary]}].map(item=>
-    <button className={'palette-option '+(style.palette===item.id?'selected':'')} key={item.id} onClick={()=>change('palette',item.id)} aria-pressed={style.palette===item.id}>
+    <button className={'palette-option '+(style.palette===item.id?'selected':'')} key={item.id} onClick={()=>update('palette',item.id)} aria-pressed={style.palette===item.id}>
      <div className="palette-swatches">{item.colors.map((color,index)=><i style={{background:color}} key={index}/>)}</div><strong>{item.name}</strong>{style.palette===item.id&&<Check size={17}/>}
     </button>)}</div>
-   {style.palette==='custom'&&<div className="form-pair stack custom-colors"><label>Основной цвет<input type="color" value={style.primary} onChange={event=>change('primary',event.target.value)}/></label>
-    <label>Второй цвет<input type="color" value={style.secondary} onChange={event=>change('secondary',event.target.value)}/></label></div>}
+   {style.palette==='custom'&&<div className="form-pair stack custom-colors"><label>Основной цвет<input type="color" value={style.primary} onChange={event=>update('primary',event.target.value)}/></label>
+    <label>Второй цвет<input type="color" value={style.secondary} onChange={event=>update('secondary',event.target.value)}/></label></div>}
   </Panel>
  </>;
 }

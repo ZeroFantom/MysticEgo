@@ -1,0 +1,46 @@
+name: Appearance and panel build checks
+on:
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - 'desktop/**'
+      - 'tools/MysticEgo.CloudDesk/**'
+      - 'services/**'
+      - 'tests/BetaResilienceSmoke/**'
+      - '.github/workflows/appearance-check.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ui:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm --prefix frontend ci --ignore-scripts --no-audit
+      - run: npm --prefix frontend run build
+      - run: npm --prefix desktop ci --ignore-scripts --no-audit
+      - run: npm --prefix desktop run build
+      - run: npm --prefix tools/MysticEgo.CloudDesk install --ignore-scripts --no-audit
+      - run: npm --prefix tools/MysticEgo.CloudDesk run build
+      - run: |
+          node --check desktop/control/effects.js
+          node --check desktop/control/view.js
+          node --input-type=module --check < desktop/local/view.js
+          node --check desktop/station/view.js
+          bash -n tools/MysticEgo.CloudDesk/update.sh
+          bash -n ops/audit-portal/install-audit-portal.sh
+  server:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet run --project tests/BetaResilienceSmoke/BetaResilienceSmoke.csproj
+      - run: |
+          for role in Orchestra Global Local Agent AuditOrchestra; do
+            dotnet build "services/Api.$role/Api.$role.csproj" -c Release
+          done

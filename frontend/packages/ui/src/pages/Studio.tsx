@@ -1,4 +1,6 @@
 import {useEffect} from 'react';
+import {ThemeToggle} from './Settings';
+import {CinematicPreview} from '../app/CinematicPreview';
 import {
   ArrowDownRight, ArrowUpRight, Box, Building2, Compass, Github, Send, Users,
   Server, ShieldCheck, Workflow,
@@ -51,7 +53,7 @@ export function LicenseLink({className}: {className?: string}) {
   </a>;
 }
 
-function PublicNavigation({page}: {page: 'studio' | 'developer'}) {
+function PublicNavigation({page,scope}: {page: 'studio' | 'developer';scope:string}) {
   useEffect(() => {
     const previous = document.title;
     document.title = page === 'studio' ? 'Студия MysticEgo' : 'Дмитрий Колыхалов · MysticEgo';
@@ -65,7 +67,7 @@ function PublicNavigation({page}: {page: 'studio' | 'developer'}) {
     <nav aria-label="Страницы MysticEgo">
       <a href="/studio" aria-current={page === 'studio' ? 'page' : undefined}>Студия</a>
       <a href="/developer" aria-current={page === 'developer' ? 'page' : undefined}>Разработчик</a>
-      <a href="/">Вход в панель <ArrowUpRight size={15} aria-hidden="true"/></a>
+      <a href="/">Вход в панель <ArrowUpRight size={15} aria-hidden="true"/></a><ThemeToggle scope={scope}/>
     </nav>
   </header>;
 }
@@ -77,9 +79,9 @@ function PublicFooter() {
   </footer>;
 }
 
-export function StudioPage() {
+export function StudioPage({scope=''}:{scope?:string}={}) {
   return <div className="studio-site">
-    <PublicNavigation page="studio"/>
+    <PublicNavigation page="studio" scope={scope}/>
     <main className="studio-content">
       <section className="studio-hero studio-hero-cover">
         <img className="studio-hero-image" src={editorialImage} alt="" fetchPriority="high"/>
@@ -94,6 +96,7 @@ export function StudioPage() {
 
       </section>
 
+      <CinematicPreview/>
       <section className="studio-section" aria-labelledby="studio-direction">
         <h2 id="studio-direction">Над чем работаем</h2>
         <div className="studio-grid two">
@@ -160,9 +163,9 @@ export function StudioPage() {
   </div>;
 }
 
-export function DeveloperPage() {
+export function DeveloperPage({scope=''}:{scope?:string}={}) {
   return <div className="studio-site">
-    <PublicNavigation page="developer"/>
+    <PublicNavigation page="developer" scope={scope}/>
     <main className="studio-content developer-content">
       <section className="studio-hero developer-hero">
         <div>

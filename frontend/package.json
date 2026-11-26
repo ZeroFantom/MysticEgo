@@ -11,10 +11,12 @@
     "dev:global": "npm run dev -w @mysticego/global",
     "dev:local": "npm run dev -w @mysticego/local",
     "dev:agent": "npm run dev -w @mysticego/agent",
-    "build": "tsc --noEmit && node scripts/build.mjs",
+    "build": "tsc --noEmit && node scripts/social.test.mjs && node scripts/appearance.test.mjs && node scripts/build.mjs",
     "typecheck": "npm run typecheck -ws --if-present",
     "dev:orchestra": "npm run dev -w @mysticego/orchestra",
-    "dev:audit": "npm run dev -w @mysticego/audit"
+    "dev:audit": "npm run dev -w @mysticego/audit",
+    "test:social": "node scripts/social.test.mjs",
+    "test:appearance": "node scripts/appearance.test.mjs"
   },
   "devDependencies": {
     "@types/react": "^19.1.0",
