@@ -56,6 +56,7 @@ function apiResponse(path,origin){
 async function isolate(page,origin){
   await page.route('**/*',async route=>{
     const url=new URL(route.request().url());
+    if(url.origin===origin&&url.pathname==='/mystic-config.js')return route.fulfill({contentType:'text/javascript',body:'window.__MYSTIC_CONFIG__='+JSON.stringify({apiUrl:origin,authUrl:origin})});
     if(url.pathname.startsWith('/api/')){
       const value=apiResponse(url.pathname,origin);
       return route.fulfill({status:value===undefined?404:200,contentType:'application/json',body:JSON.stringify(value??{error:'Fixture endpoint not implemented'})});
@@ -141,7 +142,8 @@ try{
             });
           }
           await check(page,prefix+'-runtime',async()=>assert.deepEqual(errors,[],'uncaught browser exceptions'));
-        }finally{await context.close()}
+        }catch(error){results.push({label:prefix+'-setup',passed:false,error:String(error)});await page.screenshot({path:resolve(output,prefix+'-setup-failure.png'),timeout:5000}).catch(()=>{})}
+        finally{await context.close()}
       }
     }finally{await new Promise(ok=>server.close(ok))}
   }
