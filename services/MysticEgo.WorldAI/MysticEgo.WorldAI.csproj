@@ -1,1 +1,14 @@
-<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net10.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings></PropertyGroup><ItemGroup><FrameworkReference Include="Microsoft.AspNetCore.App" /></ItemGroup><ItemGroup><Compile Include="../../shared/LocalModels.cs" Link="Deployment/LocalModels.cs" /><Compile Include="../../shared/LocalModelChat.cs" Link="Deployment/LocalModelChat.cs" /></ItemGroup></Project>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App"/>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../../shared/LocalModels.cs" Link="Deployment/LocalModels.cs"/>
+    <Compile Include="../../shared/LocalModelChat.cs" Link="Deployment/LocalModelChat.cs"/>
+  </ItemGroup>
+</Project>

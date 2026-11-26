@@ -5,6 +5,9 @@ using MysticEgo.Distributed;
 
 namespace MysticEgo.Api.Orchestra.Controllers;
 
+/// <summary>
+/// Displays the update worker's state and queues the exact release confirmed by the managing developer.
+/// </summary>
 [ApiController, Authorize(Policy = "operator"), Route("api/v1/orchestra/update")]
 public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam team) : ControllerBase
 {
@@ -17,6 +20,7 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
             ? JsonSerializer.Deserialize<UpdateStatus>(System.IO.File.ReadAllText(StateDirectory + "/status.json"), Json)
             : null;
 
+    /// <summary>Reads the latest status published by the update worker.</summary>
     [HttpGet, ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public IActionResult Status()
     {
@@ -25,6 +29,7 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
         return status is null ? StatusCode(503, new { error = "Служба обновления Orchestra ещё не настроена." }) : Ok(status);
     }
 
+    /// <summary>Validates approval and submits a single pending request to the worker.</summary>
     [HttpPost, RequestSizeLimit(4096)]
     public IActionResult Approve(Approval request)
     {
@@ -48,13 +53,22 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
             System.IO.File.WriteAllText(temporary, status.Protocol == 2
                 ? JsonSerializer.Serialize(new UpdateRequest(target, candidate), Json)
                 : JsonSerializer.Serialize(candidate, Json));
-            try { System.IO.File.Move(temporary, path); }
+            // Publish only a complete request and preserve any request already queued.
+            try
+            {
+                System.IO.File.Move(temporary, path);
+            }
             catch (IOException) when (System.IO.File.Exists(path))
-            { return Conflict(new { error = "Обновление уже ожидает запуска." }); }
+            {
+                return Conflict(new { error = "Обновление уже ожидает запуска." });
+            }
             state.Log(User.Identity?.Name ?? "developer", "orchestra.update.approved", candidate.Tag + " " + target, true);
             return Accepted(new { accepted = true, target, tag = candidate.Tag });
         }
-        finally { System.IO.File.Delete(temporary); }
+        finally
+        {
+            System.IO.File.Delete(temporary);
+        }
     }
 
     public sealed record Approval(string Tag, string Digest, bool Confirmed, string? Target = null);

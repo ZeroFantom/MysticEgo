@@ -1,3 +1,4 @@
+import {LicenseLink} from './Studio';
 import {useEffect,useState} from 'react';
 import {ArrowLeft,CloudCog,Download,Laptop,Monitor,Server,ShieldCheck} from 'lucide-react';
 import {useApp,useRemote} from '../app/context';
@@ -61,7 +62,7 @@ export function PublicDesktopDownloads(){
     </header>
     {error&&<p role="status">Не удалось получить актуальные ссылки GitHub. <button className="btn secondary" onClick={()=>retry(value=>value+1)}>Повторить</button></p>}
     <div className="desktop-download-grid">{publicApps.map(app=><AppCard key={app.name} app={app} downloads={downloads} loading={!downloads&&!error}/>)}</div>
-    <p className="desktop-download-footnote">GitHub может запросить вход и доступ к репозиторию.</p>
+    <p className="desktop-download-footnote">Лицензия исходного кода <LicenseLink/>.</p>
   </main>;
 }
 

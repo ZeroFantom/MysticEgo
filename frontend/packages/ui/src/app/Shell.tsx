@@ -41,6 +41,7 @@ import {AvatarStudio} from '../pages/AvatarStudio';
 import {AssistantCompanion} from '../avatar/AssistantCompanion';
 import {AuditSystem} from '../pages/AuditSystem';
 import {Faq} from '../pages/Faq';
+import {DeveloperPage, LicenseLink, StudioPage} from '../pages/Studio';
 
 declare global {interface Window {__MYSTIC_CONFIG__?:{apiUrl?:string;authUrl?:string}}}
 const modes={
@@ -152,6 +153,10 @@ function Workspace({logout}:{logout:()=>void}){
           <item.icon size={17}/><span>{item.label}</span>
         </NavLink>)}
       </div>)}</nav>
+      <footer className="workspace-project">
+        {mode === 'orchestra' && <a href="/studio">Студия и команда</a>}
+        <LicenseLink/>
+      </footer>
       <ReleaseStatus/>
     </aside>
     {mobile&&<div className="shade" onClick={()=>setMobile(false)}/>}
@@ -214,7 +219,13 @@ export function MysticApp({mode,defaultApi}:{mode:NodeMode;title:string;defaultA
   const scope=accountScope(session,mode,portal);
   const profile=useRemote(async()=>session.token?{scope,account:await api.request<PersonalAccount>('/collective/me')}:null,[api,scope]);
   useEffect(()=>initPalette(scope),[scope]);
-  if(mode==='orchestra'&&location.pathname.replace(/\/$/,'')==='/desktop-downloads')return <PublicDesktopDownloads/>;
+  // Public pages work with or without a session, including during service recovery.
+  const publicPath = location.pathname.replace(/\/$/, '');
+  if (mode === 'orchestra') {
+    if (publicPath === '/studio') return <StudioPage/>;
+    if (publicPath === '/developer') return <DeveloperPage/>;
+    if (publicPath === '/desktop-downloads') return <PublicDesktopDownloads/>;
+  }
   if(mode==='orchestra'&&location.pathname==='/agent-desktop')return <AgentDesktopEntry/>;
   if(restoring)return <NotificationProvider><main className="auth-experience"><section className="auth-form-side">
     <div className="auth-form-card">
