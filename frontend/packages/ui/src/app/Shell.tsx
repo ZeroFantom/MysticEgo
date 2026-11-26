@@ -6,10 +6,11 @@ import {CloudDeskDownloads,PublicDesktopDownloads} from '../pages/DesktopDownloa
 import {NoticeBell,NotificationProvider,useNotice} from './notifications';
 import './workspace-rail.css';
 import './workspace-polish.css';
+import './motion.css';
 import {ErrorBanner} from '../components/primitives';
 import {accountScope,useBrowserSession} from './browserSession';
 import {ReleaseStatus,ProjectBranches} from '../pages/ProjectConsole';
-import {useEffect,useLayoutEffect,useMemo,useRef,useState,type ReactNode} from 'react';
+import {useEffect,useId,useLayoutEffect,useMemo,useRef,useState,type ReactNode} from 'react';
 import {BrowserRouter,Link,NavLink,Navigate,Route,Routes,useLocation} from 'react-router-dom';
 import {
   Activity,Bell,BookOpen,Boxes,ChevronDown,ChevronRight,Clapperboard,Cloud,Cog,
@@ -94,6 +95,7 @@ function AccountMenu({logout}:{logout:()=>void}){
   const {pathname}=useLocation();
   const [open,setOpen]=useState(false);
   const box=useRef<HTMLDivElement>(null);
+  const menuId=useId();
   useEffect(()=>setOpen(false),[pathname]);
   useEffect(()=>{
     if(!open)return;
@@ -105,13 +107,13 @@ function AccountMenu({logout}:{logout:()=>void}){
   },[open]);
   const name=personal?.profile.displayName||personal?.game.nickname||session.username||'Аккаунт';
   return <div className="account-menu" ref={box}>
-    <button className="account-trigger" type="button" aria-label={'Меню аккаунта: '+name} aria-expanded={open} onClick={()=>setOpen(value=>!value)}>
+    <button className="account-trigger" type="button" aria-label={'Меню аккаунта: '+name} aria-expanded={open} aria-controls={menuId} onClick={()=>setOpen(value=>!value)}>
       <ProfileAvatar url={personal?.profile.avatarUrl} name={name}/><span>{name}</span><ChevronDown size={15}/>
     </button>
-    {open&&<div className="account-popover">
+    <div id={menuId} className="account-popover motion-disclosure" data-motion-open={open} inert={!open} aria-hidden={!open}>
       <Link to="/profile" onClick={()=>setOpen(false)}><UserRound size={17}/> Мой профиль</Link>
-      <button onClick={logout}><LogOut size={17}/> Выйти</button>
-    </div>}
+      <button type="button" onClick={logout}><LogOut size={17}/> Выйти</button>
+    </div>
   </div>;
 }
 
