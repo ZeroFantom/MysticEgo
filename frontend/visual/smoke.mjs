@@ -116,7 +116,11 @@ async function checkArtwork(page,theme,style,selector,kind){
   assert(data.overview.includes(data.prefix+'-overview'));
   assert.deepEqual(data.overviewSize,theme==='light'&&style==='immersive'?[1916,821]:[2172,724]);
   assert.deepEqual(data.profileSize,[1916,821]);
-  if(kind==='header'||selector==='.dashboard-landscape')assert(['100%','100% auto'].includes(data.fit),'Image must span the entire width: '+data.fit);
+  if(kind==='header'||selector==='.dashboard-landscape'){
+    // A color-only final background layer serializes as ", auto" in Chromium.
+    const imageFit=data.fit.split(',')[0].trim();
+    assert(['100%','100% auto'].includes(imageFit),'Image must span the entire width: '+data.fit);
+  }
   if(selector==='.dashboard-landscape')assert(Math.abs(data.ratio-data.overviewSize[0]/data.overviewSize[1])<.06,'Overview image box must preserve native proportions: '+data.ratio);
   if(theme==='light'){assert.equal(data.background,'#eae7ef');assert.equal(data.surface,'#f4f1f6')}
 
@@ -213,7 +217,14 @@ try{
             });
             if(role==='orchestra')for(const [route,selector] of [['profile','.profile-hero'],['nodes','.network-card'],['diagnostics','.chart-line'],['collective','.chat-thread']])await check(page,prefix+'-'+route,async()=>{
               await page.goto(origin+'/'+route,{waitUntil:'domcontentloaded'});await visible(page.locator(selector).first());
-              if(route==='profile'){await checkArtwork(page,'light','simplified','.profile-hero','profile');await page.getByRole('button',{name:'Оформление',exact:true}).click();await visible(page.getByRole('dialog',{name:'Оформление профиля'}));await capture(page,prefix+'-profile-dialog');await page.keyboard.press('Escape');await page.getByRole('dialog',{name:'Оформление профиля'}).waitFor({state:'hidden'})}
+              if(route==='profile'){
+                for(const [theme,style] of combinations){
+                  await switchAppearance(page,theme,style);
+                  await checkArtwork(page,theme,style,'.profile-hero','profile');
+                  await noHorizontalOverflow(page);
+                  await capture(page,prefix+'-profile-'+theme+'-'+style);
+                }
+                await page.getByRole('button',{name:'Оформление',exact:true}).click();await visible(page.getByRole('dialog',{name:'Оформление профиля'}));await capture(page,prefix+'-profile-dialog');await page.keyboard.press('Escape');await page.getByRole('dialog',{name:'Оформление профиля'}).waitFor({state:'hidden'})}
               if(route==='diagnostics'){await visible(page.locator('.chart-gap-bridge').first());assert.equal(await page.locator('.chart-line').first().getAttribute('class'),'chart-line')}
               if(route==='collective'){await page.locator('.chat-thread').first().click();await visible(page.getByRole('textbox',{name:'Сообщение',exact:true}));await visible(page.locator('.chat-message').first());await page.getByRole('button',{name:'Эмодзи'}).click();await visible(page.locator('.emoji-menu'));await page.keyboard.press('Escape');await page.locator('.emoji-menu').waitFor({state:'hidden'})}
               await capture(page,prefix+'-'+route);
