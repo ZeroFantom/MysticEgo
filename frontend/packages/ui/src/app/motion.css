@@ -20,6 +20,7 @@
   scale:.97;translate:0 1px;
 }
 /* Persistent disclosures remain inert while closing. Older engines close immediately. */
+.motion-disclosure[data-motion-open=false]{display:none;pointer-events:none}
 :root[data-interface] .motion-disclosure[data-motion-open]{
   display:block;opacity:1;translate:0 0;scale:1;animation:none!important;
   transition:opacity var(--mystic-time) var(--mystic-ease),translate var(--mystic-time) var(--mystic-ease),scale var(--mystic-time) var(--mystic-ease),display var(--mystic-time) allow-discrete;
