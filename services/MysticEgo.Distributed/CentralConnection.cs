@@ -58,14 +58,17 @@ public static class CentralConnection
             if (HttpMethods.IsPost(context.Request.Method) || HttpMethods.IsPut(context.Request.Method))
             {
                 var sticker = path.Equals("/api/v1/collective/stickers", StringComparison.OrdinalIgnoreCase);
+                var voiceUpload = HttpMethods.IsPost(context.Request.Method) &&
+                    path.StartsWithSegments("/api/v1/collective/voice", out var voicePath) &&
+                    Guid.TryParse(voicePath.Value?.Trim('/'), out _);
                 var avatarUpload = avatar && path.Equals("/api/v1/avatars/account/asset", StringComparison.OrdinalIgnoreCase);
-                var maximum = avatarUpload ? 25 * 1024 * 1024 : sticker ? 524_288 : 65_536;
+                var maximum = avatarUpload ? 25 * 1024 * 1024 : voiceUpload ? 5 * 1024 * 1024 : sticker ? 524_288 : 65_536;
                 if (context.Request.ContentLength > maximum)
                 {
                     context.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
                     return;
                 }
-                var type = new MediaTypeHeaderValue(sticker ? "application/octet-stream" : "application/json");
+                var type = new MediaTypeHeaderValue(sticker || voiceUpload ? "application/octet-stream" : "application/json");
                 if (avatarUpload && (!MediaTypeHeaderValue.TryParse(context.Request.ContentType, out type) || type.MediaType != "multipart/form-data"))
                 {
                     context.Response.StatusCode = StatusCodes.Status415UnsupportedMediaType;

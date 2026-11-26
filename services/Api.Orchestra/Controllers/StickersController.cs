@@ -51,7 +51,7 @@ public sealed class StickersController(NodeState state, StickerStore stickers) :
         if (saved is null) return NotFound();
         var actor = Actor.ToString();
         if (saved.Owner != Actor && !(await state.Data.ListAsync<SocialMessage>(5000, ct))
-            .Any(m => m.StickerId == id && m.Recipient == actor && m.Sender == saved.Owner.ToString()))
+            .Any(m => m.DeletedAt is null && m.StickerId == id && (m.Recipient == actor || m.Sender == actor)))
             return NotFound();
         Response.Headers["X-Content-Type-Options"] = "nosniff";
         var file = stickers.PathFor(id);

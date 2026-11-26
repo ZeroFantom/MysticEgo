@@ -88,11 +88,13 @@ public sealed class SocialService(NodeState state) : ISocialService
     }
     public async Task<object> UpdateProfile(string user,string level,ProfileEdit edit,CancellationToken ct)
     {
-        if(edit.DisplayName.Length>60||edit.Bio.Length>600||!UrlOk(edit.AvatarUrl)||!UrlOk(edit.BackgroundUrl)||!UrlOk(edit.CoverUrl)||!ColorOk(edit.Accent))
+        if((edit.StatusText?.Length ?? 0) > 100 || edit.StatusText?.Any(char.IsControl) == true ||
+            edit.DisplayName.Length>60||edit.Bio.Length>600||!UrlOk(edit.AvatarUrl)||!UrlOk(edit.BackgroundUrl)||!UrlOk(edit.CoverUrl)||!ColorOk(edit.Accent))
             throw new NodeApiException(400,"Недопустимые поля профиля. Используйте HTTPS для изображений.");
         var profile=await FindProfile(user,ct)??new SocialProfile{Id=Guid.NewGuid(),UserId=user};
         profile.DisplayName=edit.DisplayName.Trim();profile.Bio=edit.Bio.Trim();profile.AvatarUrl=edit.AvatarUrl??"";
         profile.BackgroundUrl=edit.BackgroundUrl??"";profile.CoverUrl=edit.CoverUrl??"";profile.Accent=edit.Accent??"#a16bff";
+        if (edit.StatusText is not null) profile.StatusText = edit.StatusText.Trim();
         profile.Level=level;profile.Discoverable=edit.Discoverable;profile.UpdatedAt=DateTimeOffset.UtcNow;
         await state.Data.PutAsync(profile,ct);state.Log(user,"profile.update",user,true);
         return new {profile,completion=Completeness(profile)};
@@ -194,18 +196,118 @@ public sealed class SocialService(NodeState state) : ISocialService
         finally { Writes.Release(); }
     }
     public async Task<object> Messages(string user,CancellationToken ct) =>
-        (await state.Data.ListAsync<SocialMessage>(5000,ct)).Where(x=>x.Sender==user||x.Recipient==user).OrderByDescending(x=>x.At).Take(100).ToArray();
-    public async Task<SocialMessage> SendMessage(string user,MessageEdit edit,CancellationToken ct)
+        (await state.Data.ListAsync<SocialMessage>(5000,ct)).Where(x=>x.DeletedAt is null&&(x.Sender==user||x.Recipient==user)).OrderByDescending(x=>x.At).Take(100).ToArray();
+    public Task<SocialMessage> SendMessage(string user, MessageEdit edit, CancellationToken ct) =>
+        CreateMessage(user, edit, Guid.NewGuid(), null, null, false, ct);
+
+    public Task<SocialMessage> SendVoice(string user, string peer, Guid id, string mime, Guid? replyTo, CancellationToken ct) =>
+        CreateMessage(user, new MessageEdit(peer, "", ReplyToId: replyTo), id, mime, null, false, ct);
+
+    public Task<SocialMessage> ForwardMessage(string user, string peer, Guid id, SocialMessage source, CancellationToken ct) =>
+        CreateMessage(user, new MessageEdit(peer, source.Text, source.StickerId), id, source.VoiceMime, source.Transcript, true, ct);
+
+    public async Task<SocialMessage> OpenMessage(string actor, Guid id, CancellationToken ct)
     {
-        var recipient=edit.Recipient.Trim();
-        if(recipient.Length is <2 or >128||(edit.Text?.Trim().Length ?? 0)>2000 || string.IsNullOrWhiteSpace(edit.Text)&&!edit.StickerId.HasValue||recipient==user)throw new NodeApiException(400,"Invalid message");
-        var friends=await state.Data.ListAsync<FriendRequest>(5000,ct);
-        if(!friends.Any(f=>f.Status=="accepted"&&((f.Sender==user&&f.Recipient==recipient)||(f.Recipient==user&&f.Sender==recipient))))
-            throw new NodeApiException(403,"Messaging requires accepted friendship");
-        var msg=new SocialMessage {Id=Guid.NewGuid(),Sender=user,Recipient=recipient,Text=edit.Text?.Trim() ?? "", StickerId=edit.StickerId};
-        await state.Data.PutAsync(msg,ct);
-        await Notify(recipient,user,"message","отправил сообщение",ct);
-        return msg;
+        var message = await state.Data.GetAsync<SocialMessage>(id, ct);
+        if (message is null || message.DeletedAt is not null || (message.Sender != actor && message.Recipient != actor))
+            throw new NodeApiException(404, "Сообщение не найдено.");
+        return message;
+    }
+
+    public async Task<SocialMessage> EditMessage(string actor, Guid id, string? value, CancellationToken ct)
+    {
+        var text = value?.Trim();
+        if (string.IsNullOrEmpty(text) || text.Length > 2000)
+            throw new NodeApiException(400, "Введите от 1 до 2000 символов.");
+
+        await Writes.WaitAsync(ct);
+        try
+        {
+            var message = await OpenMessage(actor, id, ct);
+            if (message.Sender != actor || message.Forwarded || message.VoiceMime is not null ||
+                message.StickerId is not null || string.IsNullOrWhiteSpace(message.Text))
+                throw new NodeApiException(403, "Можно редактировать только своё текстовое сообщение.");
+            if (message.Text == text) return message;
+            message.Text = text;
+            message.EditedAt = DateTimeOffset.UtcNow;
+            await state.Data.PutAsync(message, ct);
+            return message;
+        }
+        finally { Writes.Release(); }
+    }
+
+    public async Task<SocialMessage> DeleteMessage(string actor, Guid id, CancellationToken ct)
+    {
+        await Writes.WaitAsync(ct);
+        try
+        {
+            var message = await state.Data.GetAsync<SocialMessage>(id, ct);
+            if (message is null || message.Sender != actor)
+                throw new NodeApiException(404, "Сообщение не найдено.");
+            if (message.DeletedAt is not null) return message;
+            message.DeletedAt = DateTimeOffset.UtcNow;
+            message.Text = "";
+            message.StickerId = null;
+            message.VoiceMime = null;
+            message.Transcript = null;
+            message.ReplyToId = null;
+            await state.Data.PutAsync(message, ct);
+            return message;
+        }
+        finally { Writes.Release(); }
+    }
+
+    public async Task<SocialMessage> SaveTranscript(string actor, Guid id, string transcript, CancellationToken ct)
+    {
+        await Writes.WaitAsync(ct);
+        try
+        {
+            var message = await OpenMessage(actor, id, ct);
+            if (message.VoiceMime is null) throw new NodeApiException(404, "Аудио не найдено.");
+            if (message.Transcript is not null) return message;
+            message.Transcript = transcript;
+            await state.Data.PutAsync(message, ct);
+            return message;
+        }
+        finally { Writes.Release(); }
+    }
+
+    private async Task<SocialMessage> CreateMessage(string user, MessageEdit edit, Guid id, string? voiceMime,
+        string? transcript, bool forwarded, CancellationToken ct)
+    {
+        var recipient = edit.Recipient.Trim();
+        var text = edit.Text?.Trim() ?? "";
+        if (recipient.Length is < 2 or > 128 || recipient == user || text.Length > 2000 ||
+            (text.Length == 0 && edit.StickerId is null && voiceMime is null))
+            throw new NodeApiException(400, "Недопустимое сообщение.");
+
+        await Writes.WaitAsync(ct);
+        SocialMessage message;
+        try
+        {
+            var friends = await state.Data.ListAsync<FriendRequest>(5000, ct);
+            if (!friends.Any(friend => friend.Status == "accepted" && SamePair(friend, user, recipient)))
+                throw new NodeApiException(403, "Чат открывается после подтверждения контакта.");
+            if (edit.ReplyToId is { } replyId)
+            {
+                var reply = await OpenMessage(user, replyId, ct);
+                if (reply.Sender != recipient && reply.Recipient != recipient)
+                    throw new NodeApiException(404, "Сообщение для ответа не найдено в этом чате.");
+            }
+            message = new SocialMessage
+            {
+                Id = id, Sender = user, Recipient = recipient, Text = text, StickerId = edit.StickerId,
+                ReplyToId = edit.ReplyToId, VoiceMime = voiceMime, Transcript = transcript, Forwarded = forwarded
+            };
+            await state.Data.PutAsync(message, ct);
+        }
+        finally { Writes.Release(); }
+
+        // Notification failure must not turn a committed message into a retriable send.
+        try { await Notify(recipient, user, "message", "отправил сообщение", ct); }
+        catch (Exception error) when (error is not OutOfMemoryException)
+        { state.Log(user, "message.notification", id.ToString(), false, error.GetType().Name); }
+        return message;
     }
     private async Task Notify(string recipient, string sender, string kind, string action, CancellationToken ct)
     {

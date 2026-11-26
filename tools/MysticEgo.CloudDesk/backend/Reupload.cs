@@ -38,7 +38,7 @@ sealed partial class CloudDesk {
         var source=Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,"..","..","..","ops","orchestra-updater"));
         string[] required=["bootstrap-r31.sh","baseline.sha256","install-worker.sh","update-orchestra.py",
             "mysticego-orchestra-updater.service","mysticego-orchestra-updater.timer","payload/Api.Orchestra.dll",
-            "payload/MysticEgo.WorldAI.dll","payload/MysticEgo.Installer.dll","payload/web/index.html","payload/web/release-info.json","payload/web/favicon.ico","payload/web/mystic-mark.png"];
+            "payload/MysticEgo.Distributed.dll","payload/MysticEgo.WorldAI.dll","payload/MysticEgo.Installer.dll","payload/web/index.html","payload/web/release-info.json","payload/web/favicon.ico","payload/web/mystic-mark.png"];
         var defaultModel=new Dictionary<string,string> {
             ["model/install-default-model.sh"]="../panel-assistant/install-default-model.sh",
             ["model/infrastructure/install.sh"]="../infrastructure/install.sh",

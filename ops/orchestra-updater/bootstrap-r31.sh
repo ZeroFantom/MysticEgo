@@ -4,6 +4,7 @@ cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 [[ $EUID == 0 ]]
 root=/opt/mysticego/app/runtime/app
 api="$root/bin/Api.Orchestra.dll"
+distributed="$root/bin/MysticEgo.Distributed.dll"
 world="$root/bin/MysticEgo.WorldAI.dll"
 installer="$root/bin/MysticEgo.Installer.dll"
 web="$root/web/orchestra"
@@ -26,6 +27,7 @@ health() {
 id=$(health)
 backup=$(mktemp -d /opt/mysticego/.bootstrap-r31.XXXXXXXX)
 cp -p "$api" "$backup/Api.Orchestra.dll"
+cp -p "$distributed" "$backup/MysticEgo.Distributed.dll"
 cp -p "$world" "$backup/MysticEgo.WorldAI.dll"
 cp -p "$installer" "$backup/MysticEgo.Installer.dll"
 cp -p "$web/index.html" "$backup/index.html"
@@ -35,6 +37,7 @@ rollback() {
   set +e
   systemctl stop "$service"
   cp -p "$backup/Api.Orchestra.dll" "$api"
+  cp -p "$backup/MysticEgo.Distributed.dll" "$distributed"
   cp -p "$backup/MysticEgo.WorldAI.dll" "$world"
   cp -p "$backup/MysticEgo.Installer.dll" "$installer"
   cp -p "$backup/index.html" "$web/index.html"
@@ -46,6 +49,7 @@ rollback() {
 trap rollback ERR
 systemctl stop "$service"
 install -m 0644 payload/Api.Orchestra.dll "$api"
+install -m 0644 payload/MysticEgo.Distributed.dll "$distributed"
 install -m 0644 payload/MysticEgo.WorldAI.dll "$world"
 install -m 0644 payload/MysticEgo.Installer.dll "$installer"
 install -m 0644 payload/web/assets/* "$web/assets/"

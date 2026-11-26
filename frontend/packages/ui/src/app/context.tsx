@@ -2,7 +2,7 @@ import {createContext,useContext,useEffect,useRef,useState} from 'react';
 import {NodeApi,type NodeMode} from '@mysticego/sdk';
 
 export type Session={url:string;token:string;authUrl:string;refreshToken?:string;username?:string};
-export type AccountProfile={id:string;displayName:string;bio:string;avatarUrl:string;backgroundUrl:string;coverUrl:string;accent:string;discoverable:boolean};
+export type AccountProfile={id:string;displayName:string;bio:string;statusText?:string;avatarUrl:string;backgroundUrl:string;coverUrl:string;accent:string;discoverable:boolean};
 export type Personality={version:string;resultVersion?:string;completed:boolean;completedAt?:string;questions?:{id:string;axis:string;text:string}[];axes:{id:string;label:string;question:string;value:number|null}[]};
 export type GameAttribute={id:string;label:string;group:'mind'|'social'|'body';value:number|null;locked:boolean;base:number|null;allocated:number;grade?:string;hint:string};
 export type PersonalAccount={
@@ -23,17 +23,20 @@ export function useApp(){
   if(!value)throw new Error('Не удалось получить контекст приложения');
   return value;
 }
-export function useRemote<T>(load:()=>Promise<T>,deps:unknown[]=[],interval=0){
+export function useRemote<T>(load:()=>Promise<T>,deps:unknown[]=[],interval=0,keepWhileRefreshing=false){
   const [value,setValue]=useState<T|null>(null);
   const [error,setError]=useState('');
   const [loading,setLoading]=useState(true);
   const [tick,setTick]=useState(0);
+  const activeDeps=useRef<unknown[]>([]);
   const query=useRef(load);
   query.current=load;
   useEffect(()=>{
     let alive=true;
     let running=false;
-    setValue(null);
+    const sameQuery=deps.length===activeDeps.current.length&&deps.every((value,index)=>Object.is(value,activeDeps.current[index]));
+    activeDeps.current=deps;
+    if(!keepWhileRefreshing||!sameQuery)setValue(null);
     setLoading(true);
     setError('');
     async function update(){

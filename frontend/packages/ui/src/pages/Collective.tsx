@@ -1,16 +1,20 @@
 import {useEffect,useRef,useState,type FormEvent} from 'react';
 import {useSearchParams} from 'react-router-dom';
-import {ArrowLeft,Check,Copy,Link2,MessageCircle,Search,Send,Smile,Sticker as StickerIcon,Sparkles,UserPlus,X} from 'lucide-react';
+import {ArrowLeft,Check,Copy,Link2,MessageCircle,MoreHorizontal,Search,Send,Smile,Sticker as StickerIcon,Sparkles,UserPlus,X} from 'lucide-react';
 import {useApp,useRemote} from '../app/context';
+import {useNoticeFeed} from '../app/notifications';
 import {ErrorBanner,Header} from '../components/primitives';
 import {ProfileAvatar} from './Profile';
 import {StickerImage,StickerPicker} from '../components/Stickers';
+import {VoiceMessage,VoiceRecorder} from './ChatVoice';
 import './collective-chat.css';
 
-type Person={id:string;nickname:string;displayName:string;avatarUrl?:string;accent?:string};
+type Person={id:string;nickname:string;displayName:string;avatarUrl?:string;accent?:string;statusText?:string};
 type Contact={id:string;status:'pending'|'accepted';incoming:boolean;person:Person;
-  last?:{text:string;at:string;stickerId?:string;mine:boolean}};
-type Message={id:string;sender:string;recipient:string;text:string;at:string;stickerId?:string};
+  last?:{text:string;at:string;stickerId?:string;voice?:boolean;mine:boolean}};
+type Message={id:string;sender:string;recipient:string;text:string;at:string;stickerId?:string;replyToId?:string;forwarded?:boolean;editedAt?:string;deletedAt?:string;voiceMime?:string;transcript?:string};
+const preview=(item:Message|undefined)=>!item?'Сообщение':item.deletedAt?'Сообщение удалено':
+  item.text||(item.voiceMime?'Голосовое сообщение':'Стикер');
 const dateLabel=(value:string)=>new Date(value).toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
 const timeLabel=(value:string)=>new Date(value).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
 const dayKey=(value:string)=>new Date(value).toDateString();
@@ -21,7 +25,7 @@ function decodeSearch(value:string):string{
 }
 
 export function Collective(){
-  const {api,personal}=useApp();
+  const {api,personal,session}=useApp();
   const [params]=useSearchParams();
   const [input,setInput]=useState(params.get('add')??'');
   const [query,setQuery]=useState(params.get('add')??'');
@@ -37,17 +41,26 @@ export function Collective(){
   const nearBottom=useRef(true);
   const [jump,setJump]=useState(false);
   const [emojiOpen,setEmojiOpen]=useState(false),[stickers,setStickers]=useState(false),[suggestion,setSuggestion]=useState(''),[polishing,setPolishing]=useState(false);
+  const [reply,setReply]=useState<Message|null>(null);
+  const [editing,setEditing]=useState<Message|null>(null);
+  const [editText,setEditText]=useState('');
+  const [forward,setForward]=useState<Message|null>(null);
+  const [target,setTarget]=useState('');
+  const [menu,setMenu]=useState('');
+  const [transcripts,setTranscripts]=useState<Record<string,string>>({});
+  const composed=editing?editText:text;
+  const setComposed=editing?setEditText:setText;
   const [older,setOlder]=useState<Message[]>([]);
   const [more,setMore]=useState(true);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
-  const [notice,setNotice]=useState('');
+  const notify=useNoticeFeed()?.notify;
   const listRef=useRef<HTMLDivElement>(null);
   const composer=useRef<HTMLTextAreaElement>(null);
-  const contacts=useRemote(()=>api.request<Contact[]>('/collective/contacts'),[api],5000);
+  const contacts=useRemote(()=>api.request<Contact[]>('/collective/contacts'),[api],5000,true);
   const people=useRemote(()=>searching?api.request<Person[]>('/collective/people?q='+encodeURIComponent(query)):Promise.resolve([]),[api,query,searching]);
   const central=useRemote(()=>api.request<{orchestraUrl:string}>('/managed/context'),[api]);
-  const messages=useRemote(()=>selected?api.request<Message[]>('/collective/messages/'+selected.id):Promise.resolve([]),[api,selected?.id],3000);
+  const messages=useRemote(()=>selected?api.request<Message[]>('/collective/messages/'+selected.id):Promise.resolve([]),[api,selected?.id],3000,true);
   const mine=personal?.game.id;
   const newest=messages.value?.at(-1);
   const lastId=newest&&(newest.sender===selected?.id||newest.recipient===selected?.id)?newest.id:undefined;
@@ -56,7 +69,6 @@ export function Collective(){
     nearBottom.current=true;setJump(false);
   }
   useEffect(()=>{if(lastId){if(nearBottom.current)scrollDown();else setJump(true)}},[lastId]);
-  useEffect(()=>{if(!notice)return;const timer=setTimeout(()=>setNotice(''),3500);return()=>clearTimeout(timer)},[notice]);
   useEffect(()=>{
     const id=params.get('add');
     if(id){setInput(id);setQuery(id);setSearching(true)}
@@ -66,6 +78,7 @@ export function Collective(){
     if(activePeer.current===(person?.id??null))return;
     activePeer.current=person?.id??null;
     nearBottom.current=true;setJump(false);
+    setReply(null);setEditing(null);setForward(null);setMenu('');setTranscripts({});
     setSelected(person);setOlder([]);setMore(true);setError('');setEmojiOpen(false);setStickers(false);setSuggestion('');
   }
   async function copy(isLink:boolean){
@@ -73,48 +86,100 @@ export function Collective(){
     try{
       const url=new URL((central.value?.orchestraUrl||location.origin).replace(/\/$/,'')+'/audit-portal/collective');
       url.searchParams.set('add',mine);
-      await navigator.clipboard.writeText(isLink?url.toString():mine);setNotice(isLink?'Ссылка скопирована':'ID скопирован')
+      await navigator.clipboard.writeText(isLink?url.toString():mine);notify?.(isLink?'Ссылка скопирована':'ID скопирован','success')
     }catch{setError('Не удалось скопировать. Выделите ID и скопируйте вручную.')}
   }
   async function contact(person:Person){
-    setBusy(true);setNotice('');setError('');
-    try{await api.request('/collective/contacts',{method:'POST',body:JSON.stringify({id:person.id})});contacts.reload();setNotice('Запрос отправлен')}
+    setBusy(true);setError('');
+    try{await api.request('/collective/contacts',{method:'POST',body:JSON.stringify({id:person.id})});contacts.reload();notify?.('Запрос отправлен','success')}
     catch(error){setError(String(error))}
     finally{setBusy(false)}
   }
   async function accept(row:Contact){
-    setBusy(true);setNotice('');setError('');
+    setBusy(true);setError('');
     try{await api.request(`/collective/contacts/${row.id}/accept`,{method:'POST'});contacts.reload();select(row.person)}
     catch(error){setError(String(error))}
     finally{setBusy(false)}
   }
-  async function send(event:FormEvent){
-    event.preventDefault();if(!selected||!text.trim()||busy)return;
-    setBusy(true);setError('');
-    try{
-      const peer=selected.id;
-      await api.request('/collective/messages/'+peer,{method:'POST',body:JSON.stringify({text:text.trim()})});
-      setDrafts(items=>items[peer]===text?{...items,[peer]:''}:items);
-      if(activePeer.current===peer){nearBottom.current=true;messages.reload();composer.current?.focus()}
-    }
-    catch(error){setError(String(error))}
-    finally{setBusy(false)}
+  function sent(peer:string){
+    if(activePeer.current!==peer)return;
+    nearBottom.current=true;setReply(null);setStickers(false);messages.reload();contacts.reload();composer.current?.focus();
   }
-  async function sendSticker(id:string){
-    if(!selected||busy)return;
+  function update(item:Message){
+    setOlder(items=>items.map(previous=>previous.id===item.id?item:previous));
+    messages.reload();contacts.reload();
+  }
+  async function send(event:FormEvent){
+    event.preventDefault();if(!selected||!composed.trim()||busy)return;
+    const peer=selected.id;
     setBusy(true);setError('');
     try{
-      await api.request('/collective/messages/'+selected.id,{method:'POST',body:JSON.stringify({stickerId:id})});
-      if(activePeer.current===selected.id){nearBottom.current=true;messages.reload();setStickers(false)}
+      if(editing){
+        const item=await api.request<Message>('/collective/messages/'+editing.id,{
+          method:'PUT',body:JSON.stringify({text:editText.trim()}),
+        });
+        if(activePeer.current===peer){update(item);setEditing(null);composer.current?.focus()}
+      }else{
+        await api.request('/collective/messages/'+peer,{method:'POST',body:JSON.stringify({text:text.trim(),replyToId:reply?.id})});
+        setDrafts(items=>items[peer]===text?{...items,[peer]:''}:items);
+        sent(peer);
+      }
     }catch(error){setError(String(error))}
     finally{setBusy(false)}
   }
+  async function sendSticker(id:string){
+    if(!selected||busy||editing)return;
+    setBusy(true);setError('');
+    try{
+      await api.request('/collective/messages/'+selected.id,{method:'POST',body:JSON.stringify({stickerId:id,replyToId:reply?.id})});
+      sent(selected.id);
+    }catch(error){setError(String(error))}
+    finally{setBusy(false)}
+  }
+  async function sendVoice(clip:Blob){
+    if(!selected||busy||editing)throw Error('Отправка пока недоступна.');
+    const peer=selected.id;
+    setBusy(true);setError('');
+    try{
+      const path=session.url.replace(/\/$/,'')+'/api/v1/collective/voice/'+peer+(reply?'?replyTo='+reply.id:'');
+      const result=await fetch(path,{method:'POST',signal:AbortSignal.timeout(30000),
+        headers:{Authorization:'Bearer '+session.token,'Content-Type':'application/octet-stream'},body:clip});
+      if(!result.ok){
+        const body=await result.json().catch(()=>({}));
+        throw Error(body.error||'Не удалось отправить голосовое сообщение.');
+      }
+      sent(peer);
+    }finally{setBusy(false)}
+  }
+  async function remove(item:Message){
+    if(busy||!window.confirm('Удалить сообщение у обоих участников?'))return;
+    const peer=selected?.id;
+    setBusy(true);setError('');setMenu('');
+    try{
+      const deleted=await api.request<Message>('/collective/messages/'+item.id,{method:'DELETE'});
+      if(activePeer.current!==peer)return;
+      if(editing?.id===item.id)setEditing(null);
+      if(reply?.id===item.id)setReply(null);
+      update(deleted);
+    }catch(error){setError(String(error))}
+    finally{setBusy(false)}
+  }
+  async function sendForward(event:FormEvent){
+    event.preventDefault();if(!forward||!target||busy)return;
+    setBusy(true);setError('');
+    try{
+      await api.request('/collective/messages/'+forward.id+'/forward',{method:'POST',body:JSON.stringify({id:target})});
+      setForward(null);contacts.reload();notify?.('Сообщение переслано','success');
+    }catch(error){setError(String(error))}
+    finally{setBusy(false)}
+  }
+  function focusComposer(){requestAnimationFrame(()=>composer.current?.focus())}
   async function polish(){
-    if(!text.trim()||polishing)return;
+    if(!composed.trim()||polishing)return;
     setPolishing(true);setError('');setSuggestion('');
     try{
-      const reply=await api.request<{text:string}>('/assistant/polish',{method:'POST',body:JSON.stringify({text:text.trim()})});
-      if(activePeer.current===selected?.id)setSuggestion(reply.text);
+      const response=await api.request<{text:string}>('/assistant/polish',{method:'POST',body:JSON.stringify({text:composed.trim()})});
+      if(activePeer.current===selected?.id)setSuggestion(response.text);
     }catch(error){setError(String(error))}
     finally{setPolishing(false)}
   }
@@ -131,9 +196,9 @@ export function Collective(){
     }catch(error){setError(String(error))}
   }
   function insertEmoji(symbol:string){
-    const start=composer.current?.selectionStart??text.length;
-    const end=composer.current?.selectionEnd??text.length;
-    setText(current=>(current.slice(0,start)+symbol+current.slice(end)).slice(0,2000));
+    const start=composer.current?.selectionStart??composed.length;
+    const end=composer.current?.selectionEnd??composed.length;
+    setComposed(current=>(current.slice(0,start)+symbol+current.slice(end)).slice(0,2000));
     setEmojiOpen(false);
     requestAnimationFrame(()=>{composer.current?.focus();composer.current?.setSelectionRange(start+symbol.length,start+symbol.length)});
   }
@@ -143,6 +208,9 @@ export function Collective(){
   const rows=contacts.value??[];
   const chats=rows.filter(row=>row.status==='accepted')
     .sort((a,b)=>(b.last?Date.parse(b.last.at):0)-(a.last?Date.parse(a.last.at):0));
+  const byId=new Map(thread.map(item=>[item.id,item]));
+  const currentPerson=chats.find(row=>row.person.id===selected?.id)?.person??selected;
+  const otherChats=chats.filter(row=>row.person.id!==selected?.id);
   const requests=rows.filter(row=>row.status==='pending');
   return <>
     <Header title="Коллектив" description="Чаты и контакты MysticEgo" action={mine&&<div className="row-actions">
@@ -150,7 +218,6 @@ export function Collective(){
       <button className="btn secondary" onClick={()=>void copy(true)}><Link2 size={16}/> Поделиться</button>
     </div>}/>
     <ErrorBanner text={error||contacts.error||people.error}/>
-    {notice&&<p className="success collective-notice" role="status">{notice}</p>}
     <div className="collective-layout mystic-chats" data-chat-open={!!selected}>
       <aside className="chat-sidebar" aria-label="Чаты и контакты">
         <div className="chat-sidebar-top">
@@ -183,7 +250,7 @@ export function Collective(){
               <ProfileAvatar name={row.person.nickname} url={row.person.avatarUrl}/>
               <span className="chat-thread-info">
                 <strong>{row.person.nickname}</strong>
-                <small>{row.last?(row.last.mine?'Вы: ':'')+(row.last.text||'Стикер'):'Начать переписку'}</small>
+                <small>{row.last?(row.last.mine?'Вы: ':'')+(row.last.text||(row.last.voice?'Голосовое сообщение':'Стикер')):'Начать переписку'}</small>
               </span>
               {row.last&&<time dateTime={row.last.at}>{dayKey(row.last.at)===dayKey(new Date().toISOString())?timeLabel(row.last.at):dateLabel(row.last.at)}</time>}
             </button>)}
@@ -200,32 +267,74 @@ export function Collective(){
       </aside>
       <section className="panel messenger chat-room" aria-label={selected?'Чат '+selected.nickname:'Сообщения'}>
         <header className="messenger-header">{selected?<><button type="button" className="icon-btn chat-back" onClick={()=>select(null)} aria-label="К списку чатов"><ArrowLeft size={20}/></button>
-          <ProfileAvatar name={selected.nickname} url={selected.avatarUrl}/><h2>{selected.nickname}</h2></>:<><MessageCircle size={19}/><h2>Сообщения</h2></>}</header>
+          <ProfileAvatar name={selected.nickname} url={selected.avatarUrl}/><div className="chat-heading"><h2>{selected.nickname}</h2>{currentPerson?.statusText&&<p className="social-status">{currentPerson.statusText}</p>}</div></>:<><MessageCircle size={19}/><h2>Сообщения</h2></>}</header>
         <div className="message-list" ref={listRef} onScroll={event=>{const area=event.currentTarget;nearBottom.current=area.scrollHeight-area.scrollTop-area.clientHeight<64;if(nearBottom.current)setJump(false)}}>
           {selected&&messages.error&&<ErrorBanner text={messages.error}/>}
           {!selected&&<div className="empty chat-idle"><MessageCircle size={34}/><p>Выбери чат, чтобы открыть переписку.</p></div>}
           {selected&&more&&(older.length>0||messages.value?.length===60)&&<button className="btn secondary tiny" onClick={()=>void previous()}>Предыдущие сообщения</button>}
           {selected&&!thread.length&&!messages.loading&&!messages.error&&<div className="empty chat-idle"><p>Отправь первое сообщение.</p></div>}
-          {selected&&thread.map((item,index,items)=><div key={item.id} className="chat-message-row">
-            {(index===0||dayKey(items[index-1].at)!==dayKey(item.at))&&<div className="chat-day">{dateLabel(item.at)}</div>}
-            <div className={'chat-message '+(item.sender===mine?'mine':'')}>
-              {item.stickerId&&<StickerImage id={item.stickerId}/>} {item.text&&<p>{item.text}</p>}
-              <time dateTime={item.at} title={new Date(item.at).toLocaleString('ru-RU')}>{timeLabel(item.at)}</time>
-            </div>
-          </div>)}
+          {selected&&thread.map((item,index,items)=>{
+            const own=item.sender===mine;
+            const original=item.replyToId?byId.get(item.replyToId):undefined;
+            return <div key={item.id} id={'chat-message-'+item.id} className="chat-message-row">
+              {(index===0||dayKey(items[index-1].at)!==dayKey(item.at))&&<div className="chat-day">{dateLabel(item.at)}</div>}
+              <div className={'chat-message '+(own?'mine':'')}>
+                {item.deletedAt?<p className="chat-message-meta">Сообщение удалено</p>:<>
+                  {item.forwarded&&<small className="chat-message-meta">Переслано</small>}
+                  {item.replyToId&&(original?<button type="button" className="chat-quote" onClick={()=>
+                    document.getElementById('chat-message-'+item.replyToId)?.scrollIntoView({block:'nearest'})}>{preview(original)}</button>:
+                    <small className="chat-quote">Ответ на сообщение</small>)}
+                  {item.stickerId&&<StickerImage id={item.stickerId}/>}
+                  {item.text&&<p>{item.text}</p>}
+                  {item.voiceMime&&<VoiceMessage id={item.id} transcript={item.transcript??transcripts[item.id]}
+                    onTranscript={value=>setTranscripts(current=>({...current,[item.id]:value}))} onError={setError}/>}
+                </>}
+                <div className="chat-message-footer">
+                  {!item.deletedAt&&item.editedAt&&<small>изменено</small>}
+                  <time dateTime={item.at} title={new Date(item.at).toLocaleString('ru-RU')}>{timeLabel(item.at)}</time>
+                  {!item.deletedAt&&<div className="chat-actions">
+                    <button type="button" className="icon-btn" aria-label="Действия с сообщением" aria-expanded={menu===item.id}
+                      onClick={()=>setMenu(menu===item.id?'':item.id)}><MoreHorizontal size={17}/></button>
+                    {menu===item.id&&<div className="chat-action-menu" onKeyDown={event=>{if(event.key==='Escape')setMenu('')}}>
+                      <button type="button" disabled={busy} onClick={()=>{setEditing(null);setReply(item);setMenu('');setSuggestion('');focusComposer()}}>Ответить</button>
+                      {own&&item.text&&!item.forwarded&&!item.stickerId&&!item.voiceMime&&<button type="button" disabled={busy} onClick={()=>{
+                        setEditing(item);setEditText(item.text);setReply(null);setMenu('');setSuggestion('');setStickers(false);focusComposer();
+                      }}>Редактировать</button>}
+                      {otherChats.length>0&&<button type="button" disabled={busy} onClick={()=>{
+                        setForward(item);setTarget(otherChats[0].person.id);setMenu('');
+                      }}>Переслать</button>}
+                      {own&&<button type="button" disabled={busy} onClick={()=>void remove(item)}>Удалить</button>}
+                    </div>}
+                  </div>}
+                </div>
+              </div>
+            </div>;
+          })}
         </div>
         {selected&&jump&&<button type="button" className="btn secondary chat-jump" onClick={scrollDown}>К новым сообщениям ↓</button>}
-        {selected&&suggestion&&<div className="chat-suggestion"><p>{suggestion}</p><button className="btn secondary" onClick={()=>{setText(suggestion);setSuggestion('')}}>Вставить</button>
+        {selected&&suggestion&&<div className="chat-suggestion"><p>{suggestion}</p><button className="btn secondary" onClick={()=>{setComposed(suggestion);setSuggestion('')}}>Вставить</button>
           <button className="icon-btn" onClick={()=>setSuggestion('')} aria-label="Отклонить правку">×</button></div>}
-        {selected&&<form className="chat-compose" onSubmit={send}>
+        {selected&&(reply||editing)&&<div className="chat-suggestion chat-compose-context">
+          <div><strong>{editing?'Редактирование':'Ответ'}</strong><p>{preview(editing??reply??undefined)}</p></div>
+          <button type="button" className="icon-btn" aria-label="Отменить" onClick={()=>{setEditing(null);setReply(null);setSuggestion('')}}><X size={17}/></button>
+        </div>}
+        {selected&&forward&&<form className="chat-suggestion chat-forward" onSubmit={sendForward}>
+          <label>Переслать в чат<select value={target} onChange={event=>setTarget(event.target.value)}>
+            {otherChats.map(row=><option key={row.id} value={row.person.id}>{row.person.nickname}</option>)}
+          </select></label>
+          <button className="btn secondary" disabled={busy||!target}>Переслать</button>
+          <button type="button" className="icon-btn" aria-label="Отменить пересылку" onClick={()=>setForward(null)}><X size={17}/></button>
+        </form>}
+        {selected&&<form className="chat-compose" data-editing={Boolean(editing)} onSubmit={send}>
           <div className="emoji-control"><button type="button" className="icon-btn" aria-label="Эмодзи" aria-expanded={emojiOpen} onClick={()=>setEmojiOpen(value=>!value)}><Smile size={22}/></button>
             {emojiOpen&&<div className="emoji-menu">{emoji.map(symbol=><button type="button" key={symbol} aria-label={'Вставить '+symbol} onClick={()=>insertEmoji(symbol)}>{symbol}</button>)}</div>}</div>
-          <div className="emoji-control"><button type="button" className="icon-btn" aria-label="Стикеры" aria-expanded={stickers} onClick={()=>{setEmojiOpen(false);setStickers(value=>!value)}}><StickerIcon size={22}/></button>
+          <div className="emoji-control"><button type="button" className="icon-btn" aria-label="Стикеры" disabled={Boolean(editing)} aria-expanded={stickers} onClick={()=>{setEmojiOpen(false);setStickers(value=>!value)}}><StickerIcon size={22}/></button>
            {stickers&&<StickerPicker send={id=>void sendSticker(id)}/>}</div>
-          <button type="button" className="icon-btn" aria-label="Улучшить черновик" disabled={polishing||!text.trim()} onClick={()=>void polish()}><Sparkles size={17}/></button>
-          <textarea ref={composer} rows={2} maxLength={2000} aria-label="Сообщение" placeholder="Написать сообщение" value={text}
-            onChange={event=>setText(event.target.value)} onKeyDown={event=>{if(event.key==='Enter'&&!event.shiftKey&&!event.nativeEvent.isComposing){event.preventDefault();event.currentTarget.form?.requestSubmit()}}}/>
-          <button className="btn" disabled={busy||!text.trim()} aria-label="Отправить"><Send size={18}/></button>
+          <button type="button" className="icon-btn" aria-label="Улучшить черновик" disabled={polishing||!composed.trim()} onClick={()=>void polish()}><Sparkles size={17}/></button>
+          {!editing&&<VoiceRecorder key={selected.id} disabled={busy} send={sendVoice} onError={setError}/>}
+          <textarea ref={composer} rows={2} maxLength={2000} aria-label="Сообщение" placeholder="Написать сообщение" value={composed}
+            onChange={event=>setComposed(event.target.value)} onKeyDown={event=>{if(event.key==='Enter'&&!event.shiftKey&&!event.nativeEvent.isComposing){event.preventDefault();event.currentTarget.form?.requestSubmit()}}}/>
+          <button className="btn" disabled={busy||!composed.trim()} aria-label={editing?"Сохранить изменения":"Отправить"}>{editing?<Check size={18}/>:<Send size={18}/>}</button>
         </form>}
       </section>
     </div>
