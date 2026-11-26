@@ -1,7 +1,8 @@
 import {useEffect,useState} from 'react';
-import {ImagePlus,Sticker as StickerIcon,Trash2} from 'lucide-react';
+import {ImagePlus,Sparkles,Sticker as StickerIcon,Trash2} from 'lucide-react';
 import {useApp,useRemote} from '../app/context';
 import {ErrorBanner} from './primitives';
+import {createSticker,stickerAccents,type StickerAccent} from './createSticker';
 type Sticker={id:string;title:string;width:number;height:number};
 
 export function StickerImage({id,title='Стикер'}:{id:string;title?:string}){
@@ -26,10 +27,14 @@ export function StickerPicker({send}:{send:(id:string)=>void}){
   const {api,session}=useApp();
   const data=useRemote(()=>api.request<Sticker[]>('/collective/stickers'),[api]);
   const [error,setError]=useState(''),[busy,setBusy]=useState(false);
-  async function upload(file?:File){
-    if(!file)return;
+  const [caption,setCaption]=useState(''),[emoji,setEmoji]=useState('✨'),[accent,setAccent]=useState<StickerAccent>('mint');
+  const [saved,setSaved]=useState(false);
+  async function upload(getFile:()=>Promise<File>){
+    if(busy)return;
+    setSaved(false);
     setError('');setBusy(true);
     try{
+      const file=await getFile();
       if(!['image/png','image/webp','image/gif'].includes(file.type)||file.size>524288)throw Error('Выберите PNG, WebP или GIF до 512 КиБ.');
       const url=URL.createObjectURL(file);
       try{
@@ -41,7 +46,7 @@ export function StickerPicker({send}:{send:(id:string)=>void}){
       const result=await fetch(session.url.replace(/\/$/,'')+'/api/v1/collective/stickers?name='+encodeURIComponent(title),
         {method:'POST',headers:{Authorization:'Bearer '+session.token,'Content-Type':'application/octet-stream'},body:file});
       if(!result.ok){const details=await result.json().catch(()=>({}));throw Error(details.error||'Не удалось сохранить стикер.')}
-      data.reload();
+      data.reload();setSaved(true);
     }catch(error){setError(error instanceof Error?error.message:String(error))}
     finally{setBusy(false)}
   }
@@ -51,7 +56,30 @@ export function StickerPicker({send}:{send:(id:string)=>void}){
   }
   return <section className="sticker-picker" aria-label="Мои стикеры">
     <div className="row-actions"><strong>Мои стикеры</strong><label className="btn secondary" title="Добавить стикер"><ImagePlus size={16}/> Добавить
-      <input aria-label="Добавить стикер" accept="image/png,image/webp,image/gif" type="file" disabled={busy} onChange={event=>{const file=event.target.files?.[0];event.target.value='';void upload(file)}}/></label></div>
+      <input aria-label="Добавить стикер" accept="image/png,image/webp,image/gif" type="file" disabled={busy} onChange={event=>{const file=event.target.files?.[0];event.target.value='';if(file)void upload(async()=>file)}}/></label></div>
+    <details className="sticker-workshop">
+      <summary><Sparkles size={15} aria-hidden="true"/> Создать стикер</summary>
+      <div className="stack">
+        <label>Подпись<input required maxLength={18} value={caption} placeholder="Например, «Готово!»"
+            onKeyDown={event=>{
+              if(event.key!=='Enter'||event.nativeEvent.isComposing)return;
+              event.preventDefault();
+              if(caption.trim())void upload(()=>createSticker(caption,emoji,accent));
+            }} onChange={event=>setCaption(event.target.value)}/></label>
+        <div className="sticker-options">
+          <label>Знак<select value={emoji} onChange={event=>setEmoji(event.target.value)}>
+            {['✨','🎮','💜','🤖','🔥','👋'].map(symbol=><option key={symbol}>{symbol}</option>)}
+          </select></label>
+          <label>Цвет<select value={accent} onChange={event=>setAccent(event.target.value as StickerAccent)}>
+            {Object.entries(stickerAccents).map(([id,entry])=><option value={id} key={id}>{entry.name}</option>)}
+          </select></label>
+        </div>
+        <button type="button" className="btn secondary" disabled={busy||!caption.trim()}
+          onClick={()=>void upload(()=>createSticker(caption,emoji,accent))}>Создать и сохранить PNG</button>
+        <small className="footnote">Бесплатный шаблон. Рисуется в браузере.</small>
+      </div>
+    </details>
+    {saved&&<p className="footnote" role="status">Стикер сохранён.</p>}
     <small className="footnote">PNG, WebP, GIF · 32–512 px · до 512 КиБ</small>
     <ErrorBanner text={error||data.error}/>
     <div className="sticker-grid">{data.value?.map(item=><article key={item.id}>
