@@ -226,3 +226,8 @@ MysticEgo развивается как инфраструктурный про�
 [Сайт](https://orchestra.isdarkline.ru/studio) · [Релизы](https://github.com/ZeroFantom/MysticEgo/releases) · [Задачи и обсуждения](https://github.com/ZeroFantom/MysticEgo/issues)
 
 </div>
+
+
+### Хранение данных
+
+SQLite по умолчанию. Для новых узлов — PostgreSQL, локальный или удалённый, обычная установка или Docker. [Настройка и ограничения миграции](ops/infrastructure/README.md#sqlite-и-postgresql).

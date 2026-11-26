@@ -34,6 +34,8 @@ def smoke():
             listener.listen()
             for line, expected in [
                 (b"docker\n", {"component": "docker"}),
+                (b"postgres\n", {"component": "postgres"}),
+                (b"postgres-native\n", {"component": "postgres-native"}),
                 (b"lmstudio world\n", {"component": "lmstudio", "role": "world"}),
                 (b"exec other-command\n", None),
             ]:
