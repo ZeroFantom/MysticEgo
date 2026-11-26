@@ -13,7 +13,7 @@ sealed partial class CloudDesk {
     }
     void SaveBinding(Binding b) {
         Init(); var path=BindingPath(b.Id); var tmp=path+"."+Guid.NewGuid().ToString("N");
-        try{File.WriteAllText(tmp,System.Text.Json.JsonSerializer.Serialize(b));File.SetUnixFileMode(tmp,Private);File.Move(tmp,path,true);}finally{if(File.Exists(tmp))File.Delete(tmp);}
+        try{File.WriteAllText(tmp,System.Text.Json.JsonSerializer.Serialize(b));SetPrivateMode(tmp,Private);File.Move(tmp,path,true);}finally{if(File.Exists(tmp))File.Delete(tmp);}
     }
     static string DeploymentRole(string name) {
         var label=name.Split('.')[0];

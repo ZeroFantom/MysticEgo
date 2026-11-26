@@ -39,7 +39,7 @@ sealed partial class CloudDesk {
     readonly HttpClient http = new(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(60) };
     string token = "";
     readonly string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-    string State => Path.Combine(home, ".local", "share", "mysticego-clouddesk");
+    string State => LocalState(home);
     string Key => Path.Combine(State, "id_ed25519");
     string Known => Path.Combine(State, "known_hosts");
     string GitDisabled => Path.Combine(State, "github-disconnected");
@@ -47,14 +47,14 @@ sealed partial class CloudDesk {
     static string S(JsonObject a, string k) => a[k]?.ToString().Trim() ?? "";
     static string Need(JsonObject a, string k, string pattern) { var s = S(a,k); if (!Regex.IsMatch(s, pattern)) throw new Exception($"Некорректное поле: {k}"); return s; }
     static int Num(JsonObject a,string k) => int.TryParse(S(a,k),out var n) && n>0 ? n : throw new Exception($"Укажите ID: {k}");
-    void Init() { Directory.CreateDirectory(State); File.SetUnixFileMode(State, UnixFileMode.UserRead|UnixFileMode.UserWrite|UnixFileMode.UserExecute); }
+    void Init() { CheckLocalFiles(); Directory.CreateDirectory(State); SetPrivateMode(State, Private|UnixFileMode.UserExecute); }
     async Task<string> Exec(string cmd, IEnumerable<string> args, string? input = null, int minutes = 15, Dictionary<string,string>? environment = null, bool sensitive = false, int? timeoutSeconds = null, Action<string>? onOutput = null) {
-        using var p = new Process { StartInfo = new ProcessStartInfo(cmd) { UseShellExecute=false, RedirectStandardOutput=true, RedirectStandardError=true, RedirectStandardInput=true } };
+        using var p = new Process { StartInfo = new ProcessStartInfo(LocalTool(cmd)) { UseShellExecute=false, CreateNoWindow=true, RedirectStandardOutput=true, RedirectStandardError=true, RedirectStandardInput=true } };
         foreach (var arg in args) p.StartInfo.ArgumentList.Add(arg);
         p.StartInfo.Environment["GH_PROMPT_DISABLED"]="1";
         p.StartInfo.Environment["LC_ALL"]="C";
         if(environment!=null) foreach(var kv in environment) p.StartInfo.Environment[kv.Key]=kv.Value;
-        p.Start();
+        try { p.Start(); } catch(System.ComponentModel.Win32Exception) { throw new Exception("Не удалось запустить "+cmd+". Проверьте комплектные инструменты или установку в PATH."); }
         var stdout = onOutput == null ? p.StandardOutput.ReadToEndAsync() : ReadOutput(p.StandardOutput, onOutput);
         var stderr = p.StandardError.ReadToEndAsync();
         if(input!=null) await p.StandardInput.WriteAsync(input); p.StandardInput.Close();
@@ -94,25 +94,25 @@ sealed partial class CloudDesk {
     static string[] Parts(string line) => line.Split((char[]?)null,StringSplitOptions.RemoveEmptyEntries);
     static string PublicPart(string line) { var p=Parts(line); return p.Length>=2 && p[0]=="ssh-ed25519" && Regex.IsMatch(p[1],@"^[A-Za-z0-9+/=]+$") ? p[0]+" "+p[1] : throw new Exception("Ожидался публичный ключ ED25519."); }
     string Lookup(JsonObject a) { Target(a); var host=S(a,"host"); return Port(a)=="22"?host:$"[{host}]:{Port(a)}"; }
-    string[] CommonSsh(JsonObject a) => ["-F","/dev/null","-o","StrictHostKeyChecking=yes","-o","UserKnownHostsFile="+Known,"-o","GlobalKnownHostsFile=/dev/null","-o","HostKeyAlgorithms=ssh-ed25519","-o","UpdateHostKeys=no","-o","CheckHostIP=no","-o","ConnectTimeout=10","-o","ServerAliveInterval=15","-o","ServerAliveCountMax=2","-o","ForwardAgent=no","-o","ClearAllForwardings=yes"];
+    string[] CommonSsh(JsonObject a) { Init(); return ["-F",WriteSshConfig(State,Known)]; }
     string[] KeyOptions => ["-i",Key,"-o","IdentitiesOnly=yes","-o","IdentityAgent=none","-o","BatchMode=yes","-o","PreferredAuthentications=publickey"];
     string[] SshArgs(JsonObject a) => [..CommonSsh(a),..KeyOptions,"-p",Port(a),Target(a)];
     async Task<string> SSH(JsonObject a,string command,int minutes=15,Action<string>? onOutput=null) { await EnsureKey(); return await Exec("ssh",[..SshArgs(a),command],minutes:minutes,onOutput:onOutput); }
     async Task Upload(JsonObject a,string local,string remote) => await Exec("scp",[..CommonSsh(a),..KeyOptions,"-P",Port(a),"--",local,Target(a)+":"+remote]);
-    void CheckLocalFiles() { foreach(var f in new[]{State,Key,Key+".pub",Known}) if((File.Exists(f)||Directory.Exists(f)) && (File.GetAttributes(f)&FileAttributes.ReparsePoint)!=0) throw new Exception("Небезопасная символическая ссылка в SSH-хранилище: "+f); }
+    void CheckLocalFiles() { foreach(var f in new[]{State,Key,Key+".pub",Known,Path.Combine(State,"ssh_config"),Path.Combine(State,"empty_known_hosts"),Path.Combine(State,"timeweb.dpapi")}) if((File.Exists(f)||Directory.Exists(f)) && (File.GetAttributes(f)&FileAttributes.ReparsePoint)!=0) throw new Exception("Небезопасная символическая ссылка в SSH-хранилище: "+f); }
     async Task EnsureKey() {
         CheckLocalFiles(); Init();
         if(!File.Exists(Key)) {
             if(File.Exists(Key+".pub")) File.Move(Key+".pub",Key+".pub.orphan-"+Guid.NewGuid().ToString("N"));
             await Exec("ssh-keygen",["-q","-t","ed25519","-N","","-C","MysticEgo CloudDesk","-f",Key]);
         }
-        File.SetUnixFileMode(Key,Private);
+        SetPrivateMode(Key,Private);
         string derived;
         try { derived=PublicPart(await Exec("ssh-keygen",["-y","-P","","-f",Key],minutes:1)); }
         catch { throw new Exception("Существующий приватный ключ повреждён, не ED25519 или защищён паролем. CloudDesk не заменяет приватные ключи автоматически."); }
         if(File.Exists(Key+".pub") && PublicPart(await File.ReadAllTextAsync(Key+".pub"))!=derived) throw new Exception("Публичный и приватный SSH-ключи не совпадают. Существующие файлы сохранены.");
         if(!File.Exists(Key+".pub")) await File.WriteAllTextAsync(Key+".pub",derived+" MysticEgo CloudDesk\n");
-        File.SetUnixFileMode(Key+".pub",Private);
+        SetPrivateMode(Key+".pub",Private);
     }
     async Task<string[]> KnownLines(JsonObject a) {
         if(!File.Exists(Known)) return [];
@@ -156,9 +156,9 @@ sealed partial class CloudDesk {
         if(old.Length>0 && S(a,"replace")!="REPLACE") throw new Exception("Для изменившегося ключа нужно отдельное подтверждение.");
         var temp=Known+".new-"+Guid.NewGuid().ToString("N");
         try {
-            if(File.Exists(Known)) File.Copy(Known,temp); else await File.WriteAllTextAsync(temp,""); File.SetUnixFileMode(temp,Private);
+            if(File.Exists(Known)) File.Copy(Known,temp); else await File.WriteAllTextAsync(temp,""); SetPrivateMode(temp,Private);
             if(old.Length>0) { File.Copy(Known,Known+".backup-"+Guid.NewGuid().ToString("N")); await Exec("ssh-keygen",["-R",Lookup(a),"-f",temp],minutes:1); }
-            await File.AppendAllTextAsync(temp,"\n"+scanned.raw+"\n"); File.SetUnixFileMode(temp,Private); File.Move(temp,Known,true);
+            await File.AppendAllTextAsync(temp,"\n"+scanned.raw+"\n"); SetPrivateMode(temp,Private); File.Move(temp,Known,true);
         } finally { File.Delete(temp); File.Delete(temp+".old"); }
         return await Probe(a,true);
     }
@@ -185,26 +185,25 @@ sealed partial class CloudDesk {
         var password=a["password"]?.GetValue<string>()??""; a.Remove("password"); if(password.Length==0||password.Length>4096||password.Contains('\n')||password.Contains('\r')||password.Contains('\0')) throw new Exception("Введите пароль SSH (одна строка).");
         var state=await Probe(a,true); if(S(state,"state")!="auth") return state;
         var pub=PublicPart(await File.ReadAllTextAsync(Key+".pub"));
-        // No password on disk or argv. The short-lived askpass child inherits it in its environment.
-        var tmp=Directory.CreateTempSubdirectory("clouddesk-askpass-").FullName;
-        try {
-            var helper=Path.Combine(tmp,"askpass"); await File.WriteAllTextAsync(helper,"#!/bin/sh\nprintf '%s\\n' \"$CLOUDDESK_SSH_PASSWORD\"\n"); File.SetUnixFileMode(helper,Private|UnixFileMode.UserExecute);
-            var env=new Dictionary<string,string>{{"SSH_ASKPASS",helper},{"SSH_ASKPASS_REQUIRE","force"},{"DISPLAY",":0"},{"CLOUDDESK_SSH_PASSWORD",password}};
-            const string install="set -eu; umask 077; mkdir -p \"$HOME/.ssh\"; chmod 700 \"$HOME/.ssh\"; touch \"$HOME/.ssh/authorized_keys\"; chmod 600 \"$HOME/.ssh/authorized_keys\"; IFS= read -r k; grep -qxF -- \"$k\" \"$HOME/.ssh/authorized_keys\" || printf '\\n%s\\n' \"$k\" >> \"$HOME/.ssh/authorized_keys\"";
-            try { await Exec("ssh",[..CommonSsh(a),"-o","BatchMode=no","-o","PubkeyAuthentication=no","-o","PreferredAuthentications=password","-o","NumberOfPasswordPrompts=1","-p",Port(a),Target(a),install],pub+"\n",1,env); }
-            catch { throw new Exception("Вход по паролю или установка ключа не удались. Проверьте пользователя, пароль и разрешён ли парольный SSH-вход. Настройки sshd не менялись."); }
-        } finally { Directory.Delete(tmp,true); }
+        // The password is passed directly to SSH.NET, never to a shell, disk or process arguments.
+        // Authentication is permitted only for the previously confirmed ED25519 host key.
+        var known=await KnownLines(a);
+        var expected=TrustedHostKeys(known);
+        if(expected.Count==0)throw new Exception("Сначала подтвердите ED25519-отпечаток сервера.");
+        try { await Task.Run(()=>InstallPublicKeyWithPassword(S(a,"host"),Num(a,"port"),S(a,"user"),password,pub,expected)); }
+        catch { throw new Exception("Вход по паролю или установка ключа не удались. Проверьте пароль, доверенный отпечаток и разрешение SSH-входа. Настройки sshd не менялись."); }
         return await Probe(a,false);
     }
     async Task<object> OpenTerminal(JsonObject a) {
         var state=await Probe(a,true); if(S(state,"state")!="ready") throw new Exception(S(state,"message"));
-        return new {args=new[]{"-e","ssh"}.Concat(SshArgs(a)).ToArray()};
+        return new {command=LocalTool("ssh"),args=SshArgs(a)};
     }
     public async Task<object?> Run(string action,JsonObject a,Action<string>? progress=null) {
         switch(action) {
             case "github.status": return await GitProfile();
             case "github.release": return new {tag=Tag, asset=Asset, sha256=await GithubReleaseDigest()};
             case "github.selftest": return GithubSelftest();
+            case "platform.selftest": return await PlatformSelftest();
             case "github.enable": Init(); File.Delete(GitDisabled); return new { enabled=true };
             case "github.disconnect": Init(); await File.WriteAllTextAsync(GitDisabled,"1"); return new { connected=false };
             case "timeweb.connect": {
@@ -212,17 +211,17 @@ sealed partial class CloudDesk {
                 try { await Api("servers?limit=1"); } catch { token=old; throw; }
                 string warning="";
                 try {
-                    if(a["remember"]?.GetValue<bool>()==true) await Exec("secret-tool",["store","--label=MysticEgo CloudDesk Timeweb","application","mysticego-clouddesk","provider","timeweb"],token,1);
-                    else await Exec("secret-tool",["clear","application","mysticego-clouddesk","provider","timeweb"],minutes:1);
-                } catch { warning="Не удалось обновить системное хранилище. Токен действует в текущей сессии; проверьте KWallet."; }
+                    if(a["remember"]?.GetValue<bool>()==true) await SaveTimewebToken(token);
+                    else await ClearTimewebToken();
+                } catch { warning="Не удалось обновить системное хранилище. Токен действует в текущей сессии; проверьте системное хранилище секретов."; }
                 var profile=await TimeProfile(); profile["storageWarning"]=warning; return profile;
             }
             case "timeweb.restore": {
-                try { token=await Exec("secret-tool",["lookup","application","mysticego-clouddesk","provider","timeweb"],minutes:1); } catch { token=""; }
+                try { token=await ReadTimewebToken(); } catch { token=""; }
                 return await TimeProfile();
             }
             case "timeweb.status": return await TimeProfile();
-            case "timeweb.disconnect": token=""; try { await Exec("secret-tool",["clear","application","mysticego-clouddesk","provider","timeweb"],minutes:1); } catch { return new {connected=false,warning="Не удалось проверить удаление токена из системного хранилища."}; } return new {connected=false};
+            case "timeweb.disconnect": token=""; try { await ClearTimewebToken(); } catch { return new {connected=false,warning="Не удалось проверить удаление токена из системного хранилища."}; } return new {connected=false};
             case "topology.discover": return await DiscoverTopology(a);
             case "dns.suggest": return await SuggestDns(a);
             case "dns.inventory": return await DnsInventory(a);

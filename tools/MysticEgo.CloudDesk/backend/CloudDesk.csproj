@@ -6,6 +6,10 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="SSH.NET" Version="2026.0.1"/>
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.14"/>
+  </ItemGroup>
+  <ItemGroup>
     <None Include="../profiles/orchestra-r3.sh" Link="profiles/orchestra-r3.sh" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"/>
   </ItemGroup>
 </Project>

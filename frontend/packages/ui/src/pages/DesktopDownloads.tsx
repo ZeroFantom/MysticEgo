@@ -79,7 +79,7 @@ export function CloudDeskDownloads(){
   const releases=useRemote(()=>api.request<Downloads>('/managed/clouddesk-downloads'),[api]);
   return <div className="desktop-downloads">
     <header className="desktop-download-hero"><CloudCog size={29} aria-hidden="true"/><h1>Скачать CloudDesk</h1>
-      <p>Выберите установщик или резервный ZIP. CloudDesk ориентирован на Linux; Windows-сборка экспериментальная, отдельные операции требуют Linux. Для управления облаком также нужны GitHub CLI и OpenSSH.</p></header>
+      <p>Выберите установщик или резервный ZIP. CloudDesk поддерживает Windows 10/11 x64 и Linux x64. Windows-установщик включает клиентские инструменты SSH и GitHub CLI; в Linux нужны системные SSH, GitHub CLI и хранилище секретов.</p></header>
     {releases.error&&<p role="status">Не удалось получить ссылки. <button className="btn secondary" onClick={releases.reload}>Повторить</button></p>}
     <AppCard app={cloudDesk} downloads={releases.value??undefined} loading={releases.loading}/>
     <AppCard app={controlDesk} downloads={releases.value??undefined} loading={releases.loading}/>

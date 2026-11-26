@@ -6,8 +6,7 @@ set "CLOUDDESK_ELECTRON=%~dp0..\..\runtime\electron\electron.exe"
 if not exist "%CLOUDDESK_DOTNET%" goto missing
 if not exist "%CLOUDDESK_ELECTRON%" goto missing
 if /i "%~1"=="--check" goto check
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0ensure-hosts.ps1"
-if errorlevel 1 goto failed
+rem Public DNS is used normally. For a private test override, run ensure-hosts.ps1 explicitly.
 start "" /wait "%CLOUDDESK_ELECTRON%" .
 if errorlevel 1 goto failed
 exit /b 0
