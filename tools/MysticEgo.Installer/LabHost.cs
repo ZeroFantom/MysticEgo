@@ -146,6 +146,9 @@ internal sealed class LabHost(Dictionary<string,string> flags)
         var ownerPassword = File.ReadAllText(passwordPath).Trim();
         var sqlite = Path.Combine(data, "auth.db");
         var external = Path.Combine(data, "auth-postgres.connection");
+        var postgresMarker = Path.Combine(data, "auth-postgres-configured");
+        if (File.Exists(postgresMarker) && !File.Exists(external))
+            throw new InvalidOperationException("Auth PostgreSQL configuration is missing; refusing to start with SQLite.");
         if (File.Exists(external) && File.Exists(sqlite))
             throw new InvalidOperationException("Auth уже использует SQLite. Сначала выполните отдельную миграцию данных.");
         var authConnection = File.Exists(external) ? File.ReadAllText(external).Trim() : "Data Source=" + sqlite;
@@ -157,6 +160,7 @@ internal sealed class LabHost(Dictionary<string,string> flags)
             ["Authorization__Jwt__PrivateKeyPath"] = signing, ["Authorization__Bootstrap__Login"] = "developer",
             ["Authorization__Bootstrap__Password"] = ownerPassword
         });
+        if (File.Exists(external)) WritePrivate(postgresMarker, "PostgreSQL");
         var centerIdFile = Path.Combine(data, "center-id.txt");
         if (!File.Exists(centerIdFile)) WritePrivate(centerIdFile, Guid.NewGuid().ToString());
         var identityPath = Path.Combine(data, "orchestra-identity.json");

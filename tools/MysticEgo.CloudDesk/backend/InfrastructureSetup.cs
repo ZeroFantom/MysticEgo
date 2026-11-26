@@ -27,8 +27,9 @@ sealed partial class CloudDesk
         const string install = "set -eu; umask 077; d=$(mktemp -d); trap 'rm -rf -- \"$d\"' EXIT; " +
             "base64 -d > \"$d/bundle.zip\"; python3 -m zipfile -e \"$d/bundle.zip\" \"$d\"; bash \"$d/install.sh\"";
         progress("Передаём проверенный комплект установки по SSH");
+        string Clean(string line) { var value=S(args,"secret"); return value.Length==0?Redact(line):Redact(line).Replace(value,"[REDACTED]",StringComparison.Ordinal); }
         var output = await Exec("ssh", [..SshArgs(args), "bash -c " + ShellQuote(install)],
-            input: Convert.ToBase64String(bytes.ToArray()), minutes: 45, onOutput: line => progress(Redact(line)));
-        return new { output };
+            input: Convert.ToBase64String(bytes.ToArray()), minutes: 45, onOutput: line => progress(Clean(line)));
+        return new { output = Clean(output) };
     }
 }

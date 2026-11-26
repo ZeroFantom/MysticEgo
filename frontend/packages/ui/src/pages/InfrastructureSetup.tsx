@@ -10,7 +10,7 @@ type Setup={
 const items=[
   ['monitoring','Prometheus и Grafana'],['metrics-source','Источник метрик Orchestra'],
   ['docker','Docker и Compose'],['lmstudio','LM Studio и модель'],['model-connect','Подключить модель к Orchestra'],
-  ['postgres','PostgreSQL и базы сервисов'],['auth-postgres','Подключить Auth к PostgreSQL'],
+  ['postgres','PostgreSQL · Docker'],['postgres-native','PostgreSQL · обычная установка'],['prepare-postgres','Подготовить подключение новой панели к PostgreSQL'],['auth-postgres','Подключить Auth к PostgreSQL'],
 ] as const;
 
 export function InfrastructureSetup({initial='monitoring'}:{initial?:string}){
@@ -22,13 +22,14 @@ export function InfrastructureSetup({initial='monitoring'}:{initial?:string}){
   const [bind,setBind]=useState('127.0.0.1'),[cidr,setCidr]=useState('127.0.0.1/32');
   const [role,setRole]=useState('panel-data'),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const needsSecret=component==='metrics-source'||component==='auth-postgres'||component==='monitoring'&&!!url.trim();
-  const showSecret=needsSecret||component==='postgres';
-  const candidates=[...(state.value?.localAvailable&&['docker','lmstudio'].includes(component)?['@local']:[]),...(state.value?.targets??[])];
+  const showSecret=needsSecret||['postgres','postgres-native','prepare-postgres'].includes(component);
+  const candidates=[...(state.value?.localAvailable&&['docker','lmstudio','postgres','postgres-native'].includes(component)?['@local']:[]),...(state.value?.targets??[])];
   const selected=candidates.includes(target)?target:candidates[0]??'';
   const targetName=(value:string)=>value==='@local'?'Этот VPS Orchestra':value;
 
   async function install(event:FormEvent){
     event.preventDefault();
+    if(selected==='@local'&&['postgres','postgres-native'].includes(component)&&(bind!=='127.0.0.1'||cidr!=='127.0.0.1/32'||secret)){setError('Локальный установщик использует loopback и автоматически генерирует пароли. Для другой сети используйте доверенный SSH.');return;}
     if(!selected||busy||!window.confirm(`Установить «${items.find(([id])=>id===component)?.[1]}» на ${targetName(selected)}?`))return;
     setBusy(true);setError('');
     try {
@@ -46,27 +47,28 @@ export function InfrastructureSetup({initial='monitoring'}:{initial?:string}){
 
   return <Panel title="Развёртывание инфраструктуры">
     <form className="stack" onSubmit={install}>
-      <label>Компонент<select value={component} onChange={e=>{setComponent(e.target.value);setSecret('')}}>
+      <label>Компонент<select value={component} onChange={e=>{setComponent(e.target.value);setSecret('');setUrl('');setRole(e.target.value==='prepare-postgres'?'orchestra':'panel-data')}}>
         {items.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label>
       <label>Сервер<select value={selected} onChange={e=>setTarget(e.target.value)} disabled={!candidates.length}>
         {!candidates.length&&<option value="">Нет доступного сервера</option>}
         {candidates.map(host=><option key={host} value={host}>{targetName(host)}</option>)}</select></label>
-      {!candidates.length&&<p className="footnote">{['docker','lmstudio'].includes(component)
+      {!candidates.length&&<p className="footnote">{['docker','lmstudio','postgres','postgres-native'].includes(component)
         ?'Обновите Orchestra через CloudDesk, чтобы включить локальную установку.'
         :'Добавьте доверенный SSH-сервер для этого компонента.'}</p>}
       {['monitoring','model-connect'].includes(component)&&<label>{component==='monitoring'?'HTTPS-адрес Orchestra':'Локальный адрес или SSH-туннель к LM Studio'}
         <input type="url" placeholder={component==='monitoring'?'Пусто для Orchestra на том же сервере':'http://127.0.0.1:1234'} value={url} onChange={e=>setUrl(e.target.value)}/>
       </label>}
-      {['postgres','auth-postgres'].includes(component)&&<label>IPv4 PostgreSQL
+      {['postgres','postgres-native','prepare-postgres','auth-postgres'].includes(component)&&<label>IPv4 PostgreSQL
         <input value={bind} onChange={e=>setBind(e.target.value)} required/>
       </label>}
-      {component==='postgres'&&<label>CIDR клиентов PostgreSQL
+      {['postgres','postgres-native'].includes(component)&&<label>CIDR клиентов PostgreSQL
         <input value={cidr} onChange={e=>setCidr(e.target.value)} required/>
       </label>}
+      {component==='prepare-postgres'&&<><label>Роль новой панели<select value={['auth','orchestra','global','local','agent','audit'].includes(role)?role:'orchestra'} onChange={e=>setRole(e.target.value)}>{['auth','orchestra','global','local','agent','audit'].map(item=><option key={item} value={item}>{item}</option>)}</select></label><label className="check"><input type="checkbox" checked={url==='private-vpn'} onChange={e=>setUrl(e.target.checked?'private-vpn':'')}/>Удалённый IPv4 находится в защищённой частной сети/VPN</label><p>На машине панели подготовьте подключение до первого запуска. На том же VPS пароль можно оставить пустым; для удалённой базы нужен пароль роли. Для новой Orchestra подготовьте Auth и Orchestra отдельно. Существующие базы не переключаются автоматически.</p></>}
       {['lmstudio','model-connect'].includes(component)&&<label>Профиль модели<select value={role} onChange={e=>setRole(e.target.value)}>
         <option value="panel-data">Данные панелей · Qwen3 1.7B</option><option value="world">Мир · Qwen3 4B</option>
       </select></label>}
-      {showSecret&&<label>{['postgres','auth-postgres'].includes(component)?'Пароль PostgreSQL для Auth':'Ключ метрик'}
+      {showSecret&&<label>{['postgres','postgres-native','prepare-postgres','auth-postgres'].includes(component)?'Пароль PostgreSQL (для установки — Auth; для подключения — выбранная роль)':'Ключ метрик'}
         <input type="password" autoComplete="off" pattern="[a-f0-9]{64}" placeholder="64 строчных hex-символа"
           required={needsSecret} value={secret} onChange={e=>setSecret(e.target.value)}/>
       </label>}

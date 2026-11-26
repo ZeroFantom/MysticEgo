@@ -32,7 +32,7 @@ public sealed class InfrastructureSetupController(IConfiguration config, Develop
     public IActionResult Start(SetupInput input)
     {
         if (!team.IsOwner(User)) return Forbid();
-        if (!input.Confirmed || input.Component is not ("monitoring" or "metrics-source" or "docker" or "postgres" or "auth-postgres" or "lmstudio" or "model-connect"))
+        if (!input.Confirmed || input.Component is not ("monitoring" or "metrics-source" or "docker" or "postgres" or "postgres-native" or "prepare-postgres" or "auth-postgres" or "lmstudio" or "model-connect"))
             return BadRequest(new { error = "Выберите компонент и подтвердите установку." });
         if (input.Target == "@local") return StartLocal(input);
         var target = Targets.GetChildren().FirstOrDefault(t => t.Key == input.Target);
@@ -57,11 +57,13 @@ public sealed class InfrastructureSetupController(IConfiguration config, Develop
         var request = input.Component switch
         {
             "docker" => "docker\n",
+            "postgres" when (input.Bind is null or "" or "127.0.0.1") && (input.Cidr is null or "" or "127.0.0.1/32") && string.IsNullOrEmpty(input.Secret) => "postgres\n",
+            "postgres-native" when (input.Bind is null or "" or "127.0.0.1") && (input.Cidr is null or "" or "127.0.0.1/32") && string.IsNullOrEmpty(input.Secret) => "postgres-native\n",
             "lmstudio" when input.Role is "panel-data" or "world" => "lmstudio " + input.Role + "\n",
             _ => null
         };
         if (request is null)
-            return BadRequest(new { error = "На VPS Orchestra напрямую доступны Docker и LM Studio." });
+            return BadRequest(new { error = "На VPS Orchestra напрямую доступны Docker, LM Studio и PostgreSQL с loopback и автоматическими паролями. Подключение новой панели выполняется до её запуска." });
         if (!OperatingSystem.IsLinux() || !System.IO.File.Exists(LocalSocket))
             return Conflict(new { error = "Локальная служба установки не найдена. Обновите Orchestra из CloudDesk." });
         if (!Gate.Wait(0)) return Conflict(new { error = "Установка уже выполняется." });

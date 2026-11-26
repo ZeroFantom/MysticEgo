@@ -25,6 +25,8 @@ def main():
             return
         jobs = {
             b"docker\n": {"component": "docker"},
+            b"postgres\n": {"component": "postgres"},
+            b"postgres-native\n": {"component": "postgres-native"},
             b"lmstudio panel-data\n": {"component": "lmstudio", "role": "panel-data"},
             b"lmstudio world\n": {"component": "lmstudio", "role": "world"},
         }

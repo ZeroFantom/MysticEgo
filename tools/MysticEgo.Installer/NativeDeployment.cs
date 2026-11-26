@@ -161,6 +161,11 @@ internal static class NativeDeployment
                 ["Node__DataPath"]=Path.Combine(outDir,"data",role+".db"),
                 ["Avatar__SyncKey"]=syncKey,
             };
+            if(role!="auth")
+            {
+                var dbFile=Path.Combine(outDir,"data",role+"-postgres.connection");
+                if(File.Exists(dbFile))environment["Node__DatabaseConnectionFile"]=dbFile;
+            }
             if(role=="auth")
             {
                 environment["Authorization__Jwt__PrivateKeyPath"]=privateKey;
