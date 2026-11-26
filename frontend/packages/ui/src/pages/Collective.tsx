@@ -52,6 +52,10 @@ export function Collective(){
   const setComposed=editing?setEditText:setText;
   const [older,setOlder]=useState<Message[]>([]);
   const [more,setMore]=useState(true);
+  const historyRequest=useRef(0);
+  const [loadingHistory,setLoadingHistory]=useState(false);
+  const draftSnapshot=useRef({peer:selected?.id,text:composed,editing:editing?.id});
+  draftSnapshot.current={peer:selected?.id,text:composed,editing:editing?.id};
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const notify=useNoticeFeed()?.notify;
@@ -96,6 +100,7 @@ export function Collective(){
     activePeer.current=person?.id??null;
     nearBottom.current=true;setJump(false);
     setReply(null);setEditing(null);setForward(null);setMenu('');setTranscripts({});
+    historyRequest.current++;setLoadingHistory(false);
     setSelected(person);setOlder([]);setMore(true);setError('');setEmojiOpen(false);setStickers(false);setSuggestion('');
   }
   async function copy(isLink:boolean){
@@ -193,24 +198,29 @@ export function Collective(){
   function focusComposer(){requestAnimationFrame(()=>composer.current?.focus())}
   async function polish(){
     if(!composed.trim()||polishing)return;
+    const snapshot={peer:selected?.id,text:composed,editing:editing?.id};
     setPolishing(true);setError('');setSuggestion('');
     try{
-      const response=await api.request<{text:string}>('/assistant/polish',{method:'POST',body:JSON.stringify({text:composed.trim()})});
-      if(activePeer.current===selected?.id)setSuggestion(response.text);
+      const response=await api.request<{text:string}>('/assistant/polish',{method:'POST',body:JSON.stringify({text:snapshot.text.trim()})});
+      const current=draftSnapshot.current;
+      if(activePeer.current===snapshot.peer&&current.peer===snapshot.peer&&current.text===snapshot.text&&current.editing===snapshot.editing)setSuggestion(response.text);
     }catch(error){setError(String(error))}
     finally{setPolishing(false)}
   }
   async function previous(){
     const first=older[0]??messages.value?.[0];
-    if(!selected||!first)return;
+    if(!selected||!first||loadingHistory)return;
+    const request=++historyRequest.current;
+    setLoadingHistory(true);
     try{
       const data=await api.request<Message[]>(`/collective/messages/${selected.id}?before=${encodeURIComponent(first.at)}`);
-      if(activePeer.current!==selected.id)return;
+      if(activePeer.current!==selected.id||historyRequest.current!==request)return;
       const scrollHeight=listRef.current?.scrollHeight??0;
       const top=listRef.current?.scrollTop??0;
       setMore(data.length===60);setOlder(items=>[...data,...items]);
-      requestAnimationFrame(()=>{if(listRef.current)listRef.current.scrollTop=listRef.current.scrollHeight-scrollHeight+top});
-    }catch(error){setError(String(error))}
+      requestAnimationFrame(()=>{if(listRef.current&&activePeer.current===selected.id&&historyRequest.current===request)listRef.current.scrollTop=listRef.current.scrollHeight-scrollHeight+top});
+    }catch(error){if(historyRequest.current===request)setError(String(error))}
+    finally{if(historyRequest.current===request)setLoadingHistory(false)}
   }
   function insertEmoji(symbol:string){
     const start=composer.current?.selectionStart??composed.length;
@@ -288,7 +298,7 @@ export function Collective(){
         <div className="message-list" ref={listRef} onScroll={event=>{const area=event.currentTarget;nearBottom.current=area.scrollHeight-area.scrollTop-area.clientHeight<64;if(nearBottom.current)setJump(false)}}>
           {selected&&messages.error&&<ErrorBanner text={messages.error}/>}
           {!selected&&<div className="empty chat-idle"><MessageCircle size={34}/><p>Выбери чат, чтобы открыть переписку.</p></div>}
-          {selected&&more&&(older.length>0||messages.value?.length===60)&&<button className="btn secondary tiny" onClick={()=>void previous()}>Предыдущие сообщения</button>}
+          {selected&&more&&(older.length>0||messages.value?.length===60)&&<button className="btn secondary tiny" disabled={loadingHistory} onClick={()=>void previous()}>{loadingHistory?'Загрузка…':'Предыдущие сообщения'}</button>}
           {selected&&!thread.length&&!messages.loading&&!messages.error&&<div className="empty chat-idle"><p>Отправь первое сообщение.</p></div>}
           {selected&&thread.map((item,index,items)=>{
             const own=item.sender===mine;
