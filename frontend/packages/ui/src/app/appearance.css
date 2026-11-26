@@ -67,5 +67,12 @@
 :root[data-interface] .desktop-download-hero{background:linear-gradient(90deg,var(--mystic-veil),transparent 160%),var(--mystic-art) center/cover}
 :root[data-interface=simplified] .desktop-download-card{background:var(--mystic-surface)}
 :root[data-interface=immersive] .desktop-download-card{background:linear-gradient(145deg,color-mix(in srgb,var(--mystic-surface) 91%,var(--mystic-primary)),var(--mystic-surface) 75%)}
-:root[data-theme=light][data-interface] .mystic-workspace .btn:not(.secondary):not(.danger){color:var(--ink)}
+:root[data-theme=light][data-interface]:not([data-neon-border=true]) :is(.mystic-workspace,.auth-experience,.desktop-downloads-public,.agent-desktop-entry) .btn:not(.secondary):not(.danger){color:#fff;background:color-mix(in srgb,var(--accent) 72%,#38205d);border-color:var(--accent)}
+:root[data-theme=light][data-interface]:not([data-neon-border=true]) :is(.mystic-workspace,.auth-experience,.desktop-downloads-public,.agent-desktop-entry) .btn:not(.secondary):not(.danger):hover:not(:disabled){background:color-mix(in srgb,var(--accent) 84%,#38205d)}
 :root[data-ui-motion=low] :is(.auth-orbit i,.auth-orbit::before,.topbar-sweep,.stat-tile){animation:none!important}
+
+/* A short mesh-light sweep for navigation in immersive flow mode; no input blocking. */
+:root[data-interface=immersive][data-transition=flow][data-ui-motion=normal] .page-motion{position:relative;animation-fill-mode:backwards}
+:root[data-interface=immersive][data-transition=flow][data-ui-motion=normal] .page-motion::before{content:"";position:absolute;pointer-events:none;z-index:1;inset:0 0 auto;height:2px;background:linear-gradient(90deg,transparent,var(--mystic-primary),transparent);transform-origin:left;animation:mystic-flow-trace 420ms var(--mystic-ease) both}
+@keyframes mystic-flow-trace{from{opacity:.65;scale:0 1}to{opacity:0;scale:1 1}}
+@media(prefers-reduced-motion:reduce){:root[data-interface] .page-motion::before{display:none!important}}
