@@ -35,6 +35,7 @@ export function OrchestraOverview(){
     <Header title="Обзор" description={mode==='orchestra'?'Организации и площадки сети MysticEgo':'Доступные организации и площадки'} action={
       (context.value?.owner??context.value?.developer)&&<Link className="btn" to="/setup"><Plus size={17}/> Развернуть Global</Link>}/>
     <ErrorBanner text={topology.error}/>
+    {topology.value&&topology.error&&<p className="monitor-empty">Показаны последние полученные данные; обновление не удалось.</p>}
     <div className="metrics summary-grid">
       {[{icon:Cloud,count:globals.length,label:'Организации Global'},{icon:UserRound,count:people,label:'Участники'},
         {icon:Building2,count:sites,label:'Площадки Local'},{icon:Activity,count:up,label:'Global в сети'}].map(tile=>
@@ -139,7 +140,7 @@ export function NetworkPage(){
     setParams({node:row.node.id});setName(null);setEnabled(null);setMessage('');setError('');setMember('');
   }
   async function edit(event:FormEvent){
-    event.preventDefault();if(!selected)return;setBusy(true);setError('');setMessage('');
+    event.preventDefault();if(!selected||busy||!(name??selected.node.name).trim())return;setBusy(true);setError('');setMessage('');
     try{await api.request('/managed/nodes/'+selected.node.id,{method:'PUT',body:JSON.stringify({name:(name??selected.node.name).trim(),enabled:enabled??selected.node.enabled})});
       setMessage('Узел обновлён');topology.reload();audit.reload()}
     catch(error){setError(String(error))}
@@ -156,6 +157,7 @@ export function NetworkPage(){
     <Header title="Узлы сети" description="Оркестр, организации, площадки и рабочие станции" action={
       <Link to="/setup" className="btn"><Plus size={17}/>{mode==='local'?'Комплект Agent':mode==='global'?'Создать Local':'Развернуть Global'}</Link>}/>
     <ErrorBanner text={context.error||topology.error||error}/>
+    {topology.value&&topology.error&&<p className="monitor-empty">Показана последняя полученная топология; обновление не удалось.</p>}
     <div className="topology-layout">
       <Panel title="Топология" aside={<div className="segmented">
         <button type="button" aria-pressed={view==='graph'} className={view==='graph'?'active':''} onClick={()=>setView('graph')}><Network size={16}/> Граф</button>
