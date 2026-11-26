@@ -6,6 +6,7 @@ import {GuestEntry} from './GuestPortal';
 import {ErrorBanner} from '../components/primitives';
 import {ThemeToggle} from './Settings';
 import {PanelLoginLinks} from './PanelDirectory';
+import {LicenseLink} from './Studio';
 
 export type AuthLogin={accessToken:string;refreshToken:string;user?:{login?:string};expiresAt:string};
 export async function signIn(authUrl:string,login:string,password:string):Promise<AuthLogin>{
@@ -83,6 +84,10 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
       </div></div></details>
     </form>}
     {available.value&&onGuest&&<button className="btn secondary" onClick={()=>setGuest(value=>!value)}>{guest?'Войти в аккаунт':'Временный аккаунт гостя'}</button>}
+    <footer className="auth-project">
+      {mode === 'orchestra' && <a href="/studio">Студия и команда</a>}
+      <LicenseLink/>
+    </footer>
    </div>
   </section>
  </main>;

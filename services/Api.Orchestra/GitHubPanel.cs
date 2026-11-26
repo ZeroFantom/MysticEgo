@@ -7,6 +7,9 @@ using System.Net;
 
 namespace MysticEgo.Api.Orchestra;
 
+/// <summary>
+/// Retrieves repository metadata with the configured server credentials and caches responses.
+/// </summary>
 public sealed class GitHubPanel(IHttpClientFactory clients, IConfiguration config, NodeState state)
 {
     public const string Repository = "ZeroFantom/MysticEgo";
@@ -113,6 +116,7 @@ public sealed class GitHubPanel(IHttpClientFactory clients, IConfiguration confi
 
     public sealed record DesktopDownload(string Tag, string Url);
 
+    /// <summary>Selects the newest uploaded archive for each supported desktop platform.</summary>
     public async Task<Dictionary<string, DesktopDownload>> DesktopDownloads(bool cloudDesk, CancellationToken ct)
     {
         var downloads = new Dictionary<string, DesktopDownload>();
@@ -123,6 +127,7 @@ public sealed class GitHubPanel(IHttpClientFactory clients, IConfiguration confi
                 ? published : DateTimeOffset.MinValue))
             .Where(item => item.Published != DateTimeOffset.MinValue)
             .OrderByDescending(item => item.Published);
+        // A release can contain only one platform, so each platform is selected independently.
         foreach (var (release, _) in releases)
         {
             var tag = release["tag_name"]?.ToString();
