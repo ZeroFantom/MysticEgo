@@ -142,10 +142,10 @@
 :root[data-interface] .mystic-workspace .orchestral-topbar:not([style*="url"]){
  background:linear-gradient(90deg,var(--mystic-surface) 12%,var(--mystic-veil) 34%,transparent 100%),var(--mystic-header-art) right center/contain no-repeat,var(--mystic-surface)
 }
-:root[data-interface] .mystic-workspace .sidebar{
+:root[data-interface][data-theme] .mystic-workspace .sidebar{
  background:linear-gradient(180deg,var(--mystic-surface) 16%,var(--mystic-veil) 42%,transparent 100%),var(--mystic-sidebar-art) center bottom/contain no-repeat,var(--mystic-surface)
 }
-:root[data-interface=simplified] .mystic-workspace .sidebar{
+:root[data-interface=simplified][data-theme] .mystic-workspace .sidebar{
  background:linear-gradient(180deg,var(--mystic-surface) 45%,var(--mystic-veil) 68%,transparent 160%),var(--mystic-sidebar-art) center bottom/contain no-repeat,var(--mystic-surface)
 }
 @media(max-width:650px){
