@@ -116,11 +116,7 @@ button.plain{color:var(--ink)}
 :root[data-interface="simplified"][data-theme="light"]{--mystic-header-art:url("./appearance-art/simplified-light-header.webp");--mystic-sidebar-art:url("./appearance-art/simplified-light-sidebar.webp")}
 :root[data-interface="immersive"][data-theme="dark"]{--mystic-header-art:url("./appearance-art/immersive-dark-header.webp");--mystic-sidebar-art:url("./appearance-art/immersive-dark-sidebar.webp")}
 :root[data-interface="immersive"][data-theme="light"]{--mystic-header-art:url("./appearance-art/immersive-light-header.webp");--mystic-sidebar-art:url("./appearance-art/immersive-light-sidebar.webp")}
-:root[data-interface] .desktop-header{
- background:linear-gradient(90deg,var(--body) 12%,color-mix(in srgb,var(--body) 85%,transparent) 40%,transparent 100%),var(--mystic-header-art) right center/contain no-repeat,var(--body)
-}
 @media(max-width:650px){
- :root[data-interface] .desktop-header{background-image:linear-gradient(90deg,var(--body) 20%,color-mix(in srgb,var(--body) 85%,transparent) 55%,transparent 150%),var(--mystic-art)}
 }
 
 /* Full-width narrow artwork; separate readable text from the scene. */

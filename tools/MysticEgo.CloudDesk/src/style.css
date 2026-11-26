@@ -144,9 +144,6 @@ aside .desk-art-preview{width:100%;max-height:none}
 :root[data-interface="simplified"][data-theme="light"]{--mystic-header-art:url("./appearance-art/simplified-light-header.webp");--mystic-sidebar-art:url("./appearance-art/simplified-light-sidebar.webp")}
 :root[data-interface="immersive"][data-theme="dark"]{--mystic-header-art:url("./appearance-art/immersive-dark-header.webp");--mystic-sidebar-art:url("./appearance-art/immersive-dark-sidebar.webp")}
 :root[data-interface="immersive"][data-theme="light"]{--mystic-header-art:url("./appearance-art/immersive-light-header.webp");--mystic-sidebar-art:url("./appearance-art/immersive-light-sidebar.webp")}
-:root[data-interface] main>header{
- background:linear-gradient(90deg,var(--desk-panel) 12%,var(--desk-veil) 40%,transparent 100%),var(--mystic-header-art) right center/contain no-repeat,var(--desk-panel)
-}
 :root[data-interface] aside{
  background:linear-gradient(180deg,var(--desk-panel) 20%,var(--desk-veil) 48%,transparent 100%),var(--mystic-sidebar-art) center bottom/contain no-repeat,var(--desk-panel)
 }
@@ -154,7 +151,6 @@ aside .desk-art-preview{width:100%;max-height:none}
  background:linear-gradient(180deg,var(--desk-panel) 45%,var(--desk-veil) 68%,transparent 160%),var(--mystic-sidebar-art) center bottom/contain no-repeat,var(--desk-panel)
 }
 @media(max-width:700px){
- :root[data-interface] main>header{background-image:linear-gradient(90deg,var(--desk-panel) 20%,var(--desk-veil) 55%,transparent 150%),var(--mystic-art)}
  :root[data-interface] aside{background:var(--desk-panel)}
 }
 
