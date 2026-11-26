@@ -1,3 +1,4 @@
+import {ThemeToggle} from './Settings';
 import {useEffect,useState} from 'react';
 import {ArrowRight,Building2,Download,ExternalLink,Monitor,ShieldCheck,UserRound} from 'lucide-react';
 import {Link,useSearchParams} from 'react-router-dom';
@@ -80,8 +81,8 @@ function LocalAgent(){
   </a>;
 }
 
-export function AgentDesktopEntry(){
-  return <main className="agent-desktop-entry">
+export function AgentDesktopEntry({scope=''}:{scope?:string}={}){
+  return <main className="agent-desktop-entry"><div className="appearance-public-bar"><ThemeToggle scope={scope}/></div>
     <section className="panel">
       <Monitor size={27} aria-hidden="true"/>
       <h1>Вход в Agent</h1>

@@ -7,7 +7,7 @@ export function initEffects(host){
   function set(key,value){state[key]=value;apply();try{localStorage.setItem('mysticego.desktop.style',JSON.stringify(state))}catch{}}
   function apply(){
     const root=document.documentElement;
-    root.dataset.theme=state.theme==='system'?(system.matches?'light':'dark'):state.theme;
+    root.dataset.theme=state.theme==='system'?(system.matches?'light':'dark'):state.theme==='light'?'light':'dark';
     root.dataset.interface=state.interfaceStyle==='immersive'?'immersive':'simplified';
     root.dataset.transition=['flow','fade','slide','scale'].includes(state.transition)?state.transition:'flow';
     root.dataset.uiMotion=['off','low','normal'].includes(state.uiMotion)?state.uiMotion:'normal';

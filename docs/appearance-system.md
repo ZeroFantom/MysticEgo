@@ -13,3 +13,5 @@ Settings are stored locally, per web account scope or desktop origin. They are n
 
 ## Validation
 Run frontend npm ci / npm run build; desktop npm ci / npm run build (see package scripts); CloudDesk npm install / npm run build. Run node --check on desktop view/effects JS. Review four combinations, settings persistence, system color changes, reduced motion, keyboard, login, menus, desktop station and topology. Full native and browser visual checks still required before release. No MP4/WebM cinematics are included: lightweight CSS transitions are used instead.
+
+The frontend build runs `test:appearance` source-contract checks. They check asset presence and selector/control coverage, not visual rendering. The CloudDesk updater creates asset directories before copying.

@@ -16,8 +16,10 @@ const palettes=[
  {id:'steel',name:'Сталь',colors:['#c6d5eb','#53657c','#a5cccf']}
 ];
 export type Style={interfaceStyle:'immersive'|'simplified';transition:'flow'|'fade'|'slide'|'scale';uiMotion:'off'|'low'|'normal';theme:'dark'|'light'|'system';palette:string;primary:string;secondary:string;ambient:boolean;wave:boolean;grid:boolean;border:boolean;intensity:number;density:'compact'|'comfortable';size:'normal'|'large'};
+const volatileStyles=new Map<string,Style>();
 const defaults:Style={interfaceStyle:'simplified',transition:'flow',uiMotion:'normal',theme:'dark',palette:'iris',primary:'#b49bf7',secondary:'#75d9c7',ambient:true,wave:false,grid:false,border:false,intensity:55,density:'comfortable',size:'normal'};
 function current(scope:string):Style{
+ if(volatileStyles.has(scope))return volatileStyles.get(scope)!;
  try{const saved={...defaults,...JSON.parse(localStorage.getItem(preferenceKey(scope,'appearance'))??localStorage.getItem(preferenceKey('','appearance'))??'{}')};return {...saved,theme:['dark','light','system'].includes(saved.theme)?saved.theme:defaults.theme,interfaceStyle:saved.interfaceStyle==='immersive'?'immersive':'simplified',transition:['flow','fade','slide','scale'].includes(saved.transition)?saved.transition:'flow',uiMotion:['off','low','normal'].includes(saved.uiMotion)?saved.uiMotion:'normal'}}
  catch{return defaults}
 }
@@ -39,7 +41,7 @@ export function applyStyle(style:Style){
  root.style.setProperty('--accent-light','color-mix(in srgb,var(--accent) 70%,var(--ink))');
  root.style.setProperty('--neon-strength',String(Math.max(.05,Math.min(1,style.intensity/100))));
 }
-function save(scope:string,style:Style){applyStyle(style);try{localStorage.setItem(preferenceKey(scope,'appearance'),JSON.stringify(style))}catch{}window.dispatchEvent(new Event('mystic-appearance'));}
+function save(scope:string,style:Style){applyStyle(style);try{localStorage.setItem(preferenceKey(scope,'appearance'),JSON.stringify(style));volatileStyles.delete(scope)}catch{volatileStyles.set(scope,style)}window.dispatchEvent(new Event('mystic-appearance'));}
 export function initPalette(scope:string){
  const media=matchMedia('(prefers-color-scheme:light)');
  const update=()=>applyStyle(current(scope));
@@ -56,7 +58,7 @@ export function ThemeToggle({scope=''}:{scope?:string}){
 export function Settings(){
  const {preferenceScope:scope}=useApp();
  const [style,setStyle]=useState(()=>current(scope));
- useEffect(()=>{const sync=()=>setStyle(current(scope));window.addEventListener('mystic-appearance',sync);return()=>window.removeEventListener('mystic-appearance',sync)},[scope]);
+ useEffect(()=>{const sync=()=>setStyle(current(scope));sync();window.addEventListener('mystic-appearance',sync);window.addEventListener('storage',sync);return()=>{window.removeEventListener('mystic-appearance',sync);window.removeEventListener('storage',sync)}},[scope]);
  const update=<K extends keyof Style>(field:K,value:Style[K])=>{const next={...current(scope),[field]:value};save(scope,next);setStyle(next)};
  return <><Header title="Настройки" description="Тема, палитра и эффекты оформления" action={<button className="btn secondary" onClick={()=>{save(scope,{...defaults});setStyle({...defaults})}}>Сбросить оформление</button>}/>
   <div className="two-col">

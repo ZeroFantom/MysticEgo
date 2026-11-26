@@ -68,3 +68,8 @@
 @media(prefers-reduced-motion:reduce){:root[data-interface] *{animation:none!important;transition:none!important}}
 .desk-appearance{border:1px solid var(--line);border-radius:10px;padding:9px;margin:0 0 16px}.desk-appearance summary{cursor:pointer;color:var(--desk-ink);font-size:13px}.desk-appearance select{padding:7px}.desk-appearance label{margin:7px 0}.desk-appearance button{padding:6px}
 aside{overflow-y:auto}
+
+:root[data-interface] .auth-intro{background:linear-gradient(120deg,var(--desk-veil),transparent 170%),var(--mystic-art) center/cover;border-radius:16px;padding:24px}
+:root[data-interface] .auth-wrap{animation:var(--mystic-reveal) var(--mystic-page-time) var(--mystic-ease) backwards}
+:root[data-interface=simplified] :is(.dot,.sync i){animation:none}
+:root[data-ui-motion=low] :is(.dot,.sync i){animation:none}

@@ -59,3 +59,13 @@
 :root[data-ui-motion=off] :is(.mystic-workspace,.auth-experience,.mystic-share,.studio-site,.desktop-downloads) *, :root[data-ui-motion=off] :is(.auth-visual,.auth-orbit)::before,:root[data-ui-motion=off] :is(.auth-visual,.topbar-light)::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
 @media(prefers-reduced-motion:reduce){:root[data-interface] :is(.mystic-workspace,.auth-experience,.mystic-share,.studio-site,.desktop-downloads) *, :root[data-interface] :is(.auth-visual,.auth-orbit,.topbar-light)::before,:root[data-interface] :is(.auth-visual,.topbar-light)::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 @media(max-width:420px){.appearance-style-options{grid-template-columns:1fr}.appearance-quick{gap:1px}}
+
+:root[data-theme] body{background:var(--mystic-bg);color:var(--mystic-ink)}
+.appearance-public-bar{display:flex;justify-content:flex-end}
+:root[data-interface] .agent-desktop-entry{background:var(--mystic-bg);color:var(--mystic-ink);--surface:var(--mystic-surface);--ink:var(--mystic-ink);--subtle:var(--mystic-muted);--line:var(--mystic-line)}
+:root[data-interface] .agent-desktop-entry .panel{background:var(--surface);border-color:var(--line);color:var(--ink)}
+:root[data-interface] .desktop-download-hero{background:linear-gradient(90deg,var(--mystic-veil),transparent 160%),var(--mystic-art) center/cover}
+:root[data-interface=simplified] .desktop-download-card{background:var(--mystic-surface)}
+:root[data-interface=immersive] .desktop-download-card{background:linear-gradient(145deg,color-mix(in srgb,var(--mystic-surface) 91%,var(--mystic-primary)),var(--mystic-surface) 75%)}
+:root[data-theme=light][data-interface] .mystic-workspace .btn:not(.secondary):not(.danger){color:var(--ink)}
+:root[data-ui-motion=low] :is(.auth-orbit i,.auth-orbit::before,.topbar-sweep,.stat-tile){animation:none!important}

@@ -18,7 +18,7 @@ for f in "${files[@]}"; do mkdir -p -- "$backup/$(dirname "$f")"; [[ ! -e "$targ
 stage=$(mktemp -d "$target/.build-v046-XXXXXXXX")
 rollback(){ local rc=$?; trap - ERR; echo "Обновление прервано. Восстанавливаем из $backup" >&2; for f in "${files[@]}"; do if [[ -e "$backup/$f" ]]; then cp -a -- "$backup/$f" "$target/$f"; else rm -f -- "$target/$f"; fi; done; for d in out dist; do if [[ -e "$backup/$d" ]]; then rm -rf -- "$target/$d"; mv -- "$backup/$d" "$target/$d"; elif [[ -e "$stage/.new-$d" ]]; then rm -rf -- "$target/$d"; fi; done; rm -rf -- "$stage"; exit "$rc"; }
 trap rollback ERR
-for f in "${files[@]}"; do cp -- "$here/$f" "$target/$f"; done
+for f in "${files[@]}"; do mkdir -p -- "$target/$(dirname "$f")"; cp -- "$here/$f" "$target/$f"; done
 chmod +x "$target/run.sh" "$target/github-network-check.sh"
 cd -- "$target"
 if [[ -f "$here/out/CloudDesk.dll" && -f "$here/dist/index.html" ]]; then

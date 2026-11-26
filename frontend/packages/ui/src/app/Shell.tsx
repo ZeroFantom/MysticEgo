@@ -8,7 +8,7 @@ import './workspace-rail.css';
 import {ErrorBanner} from '../components/primitives';
 import {accountScope,useBrowserSession} from './browserSession';
 import {ReleaseStatus,ProjectBranches} from '../pages/ProjectConsole';
-import {useEffect,useMemo,useRef,useState,type ReactNode} from 'react';
+import {useEffect,useLayoutEffect,useMemo,useRef,useState,type ReactNode} from 'react';
 import {BrowserRouter,Link,NavLink,Navigate,Route,Routes,useLocation} from 'react-router-dom';
 import {
   Activity,Bell,BookOpen,Boxes,ChevronDown,ChevronRight,Clapperboard,Cloud,Cog,
@@ -220,16 +220,16 @@ export function MysticApp({mode,defaultApi}:{mode:NodeMode;title:string;defaultA
   const api=useMemo(()=>new NodeApi(session.url,()=>session.token),[session.url,session.token]);
   const scope=accountScope(session,mode,portal);
   const profile=useRemote(async()=>session.token?{scope,account:await api.request<PersonalAccount>('/collective/me')}:null,[api,scope]);
-  useEffect(()=>initPalette(scope),[scope]);
+  useLayoutEffect(()=>initPalette(scope),[scope]);
   // Public pages work with or without a session, including during service recovery.
   const publicPath = location.pathname.replace(/\/$/, '');
   if (publicPath === '/share' || (portal && publicPath === '/audit-portal/share')) return <SharePage mode={portal?'audit':mode} portal={portal} scope={scope}/>;
   if (mode === 'orchestra') {
-    if (publicPath === '/studio') return <StudioPage/>;
-    if (publicPath === '/developer') return <DeveloperPage/>;
-    if (publicPath === '/desktop-downloads') return <PublicDesktopDownloads/>;
+    if (publicPath === '/studio') return <StudioPage scope={scope}/>;
+    if (publicPath === '/developer') return <DeveloperPage scope={scope}/>;
+    if (publicPath === '/desktop-downloads') return <PublicDesktopDownloads scope={scope}/>;
   }
-  if(mode==='orchestra'&&location.pathname==='/agent-desktop')return <AgentDesktopEntry/>;
+  if(mode==='orchestra'&&location.pathname==='/agent-desktop')return <AgentDesktopEntry scope={scope}/>;
   if(restoring)return <NotificationProvider><main className="auth-experience"><section className="auth-form-side">
     <div className="auth-form-card">
       <h2>Восстановление входа</h2>
