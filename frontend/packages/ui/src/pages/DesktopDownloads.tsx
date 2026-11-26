@@ -5,7 +5,8 @@ import {ArrowLeft,CloudCog,Download,Laptop,Monitor,Server,ShieldCheck} from 'luc
 import {useApp,useRemote} from '../app/context';
 import './desktop-downloads.css';
 
-type Downloads=Partial<Record<'windows'|'linux',{tag:string;url:string}>>;
+type DownloadAsset={tag:string;url:string;fileName?:string;format?:'exe'|'run'|'zip'};
+type Downloads=Partial<Record<string,DownloadAsset>>;
 const publicApps=[
   {name:'AuditDesktop',icon:ShieldCheck,tone:'audit',description:'Личное рабочее пространство аудитора. Войдите в MysticEgo, чтобы запустить личный Audit и открыть его панель прямо из приложения.',
     features:['Личная панель Audit','Доступ к организациям','Заявка в команду разработки'],windows:'AuditDesktop.exe',linux:'./audit-desktop'},
@@ -18,6 +19,8 @@ const cloudDesk={name:'CloudDesk',icon:CloudCog,tone:'cloud',description:'Раб
   features:['Инвентарь VPS Timeweb и DNS','Развёртывание через SSH','Обновление Orchestra и Global с журналом этапов'],
   windows:'tools\\MysticEgo.CloudDesk\\run-windows.cmd',linux:'bash tools/MysticEgo.CloudDesk/run.sh'};
 
+const controlDesk={name:'ControlDesktop',icon:Server,tone:'control',description:'Локальный центральный сервер для разработки и тестирования.',features:['Запуск локальной Orchestra','Журнал и состояние сервисов'],windows:'MysticEgo.exe',linux:'./mysticego'};
+
 function AppCard({app,downloads,loading}:{app:typeof cloudDesk;downloads?:Downloads;loading:boolean}){
   const Icon=app.icon;
   return <article className="desktop-download-card" data-product={app.tone}>
@@ -27,13 +30,16 @@ function AppCard({app,downloads,loading}:{app:typeof cloudDesk;downloads?:Downlo
     <ul>{app.features.map(feature=><li key={feature}>{feature}</li>)}</ul>
     <div className="desktop-download-platforms">
       {(['windows','linux'] as const).map(platform=>{
-        const asset=downloads?.[platform];
+        const direct=downloads?.[app.tone+'-'+platform];
+        const asset=direct??(app.tone==='control'?undefined:downloads?.[platform]);
+        const format=asset?.format??(direct?(platform==='windows'?'exe':'run'):'zip');
         const os=platform==='windows'?'Windows x64':'Linux x64';
         return <div key={platform}>
-          {asset?<a className="btn secondary" href={asset.url} rel="noreferrer" aria-label={`Скачать ${app.name} для ${os} на GitHub`}><Download size={16} aria-hidden="true"/>{os}</a>:
+          {asset?<a className="btn secondary" href={asset.url} rel="noreferrer" aria-label={`Скачать ${app.name} для ${os} на GitHub`}><Download size={16} aria-hidden="true"/>{os} · {format.toUpperCase()}</a>:
             <span className="desktop-download-os">{os}</span>}
           <small>{asset?.tag??(loading?'Проверяем GitHub…':'Сборка недоступна')}</small>
-          <code>{app[platform]}</code>
+          {asset&&<code>{format==='zip'?app[platform]:format==='run'?`bash ${asset.fileName??'установщик.run'}`:'Запустите установщик EXE'}</code>}
+          {asset&&format==='zip'&&<small>Резервный ZIP-комплект</small>}
         </div>;
       })}
     </div>
@@ -60,7 +66,7 @@ export function PublicDesktopDownloads({scope=''}:{scope?:string}={}){
     <div className="appearance-public-bar"><ThemeToggle scope={scope}/></div>
     <a className="desktop-download-back" href="/"><ArrowLeft size={17} aria-hidden="true"/> К авторизации</a>
     <header className="desktop-download-hero"><Laptop size={29} aria-hidden="true"/><h1>Приложения MysticEgo</h1>
-      <p>Один комплект для каждой ОС включает AuditDesktop, AgentDesktop и LocalDesktop. Распакуйте ZIP и запустите нужное приложение.</p>
+      <p>Выберите нужное приложение и ОС. Windows: запустите EXE. Linux x64: запустите скачанный RUN-файл через bash. Среды выполнения включены. Если установщика пока нет, доступен прежний ZIP.</p>
     </header>
     {error&&<p role="status">Не удалось получить актуальные ссылки GitHub. <button className="btn secondary" onClick={()=>retry(value=>value+1)}>Повторить</button></p>}
     <div className="desktop-download-grid">{publicApps.map(app=><AppCard key={app.name} app={app} downloads={downloads} loading={!downloads&&!error}/>)}</div>
@@ -73,8 +79,9 @@ export function CloudDeskDownloads(){
   const releases=useRemote(()=>api.request<Downloads>('/managed/clouddesk-downloads'),[api]);
   return <div className="desktop-downloads">
     <header className="desktop-download-hero"><CloudCog size={29} aria-hidden="true"/><h1>Скачать CloudDesk</h1>
-      <p>Выберите сборку на GitHub, распакуйте ZIP и выполните команду для своей ОС.</p></header>
+      <p>Выберите установщик или резервный ZIP. CloudDesk ориентирован на Linux; Windows-сборка экспериментальная, отдельные операции требуют Linux. Для управления облаком также нужны GitHub CLI и OpenSSH.</p></header>
     {releases.error&&<p role="status">Не удалось получить ссылки. <button className="btn secondary" onClick={releases.reload}>Повторить</button></p>}
     <AppCard app={cloudDesk} downloads={releases.value??undefined} loading={releases.loading}/>
+    <AppCard app={controlDesk} downloads={releases.value??undefined} loading={releases.loading}/>
   </div>;
 }

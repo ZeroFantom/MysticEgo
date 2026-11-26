@@ -88,8 +88,8 @@ export function AgentDesktopEntry({scope=''}:{scope?:string}={}){
       <h1>Вход в Agent</h1>
       <p>Для входа на рабочую станцию нужен запущенный AgentDesktop.</p>
       <ol>
-        <li>Если AgentDesktop ещё не установлен, скачайте комплект приложений MysticEgo.</li>
-        <li>Запустите <code>AgentDesktop.cmd</code> на Windows или <code>./agent-desktop</code> на Linux.</li>
+        <li>Если AgentDesktop ещё не установлен, скачайте установщик для своей ОС.</li>
+        <li>Откройте EXE на Windows или выполните <code>bash MysticEgo-AgentDesktop-linux-x64.run</code> на Linux. Для резервного ZIP используйте прежний запуск.</li>
         <li>Для клубного Agent используйте комплект, выданный администратором Local. Откройте «Панель роли» в AgentDesktop.</li>
       </ol>
       <div className="row-actions">

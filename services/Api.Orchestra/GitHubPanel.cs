@@ -114,33 +114,41 @@ public sealed class GitHubPanel(IHttpClientFactory clients, IConfiguration confi
         return latest is null?null:new {latest.Tag,latest.PublishedAt,latest.Url,latest.Prerelease};
     }
 
-    public sealed record DesktopDownload(string Tag, string Url);
+    public sealed record DesktopDownload(string Tag, string Url, string FileName, string Format);
 
-    /// <summary>Selects the newest uploaded archive for each supported desktop platform.</summary>
     public async Task<Dictionary<string, DesktopDownload>> DesktopDownloads(bool cloudDesk, CancellationToken ct)
+        => SelectDesktopDownloads(await List("releases", ct), cloudDesk);
+
+    public static Dictionary<string, DesktopDownload> SelectDesktopDownloads(JsonArray data, bool cloudDesk)
     {
         var downloads = new Dictionary<string, DesktopDownload>();
-        var product = cloudDesk ? "CloudDesk" : "Desktop";
-        var releases = (await List("releases", ct)).OfType<JsonObject>()
+        var products = cloudDesk
+            ? new[] { ("cloud", "CloudDesk"), ("control", "ControlDesktop") }
+            : new[] { ("audit", "AuditDesktop"), ("agent", "AgentDesktop"), ("local", "LocalDesktop") };
+        var releases = data.OfType<JsonObject>()
             .Where(release => release["draft"]?.GetValue<bool>() == false)
             .Select(release => (Release: release, Published: DateTimeOffset.TryParse(release["published_at"]?.ToString(), out var published)
                 ? published : DateTimeOffset.MinValue))
             .Where(item => item.Published != DateTimeOffset.MinValue)
             .OrderByDescending(item => item.Published);
-        // A release can contain only one platform, so each platform is selected independently.
         foreach (var (release, _) in releases)
         {
             var tag = release["tag_name"]?.ToString();
             if (string.IsNullOrWhiteSpace(tag) || release["assets"] is not JsonArray assets) continue;
-            foreach (var (platform, suffix) in new[] { ("windows", "win-x64"), ("linux", "linux-x64") })
+            void Add(string key, string name, string format)
             {
-                var name = $"MysticEgo-{product}-{suffix}.zip";
-                if (downloads.ContainsKey(platform) || !assets.OfType<JsonObject>().Any(asset =>
-                    asset["name"]?.ToString() == name && asset["state"]?.ToString() == "uploaded")) continue;
-                downloads.Add(platform, new DesktopDownload(tag,
-                    $"https://github.com/{Repository}/releases/download/{Uri.EscapeDataString(tag)}/{name}"));
+                if (downloads.ContainsKey(key) || !assets.OfType<JsonObject>().Any(asset =>
+                    asset["name"]?.ToString() == name && asset["state"]?.ToString() == "uploaded")) return;
+                downloads.Add(key, new DesktopDownload(tag,
+                    $"https://github.com/{Repository}/releases/download/{Uri.EscapeDataString(tag)}/{name}", name, format));
             }
-            if (downloads.Count == 2) break;
+            foreach (var (platform, suffix, extension) in new[] { ("windows", "win-x64", "exe"), ("linux", "linux-x64", "run") })
+            {
+                foreach (var (key, product) in products)
+                    Add($"{key}-{platform}", $"MysticEgo-{product}-{suffix}.{extension}", extension);
+                Add(platform, $"MysticEgo-{(cloudDesk ? "CloudDesk" : "Desktop")}-{suffix}.zip", "zip");
+            }
+            if (downloads.Count == products.Length * 2 + 2) break;
         }
         return downloads;
     }

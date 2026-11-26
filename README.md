@@ -137,14 +137,17 @@ Auth обеспечивает управление доступом; схема 
 
 **Начните со страницы [GitHub Releases](https://github.com/ZeroFantom/MysticEgo/releases).**
 
-Для AuditDesktop, AgentDesktop и LocalDesktop скачайте комплект **MysticEgo-Desktop** для своей ОС, распакуйте ZIP целиком и запустите нужный файл. Каталог приложений также доступен на странице входа Orchestra.
+Для релизов с отдельными установщиками скачайте **один файл нужного приложения**. Windows — EXE, Linux x64 — RUN (например, `bash MysticEgo-AuditDesktop-linux-x64.run`). Комплектные .NET и Electron устанавливаются в пользовательский каталог. Старые ZIP остаются резервным вариантом.
 
 | Приложение | Назначение | Windows x64 | Linux x64 |
 | :--- | :--- | :--- | :--- |
-| AuditDesktop | Личный Audit и доступ к своим организациям | `AuditDesktop.exe` | `./audit-desktop` |
-| AgentDesktop | Подключение компьютера клуба по приглашению Local | `AgentDesktop.cmd` | `./agent-desktop` |
-| LocalDesktop | Запуск Local на площадке с профилем из Global | `LocalDesktop.cmd` | `./local-desktop` |
-| CloudDesk | Развёртывание, обновление серверов и диагностика | `tools\MysticEgo.CloudDesk\run-windows.cmd` | `bash tools/MysticEgo.CloudDesk/run.sh` |
+| AuditDesktop | Личный Audit | EXE | RUN |
+| AgentDesktop | Рабочая станция клуба | EXE | RUN |
+| LocalDesktop | Управление площадкой | EXE | RUN |
+| CloudDesk | Управление облаком (Windows экспериментально) | EXE | RUN |
+| ControlDesktop | Локальный центральный сервер | EXE | RUN |
+
+[Установка и системные зависимости](ops/desktop-releases/README.md).
 
 **Как подключить площадку:** создайте её в Global, получите конфигурацию через LocalDesktop, затем выпустите приглашение в панели Local. AgentDesktop получает профиль станции по сети площадки. Для личного использования можно начать с AuditDesktop.
 
