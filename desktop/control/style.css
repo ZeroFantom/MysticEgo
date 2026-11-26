@@ -46,7 +46,7 @@ button.plain{color:var(--ink)}
 
 :root[data-interface="immersive"][data-theme="dark"]{--mystic-art:url("./appearance-art/immersive-dark.webp")}
 :root[data-interface="immersive"][data-theme="light"]{--mystic-art:url("./appearance-art/immersive-light.webp")}
-:root[data-interface="simplified"][data-theme="dark"]{--mystic-art:url("./appearance-art/simplified-dark.webp")}
+:root[data-interface="simplified"][data-theme="dark"]{--mystic-art:url("./appearance-art/simplified-dark.svg")}
 :root[data-interface="simplified"][data-theme="light"]{--mystic-art:url("./appearance-art/simplified-light.webp")}
 :root{--mystic-time:220ms;--mystic-page-time:300ms;--mystic-ease:cubic-bezier(.2,.78,.22,1);--mystic-reveal:mystic-flow}
 :root[data-interface=immersive]{--mystic-time:300ms;--mystic-page-time:420ms}
@@ -81,3 +81,32 @@ button.plain{color:var(--ink)}
 :root[data-interface=simplified] .desktop-header{background:linear-gradient(90deg,var(--panel) 35%,transparent 160%),var(--mystic-art) right center/auto 100% no-repeat,var(--panel)}
 :root[data-interface=immersive] .desktop-card{border-radius:14px}
 :root[data-interface=immersive] .desktop-logo{box-shadow:0 0 20px color-mix(in srgb,var(--accent) 25%,transparent)}
+
+/* Desktop control surfaces use the same visual roles as the web panels. */
+:root[data-interface] .desktop-header{gap:clamp(10px,2vw,18px);padding:clamp(16px,3vw,28px) clamp(16px,4vw,34px);min-height:104px}
+:root[data-interface=immersive] .desktop-header{background:linear-gradient(90deg,var(--body) 16%,color-mix(in srgb,var(--body) 85%,transparent) 48%,transparent 90%),var(--mystic-art) right center/auto 175% no-repeat,var(--body)}
+:root[data-interface] .desktop-header>div:not(.desktop-logo){min-width:0}
+:root[data-interface] .desktop-header h1{font-size:clamp(19px,3vw,26px);overflow-wrap:anywhere}
+:root[data-interface] .desktop-header .status{max-width:40%;text-align:end;overflow-wrap:anywhere}
+:root[data-interface] :is(.desktop-logo,.product-icon){flex:none;aspect-ratio:1;object-fit:contain;object-position:center}
+:root[data-interface] .desktop-card{border-radius:14px;padding:clamp(14px,2vw,22px)}
+:root[data-interface] .desktop-columns{grid-template-columns:repeat(2,minmax(0,1fr))}
+:root[data-interface] .services>div{min-width:0;gap:8px;flex-wrap:wrap}
+:root[data-interface] .actions>button{min-height:40px;max-width:100%;overflow-wrap:anywhere}
+:root[data-interface] button{filter:none}
+:root[data-interface] button:hover:not(:disabled){filter:none;border-color:var(--accent)}
+:root[data-interface] button:active:not(:disabled){translate:0 1px}
+:root[data-interface] .desktop-card :is(input,select,textarea){min-width:0}
+:root[data-interface] input[type=range]{accent-color:var(--accent)}
+.desktop-style-options{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+:root[data-interface] .desktop-style-option{display:grid;gap:8px;align-content:start;text-align:start;border-radius:12px;padding:8px;background:var(--panel);border-color:var(--border);color:var(--ink);min-width:0;animation:none}
+:root[data-interface] .desktop-style-option[aria-pressed=true]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.desktop-art-preview{display:block;width:100%;aspect-ratio:16/9;background-size:contain;background-position:center;background-repeat:no-repeat;background-color:var(--input);border-radius:8px}
+.desktop-style-option[data-preview=simplified] .desktop-art-preview{background-image:url("./appearance-art/simplified-dark.svg")}
+.desktop-style-option[data-preview=immersive] .desktop-art-preview{background-image:url("./appearance-art/immersive-dark.webp")}
+:root[data-theme=light] .desktop-style-option[data-preview=simplified] .desktop-art-preview{background-image:url("./appearance-art/simplified-light.webp")}
+:root[data-theme=light] .desktop-style-option[data-preview=immersive] .desktop-art-preview{background-image:url("./appearance-art/immersive-light.webp")}
+@media(max-width:740px){:root[data-interface] .desktop-columns{grid-template-columns:minmax(0,1fr)}:root[data-interface] .desktop-header{flex-wrap:wrap}:root[data-interface] .desktop-header .status{max-width:100%;margin-left:0}:root[data-interface] .services{flex-wrap:wrap}:root[data-interface] .services>div{flex-basis:140px}}
+@media(max-width:420px){#design{grid-template-columns:minmax(0,1fr)}.desktop-style-options{grid-template-columns:minmax(0,1fr)}}
+:root[data-ui-motion=off] button:is(:hover,:active){translate:none}
+@media(prefers-reduced-motion:reduce){:root[data-interface] button:is(:hover,:active){translate:none}}
