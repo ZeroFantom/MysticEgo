@@ -101,3 +101,22 @@
 
 /* The generated still is a 21:9 panorama; the original videos retain their own media frame. */
 .cinematic-preview>.cinematic-media[data-playing=false]{aspect-ratio:21/9}
+
+/* An explicit, short cinematic using the complete generated 21:9 artwork.
+   Only overlay opacity/transform animate; the underlying scene never zooms. */
+.cinematic-preview>.cinematic-media.cinematic-live{position:relative;isolation:isolate;aspect-ratio:21/9;max-height:none}
+.cinematic-preview .cinematic-live>img{position:absolute;inset:0;width:100%;height:100%;max-height:none;object-fit:contain;animation:none!important}
+.cinematic-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cinematic-effects{position:absolute;inset:0;pointer-events:none;overflow:hidden;--scene-tint:rgba(172,104,255,.24);--scene-petal:#f3a8e2}
+.cinematic-live[data-light=true] .cinematic-effects{--scene-tint:rgba(255,226,182,.35);--scene-petal:#b75b9a}
+.cinematic-live[data-immersive=false] .cinematic-effects{--scene-tint:rgba(169,144,220,.15)}
+.cinematic-haze,.cinematic-glow{position:absolute;inset:0;opacity:0}
+.cinematic-haze{background:radial-gradient(ellipse at 68% 75%,var(--scene-tint),transparent 62%);animation:mystic-scene-haze 12s ease-in-out both}
+.cinematic-glow{background:radial-gradient(ellipse at 85% 23%,var(--scene-tint),transparent 42%);animation:mystic-scene-glow 12s ease-in-out both}
+.cinematic-petal{position:absolute;width:var(--petal-size);height:calc(var(--petal-size)*.7);background:var(--scene-petal);border-radius:75% 25% 65% 35%;opacity:0;animation:mystic-scene-petal calc(12s - var(--petal-delay)) var(--petal-delay) ease-in-out both}
+.cinematic-live[data-running=false] :is(.cinematic-haze,.cinematic-glow,.cinematic-petal){animation-play-state:paused}
+@keyframes mystic-scene-haze{0%,100%{opacity:0}28%,72%{opacity:.72}50%{opacity:.35}}
+@keyframes mystic-scene-glow{0%,100%{opacity:0}40%{opacity:.75}65%{opacity:.25}}
+@keyframes mystic-scene-petal{0%{opacity:0;transform:translate(0,0) rotate(-20deg)}22%,70%{opacity:.8}100%{opacity:0;transform:translate(var(--petal-x),var(--petal-y)) rotate(150deg)}}
+:root[data-ui-motion=off] .cinematic-effects{display:none!important}
+@media(prefers-reduced-motion:reduce){.cinematic-effects{display:none!important}}

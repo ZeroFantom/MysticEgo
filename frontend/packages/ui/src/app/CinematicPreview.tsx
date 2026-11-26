@@ -1,43 +1,56 @@
-import {useEffect,useId,useRef,useState} from 'react';
-import dark from './appearance-art/immersive-dark.webm';
-import light from './appearance-art/immersive-light.webm';
-import simple from './appearance-art/simplified-light.webm';
+import {useEffect,useId,useRef,useState,type CSSProperties} from 'react';
 import darkPoster from './appearance-art/immersive-dark-hero.webp';
 import lightPoster from './appearance-art/immersive-light-hero.webp';
 import simplePoster from './appearance-art/simplified-light-hero.webp';
 import simpleDarkPoster from './appearance-art/simplified-dark-hero.webp';
+
 function useVariant(){
  const read=()=>{const d=document.documentElement.dataset;return {theme:d.theme??'dark',style:d.interface??'simplified',motion:d.uiMotion??'normal',reduced:matchMedia('(prefers-reduced-motion: reduce)').matches}};
  const [variant,setVariant]=useState(read);
  useEffect(()=>{const refresh=()=>setVariant(read());const observer=new MutationObserver(refresh);observer.observe(document.documentElement,{attributes:true,attributeFilter:['data-theme','data-interface','data-ui-motion']});const media=matchMedia('(prefers-reduced-motion: reduce)');media.addEventListener('change',refresh);refresh();return()=>{observer.disconnect();media.removeEventListener('change',refresh)}},[]);
  return variant;
 }
+const particles=Array.from({length:18},(_,i)=>({
+ x:18+(i*37)%78,y:12+(i*29)%72,dx:-(18+(i*13)%64),dy:16+(i*19)%52,
+ size:3+(i%4),delay:(i%6)*.55
+}));
+function Scene({poster,immersive,light,allowed}:{poster:string;immersive:boolean;light:boolean;allowed:boolean}){
+ const mediaId=useId();
+ const frame=useRef<HTMLDivElement>(null);
+ const [state,setState]=useState<'idle'|'playing'|'paused'|'finished'>('idle');
+ const [visible,setVisible]=useState(false);
+ const [pageVisible,setPageVisible]=useState(()=>!document.hidden);
+ useEffect(()=>{
+   const refresh=()=>setPageVisible(!document.hidden);
+   document.addEventListener('visibilitychange',refresh);
+   const observer=typeof IntersectionObserver==='undefined'?null:new IntersectionObserver(entries=>setVisible(!!entries[0]?.isIntersecting),{threshold:.05});
+   if(frame.current)observer?.observe(frame.current);
+   if(!observer)setVisible(true);
+   return()=>{observer?.disconnect();document.removeEventListener('visibilitychange',refresh)};
+ },[]);
+ const active=allowed&&(state==='playing'||state==='paused');
+ const running=active&&state==='playing'&&visible&&pageVisible;
+ const status=!allowed?'Статический пейзаж · анимации ограничены':state==='finished'?'Сцена завершена':active?(running?'Воспроизведение':'Пауза'):'12 секунд · свет и движение частиц';
+ return <section className="cinematic-preview" aria-label="Синематика оформления">
+   <div><p>Живой пейзаж · MysticEgo</p>{allowed&&<div className="cinematic-controls">
+     <button type="button" aria-controls={mediaId} onClick={()=>setState(s=>s==='playing'?'paused':s==='paused'?'playing':'playing')}>{state==='playing'?'Пауза':state==='paused'?'Продолжить':state==='finished'?'Повторить сцену':'Смотреть сцену'}</button>
+     {active&&<button type="button" onClick={()=>setState('idle')}>Остановить</button>}
+   </div>}</div>
+   <div id={mediaId} ref={frame} className="cinematic-media cinematic-live" data-playing={active} data-running={running} data-light={light} data-immersive={immersive}>
+     <img src={poster} loading="lazy" decoding="async" alt="Пейзаж оформления MysticEgo"/>
+     {active&&<div className="cinematic-effects" aria-hidden="true">
+       <div className="cinematic-haze" onAnimationEnd={event=>{if(event.animationName==='mystic-scene-haze')setState('finished')}}/>
+       <div className="cinematic-glow"/>
+       {particles.slice(0,immersive?18:8).map((p,i)=><i key={i} className="cinematic-petal" style={{left:p.x+'%',top:p.y+'%','--petal-x':p.dx+'px','--petal-y':p.dy+'px','--petal-size':p.size+'px','--petal-delay':p.delay+'s'} as CSSProperties}/>)}
+     </div>}
+   </div>
+   <small className="cinematic-motion-note" role="status">{status}</small>
+ </section>;
+}
 export function CinematicPreview(){
  const variant=useVariant();
- const source=variant.style==='immersive'?(variant.theme==='light'?light:dark):variant.theme==='light'?simple:null;
- const poster=variant.style==='immersive'?(variant.theme==='light'?lightPoster:darkPoster):variant.theme==='light'?simplePoster:simpleDarkPoster;
- const allowed=!!source&&!variant.reduced&&variant.motion==='normal';
- const [openSource,setOpenSource]=useState<string|null>(null);
- const opened=allowed&&source===openSource;
- const video=useRef<HTMLVideoElement>(null);
- const mediaId=useId();
- useEffect(()=>{setOpenSource(null)},[source,allowed]);
- useEffect(()=>{
-  if(!opened)return;
-  const element=video.current;
-  if(!element)return;
-  const pauseHidden=()=>{if(document.hidden)element.pause()};
-  document.addEventListener('visibilitychange',pauseHidden);
-  const observer=typeof IntersectionObserver==='undefined'?null:new IntersectionObserver(entries=>{if(!entries[0]?.isIntersecting)element.pause()},{threshold:0.05});
-  observer?.observe(element);
-  return()=>{observer?.disconnect();document.removeEventListener('visibilitychange',pauseHidden);element.pause()};
- },[opened]);
- return <section className="cinematic-preview" aria-label="Синематика оформления">
- <div><p>Пейзаж оформления · MysticEgo</p>{allowed&&<button type="button" aria-controls={mediaId} aria-expanded={opened} onClick={()=>setOpenSource(opened?null:source)}>{opened?'Скрыть видео':'Смотреть ранний видеоконцепт'}</button>}</div>
- <div id={mediaId} className="cinematic-media" data-playing={opened}>
- {opened?<video ref={video} key={source} controls muted playsInline preload="metadata" poster={poster} src={source??undefined} aria-label="Ранний видеоконцепт MysticEgo"/>:<img src={poster} loading="lazy" decoding="async" alt="Статический пейзаж оформления MysticEgo"/>}
- </div>
- {opened&&<small className="cinematic-motion-note">Ранний видеоконцепт · не анимация нового фонового изображения.</small>}
- {!allowed&&<small className="cinematic-motion-note">{source?'Статический кадр · анимации отключены или ограничены':'Статический пейзаж'}</small>}
- </section>;
+ const immersive=variant.style==='immersive',light=variant.theme==='light';
+ const poster=immersive?(light?lightPoster:darkPoster):(light?simplePoster:simpleDarkPoster);
+ const allowed=!variant.reduced&&variant.motion==='normal';
+ return <Scene key={poster+':'+allowed} poster={poster} immersive={immersive} light={light} allowed={allowed}/>;
 }

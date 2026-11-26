@@ -211,6 +211,35 @@ try{
               await capture(page,prefix+'-'+route);
             });
           }
+          if(role==='orchestra'&&viewport.width===1440)await check(page,prefix+'-cinematic',async()=>{
+            await page.goto(origin+'/studio',{waitUntil:'domcontentloaded'});
+            const scene=page.locator('.cinematic-live');
+            await visible(scene);
+            await scene.scrollIntoViewIfNeeded();
+            assert.equal(await scene.getAttribute('data-playing'),'false');
+            assert.equal(await page.locator('.cinematic-effects').count(),0);
+            await page.emulateMedia({reducedMotion:'no-preference'});
+            for(const [theme,style] of combinations){
+              await switchAppearance(page,theme,style);
+              await scene.scrollIntoViewIfNeeded();
+              const image=await scene.locator('img').evaluate(async img=>{await img.decode();const rect=img.getBoundingClientRect();return {src:img.currentSrc,ratio:rect.width/rect.height,fit:getComputedStyle(img).objectFit}});
+              assert(image.src.includes(style+'-'+theme+'-hero'));
+              assert(Math.abs(image.ratio-21/9)<.08&&image.fit==='contain');
+              await page.getByRole('button',{name:'Смотреть сцену',exact:true}).click();
+              await page.waitForFunction(()=>document.querySelector('.cinematic-live')?.getAttribute('data-running')==='true');
+              await page.getByRole('button',{name:'Пауза',exact:true}).click();
+              assert.equal(await scene.getAttribute('data-running'),'false');
+              await page.getByRole('button',{name:'Продолжить',exact:true}).click();
+              await page.waitForFunction(()=>document.querySelector('.cinematic-live')?.getAttribute('data-running')==='true');
+              await page.getByRole('button',{name:'Остановить',exact:true}).click();
+              assert.equal(await page.locator('.cinematic-effects').count(),0);
+              await capture(page,prefix+'-cinematic-'+theme+'-'+style);
+            }
+            await page.getByRole('button',{name:'Смотреть сцену',exact:true}).click();
+            await page.emulateMedia({reducedMotion:'reduce'});
+            await page.waitForFunction(()=>!document.querySelector('.cinematic-effects'));
+            assert.equal(await page.getByRole('button',{name:'Смотреть сцену',exact:true}).count(),0);
+          });
           await check(page,prefix+'-runtime',async()=>assert.deepEqual(errors,[],'uncaught browser exceptions'));
         }catch(error){results.push({label:prefix+'-setup',passed:false,error:String(error)});await page.screenshot({path:resolve(output,prefix+'-setup-failure.png'),timeout:5000}).catch(()=>{})}
         finally{await context.close()}
