@@ -53,3 +53,15 @@ assert(shell.includes("document.body.style.overflow=previousOverflow"));
 assert(workspace.includes('object-fit:contain')&&workspace.includes('visibility:hidden')&&workspace.includes('visibility:visible'));
 assert(workspace.includes('prefers-reduced-motion:reduce')&&workspace.includes('data-ui-motion=off'));
 assert(workspace.includes('.auth-recovery')&&workspace.includes('grid-template-columns:minmax(0,1fr)'));
+
+const profile=read('frontend/packages/ui/src/pages/Profile.tsx');
+const profileCss=read('frontend/packages/ui/src/pages/profile-polish.css');
+const profileDialog=read('frontend/packages/ui/src/components/ProfileDialog.tsx');
+const collective=read('frontend/packages/ui/src/pages/Collective.tsx');
+const chatCss=read('frontend/packages/ui/src/pages/collective-chat.css');
+assert(profile.includes('profile-edit-preview')&&profile.includes('data-custom-cover')&&profile.includes('<ProfileDialog'));
+assert(profileDialog.includes('element.showModal()')&&profileDialog.includes('onCancel='));
+assert(profileCss.includes('background-size:cover')&&profileCss.includes('dialog.profile-dialog::backdrop'));
+assert(collective.includes('chat-compose-tools')&&collective.includes('draftSnapshot.current')&&collective.includes('historyRequest.current!==request'));
+assert(chatCss.includes('grid-template-columns:auto minmax(0,1fr) auto')&&chatCss.includes('chat-compose-tools:has(.voice-draft)'));
+assert(chatCss.includes('data-ui-motion=off')&&chatCss.includes('prefers-reduced-motion:reduce'));
