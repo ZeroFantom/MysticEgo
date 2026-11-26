@@ -123,7 +123,7 @@ public sealed class GitHubPanel(IHttpClientFactory clients, IConfiguration confi
     {
         var downloads = new Dictionary<string, DesktopDownload>();
         var products = cloudDesk
-            ? new[] { ("cloud", "CloudDesk"), ("control", "ControlDesktop") }
+            ? new[] { ("cloud", "CloudDesk") }
             : new[] { ("audit", "AuditDesktop"), ("agent", "AgentDesktop"), ("local", "LocalDesktop") };
         var releases = data.OfType<JsonObject>()
             .Where(release => release["draft"]?.GetValue<bool>() == false)

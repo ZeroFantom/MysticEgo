@@ -7,3 +7,7 @@ Windows использует комплектный .NET/Electron, GitHub CLI и
 Linux: прежнее secret-tool, chmod 600/700 и каталог ~/.local/share/mysticego-clouddesk; доступны Konsole, GNOME Terminal, x-terminal-emulator. AppArmor при необходимости настраивается существующим способом. Проверка ключа сервера обязательна на обеих ОС. Пароль SSH передаётся непосредственно SSH.NET, не в командной строке или временном файле.
 
 Разработка: npm install --ignore-scripts --include=dev --include=optional; npm run build; dotnet publish backend/CloudDesk.csproj -c Release -o out. Требуется SDK 10. Для запуска нужен комплект runtime. CI проверяет локальные криптографические операции, ACL/chmod, генерацию ключа, SSH-конфигурацию и регрессии IPC на Windows и Linux. Живые платные операции не выполняются в CI.
+
+## Локальный центр
+
+В CloudDesk 0.5.0 раздел «Локальный центр» заменяет ControlDesktop. Использует штатный MysticEgo.Installer --lab, существующий каталог MysticEgo/BETA7-Lab/center, порты 5400 и 5500. Отдельная установка не нужна; сервер запускается вручную, закрытие CloudDesk завершает только принадлежащий ему процесс. Для локального центра нужен полный runtime/app; не требуется подключение GitHub/Timeweb. LAN HTTP и настройка AI включаются явно. Headless-режим сервера не изменён.

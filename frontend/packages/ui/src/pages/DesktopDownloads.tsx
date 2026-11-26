@@ -15,11 +15,10 @@ const publicApps=[
   {name:'LocalDesktop',icon:Server,tone:'local',description:'Приложение администратора площадки. Загружает профиль у указанного Global и запускает Local в сети клуба.',
     features:['Получение профиля через Global','Запуск Local и журнал','Сетевые приглашения для Agent через панель Local'],windows:'LocalDesktop.cmd',linux:'./local-desktop'}
 ];
-const cloudDesk={name:'CloudDesk',icon:CloudCog,tone:'cloud',description:'Рабочее приложение разработчика для обслуживания инфраструктуры MysticEgo.',
-  features:['Инвентарь VPS Timeweb и DNS','Развёртывание через SSH','Обновление Orchestra и Global с журналом этапов'],
+const cloudDesk={name:'CloudDesk',icon:CloudCog,tone:'cloud',description:'Единое приложение разработчика: локальный центр и удалённая инфраструктура MysticEgo.',
+  features:['Локальные Auth, Orchestra и Audit без облачной авторизации','Инвентарь VPS Timeweb и DNS','Развёртывание через SSH','Обновление Orchestra и Global с журналом этапов'],
   windows:'tools\\MysticEgo.CloudDesk\\run-windows.cmd',linux:'bash tools/MysticEgo.CloudDesk/run.sh'};
 
-const controlDesk={name:'ControlDesktop',icon:Server,tone:'control',description:'Локальный центральный сервер для разработки и тестирования.',features:['Запуск локальной Orchestra','Журнал и состояние сервисов'],windows:'MysticEgo.exe',linux:'./mysticego'};
 
 function AppCard({app,downloads,loading}:{app:typeof cloudDesk;downloads?:Downloads;loading:boolean}){
   const Icon=app.icon;
@@ -31,7 +30,7 @@ function AppCard({app,downloads,loading}:{app:typeof cloudDesk;downloads?:Downlo
     <div className="desktop-download-platforms">
       {(['windows','linux'] as const).map(platform=>{
         const direct=downloads?.[app.tone+'-'+platform];
-        const asset=direct??(app.tone==='control'?undefined:downloads?.[platform]);
+        const asset=direct??downloads?.[platform];
         const format=asset?.format??(direct?(platform==='windows'?'exe':'run'):'zip');
         const os=platform==='windows'?'Windows x64':'Linux x64';
         return <div key={platform}>
@@ -82,6 +81,5 @@ export function CloudDeskDownloads(){
       <p>Выберите установщик или резервный ZIP. CloudDesk поддерживает Windows 10/11 x64 и Linux x64. Windows-установщик включает клиентские инструменты SSH и GitHub CLI; в Linux нужны системные SSH, GitHub CLI и хранилище секретов.</p></header>
     {releases.error&&<p role="status">Не удалось получить ссылки. <button className="btn secondary" onClick={releases.reload}>Повторить</button></p>}
     <AppCard app={cloudDesk} downloads={releases.value??undefined} loading={releases.loading}/>
-    <AppCard app={controlDesk} downloads={releases.value??undefined} loading={releases.loading}/>
   </div>;
 }

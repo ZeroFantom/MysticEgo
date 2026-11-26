@@ -144,8 +144,7 @@ Auth обеспечивает управление доступом; схема 
 | AuditDesktop | Личный Audit | EXE | RUN |
 | AgentDesktop | Рабочая станция клуба | EXE | RUN |
 | LocalDesktop | Управление площадкой | EXE | RUN |
-| CloudDesk | Управление облаком | EXE | RUN |
-| ControlDesktop | Локальный центральный сервер | EXE | RUN |
+| CloudDesk | Локальный центр Auth/Orchestra и управление облаком | EXE | RUN |
 
 [Установка и системные зависимости](ops/desktop-releases/README.md).
 

@@ -15,15 +15,13 @@ for platform in linux-x64 win-x64; do
   unzip -q "$output/MysticEgo-CloudDesk-$platform.zip" -d "$dev"
   public="$public/$(basename "$root")"
   dev="$dev/$(basename "$root")"
-  for product in AuditDesktop AgentDesktop LocalDesktop ControlDesktop CloudDesk; do
+  for product in AuditDesktop AgentDesktop LocalDesktop CloudDesk; do
     stage=$public
     [[ $product != CloudDesk ]] || stage=$dev
-    if [[ $product == ControlDesktop ]]; then cp -a "$root/mysticego" "$public/mysticego"; fi
     case "$product" in
       AuditDesktop) linux='./audit-desktop'; win='runtime\electron\electron.exe desktop\station';;
       AgentDesktop) linux='./agent-desktop'; win='runtime\electron\electron.exe desktop\station --agent-desktop';;
       LocalDesktop) linux='./local-desktop'; win='runtime\electron\electron.exe desktop\local';;
-      ControlDesktop) linux='./mysticego'; win='runtime\electron\electron.exe desktop\control';;
       CloudDesk) linux='bash tools/MysticEgo.CloudDesk/run.sh'; win='call tools\MysticEgo.CloudDesk\run-windows.cmd';;
     esac
     name="MysticEgo-$product-$platform"

@@ -14,6 +14,6 @@ Assert(user["agent-linux"].FileName=="MysticEgo-AgentDesktop-linux-x64.run","rol
 Assert(!user.ContainsKey("local-windows"),"not uploaded ignored");
 Assert(user["windows"].Format=="zip"&&user["linux"].Tag=="v1","legacy compatibility");
 Assert(!user.ContainsKey("cloud-linux"),"no developer installers in public result");
-Assert(owner["cloud-linux"].Format=="run"&&owner["control-windows"].Format=="exe","developer products");
+Assert(owner["cloud-linux"].Format=="run"&&!owner.ContainsKey("control-windows"),"unified developer product; retired installer ignored");
 Assert(owner["linux"].Format=="zip","developer fallback");
 Console.WriteLine("Desktop download contracts passed");
