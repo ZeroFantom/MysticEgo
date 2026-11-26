@@ -171,6 +171,17 @@ try{
               await page.keyboard.press('Escape');await page.locator('.account-popover').waitFor({state:'hidden'});
               assert.equal(await trigger.getAttribute('aria-expanded'),'false');
             });
+            await check(page,prefix+'-overview',async()=>{
+              await page.goto(origin+'/',{waitUntil:'domcontentloaded'});
+              await visible(page.locator('.dashboard-hero'));
+              if(['orchestra','global','local'].includes(role))await visible(page.locator('.dashboard-network .network-card').first());
+              if(role==='orchestra')await visible(page.locator('.dashboard-monitor-grid .chart-gap-bridge').first());
+              for(const [theme,style] of combinations){
+                await switchAppearance(page,theme,style);
+                await noHorizontalOverflow(page);
+                await capture(page,prefix+'-overview-'+theme+'-'+style);
+              }
+            });
             if(role==='orchestra')for(const [route,selector] of [['profile','.profile-hero'],['nodes','.network-card'],['diagnostics','.chart-line'],['collective','.chat-thread']])await check(page,prefix+'-'+route,async()=>{
               await page.goto(origin+'/'+route,{waitUntil:'domcontentloaded'});await visible(page.locator(selector).first());
               if(route==='profile'){await page.getByRole('button',{name:'Оформление',exact:true}).click();await visible(page.getByRole('dialog',{name:'Оформление профиля'}));await capture(page,prefix+'-profile-dialog');await page.keyboard.press('Escape');await page.getByRole('dialog',{name:'Оформление профиля'}).waitFor({state:'hidden'})}
