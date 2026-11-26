@@ -116,7 +116,7 @@ async function checkArtwork(page,theme,style,selector,kind){
   assert(data.overview.includes(data.prefix+'-overview'));
   assert.deepEqual(data.overviewSize,theme==='light'&&style==='immersive'?[1916,821]:[2172,724]);
   assert.deepEqual(data.profileSize,[1916,821]);
-  if(kind==='header'||selector==='.dashboard-landscape')assert.equal(data.fit,'100% auto','Image must span the entire width');
+  if(kind==='header'||selector==='.dashboard-landscape')assert(['100%','100% auto'].includes(data.fit),'Image must span the entire width: '+data.fit);
   if(selector==='.dashboard-landscape')assert(Math.abs(data.ratio-data.overviewSize[0]/data.overviewSize[1])<.06,'Overview image box must preserve native proportions: '+data.ratio);
   if(theme==='light'){assert.equal(data.background,'#eae7ef');assert.equal(data.surface,'#f4f1f6')}
 
