@@ -191,13 +191,18 @@ def postgres(data):
         raise ValueError("Для localhost допустим CIDR 127.0.0.1/32.")
     if not bind.is_loopback and (network.prefixlen < 24 or not any(network.subnet_of(net) for net in RFC1918)):
         raise ValueError("Для VPN или частной сети укажите CIDR клиентов /24–/32.")
-    docker()
+    method = "native" if data.get("component") == "postgres-native" else "docker"
     directory = ROOT / "postgres"
     directory.mkdir(parents=True, exist_ok=True)
     config = directory / "network.json"
     network_config = [str(bind), str(network)]
+    mode_file = directory / "method"
+    previous = mode_file.read_text().strip() if mode_file.exists() else ("docker" if (directory / "compose.json").exists() else method)
+    if previous != method:
+        raise ValueError("Смена способа установки PostgreSQL требует отдельного переноса данных.")
     if config.exists() and json.loads(config.read_text()) != network_config:
         raise ValueError("PostgreSQL уже установлен с другой сетевой конфигурацией.")
+    atomic(mode_file, method + "\n")
     passwords = directory / "credentials.json"
     if passwords.exists():
         values = json.loads(passwords.read_text())
@@ -209,25 +214,39 @@ def postgres(data):
             values["auth"] = secret(data, "secret")
         atomic(passwords, json.dumps(values))
     atomic(config, json.dumps(network_config))
-    atomic(directory / "admin", values["admin"], 0o400, owner=999)
+    if method == "docker":
+        docker()
+        atomic(directory / "admin", values["admin"], 0o400, owner=999)
     atomic(directory / "pg_hba.conf", f"local all postgres peer\nlocal all all reject\nhost all all {network} scram-sha-256\n", 0o644)
-    compose = {"name": "mysticego-postgres", "services": {"db": {
-        "image": "postgres:17-bookworm", "network_mode": "host", "restart": "unless-stopped",
-        "environment": {"POSTGRES_PASSWORD_FILE": "/run/mysticego-password"},
-        "command": ["postgres", "-p", "55432", "-c", f"listen_addresses={bind}", "-c",
-                    "hba_file=/etc/mysticego-pg_hba.conf"],
-        "volumes": ["data:/var/lib/postgresql/data", "./admin:/run/mysticego-password:ro",
-                    "./pg_hba.conf:/etc/mysticego-pg_hba.conf:ro"]}}, "volumes": {"data": {}}}
-    atomic(directory / "compose.json", json.dumps(compose))
-    command = ("docker", "compose", "-f", str(directory / "compose.json"))
-    run(*command, "up", "-d")
-    for _ in range(30):
-        if subprocess.run((*command, "exec", "-T", "--user", "postgres", "db", "pg_isready",
-                           "-h", str(bind), "-p", "55432"), stdout=subprocess.DEVNULL).returncode == 0:
-            break
-        time.sleep(2)
+    if method == "docker":
+        compose = {"name": "mysticego-postgres", "services": {"db": {
+            "image": "postgres:17-bookworm", "network_mode": "host", "restart": "unless-stopped",
+            "environment": {"POSTGRES_PASSWORD_FILE": "/run/mysticego-password"},
+            "command": ["postgres", "-p", "55432", "-c", f"listen_addresses={bind}", "-c",
+                        "hba_file=/etc/mysticego-pg_hba.conf"],
+            "volumes": ["data:/var/lib/postgresql/data", "./admin:/run/mysticego-password:ro",
+                        "./pg_hba.conf:/etc/mysticego-pg_hba.conf:ro"]}}, "volumes": {"data": {}}}
+        atomic(directory / "compose.json", json.dumps(compose))
+        command = ("docker", "compose", "-f", str(directory / "compose.json"))
+        run(*command, "up", "-d")
+        for _ in range(30):
+            if subprocess.run((*command, "exec", "-T", "--user", "postgres", "db", "pg_isready",
+                               "-h", str(bind), "-p", "55432"), stdout=subprocess.DEVNULL).returncode == 0:
+                break
+            time.sleep(2)
+        else:
+            raise ValueError("PostgreSQL не запустился. Проверьте журнал контейнера.")
+        sql_command = (*command, "exec", "-T", "--user", "postgres", "db", "psql", "-p", "55432", "-d", "postgres", "-v", "ON_ERROR_STOP=1")
     else:
-        raise ValueError("PostgreSQL не запустился. Проверьте журнал контейнера.")
+        system_packages("postgresql-16", "postgresql-client-16")
+        cluster = Path("/etc/postgresql/16/mysticego")
+        if not cluster.exists():
+            run("pg_createcluster", "16", "mysticego", "--port=55432", "--start-conf=auto")
+        atomic(cluster / "pg_hba.conf", (directory / "pg_hba.conf").read_text(), 0o640, owner=pwd.getpwnam("postgres").pw_uid)
+        atomic(cluster / "conf.d/mysticego.conf", "port = 55432\nlisten_addresses = '" + str(bind) + "'\npassword_encryption = 'scram-sha-256'\n", 0o644)
+        run("systemctl", "enable", "postgresql.service")
+        run("pg_ctlcluster", "16", "mysticego", "restart")
+        sql_command = ("runuser", "-u", "postgres", "--", "psql", "-h", "/var/run/postgresql", "-p", "55432", "-d", "postgres", "-v", "ON_ERROR_STOP=1")
     setup = []
     for role in SERVICES:
         name = "mysticego_" + role
@@ -240,11 +259,10 @@ def postgres(data):
           (SELECT FROM pg_database WHERE datname='{name}') \\gexec""",
             f'REVOKE CONNECT ON DATABASE "{name}" FROM PUBLIC;'))
     # SQL may contain passwords. Only report whether provisioning succeeded.
-    if subprocess.run((*command, "exec", "-T", "--user", "postgres", "db", "psql", "-p", "55432",
-                       "-d", "postgres", "-v", "ON_ERROR_STOP=1"), input="\n".join(setup) + "\n",
+    if subprocess.run(sql_command, input="\n".join(setup) + "\n",
                       text=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         raise ValueError("Не удалось подготовить роли и базы PostgreSQL.")
-    say(f"PostgreSQL готов на {bind}:55432. Созданы отдельные базы и роли: " + ", ".join(SERVICES) + ".")
+    say(f"PostgreSQL ({method}) готов на {bind}:55432. Созданы отдельные базы и роли: " + ", ".join(SERVICES) + ".")
     say("Учётные данные: /opt/mysticego-infrastructure/postgres/credentials.json (root).")
 
 
@@ -257,6 +275,49 @@ def auth_postgres(data):
     connection = f"Host={host};Port=55432;Database=mysticego_auth;Username=mysticego_auth;Password={password};Timeout=5"
     atomic(STATE / "auth-postgres.connection", connection + "\n", owner=uid)
     say("PostgreSQL настроен для первого запуска Auth. SQLite на существующих узлах сохранён.")
+
+
+def prepare_postgres(data):
+    role = data.get("role")
+    if role not in SERVICES or role == "world_ai":
+        raise ValueError("Выберите роль панели или Auth.")
+    if (STATE / "center-id.txt").exists() or (STATE / "auth.db").exists() or (STATE / "auth.db-wal").exists() or (STATE / "orchestra-identity.json").exists() or (STATE / role / "node.db").exists() or (STATE / role / "node.db.audit.db").exists():
+        raise ValueError("Обнаружены данные действующего узла. Нужна отдельная миграция.")
+    host = private_ip(data.get("bind") or "127.0.0.1")
+    supplied = data.get("secret")
+    if supplied:
+        password = secret(data, "secret")
+    elif host.is_loopback:
+        credentials = ROOT / "postgres/credentials.json"
+        if not credentials.is_file():
+            raise ValueError("Укажите пароль роли или сначала установите PostgreSQL на этом VPS.")
+        password = json.loads(credentials.read_text())[role]
+        if not HEX.fullmatch(password):
+            raise ValueError("Некорректный файл учётных данных.")
+    else:
+        raise ValueError("Для удалённой базы требуется пароль её отдельной роли.")
+    if not host.is_loopback and data.get("url") != "private-vpn":
+        raise ValueError("Удалённое подключение разрешено только по подтверждённой защищённой частной сети/VPN. Для SSH-туннеля используйте loopback.")
+    name = "mysticego_" + role
+    if not shutil.which("psql"):
+        system_packages("postgresql-client-16")
+    result = subprocess.run(("psql", "-X", "-h", str(host), "-p", "55432", "-U", name, "-d", name, "-At", "-v", "ON_ERROR_STOP=1",
+                             "-c", "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'"),
+                            env={**os.environ, "PGPASSWORD": password, "PGCONNECT_TIMEOUT": "5", "PGSSLMODE": "disable"},
+                            capture_output=True, text=True, timeout=15)
+    if result.returncode:
+        raise ValueError("Не удалось подключиться к PostgreSQL. Проверьте сеть, CIDR и пароль роли.")
+    if result.stdout.strip() != "0":
+        raise ValueError("В базе уже есть таблицы. Для нового узла используйте отдельную пустую базу; повторное подключение требует явного восстановления.")
+    directory = Path("/etc/mysticego/database-staging")
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(directory, 0o700)
+    connection = f"Host={host};Port=55432;Database={name};Username={name};Password={password};Timeout=5;SSL Mode=Disable"
+    target = directory / (role + "-postgres.connection")
+    if target.exists() and target.read_text().strip() != connection:
+        raise ValueError("Роль уже подготовлена с другими параметрами; измените настройки вручную после проверки.")
+    atomic(target, connection + "\n")
+    say(f"Подготовлено подключение {role} к PostgreSQL {host}:55432. Пароль сохранён только на целевом VPS.")
 
 
 def lmstudio(data):
@@ -382,7 +443,7 @@ def install_runner(_):
 def main():
     data = json.loads(Path("request.json").read_text())
     actions = {"docker": lambda _: docker(), "metrics-source": metrics_source, "monitoring": monitoring,
-               "postgres": postgres, "auth-postgres": auth_postgres, "lmstudio": lmstudio, "model-connect": model_connect, "web-runner": install_runner}
+               "postgres": postgres, "postgres-native": postgres, "prepare-postgres": prepare_postgres, "auth-postgres": auth_postgres, "lmstudio": lmstudio, "model-connect": model_connect, "web-runner": install_runner}
     action = actions.get(data.get("component"))
     if not action:
         raise ValueError("Неизвестный компонент.")
