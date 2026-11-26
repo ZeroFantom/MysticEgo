@@ -9,7 +9,7 @@ namespace MysticEgo.Api.Orchestra.Controllers;
 
 [ApiController, Authorize(Policy = "operator"), Route("api/v1/collective")]
 public sealed class CollectiveController(
-    SocialService social, ISocialAccessPolicy access, ISoulService souls, IConfiguration config, NodeState state) : ControllerBase
+    SocialService social, ISocialAccessPolicy access, ISoulService souls, IConfiguration config, NodeState state, CollectiveVoice voice) : ControllerBase
 {
     private Guid Actor() => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
     private string Nickname => User.FindFirstValue("nickname") ?? User.Identity?.Name ?? "Игрок";
@@ -95,7 +95,7 @@ public sealed class CollectiveController(
             {
                 friend.Id, friend.Status, incoming = friend.Recipient == id, person = Card(partner),
                 last = friend.Status == "accepted" && latest.TryGetValue(partner.Id.ToString(), out var message)
-                    ? new { message.Text, message.At, message.StickerId, mine = message.Sender == id }
+                    ? new { message.Text, message.At, message.StickerId, voice = message.VoiceMime is not null, mine = message.Sender == id }
                     : null
             });
         }
@@ -129,8 +129,82 @@ public sealed class CollectiveController(
             var sticker = await state.Data.GetAsync<Sticker>(id, ct);
             if (sticker is not { Saved: true } || sticker.Owner != Actor()) return NotFound();
         }
-        return await Run(() => social.SendMessage(Actor().ToString(), new(peer.ToString(), input.Text ?? "", input.StickerId), ct));
+        return await Run(() => social.SendMessage(Actor().ToString(), new(peer.ToString(), input.Text ?? "", input.StickerId, input.ReplyToId), ct));
     }
+
+    [HttpPut("messages/{id:guid}")]
+    public Task<IActionResult> EditMessage(Guid id, ChatInput input, CancellationToken ct) =>
+        Run(() => social.EditMessage(Actor().ToString(), id, input.Text, ct));
+
+    [HttpDelete("messages/{id:guid}")]
+    public Task<IActionResult> DeleteMessage(Guid id, CancellationToken ct) => Run(async () =>
+    {
+        var message = await social.DeleteMessage(Actor().ToString(), id, ct);
+        voice.Delete(id);
+        return message;
+    });
+
+    [HttpPost("messages/{id:guid}/forward")]
+    public Task<IActionResult> Forward(Guid id, ContactInput input, CancellationToken ct) => Run(async () =>
+    {
+        var actor = Actor().ToString();
+        var source = await social.OpenMessage(actor, id, ct);
+        var copy = Guid.NewGuid();
+        try
+        {
+            if (source.VoiceMime is not null)
+            {
+                await using var audio = voice.Open(id);
+                await voice.Save(copy, audio, ct);
+            }
+            return await social.ForwardMessage(actor, input.Id.ToString(), copy, source, ct);
+        }
+        catch
+        {
+            voice.Delete(copy);
+            throw;
+        }
+    });
+
+    [HttpPost("voice/{peer:guid}"), RequestSizeLimit(CollectiveVoice.MaxBytes)]
+    public Task<IActionResult> SendVoice(Guid peer, [FromQuery] Guid? replyTo, CancellationToken ct) => Run(async () =>
+    {
+        var id = Guid.NewGuid();
+        try
+        {
+            var mime = await voice.Save(id, Request.Body, ct);
+            return await social.SendVoice(Actor().ToString(), peer.ToString(), id, mime, replyTo, ct);
+        }
+        catch
+        {
+            voice.Delete(id);
+            throw;
+        }
+    });
+
+    [HttpGet("voice/{id:guid}")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> Voice(Guid id, CancellationToken ct)
+    {
+        try
+        {
+            var message = await social.OpenMessage(Actor().ToString(), id, ct);
+            if (message.VoiceMime is null) return NotFound();
+            Response.Headers["X-Content-Type-Options"] = "nosniff";
+            return File(voice.Open(id), message.VoiceMime);
+        }
+        catch (NodeApiException ex) { return StatusCode(ex.StatusCode, new { error = ex.Message }); }
+    }
+
+    [HttpPost("voice/{id:guid}/transcript")]
+    public Task<IActionResult> Transcript(Guid id, CancellationToken ct) => Run(async () =>
+    {
+        var actor = Actor().ToString();
+        var message = await social.OpenMessage(actor, id, ct);
+        if (message.VoiceMime is null) throw new NodeApiException(404, "Аудио не найдено.");
+        if (message.Transcript is not null) return message;
+        return await social.SaveTranscript(actor, id, await voice.Transcribe(message, ct), ct);
+    });
 
     [HttpGet("notifications")]
     public Task<IActionResult> Notifications(CancellationToken ct) =>
@@ -175,7 +249,7 @@ public sealed class CollectiveController(
         catch (InvalidOperationException error) { return Conflict(new { error = error.Message }); }
     }
 
-    private static object Card(SocialProfile x) => new { x.Id, x.DisplayName, nickname = x.GameNickname, x.AvatarUrl, x.Accent };
+    private static object Card(SocialProfile x) => new { x.Id, x.DisplayName, nickname = x.GameNickname, x.AvatarUrl, x.Accent, x.StatusText };
     private async Task<IActionResult> Run<T>(Func<Task<T>> action)
     {
         try { return Ok(await action()); }
@@ -184,5 +258,5 @@ public sealed class CollectiveController(
 
     public sealed record PersonalityAnswers(string Version, bool Consent, Dictionary<string, int> Answers);
     public sealed record ContactInput(Guid Id);
-    public sealed record ChatInput(string? Text, Guid? StickerId = null);
+    public sealed record ChatInput(string? Text, Guid? StickerId = null, Guid? ReplyToId = null);
 }

@@ -18,6 +18,7 @@ public sealed class SocialProfile
     public string GameNickname {get;set;}="";
     public string Login {get;set;}="";
     public string Bio {get;set;}="";
+    public string StatusText { get; set; } = "";
     public string AvatarUrl {get;set;}="";
     public string BackgroundUrl {get;set;}="";
     public string CoverUrl {get;set;}="";
@@ -43,6 +44,12 @@ public sealed class SocialMessage
     [EntityField(Required=true)]public string Recipient {get;set;}="";
     [EntityField(Required=true)]public string Text {get;set;}="";
     public Guid? StickerId { get; set; }
+    public Guid? ReplyToId { get; set; }
+    public bool Forwarded { get; set; }
+    public DateTimeOffset? EditedAt { get; set; }
+    public DateTimeOffset? DeletedAt { get; set; }
+    public string? VoiceMime { get; set; }
+    public string? Transcript { get; set; }
     public DateTimeOffset At {get;set;}=DateTimeOffset.UtcNow;
 }
 [Entity("mysticego.social.notification",version:1)]
@@ -80,7 +87,7 @@ public sealed class RoleAppearance
 }
 public sealed record RoleAppearanceEdit(string RoleCode,string Label,string Color);
 
-public sealed record ProfileEdit(string DisplayName,string Bio,string? AvatarUrl,string? BackgroundUrl,string? CoverUrl,string? Accent,bool Discoverable=false);
+public sealed record ProfileEdit(string DisplayName,string Bio,string? AvatarUrl,string? BackgroundUrl,string? CoverUrl,string? Accent,bool Discoverable=false,string? StatusText=null);
 public sealed record FriendEdit(string Recipient);
-public sealed record MessageEdit(string Recipient,string Text,Guid? StickerId = null);
+public sealed record MessageEdit(string Recipient,string Text,Guid? StickerId = null,Guid? ReplyToId = null);
 

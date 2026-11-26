@@ -11,6 +11,12 @@ builder.Services.AddWorldAi();
 builder.Services.AddWorldAiQueue();
 builder.Services.AddControllers().AddApplicationPart(typeof(WorldAiController).Assembly);
 builder.Services.AddHttpClient();
+builder.Services.AddScoped<MysticEgo.Api.Orchestra.Controllers.CollectiveVoice>();
+builder.Services.AddHttpClient("voice-transcription", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(100);
+    client.MaxResponseContentBufferSize = 131072;
+}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 builder.Services.AddHttpClient("mysticego-timeweb").ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseProxy = false });
 builder.Services.AddSingleton<StationRegistry>();
 builder.Services.AddSingleton<NativeDeploymentJobs>();

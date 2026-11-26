@@ -139,12 +139,13 @@ export function ProfilePage(){
       <div className="profile-identity"><ProfileAvatar url={profile.avatarUrl} name={name} large/><div>
         <h2>{name}</h2><p>{game.nickname===name?'Ether and Chaos':game.nickname}</p>
       </div></div>
+      {profile.statusText&&<p className="social-status">{profile.statusText}</p>}
       {profile.bio&&<p className="profile-bio">{profile.bio}</p>}
       <div className="profile-facts">
         <div className="game-rank"><Shield size={20}/><span>Ранг</span><strong>{game.rank}</strong></div>
         <div><Layers3 size={18}/><span>Уровень</span><strong>{game.level}</strong></div>
         <div><Clock3 size={18}/><span>Срок жизни</span><strong>{game.immortal?'Бессмертен':game.expiresAt?new Date(game.expiresAt).toLocaleDateString('ru-RU'):'По правилам мира'}</strong></div>
-        <div><Sparkles size={18}/><span>Статус</span><strong>{game.state==='EgoShard'?'Осколок Эго':game.state}</strong></div>
+        <div><Sparkles size={18}/><span>Статус персонажа</span><strong>{game.state==='EgoShard'?'Осколок Эго':game.state}</strong></div>
       </div>
       {progress&&<div className="xp-track">
         <div><strong>{number(progress.experience)} XP</strong><span>{progress.toNext?number(progress.inLevel)+' / '+number(progress.toNext)+' · '+number(progress.percent)+'%':'Максимальный уровень'}</span></div>
@@ -181,6 +182,7 @@ export function ProfilePage(){
     {draft&&<div className="modal-shade" onClick={()=>!busy&&setDraft(null)}><section className="modal" role="dialog" aria-modal="true" aria-label="Оформление профиля" onClick={event=>event.stopPropagation()}>
       <h2>Оформление профиля</h2><form className="stack" onSubmit={save}>
         <label>Отображаемое имя<input maxLength={60} value={draft.displayName} onChange={event=>update('displayName',event.target.value)}/></label>
+        <label>Статус<input maxLength={100} value={draft.statusText??''} placeholder="Например, «На связи после 18:00»" onChange={event=>update('statusText',event.target.value)}/></label>
         <label>О себе<textarea rows={3} maxLength={600} value={draft.bio} onChange={event=>update('bio',event.target.value)}/></label>
         {([['avatarUrl','Аватар'],['coverUrl','Баннер профиля и панели'],['backgroundUrl','Фон профиля']] as const).map(([key,label])=>
           <label key={key}>{label}<input type="url" placeholder="https://…" value={draft[key]} onChange={event=>update(key,event.target.value)}/></label>)}

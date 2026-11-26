@@ -37,8 +37,9 @@ button.chat-thread:active {transform:scale(.98)}
 .chat-room .chat-message.mine {background:color-mix(in srgb,var(--chat-accent) 23%,var(--surface));border-color:color-mix(in srgb,var(--chat-accent) 36%,var(--line))}
 .chat-room .chat-jump {position:absolute; inset:auto 1rem 5.4rem auto; box-shadow:0 4px 20px #0004}
 .chat-room .chat-compose {padding:.5rem;min-width:0;gap:.28rem}
-.chat-room .chat-compose textarea {min-width:0; border-radius:15px}
+.chat-room .chat-compose textarea {min-width:0; border-radius:15px;grid-column:-3}
 .chat-room .chat-compose button.btn {border-radius:50%; padding:.65rem; aspect-ratio:1}
+.chat-room .chat-compose>button.btn {grid-column:-2}
 .chat-room .chat-back {display:none}
 @keyframes mystic-message-in {from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:translateY(0)}}
 @media (max-width:760px){
@@ -51,4 +52,40 @@ button.chat-thread:active {transform:scale(.98)}
 }
 @media (prefers-reduced-motion:reduce){
   .mystic-chats *, .mystic-chats .chat-room, .chat-room .chat-message{animation:none!important;transition:none!important}
+}
+
+.social-status {margin:.2rem 0 0;color:var(--muted);font-size:.86rem;overflow-wrap:anywhere}
+.chat-heading {min-width:0}
+.chat-heading h2 {margin:0}
+.chat-message-meta,.chat-message-footer small {color:var(--muted);font-size:.75rem}
+.chat-message-footer {display:flex;align-items:center;justify-content:end;gap:.35rem}
+.chat-actions {position:relative}
+.chat-actions .icon-btn {width:26px;height:24px;min-width:26px;min-height:24px;padding:0}
+.chat-action-menu {display:grid;position:absolute;inset:auto 0 calc(100% + 4px) auto;z-index:3;
+  min-width:8.5rem;padding:.3rem;background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  box-shadow:0 8px 26px #0003}
+.chat-message:not(.mine) .chat-action-menu {inset-inline:0 auto}
+.chat-action-menu button,.chat-quote {color:var(--ink);text-align:start;background:none;border:0;padding:.35rem .55rem;border-radius:7px}
+.chat-action-menu button:hover,.chat-quote:hover {background:var(--raised)}
+.chat-quote {display:block;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+  border-inline-start:2px solid var(--chat-accent);font:inherit;font-size:.82rem}
+.chat-suggestion.chat-compose-context {display:flex;align-items:center;justify-content:space-between}
+.chat-compose-context p {overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chat-compose-context div {min-width:0}
+.chat-forward label {min-width:0;display:grid;gap:.25rem;flex:1}
+.chat-forward select {width:100%;min-width:0}
+.chat-room .chat-compose {display:grid;grid-template-columns:repeat(4,auto) minmax(0,1fr) auto}
+.chat-room .chat-compose[data-editing=true] {grid-template-columns:repeat(3,auto) minmax(0,1fr) auto}
+.chat-recording {color:#df5f75}
+.chat-voice-record:has(.voice-draft) {grid-column:1/-1;grid-row:1}
+.voice-draft,.voice-message {display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;min-width:0}
+.voice-draft audio,.voice-message audio {height:36px;width:min(16rem,100%)}
+.voice-message .voice-transcript {width:100%;overflow-wrap:anywhere}
+.chat-room .chat-compose .voice-draft .btn {aspect-ratio:auto;border-radius:10px;padding:.35rem .55rem}
+@media(max-width:500px){
+  .chat-room .chat-compose,.chat-room .chat-compose[data-editing=true] {grid-template-columns:repeat(4,auto) minmax(0,1fr) auto}
+  .chat-room .chat-compose textarea {grid-column:1/-2;grid-row:2}
+  .chat-room .chat-compose>button.btn {grid-column:-2;grid-row:2}
+  .chat-voice-record:has(.voice-draft) {grid-row:3}
+  .chat-message-footer time {white-space:nowrap}
 }
