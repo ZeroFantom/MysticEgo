@@ -9,10 +9,10 @@ import {chartGeometry,smoothEdges,gapPath,isMeasurement as valid,type SamplePoin
 type Sample={at:string;cpuPercent:number;memoryBytes:number;managedBytes:number;memoryLimitBytes:number;rxBytesPerSecond:number;txBytesPerSecond:number;
   diskFreeBytes:number;diskTotalBytes:number;uptimeSeconds:number;hostCpuPercent?:number;hostMemoryUsedBytes?:number;hostMemoryTotalBytes?:number};
 type Connection={from:string;to:string;name:string;parentName:string;online:boolean;measurement?:{latencyMs?:number;mbps?:number;measuredAt:string}};
-type Telemetry={os:string;processors:number;samples:Sample[];links:Connection[];observabilityAvailable:boolean;audit?:{enrolled:number;online:number}};
+export type Telemetry={os:string;processors:number;samples:Sample[];links:Connection[];observabilityAvailable:boolean;audit?:{enrolled:number;online:number}};
 const format=(value:number)=>new Intl.NumberFormat('ru',{maximumFractionDigits:1}).format(value);
 const mib=(value:number)=>format(value/1048576)+' МиБ';
-function ResourceChart({points,formatValue,maximum,label,start,end}:{points:Point[];formatValue:(v:number)=>string;maximum?:number;label:string;start:number;end:number}){
+export function ResourceChart({points,formatValue,maximum,label,start,end}:{points:Point[];formatValue:(v:number)=>string;maximum?:number;label:string;start:number;end:number}){
   const id='telemetry-'+useId().replace(/[^a-zA-Z0-9_-]/g,'-');
   const actual=points.filter(p=>valid(p.value)&&Number.isFinite(Date.parse(p.at)));
   if(!actual.length)return <div className="chart-loading">Нет доступных замеров</div>;
