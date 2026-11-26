@@ -1,9 +1,10 @@
-import {useState} from 'react';
+import {useId,useState} from 'react';
 import {Activity,Cpu,HardDrive,MemoryStick,Network} from 'lucide-react';
 import {useApp,useRemote} from '../app/context';
 import {Header,Panel,Badge,ErrorBanner} from '../components/primitives';
 import {InfrastructureSetup} from './InfrastructureSetup';
 import './monitoring.css';
+import {chartGeometry,smoothEdges,gapPath,isMeasurement as valid,type SamplePoint as Point} from './telemetryGeometry';
 
 type Sample={at:string;cpuPercent:number;memoryBytes:number;managedBytes:number;memoryLimitBytes:number;rxBytesPerSecond:number;txBytesPerSecond:number;
   diskFreeBytes:number;diskTotalBytes:number;uptimeSeconds:number;hostCpuPercent?:number;hostMemoryUsedBytes?:number;hostMemoryTotalBytes?:number};
@@ -11,31 +12,50 @@ type Connection={from:string;to:string;name:string;parentName:string;online:bool
 type Telemetry={os:string;processors:number;samples:Sample[];links:Connection[];observabilityAvailable:boolean;audit?:{enrolled:number;online:number}};
 const format=(value:number)=>new Intl.NumberFormat('ru',{maximumFractionDigits:1}).format(value);
 const mib=(value:number)=>format(value/1048576)+' МиБ';
-type Point={at:string;value:number|null|undefined};
-const valid=(value:unknown):value is number=>typeof value==='number'&&Number.isFinite(value)&&value>=0;
 function ResourceChart({points,formatValue,maximum,label,start,end}:{points:Point[];formatValue:(v:number)=>string;maximum?:number;label:string;start:number;end:number}){
+  const id='telemetry-'+useId().replace(/[^a-zA-Z0-9_-]/g,'-');
   const actual=points.filter(p=>valid(p.value)&&Number.isFinite(Date.parse(p.at)));
   if(!actual.length)return <div className="chart-loading">Нет доступных замеров</div>;
   const top=Math.max(1,valid(maximum)?maximum:0,...actual.map(p=>p.value!));
   const width=420,height=112;
-  const x=(at:string)=>Math.max(0,Math.min(width,(Date.parse(at)-start)/Math.max(1,end-start)*width));
-  const y=(value:number)=>height-5-(height-10)*value/top;
-  const segments:{x:number;y:number}[][]=[];
-  let lastAt:number|undefined;
-  for(const point of points){
-    const at=Date.parse(point.at);
-    if(!valid(point.value)||!Number.isFinite(at)){lastAt=undefined;continue}
-    if(lastAt===undefined||at-lastAt>15000)segments.push([]);
-    segments[segments.length-1].push({x:x(point.at),y:y(point.value)});
-    lastAt=at;
-  }
-  return <div className="resource-plot">
-    <div className="chart-scale"><span>{formatValue(top)}</span><span>{formatValue(top/2)}</span><span>{formatValue(0)}</span></div>
-    <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label={label+' — реальные замеры во времени'}>
-      {[5,56,107].map(y=><path key={y} d={`M 0 ${y} H ${width}`} className="chart-gridline"/>)}
-      {segments.map((segment,index)=>segment.length===1?<circle key={index} cx={segment[0].x} cy={segment[0].y} r={3} fill="currentColor"/>:
-        <g key={index}><polygon points={`${segment[0].x},${height} ${segment.map(p=>p.x+','+p.y).join(' ')} ${segment.at(-1)!.x},${height}`}/><polyline points={segment.map(p=>p.x+','+p.y).join(' ')}/></g>)}
-    </svg>
+  const {segments,gaps}=chartGeometry(points,start,end,top,width,height);
+  const latest=segments.at(-1)?.at(-1);
+  const trailing=latest&&end-latest.at>15000;
+  const leading=segments[0]?.[0]&&segments[0][0].at-start>15000;
+  return <div className="telemetry-chart">
+    <div className="resource-plot">
+      <div className="chart-scale"><span>{formatValue(top)}</span><span>{formatValue(top/2)}</span><span>{formatValue(0)}</span></div>
+      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label={label+' — реальные замеры во времени; янтарные пунктирные переходы обозначают отсутствие измерений'}>
+        <defs>
+          <linearGradient id={id+'-area'} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="currentColor" stopOpacity=".22"/><stop offset="100%" stopColor="currentColor" stopOpacity="0"/>
+          </linearGradient>
+          {gaps.map(gap=><linearGradient key={gap.from.at+'-'+gap.to.at} id={id+'-gap-'+gap.from.at+'-'+gap.to.at} gradientUnits="userSpaceOnUse" x1={gap.from.x} y1="0" x2={gap.to.x} y2="0">
+            <stop offset="0%" stopColor="currentColor"/><stop offset="22%" stopColor="var(--chart-gap-color)"/><stop offset="78%" stopColor="var(--chart-gap-color)"/><stop offset="100%" stopColor="currentColor"/>
+          </linearGradient>)}
+        </defs>
+        {[5,56,107].map(y=><path key={y} d={`M 0 ${y} H ${width}`} className="chart-gridline"/>)}
+        {leading&&<rect x="0" y="5" width={segments[0][0].x} height={height-10} className="chart-gap-region"/>}
+        {trailing&&<rect x={latest.x} y="5" width={width-latest.x} height={height-10} className="chart-gap-region"/>}
+        {gaps.map(gap=><rect key={'region-'+gap.from.at+'-'+gap.to.at} x={gap.from.x} y="5" width={gap.to.x-gap.from.x} height={height-10} className="chart-gap-region"/>)}
+        {segments.map(segment=>{
+          const first=segment[0],last=segment.at(-1)!;
+          const edges=smoothEdges(segment);
+          const begin=`M ${first.x} ${first.y}`;
+          const newest=last.at===latest?.at;
+          const animate=newest&&edges.length>0;
+          const area=begin+' '+edges.map(edge=>edge.command).join(' ')+` L ${last.x} ${height} L ${first.x} ${height} Z`;
+          return <g key={first.at}>
+            {edges.length>0&&<path d={area} fill={`url(#${id}-area)`}/>}
+            {edges.length>0&&<path className="chart-line" d={begin+' '+(animate?edges.slice(0,-1):edges).map(edge=>edge.command).join(' ')}/>}
+            {animate&&<path key={last.at} className="chart-line chart-new-edge" pathLength={1} d={`M ${edges.at(-1)!.from.x} ${edges.at(-1)!.from.y} ${edges.at(-1)!.command}`}/>}
+            {edges.length===0&&<circle className={newest?'chart-new-point':''} cx={first.x} cy={first.y} r={2.5} fill="currentColor"/>}
+          </g>;
+        })}
+        {gaps.map(gap=><path key={gap.from.at+'-'+gap.to.at} className="chart-gap-bridge" d={gapPath(gap)} stroke={`url(#${id}-gap-${gap.from.at}-${gap.to.at})`}><title>Нет замеров: {new Date(gap.from.at).toLocaleTimeString('ru-RU')} — {new Date(gap.to.at).toLocaleTimeString('ru-RU')}</title></path>)}
+      </svg>
+    </div>
+    <div className="chart-data-legend"><span><i className="chart-legend-solid"/>Замеры</span><span><i className="chart-legend-gap"/>Нет данных · условный переход</span></div>
   </div>;
 }
 export function Diagnostics(){
