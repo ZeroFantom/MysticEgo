@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const read=p=>readFileSync(new URL('../packages/ui/src/pages/'+p,import.meta.url),'utf8');
+const diagnostics=read('Diagnostics.tsx'),network=read('Network.tsx'),agents=read('Agents.tsx'),css=read('monitoring.css');
+assert(diagnostics.includes('Date.parse(at)-start')&&diagnostics.includes('at-lastAt>15000'));
+assert(diagnostics.includes('lastAt=undefined;continue')&&diagnostics.includes('segment.length===1'));
+assert(diagnostics.includes('Date.parse(s.at)>=start')&&diagnostics.includes('data-stale={stale}'));
+assert(network.includes('row.node.enabled&&')&&network.includes('data-node-state={nodeState(row)}'));
+assert(network.includes("topology.value?tile.count:topology.loading?'…':'—'"));
+assert(network.includes('if(!visited.has(child.node.id))')&&network.includes('item.node.id!==root'));
+assert(network.includes("'--network-zoom':zoom/100")&&css.includes('zoom:var(--network-zoom,1)'));
+assert(network.includes('min={50} max={200}')&&network.includes('value={name??selected.node.name}'));
+assert(agents.includes('!filtered.length')&&agents.includes('a.host??'));
+assert(css.includes('prefers-reduced-motion:reduce')&&css.includes('data-ui-motion=off'));
+console.log('Monitoring source contracts: timestamps, gaps, state, zoom, search and motion');
