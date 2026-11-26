@@ -29,11 +29,11 @@
 :root[data-ui-motion=off] :is(.settings,.floating-controls) *,:root[data-ui-motion=off] .settings{animation:none!important;transition:none!important}
 @media(prefers-reduced-motion:reduce){:root[data-interface] :is(.settings,.floating-controls) *,:root[data-interface] .settings{animation:none!important;transition:none!important}}
 
-:root[data-interface=immersive][data-theme=dark]{--overlay-art:url("../../control/appearance-art/immersive-dark-hero.webp")}
-:root[data-interface=immersive][data-theme=light]{--overlay-art:url("../../control/appearance-art/immersive-light-hero.webp")}
-:root[data-interface=simplified][data-theme=dark]{--overlay-art:url("../../control/appearance-art/simplified-dark-hero.webp")}
-:root[data-interface=simplified][data-theme=light]{--overlay-art:url("../../control/appearance-art/simplified-light-hero.webp")}
-:root[data-interface] .settings{background:linear-gradient(90deg,var(--overlay-surface) 45%,transparent 220%),var(--overlay-art) right top/auto 85px no-repeat,var(--overlay-surface)}
+:root[data-interface=immersive][data-theme=dark]{--overlay-art:url("../../control/appearance-art/immersive-dark-header.webp")}
+:root[data-interface=immersive][data-theme=light]{--overlay-art:url("../../control/appearance-art/immersive-light-header.webp")}
+:root[data-interface=simplified][data-theme=dark]{--overlay-art:url("../../control/appearance-art/simplified-dark-header.webp")}
+:root[data-interface=simplified][data-theme=light]{--overlay-art:url("../../control/appearance-art/simplified-light-header.webp")}
+:root[data-interface] .settings{background:linear-gradient(90deg,var(--overlay-surface) 45%,transparent 220%),var(--overlay-art) right top/100% auto no-repeat,var(--overlay-surface)}
 
 /* Keep the transparent avatar stage unchanged; refine only its control surfaces. */
 :root[data-interface] .floating-controls button{border-radius:50%;min-width:30px;min-height:30px;display:grid;place-items:center;transition:background-color var(--mystic-time),color var(--mystic-time),scale var(--mystic-time)}

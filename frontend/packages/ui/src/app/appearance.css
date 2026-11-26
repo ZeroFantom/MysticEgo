@@ -133,3 +133,21 @@
  :root[data-interface] .mystic-share{background-image:linear-gradient(130deg,var(--mystic-veil),transparent 150%),var(--mystic-entry-art)}
  :root[data-interface] .studio-site :is(.studio-hero,.developer-hero),:root[data-interface] .desktop-download-hero{background-image:linear-gradient(90deg,var(--mystic-veil),transparent 160%),var(--mystic-entry-art)}
 }
+
+/* Purpose-built narrow compositions. */
+:root[data-interface="simplified"][data-theme="dark"]{--mystic-header-art:url("./appearance-art/simplified-dark-header.webp");--mystic-sidebar-art:url("./appearance-art/simplified-dark-sidebar.webp")}
+:root[data-interface="simplified"][data-theme="light"]{--mystic-header-art:url("./appearance-art/simplified-light-header.webp");--mystic-sidebar-art:url("./appearance-art/simplified-light-sidebar.webp")}
+:root[data-interface="immersive"][data-theme="dark"]{--mystic-header-art:url("./appearance-art/immersive-dark-header.webp");--mystic-sidebar-art:url("./appearance-art/immersive-dark-sidebar.webp")}
+:root[data-interface="immersive"][data-theme="light"]{--mystic-header-art:url("./appearance-art/immersive-light-header.webp");--mystic-sidebar-art:url("./appearance-art/immersive-light-sidebar.webp")}
+:root[data-interface] .mystic-workspace .orchestral-topbar:not([style*="url"]){
+ background:linear-gradient(90deg,var(--mystic-surface) 12%,var(--mystic-veil) 34%,transparent 100%),var(--mystic-header-art) right center/contain no-repeat,var(--mystic-surface)
+}
+:root[data-interface] .mystic-workspace .sidebar{
+ background:linear-gradient(180deg,var(--mystic-surface) 16%,var(--mystic-veil) 42%,transparent 100%),var(--mystic-sidebar-art) center bottom/contain no-repeat,var(--mystic-surface)
+}
+:root[data-interface=simplified] .mystic-workspace .sidebar{
+ background:linear-gradient(180deg,var(--mystic-surface) 45%,var(--mystic-veil) 68%,transparent 160%),var(--mystic-sidebar-art) center bottom/contain no-repeat,var(--mystic-surface)
+}
+@media(max-width:650px){
+ :root[data-interface] .mystic-workspace .orchestral-topbar:not([style*="url"]){background-image:linear-gradient(90deg,var(--mystic-surface) 20%,var(--mystic-veil) 55%,transparent 150%),var(--mystic-art)}
+}
