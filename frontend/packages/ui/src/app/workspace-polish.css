@@ -1,0 +1,78 @@
+/* Shared workspace refinement. Keep artwork decorative, and controls native. */
+:root[data-interface]{
+  --workspace-radius:14px;
+  --workspace-control-radius:10px;
+  --workspace-touch:44px;
+  --workspace-motion:180ms;
+}
+:root[data-interface] .mystic-workspace .main{min-width:0;max-width:100%}
+:root[data-interface] .mystic-workspace .brand-mark{flex:none;aspect-ratio:1}
+:root[data-interface] .mystic-workspace .brand-mark img{object-fit:contain;object-position:center}
+:root[data-interface] .mystic-workspace .page-header>div:first-child{flex:1;min-width:0;overflow-wrap:anywhere}
+:root[data-interface] .mystic-workspace .page-header h1{font-size:clamp(24px,2.5vw,32px);line-height:1.16;letter-spacing:-.035em}
+:root[data-interface] .mystic-workspace .page-header p{max-width:72ch;line-height:1.55}
+:root[data-interface] .mystic-workspace :is(.panel,.metric,.network-card,.deployment-node){border-radius:var(--workspace-radius)}
+:root[data-interface] .mystic-workspace :is(.panel-title,.row-actions,.line){min-width:0}
+:root[data-interface] .mystic-workspace .panel-title h2{min-width:0;overflow-wrap:anywhere;line-height:1.35}
+:root[data-interface] .mystic-workspace .metric-value{overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+:root[data-interface] .mystic-workspace .table-wrap{max-width:100%;overscroll-behavior-inline:contain}
+:root[data-interface] .mystic-workspace .quick-action{
+  min-width:0;background:var(--mystic-surface);color:var(--mystic-ink);border-color:var(--mystic-line);
+  border-radius:var(--workspace-radius);box-shadow:none;min-height:72px;
+  transition:background-color var(--workspace-motion) ease,border-color var(--workspace-motion) ease,box-shadow var(--workspace-motion) ease,translate var(--workspace-motion) ease;
+}
+:root[data-interface] .mystic-workspace .quick-action>span{min-width:0;overflow-wrap:anywhere}
+:root[data-interface] .mystic-workspace .quick-action>svg:first-child{color:var(--mystic-primary);flex:none}
+:root[data-interface] .mystic-workspace .quick-action small{color:var(--mystic-muted);line-height:1.4}
+:root[data-interface=immersive] .mystic-workspace .quick-action{background:linear-gradient(135deg,color-mix(in srgb,var(--mystic-surface) 94%,var(--mystic-primary)),var(--mystic-surface) 75%)}
+@media(hover:hover) and (pointer:fine){
+  :root[data-interface] .mystic-workspace .quick-action:hover{border-color:var(--mystic-primary);translate:0 -2px;box-shadow:0 6px 20px color-mix(in srgb,var(--mystic-primary) 14%,transparent)}
+}
+:root[data-interface] .mystic-workspace .quick-action:active{translate:0 1px}
+:root[data-interface] .mystic-workspace :is(.account-trigger,.drawer-close,.mobile-toggle){color:var(--mystic-ink);border-color:var(--mystic-line);background:var(--mystic-surface)}
+:root[data-interface] .mystic-workspace :is(.account-trigger,.drawer-close,.mobile-toggle):hover{background:var(--mystic-raised)}
+:root[data-interface] .mystic-workspace :is(.drawer-close,.mobile-toggle){border:1px solid var(--mystic-line);border-radius:var(--workspace-control-radius);width:var(--workspace-touch);height:var(--workspace-touch);padding:0;place-items:center;flex:none}
+:root[data-interface] .mystic-workspace .drawer-close{display:none}
+:root[data-interface] .mystic-workspace .top-actions{flex:none}
+:root[data-interface] .mystic-workspace .account-trigger{min-height:44px;max-width:220px}
+:root[data-interface] .mystic-workspace .account-popover{background:var(--mystic-surface);border-color:var(--mystic-line);max-width:calc(100vw - 24px)}
+:root[data-interface] .mystic-workspace .account-popover :is(a,button){min-height:40px}
+:root[data-interface] .auth-recovery{display:grid;grid-template-columns:minmax(0,1fr);place-items:stretch}
+:root[data-interface] .auth-recovery .auth-form-side{min-height:100svh}
+@keyframes workspace-shade-in{from{opacity:0}to{opacity:1}}
+@media(max-width:850px){
+  :root[data-interface] .mystic-workspace .sidebar{
+    width:min(300px,calc(100vw - 48px));min-width:0;height:100dvh;visibility:hidden;transform:translateX(-100%);
+    transition:transform var(--mystic-page-time) var(--mystic-ease),visibility 0s linear var(--mystic-page-time);
+    padding-block-end:env(safe-area-inset-bottom);
+  }
+  :root[data-interface] .mystic-workspace .sidebar.open{visibility:visible;transform:translateX(0);transition-delay:0s;box-shadow:12px 0 42px #07051160}
+  :root[data-interface] .mystic-workspace .drawer-close{display:grid;position:absolute;top:12px;right:12px}
+  :root[data-interface] .mystic-workspace .sidebar .brand{padding-inline-end:62px}
+  :root[data-interface] .mystic-workspace .mobile-toggle{display:grid}
+  :root[data-interface] .mystic-workspace .workspace-shade{background:#090715a6;animation:workspace-shade-in var(--mystic-time) ease both}
+  :root[data-interface] .mystic-workspace .topbar{gap:8px}
+  :root[data-interface] .mystic-workspace .top-actions{gap:6px}
+  :root[data-interface] .mystic-workspace .breadcrumb{flex:1;min-width:0}
+  :root[data-interface] .mystic-workspace .breadcrumb>strong{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis}
+}
+@media(max-width:650px){
+  :root[data-interface] .mystic-workspace .page-header{align-items:stretch;flex-direction:column}
+  :root[data-interface] .mystic-workspace .page-header>.btn{align-self:flex-start;max-width:100%;min-height:44px}
+  :root[data-interface] .mystic-workspace .account-trigger{padding:4px;gap:0}
+  :root[data-interface] .mystic-workspace .account-trigger>svg:last-child{display:none}
+  :root[data-interface] .mystic-workspace .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+  :root[data-interface] .mystic-workspace .quick-actions{grid-template-columns:minmax(0,1fr)}
+  :root[data-interface] .mystic-workspace .row-actions{flex-wrap:wrap}
+  :root[data-interface] .mystic-workspace .row-actions>.btn{max-width:100%;overflow-wrap:anywhere}
+}
+@media(max-width:390px){
+  :root[data-interface] .mystic-workspace .metrics{grid-template-columns:minmax(0,1fr)}
+  :root[data-interface] .mystic-workspace .page-header>.btn{align-self:stretch}
+  :root[data-interface] .mystic-workspace .topbar{padding-inline:8px}
+  :root[data-interface] .mystic-workspace .top-actions{gap:4px}
+}
+:root[data-ui-motion=off] .mystic-workspace :is(.sidebar,.workspace-shade,.quick-action){animation:none!important;transition:none!important;translate:none!important}
+@media(prefers-reduced-motion:reduce){
+  :root[data-interface] .mystic-workspace :is(.sidebar,.workspace-shade,.quick-action){animation:none!important;transition:none!important;translate:none!important}
+}
