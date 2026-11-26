@@ -7,10 +7,10 @@
 .mystic-workspace .page-motion{animation:mystic-page-in var(--mystic-page) var(--mystic-ease) both}
 :is(.mystic-workspace,.auth-experience) :is(.account-popover,.notification-drawer,.chat-action-menu,.emoji-menu,.modal,.auth-field-new){animation:mystic-reveal var(--mystic-enter) var(--mystic-ease) both;transform-origin:center top}
 .notification-float .notification-drawer{animation:mystic-reveal var(--mystic-enter) var(--mystic-ease) both;transform-origin:bottom right}
-:is(.mystic-workspace,.auth-experience) :is(.row-actions,.page-header,.auth-form,.panel-directory-grid)>:is(button.btn,a.btn,.panel-login-card){animation:mystic-surface-in var(--mystic-enter) var(--mystic-ease) both}
-:is(.row-actions,.panel-directory-grid)>:nth-child(2){animation-delay:25ms!important}
-:is(.row-actions,.panel-directory-grid)>:nth-child(3){animation-delay:50ms!important}
-:is(.row-actions,.panel-directory-grid)>:nth-child(4){animation-delay:75ms!important}
+:is(.mystic-workspace,.auth-experience) :is(.row-actions,.page-header,.auth-form,.panel-directory-grid)>:is(button.btn,a.btn,.panel-login-card){animation:mystic-surface-in var(--mystic-enter) var(--mystic-ease) backwards}
+:is(.row-actions,.panel-directory-grid)>:is(button.btn,a.btn,.panel-login-card):nth-child(2){animation-delay:25ms!important}
+:is(.row-actions,.panel-directory-grid)>:is(button.btn,a.btn,.panel-login-card):nth-child(3){animation-delay:50ms!important}
+:is(.row-actions,.panel-directory-grid)>:is(button.btn,a.btn,.panel-login-card):nth-child(4){animation-delay:75ms!important}
 :is(.mystic-workspace,.auth-experience,.mystic-share,.studio-site) :is(.btn,.icon-btn,.nav-link,.account-trigger,.panel-login-card,.studio-button,.bell-button){
  transition:background-color var(--mystic-fast) ease,border-color var(--mystic-fast) ease,box-shadow var(--mystic-enter) var(--mystic-ease),color var(--mystic-fast) ease,filter var(--mystic-fast) ease,translate var(--mystic-fast) var(--mystic-ease);
 }
@@ -26,7 +26,7 @@
  border-color:color-mix(in srgb,var(--line) 88%,var(--accent) 12%);
 }
 :root:not([data-theme=light]) .auth-form-card{background:linear-gradient(145deg,color-mix(in srgb,var(--surface) 94%,var(--accent)),var(--surface) 58%)}
-.auth-visual{background:linear-gradient(150deg,#101125bb,#11112528 48%,#080b19dd),url('./cinematic-landscape.svg') center/cover no-repeat,#141629}
+.auth-experience .auth-visual{background:linear-gradient(150deg,#101125bb,#11112528 48%,#080b19dd),url('./cinematic-landscape.svg') center/cover no-repeat,#141629}
 .auth-orbit::before{opacity:.43}
 .auth-role h1{text-shadow:0 2px 20px #080912a0}
 .mystic-share{min-height:100vh;min-height:100svh;display:grid;place-items:center;padding:24px;color:#f4f1ff;background:linear-gradient(120deg,#0a0e20cc,#0c102444),url('./cinematic-landscape.svg') center/cover no-repeat,#101529}
@@ -36,7 +36,7 @@
 .mystic-share-card h1{font-size:clamp(42px,9vw,76px);line-height:1;letter-spacing:-.04em;margin:0}
 .mystic-share-card>p:not(.mystic-share-brand){color:#c8cfe0;font-size:clamp(16px,3vw,21px);line-height:1.55;margin:0}
 .mystic-share-card .mystic-share-open{width:fit-content;display:inline-flex;align-items:center;gap:12px;padding:12px 18px;min-height:44px;background:#b49bf7;color:#161022;font-weight:700}
-@media(max-width:650px){.auth-visual{background-position:center,center 40%}.mystic-share-card{border-radius:18px}}
+@media(max-width:650px){.auth-experience .auth-visual{background-position:center,center 40%}.mystic-share-card{border-radius:18px}}
 @media(prefers-reduced-motion:reduce){
  :is(.mystic-workspace,.auth-experience,.mystic-share,.studio-site) :is(.page-motion,.account-popover,.notification-drawer,.chat-action-menu,.emoji-menu,.modal,.auth-field-new,.btn,.icon-btn,.nav-link,.account-trigger,.panel-login-card,.studio-button,.bell-button,.mystic-share-card,.auth-orbit i,.auth-orbit::before){animation:none!important;transition:none!important;translate:none!important;scale:1!important}
  .notification-float .notification-drawer{animation:none!important}

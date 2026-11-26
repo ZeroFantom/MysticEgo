@@ -157,6 +157,30 @@ $site {
         rewrite * /release-info.json
         file_server
     }
+    vars mystic_public_origin "https://$site"
+    handle /audit-portal/og/audit.png {
+        rewrite * /og/audit.png
+        file_server
+    }
+    handle /audit-portal/share/ {
+        redir /audit-portal/share 308
+    }
+    handle /audit-portal/share {
+        try_files /social/audit-caddy-share.html /index.html
+        header Cache-Control "no-cache"
+        templates {
+            mime text/html
+        }
+        file_server
+    }
+    handle /audit-portal/ {
+        try_files /social/audit-caddy-root.html /index.html
+        header Cache-Control "no-cache"
+        templates {
+            mime text/html
+        }
+        file_server
+    }
     handle /audit-portal/* {
         try_files /index.html
         file_server
@@ -177,7 +201,14 @@ caddy validate --config "$caddyfile" --adapter caddyfile 2>&1
 systemctl reload caddy.service
 trap - ERR
 if curl -fsS --retry 4 --retry-delay 4 --retry-all-errors --max-time 5 "https://$site/audit-portal/" 2>/dev/null |
-    cmp -s "$version/index.html" -; then
+    python3 -c 'import re,sys
+expected=open(sys.argv[1],"rb").read(); received=sys.stdin.buffer.read()
+marker=rb"<!-- mysticego-social-start -->[\s\S]*?<!-- mysticego-social-end -->"
+assert re.sub(marker,b"",expected)==re.sub(marker,b"",received),"Unexpected portal build"
+if re.search(marker,expected):
+    assert (sys.argv[2]+"/audit-portal/og/audit.png").encode() in received,"Preview image missing"
+    assert b"{{placeholder" not in received,"Template was not rendered"
+' "$version/index.html" "https://$site"; then
   echo 'Портал отвечает по HTTPS.'
 else
   echo 'Caddy применил настройки. HTTPS ещё не подтверждён. Проверьте DNS, порты 80/443 и журнал Caddy.'

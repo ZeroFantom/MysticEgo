@@ -24,7 +24,7 @@ public static class PanelSocialPreviews
         var block = Regex.Replace(html[start..end], "(?<attr>content|href)=\"(?<path>/[a-zA-Z0-9/_.-]*)\"", match =>
         {
             var path = match.Groups["path"].Value;
-            if (embeddedAudit && !path.StartsWith("/og/", StringComparison.Ordinal))
+            if (embeddedAudit)
                 path = "/audit-portal" + path;
             return match.Groups["attr"].Value + "=\"" + HtmlEncoder.Default.Encode(origin + path) + "\"";
         });
@@ -40,6 +40,29 @@ public static class PanelSocialPreviews
             { await next(context); return; }
 
             var path = context.Request.Path.Value?.TrimEnd('/') ?? "";
+            // Keep the updater's existing local byte-for-byte health check intact.
+            // This branch never constructs URLs from the Host header.
+            if (path == "/audit-portal" && !context.Request.IsHttps &&
+                context.Request.Host.Host == "127.0.0.1" &&
+                context.Connection.RemoteIpAddress is { } ip && System.Net.IPAddress.IsLoopback(ip) &&
+                !context.Request.Headers.ContainsKey("X-Forwarded-Host") &&
+                !context.Request.Headers.ContainsKey("X-Forwarded-Proto"))
+            { await next(context); return; }
+
+            if (node.Kind == NodeKind.Orchestra && path == "/audit-portal/og/audit.png")
+            {
+                var auditRoot = app.Configuration["Managed:AuditWebRoot"];
+                var cover = auditRoot is null ? null : Path.Combine(auditRoot, "og", "audit.png");
+                if (cover is null || !File.Exists(cover))
+                { context.Response.StatusCode = 404; return; }
+                context.Response.ContentType = "image/png";
+                context.Response.ContentLength = new FileInfo(cover).Length;
+                context.Response.Headers.CacheControl = "public, max-age=3600";
+                if (!HttpMethods.IsHead(context.Request.Method))
+                    await context.Response.SendFileAsync(cover, context.RequestAborted);
+                return;
+            }
+
             var web = app.Environment.WebRootPath;
             var audit = node.Kind == NodeKind.Orchestra &&
                 (path == "/audit-portal" || path == "/audit-portal/share" || path == "/audit-portal/index.html");

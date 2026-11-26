@@ -4,7 +4,7 @@ import {cp, mkdir, readFile, writeFile, rm, mkdtemp} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {roles,publicPages,panelHtml,writeSocialAssets} from './social.mjs';
+import {roles,publicPages,panelHtml,auditCaddyHtml,writeSocialAssets} from './social.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
 const temp=await mkdtemp(join(tmpdir(),'mysticego-ui-'));
@@ -23,5 +23,7 @@ try{
     await mkdir(join(dist,'social'),{recursive:true});
     for(const page of ['share',...(role==='orchestra'?Object.keys(publicPages):[])])
       await writeFile(join(dist,'social',page+'.html'),panelHtml(template,role,page));
+    if(role==='audit')for(const page of ['root','share'])
+      await writeFile(join(dist,'social','audit-caddy-'+page+'.html'),auditCaddyHtml(template,page));
   }
 }finally{await rm(temp,{recursive:true,force:true})}

@@ -51,6 +51,7 @@ const glyphs={
  N:['10001','11001','10101','10011','10001','10001','10001'],O:['01110','10001','10001','10001','10001','10001','01110'],
  R:['11110','10001','10001','11110','10100','10010','10001'],S:['01111','10000','10000','01110','00001','00001','11110'],
  T:['11111','00100','00100','00100','00100','00100','00100'],U:['10001','10001','10001','10001','10001','10001','01110'],
+ K:['10001','10010','10100','11000','10100','10010','10001'],W:['10001','10001','10001','10101','10101','11011','10001'],
  Y:['10001','10001','01010','00100','00100','00100','00100']
 };
 const clamp=v=>Math.max(0,Math.min(255,Math.round(v)));
@@ -104,6 +105,13 @@ export function coverPng(role){
   label('CONTROL NETWORK',126,377,3,[192,202,225]);
   const ihdr=Buffer.alloc(13);ihdr.writeUInt32BE(w);ihdr.writeUInt32BE(h,4);ihdr[8]=8;ihdr[9]=2;
   return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',ihdr),chunk('IDAT',deflateSync(raw,{level:6})),chunk('IEND',Buffer.alloc(0))]);
+}
+// Caddy evaluates only these trusted generated HTML pages, using a fixed site variable.
+export function auditCaddyHtml(template,page='root'){
+  const html=panelHtml(template,'audit',page);
+  return html.replace(/<!-- mysticego-social-start -->[\s\S]*?<!-- mysticego-social-end -->/,block=>
+    block.replace(/(content|href)="(\/[a-zA-Z0-9/_.-]*)"/g,(_all,attribute,path)=>
+      attribute+'="{{placeholder "http.vars.mystic_public_origin"}}/audit-portal'+path+'"'));
 }
 export async function writeSocialAssets(root){
   const folder=join(root,'og');await mkdir(folder,{recursive:true});
