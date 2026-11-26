@@ -42,3 +42,23 @@
 }
 :root[data-ui-motion=off] .mystic-workspace .network-card{transition:none!important}
 @media(prefers-reduced-motion:reduce){:root[data-interface] .mystic-workspace .network-card{transition:none!important}}
+
+/* Smooth measured series and clearly distinct, unmeasured intervals. */
+.telemetry-chart{--chart-gap-color:#d8ac61;min-width:0}
+:root[data-theme=light] .telemetry-chart{--chart-gap-color:#a46b20}
+.telemetry-chart .chart-line,.telemetry-chart .chart-gap-bridge{
+  fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke
+}
+.telemetry-chart .chart-line{stroke:currentColor}
+.telemetry-chart .chart-gap-bridge{stroke-dasharray:5 4;opacity:.92;animation:chart-gap-appear var(--mystic-time,240ms) ease-out both}
+.telemetry-chart .chart-gap-region{fill:var(--chart-gap-color);opacity:.045;pointer-events:none}
+.telemetry-chart .chart-new-edge{stroke-dasharray:1 1;stroke-dashoffset:0;animation:chart-edge-reveal var(--mystic-time,240ms) var(--mystic-ease,ease-out) both}
+.telemetry-chart .chart-new-point{animation:chart-gap-appear var(--mystic-time,240ms) ease-out both}
+@keyframes chart-edge-reveal{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+@keyframes chart-gap-appear{from{opacity:0}to{opacity:.92}}
+.chart-data-legend{display:flex;gap:6px 14px;flex-wrap:wrap;margin:6px 0 0;color:var(--mystic-muted);font-size:.72rem;line-height:1.45}
+.chart-data-legend>span{display:inline-flex;align-items:center;gap:6px}
+.chart-data-legend i{display:inline-block;width:18px;flex:none;border-radius:4px;border-top:2px solid var(--mystic-primary)}
+.chart-data-legend .chart-legend-gap{border-top:2px dashed var(--chart-gap-color)}
+:root[data-ui-motion=off] .telemetry-chart :is(.chart-new-edge,.chart-new-point,.chart-gap-bridge){animation:none!important;stroke-dashoffset:0}
+@media(prefers-reduced-motion:reduce){.telemetry-chart :is(.chart-new-edge,.chart-new-point,.chart-gap-bridge){animation:none!important;stroke-dashoffset:0}}
