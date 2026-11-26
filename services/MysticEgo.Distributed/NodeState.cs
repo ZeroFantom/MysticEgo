@@ -13,14 +13,16 @@ public sealed class NodeState
     {
         Options = options;
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(options.DataPath))!);
-        Journal = new AuditJournal(Path.GetFullPath(options.DataPath) + ".audit.db");
-        Data = new DynamicEntityStore($"Data Source={options.DataPath}");
+        var path = Path.GetFullPath(options.DataPath);
+        var connection = RelationalStorage.NodeConnection(path, options.DatabaseConnection, options.DatabaseConnectionFile);
+        Journal = new AuditJournal(path + ".audit.db", RelationalStorage.IsPostgres(connection) ? connection : null);
+        Data = new DynamicEntityStore(connection);
     }
     public void Log(string actor,string action,string target,bool success,string? detail=null)
     {
         var eventEntry = new AuditEntry(Guid.NewGuid(), DateTimeOffset.UtcNow, actor, action, target, success, detail);
         try { Journal.Append(eventEntry); }
-        catch (Microsoft.Data.Sqlite.SqliteException error) { Console.Error.WriteLine("Audit write failed: " + error.SqliteErrorCode); }
+        catch (System.Data.Common.DbException error) { Console.Error.WriteLine("Audit write failed: " + error.GetType().Name); }
         Audit.Enqueue(eventEntry);
         while (Audit.Count > 1000) Audit.TryDequeue(out _);
     }

@@ -13,6 +13,8 @@ public sealed class NodeOptions
     public string? LocalUrl { get; set; }
     public string? PublicUrl { get; set; }
     public string DataPath { get; set; } = "data/node.db";
+    public string? DatabaseConnection { get; set; }
+    public string? DatabaseConnectionFile { get; set; }
     public bool Managed { get; set; }
     public string? MachineFingerprint { get; set; }
     public string? GlobalId { get; set; }

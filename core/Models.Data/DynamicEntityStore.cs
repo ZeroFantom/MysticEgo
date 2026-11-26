@@ -1,12 +1,12 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Microsoft.Data.Sqlite;
+using System.Data.Common;
 
 namespace Models.Data;
 
 /// <summary>
-/// Динамическое хранилище JSON-сущностей в SQLite. Для каждого идентификатора сущности используется отдельная таблица.
+/// Динамическое хранилище JSON-сущностей в SQLite или PostgreSQL. Для каждого идентификатора сущности используется отдельная таблица.
 /// Политика миграций: только добавление полей с явной версией; потенциально разрушительные изменения запрещены.
 /// Это хранилище локального узла; репликация и распределённая координация остаются ответственностью сервисов.
 /// </summary>
@@ -27,18 +27,20 @@ public sealed class DynamicEntityStore
         return "entity_" + hex[..24]; // Не подставляем идентификаторы пользователя непосредственно в SQL.
     }
 
-    private SqliteConnection Open()
-    {
-        var connection = new SqliteConnection(_connectionString);
-        connection.Open();
-        return connection;
-    }
+    private DbConnection Open() => RelationalStorage.Open(_connectionString);
 
     public async Task EnsureSchemaAsync<T>(CancellationToken ct = default) where T : class
     {
         var descriptor = EntityMetadata.Describe<T>();
         using var connection = Open();
         using var transaction = connection.BeginTransaction();
+        if (RelationalStorage.IsPostgres(_connectionString))
+        {
+            using var gate = connection.CreateCommand();
+            gate.Transaction = transaction;
+            gate.CommandText = "SELECT pg_advisory_xact_lock(671021904)";
+            await gate.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
         using (var create = connection.CreateCommand())
         {
             create.Transaction = transaction;
@@ -56,21 +58,21 @@ public sealed class DynamicEntityStore
         using (var upsert = connection.CreateCommand())
         {
             upsert.Transaction = transaction;
-            upsert.CommandText = "INSERT INTO __entity_schemas(entity_id, version, descriptor_json) VALUES ($id, $ver, $json) ON CONFLICT(entity_id) DO UPDATE SET version=excluded.version, descriptor_json=excluded.descriptor_json;";
-            upsert.Parameters.AddWithValue("$id", descriptor.Id);
-            upsert.Parameters.AddWithValue("$ver", descriptor.Version);
-            upsert.Parameters.AddWithValue("$json", descriptor.SchemaJson);
+            upsert.CommandText = "INSERT INTO __entity_schemas(entity_id, version, descriptor_json) VALUES (@id, @ver, @json) ON CONFLICT(entity_id) DO UPDATE SET version=excluded.version, descriptor_json=excluded.descriptor_json;";
+            upsert.AddValue("@id", descriptor.Id);
+            upsert.AddValue("@ver", descriptor.Version);
+            upsert.AddValue("@json", descriptor.SchemaJson);
             await upsert.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
         }
         transaction.Commit();
     }
 
-    private static async Task<(int Version, string Json)?> ReadSchemaAsync(SqliteConnection c, SqliteTransaction tx, string id, CancellationToken ct)
+    private static async Task<(int Version, string Json)?> ReadSchemaAsync(DbConnection c, DbTransaction tx, string id, CancellationToken ct)
     {
         using var command = c.CreateCommand();
         command.Transaction = tx;
-        command.CommandText = "SELECT version, descriptor_json FROM __entity_schemas WHERE entity_id=$id;";
-        command.Parameters.AddWithValue("$id", id);
+        command.CommandText = "SELECT version, descriptor_json FROM __entity_schemas WHERE entity_id=@id;";
+        command.AddValue("@id", id);
         using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
         if (!await reader.ReadAsync(ct).ConfigureAwait(false)) return null;
         return (reader.GetInt32(0), reader.GetString(1));
@@ -115,11 +117,11 @@ public sealed class DynamicEntityStore
                 throw new ArgumentException($"Обязательное поле '{field.Name}' не заполнено.", nameof(value));
         using var connection = Open();
         using var command = connection.CreateCommand();
-        command.CommandText = $"INSERT INTO {Table(d.Id)} (id,payload,schema_version,updated_at) VALUES ($id,$json,$ver,$time) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload, schema_version=excluded.schema_version, updated_at=excluded.updated_at;";
-        command.Parameters.AddWithValue("$id", key.ToString("D"));
-        command.Parameters.AddWithValue("$json", JsonSerializer.Serialize(value, _json));
-        command.Parameters.AddWithValue("$ver", d.Version);
-        command.Parameters.AddWithValue("$time", DateTimeOffset.UtcNow.ToString("O"));
+        command.CommandText = $"INSERT INTO {Table(d.Id)} (id,payload,schema_version,updated_at) VALUES (@id,@json,@ver,@time) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload, schema_version=excluded.schema_version, updated_at=excluded.updated_at;";
+        command.AddValue("@id", key.ToString("D"));
+        command.AddValue("@json", JsonSerializer.Serialize(value, _json));
+        command.AddValue("@ver", d.Version);
+        command.AddValue("@time", DateTimeOffset.UtcNow.ToString("O"));
         await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
@@ -129,8 +131,8 @@ public sealed class DynamicEntityStore
         await EnsureSchemaAsync<T>(ct).ConfigureAwait(false);
         using var connection = Open();
         using var command = connection.CreateCommand();
-        command.CommandText = $"SELECT payload FROM {Table(d.Id)} WHERE id=$id;";
-        command.Parameters.AddWithValue("$id", key.ToString("D"));
+        command.CommandText = $"SELECT payload FROM {Table(d.Id)} WHERE id=@id;";
+        command.AddValue("@id", key.ToString("D"));
         var payload = (string?)await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
         return payload is null ? null : JsonSerializer.Deserialize<T>(payload, _json);
     }
@@ -141,8 +143,8 @@ public sealed class DynamicEntityStore
         await EnsureSchemaAsync<T>(ct).ConfigureAwait(false);
         using var connection = Open();
         using var command = connection.CreateCommand();
-        command.CommandText = $"DELETE FROM {Table(d.Id)} WHERE id=$id;";
-        command.Parameters.AddWithValue("$id", key.ToString("D"));
+        command.CommandText = $"DELETE FROM {Table(d.Id)} WHERE id=@id;";
+        command.AddValue("@id", key.ToString("D"));
         return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false) > 0;
     }
 
@@ -154,8 +156,8 @@ public sealed class DynamicEntityStore
         await EnsureSchemaAsync<T>(ct).ConfigureAwait(false);
         using var connection = Open();
         using var command = connection.CreateCommand();
-        command.CommandText = $"SELECT payload FROM {Table(d.Id)} ORDER BY updated_at DESC LIMIT $limit;";
-        command.Parameters.AddWithValue("$limit", limit);
+        command.CommandText = $"SELECT payload FROM {Table(d.Id)} ORDER BY updated_at DESC LIMIT @limit;";
+        command.AddValue("@limit", limit);
         using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
         var results = new List<T>();
         while (await reader.ReadAsync(ct).ConfigureAwait(false))

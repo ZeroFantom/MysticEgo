@@ -453,6 +453,11 @@ internal sealed class LabHost(Dictionary<string,string> flags)
         var origins=new[]{5100,5200,5300,5350,5500}.SelectMany(p=>new[]{$"http://127.0.0.1:{p+offset}",$"http://localhost:{p+offset}"});
         int i=0;foreach(var origin in origins)env["AllowedOrigins__"+i++]=origin;
         foreach(var kv in settings)env[kv.Key]=kv.Value;
+        if(role!="auth")
+        {
+            var dbFile=Path.Combine(data,role+"-postgres.connection");
+            if(File.Exists(dbFile)) env["Node__DatabaseConnectionFile"]=dbFile;
+        }
         var log=Path.Combine(dir,"service.log");
         if(File.Exists(log)&&new FileInfo(log).Length>2_000_000)File.Move(log,log+".1",true);
         var process=new Process{StartInfo=start};

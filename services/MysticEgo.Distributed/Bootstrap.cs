@@ -58,6 +58,8 @@ public static class Bootstrap
         }
         app.UseCors("ui");app.UseAuthentication();app.UseAuthorization();
         var node = app.Services.GetRequiredService<NodeOptions>();
+        // Validate the selected database before reporting service readiness.
+        _ = app.Services.GetRequiredService<NodeState>();
         app.UseCentralConnection(node);
         app.MapAuthGateway(node);
         app.MapGet("/api/v1/public/runtime", () => new { authUrl = node.BrowserAuthUrl ?? node.AuthUrl, nodeId = node.NodeId })
