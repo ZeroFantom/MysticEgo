@@ -99,16 +99,18 @@ async function checkArtwork(page,theme,style,selector,kind){
   const data=await page.evaluate(async({theme,style,selector,kind})=>{
     const root=getComputedStyle(document.documentElement);
     const url=raw=>{const match=raw.match(/url\(["']?([^"')]+)["']?\)/);return match?new URL(match[1],document.baseURI).href:null};
-    const hero=url(root.getPropertyValue('--mystic-art')),entry=url(root.getPropertyValue('--mystic-entry-art'));
+    const hero=url(root.getPropertyValue('--mystic-art')),entry=url(root.getPropertyValue('--mystic-entry-art')),header=url(root.getPropertyValue('--mystic-header-art')),sidebar=url(root.getPropertyValue('--mystic-sidebar-art'));
     const load=async src=>{if(!src)throw Error('Missing artwork URL');const img=new Image();img.src=src;await img.decode();return [img.naturalWidth,img.naturalHeight]};
     const element=document.querySelector(selector);
     if(!element)throw Error('Missing artwork surface '+selector);
     const active=url(getComputedStyle(element).backgroundImage);
-    const expected=kind==='hero'?hero:entry;
-    return {hero,entry,active,expected,heroSize:await load(hero),entrySize:await load(entry),prefix:style+'-'+theme};
+    const expected={hero,entry,header,sidebar}[kind];
+    return {hero,entry,header,sidebar,active,expected,heroSize:await load(hero),entrySize:await load(entry),headerSize:await load(header),sidebarSize:await load(sidebar),prefix:style+'-'+theme};
   },{theme,style,selector,kind});
   assert.deepEqual(data.heroSize,[1916,821]);assert.deepEqual(data.entrySize,[1122,1402]);
   assert(data.hero.includes(data.prefix+'-hero')&&data.entry.includes(data.prefix+'-entry'),'Incorrect theme artwork');
+  assert(data.header.includes(data.prefix+'-header')&&data.sidebar.includes(data.prefix+'-sidebar'),'Wrong narrow artwork');
+  assert(data.headerSize[0]/data.headerSize[1]>8&&data.sidebarSize[0]/data.sidebarSize[1]<.25,'Incorrect narrow artwork proportions');
   assert.equal(data.active,data.expected,'Incorrect artwork for '+selector);
 }
 async function capture(page,label){
@@ -196,6 +198,8 @@ try{
                 await switchAppearance(page,theme,style);
                 await noHorizontalOverflow(page);
                 await checkArtwork(page,theme,style,'.dashboard-hero',viewport.width<=650?'entry':'hero');
+                await checkArtwork(page,theme,style,'.orchestral-topbar',viewport.width<=650?'hero':'header');
+                await checkArtwork(page,theme,style,'.sidebar','sidebar');
                 await capture(page,prefix+'-overview-'+theme+'-'+style);
               }
             });
