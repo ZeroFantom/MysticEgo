@@ -57,6 +57,23 @@ export function Collective(){
   const notify=useNoticeFeed()?.notify;
   const listRef=useRef<HTMLDivElement>(null);
   const composer=useRef<HTMLTextAreaElement>(null);
+  const messageActions=useRef<HTMLDivElement>(null);
+  const composerTools=useRef<HTMLDivElement>(null);
+  useEffect(()=>{
+    if(!menu&&!emojiOpen&&!stickers)return;
+    const outside=(event:PointerEvent)=>{
+      if(!(event.target instanceof Node))return;
+      if(menu&&!messageActions.current?.contains(event.target))setMenu('');
+      if(!composerTools.current?.contains(event.target)){setEmojiOpen(false);setStickers(false)}
+    };
+    const escape=(event:KeyboardEvent)=>{
+      if(event.key!=='Escape')return;
+      if(menu){messageActions.current?.querySelector('button')?.focus();setMenu('')}
+      else if(emojiOpen||stickers){const open=composerTools.current?.querySelector<HTMLButtonElement>('button[aria-expanded=true]');setEmojiOpen(false);setStickers(false);open?.focus()}
+    };
+    document.addEventListener('pointerdown',outside);document.addEventListener('keydown',escape);
+    return()=>{document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',escape)};
+  },[menu,emojiOpen,stickers]);
   const contacts=useRemote(()=>api.request<Contact[]>('/collective/contacts'),[api],5000,true);
   const people=useRemote(()=>searching?api.request<Person[]>('/collective/people?q='+encodeURIComponent(query)):Promise.resolve([]),[api,query,searching]);
   const central=useRemote(()=>api.request<{orchestraUrl:string}>('/managed/context'),[api]);
@@ -267,7 +284,7 @@ export function Collective(){
       </aside>
       <section className="panel messenger chat-room" aria-label={selected?'Чат '+selected.nickname:'Сообщения'}>
         <header className="messenger-header">{selected?<><button type="button" className="icon-btn chat-back" onClick={()=>select(null)} aria-label="К списку чатов"><ArrowLeft size={20}/></button>
-          <ProfileAvatar name={selected.nickname} url={selected.avatarUrl}/><div className="chat-heading"><h2>{selected.nickname}</h2>{currentPerson?.statusText&&<p className="social-status">{currentPerson.statusText}</p>}</div></>:<><MessageCircle size={19}/><h2>Сообщения</h2></>}</header>
+          <ProfileAvatar name={currentPerson?.nickname??selected.nickname} url={currentPerson?.avatarUrl??selected.avatarUrl}/><div className="chat-heading"><h2>{currentPerson?.nickname??selected.nickname}</h2>{currentPerson?.statusText&&<p className="social-status">{currentPerson.statusText}</p>}</div></>:<><MessageCircle size={19}/><h2>Сообщения</h2></>}</header>
         <div className="message-list" ref={listRef} onScroll={event=>{const area=event.currentTarget;nearBottom.current=area.scrollHeight-area.scrollTop-area.clientHeight<64;if(nearBottom.current)setJump(false)}}>
           {selected&&messages.error&&<ErrorBanner text={messages.error}/>}
           {!selected&&<div className="empty chat-idle"><MessageCircle size={34}/><p>Выбери чат, чтобы открыть переписку.</p></div>}
@@ -278,7 +295,7 @@ export function Collective(){
             const original=item.replyToId?byId.get(item.replyToId):undefined;
             return <div key={item.id} id={'chat-message-'+item.id} className="chat-message-row">
               {(index===0||dayKey(items[index-1].at)!==dayKey(item.at))&&<div className="chat-day">{dateLabel(item.at)}</div>}
-              <div className={'chat-message '+(own?'mine':'')}>
+              <div className={'chat-message '+(own?'mine':'')} data-deleted={Boolean(item.deletedAt)}>
                 {item.deletedAt?<p className="chat-message-meta">Сообщение удалено</p>:<>
                   {item.forwarded&&<small className="chat-message-meta">Переслано</small>}
                   {item.replyToId&&(original?<button type="button" className="chat-quote" onClick={()=>
@@ -292,10 +309,10 @@ export function Collective(){
                 <div className="chat-message-footer">
                   {!item.deletedAt&&item.editedAt&&<small>изменено</small>}
                   <time dateTime={item.at} title={new Date(item.at).toLocaleString('ru-RU')}>{timeLabel(item.at)}</time>
-                  {!item.deletedAt&&<div className="chat-actions">
+                  {!item.deletedAt&&<div className="chat-actions" ref={menu===item.id?messageActions:undefined}>
                     <button type="button" className="icon-btn" aria-label="Действия с сообщением" aria-expanded={menu===item.id}
-                      onClick={()=>setMenu(menu===item.id?'':item.id)}><MoreHorizontal size={17}/></button>
-                    {menu===item.id&&<div className="chat-action-menu" onKeyDown={event=>{if(event.key==='Escape')setMenu('')}}>
+                      onClick={()=>{setMenu(menu===item.id?'':item.id);setEmojiOpen(false);setStickers(false)}}><MoreHorizontal size={17}/></button>
+                    {menu===item.id&&<div className="chat-action-menu" aria-label="Действия с сообщением">
                       <button type="button" disabled={busy} onClick={()=>{setEditing(null);setReply(item);setMenu('');setSuggestion('');focusComposer()}}>Ответить</button>
                       {own&&item.text&&!item.forwarded&&!item.stickerId&&!item.voiceMime&&<button type="button" disabled={busy} onClick={()=>{
                         setEditing(item);setEditText(item.text);setReply(null);setMenu('');setSuggestion('');setStickers(false);focusComposer();
@@ -303,7 +320,7 @@ export function Collective(){
                       {otherChats.length>0&&<button type="button" disabled={busy} onClick={()=>{
                         setForward(item);setTarget(otherChats[0].person.id);setMenu('');
                       }}>Переслать</button>}
-                      {own&&<button type="button" disabled={busy} onClick={()=>void remove(item)}>Удалить</button>}
+                      {own&&<button type="button" className="chat-delete-action" disabled={busy} onClick={()=>void remove(item)}>Удалить</button>}
                     </div>}
                   </div>}
                 </div>
@@ -326,12 +343,14 @@ export function Collective(){
           <button type="button" className="icon-btn" aria-label="Отменить пересылку" onClick={()=>setForward(null)}><X size={17}/></button>
         </form>}
         {selected&&<form className="chat-compose" data-editing={Boolean(editing)} onSubmit={send}>
-          <div className="emoji-control"><button type="button" className="icon-btn" aria-label="Эмодзи" aria-expanded={emojiOpen} onClick={()=>setEmojiOpen(value=>!value)}><Smile size={22}/></button>
+          <div className="chat-compose-tools" ref={composerTools}>
+          <div className="emoji-control"><button type="button" className="icon-btn" aria-label="Эмодзи" aria-expanded={emojiOpen} onClick={()=>{setStickers(false);setMenu('');setEmojiOpen(value=>!value)}}><Smile size={22}/></button>
             {emojiOpen&&<div className="emoji-menu">{emoji.map(symbol=><button type="button" key={symbol} aria-label={'Вставить '+symbol} onClick={()=>insertEmoji(symbol)}>{symbol}</button>)}</div>}</div>
-          <div className="emoji-control"><button type="button" className="icon-btn" aria-label="Стикеры" disabled={Boolean(editing)} aria-expanded={stickers} onClick={()=>{setEmojiOpen(false);setStickers(value=>!value)}}><StickerIcon size={22}/></button>
+          <div className="emoji-control"><button type="button" className="icon-btn" aria-label="Стикеры" disabled={Boolean(editing)} aria-expanded={stickers} onClick={()=>{setEmojiOpen(false);setMenu('');setStickers(value=>!value)}}><StickerIcon size={22}/></button>
            {stickers&&<StickerPicker send={id=>void sendSticker(id)}/>}</div>
           <button type="button" className="icon-btn" aria-label="Улучшить черновик" disabled={polishing||!composed.trim()} onClick={()=>void polish()}><Sparkles size={17}/></button>
           {!editing&&<VoiceRecorder key={selected.id} disabled={busy} send={sendVoice} onError={setError}/>}
+          </div>
           <textarea ref={composer} rows={2} maxLength={2000} aria-label="Сообщение" placeholder="Написать сообщение" value={composed}
             onChange={event=>setComposed(event.target.value)} onKeyDown={event=>{if(event.key==='Enter'&&!event.shiftKey&&!event.nativeEvent.isComposing){event.preventDefault();event.currentTarget.form?.requestSubmit()}}}/>
           <button className="btn" disabled={busy||!composed.trim()} aria-label={editing?"Сохранить изменения":"Отправить"}>{editing?<Check size={18}/>:<Send size={18}/>}</button>
