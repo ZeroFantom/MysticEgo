@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import {NodeApi,type NodeMode} from '@mysticego/sdk';
 import {CTX,useApp,useRemote,type PersonalAccount} from './context';
-import {ProfilePage,ProfileAvatar,bannerStyle} from '../pages/Profile';
+import {ProfilePage,ProfileAvatar} from '../pages/Profile';
 import {Collective} from '../pages/Collective';
 import {NetworkPage,OrchestraOverview} from '../pages/Network';
 import {Deployment,OrganizationRequests} from '../pages/Deployment';
@@ -137,7 +137,7 @@ function AnimatedArea({children}:{children:ReactNode}){
 }
 
 function Workspace({logout}:{logout:()=>void}){
-  const {mode,portal,personal,preferenceScope,api}=useApp();
+  const {mode,portal,preferenceScope,api}=useApp();
   const developer=useRemote(()=>mode==='orchestra'?api.request<{owner:boolean;membership?:{status:string}}>('/managed/development-team'):Promise.resolve(null),[api,mode]);
   const cloudDownloads=mode==='orchestra'&&(developer.value?.owner||developer.value?.membership?.status==='approved');
   const {pathname}=useLocation();
@@ -200,7 +200,7 @@ function Workspace({logout}:{logout:()=>void}){
     </aside>
     {drawerOpen&&<div className="shade workspace-shade" aria-hidden="true" onClick={()=>setMobile(false)}/>}
     <div className="main" inert={drawerOpen}>
-      <header className="topbar orchestral-topbar" style={bannerStyle(personal?.profile.coverUrl)}>
+      <header className="topbar orchestral-topbar">
         <span className="topbar-light" aria-hidden="true"><span className="topbar-sweep"/></span>
         <button ref={menuTrigger} type="button" className="icon-btn mobile-toggle" onClick={()=>setMobile(value=>!value)} aria-label="Открыть меню" aria-controls="workspace-navigation" aria-expanded={drawerOpen}><Menu size={22}/></button>
         <div className="breadcrumb"><span>{modes[mode].name}</span><ChevronRight size={14}/><strong>{current}</strong></div>

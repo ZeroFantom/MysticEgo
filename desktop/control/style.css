@@ -116,9 +116,15 @@ button.plain{color:var(--ink)}
 :root[data-interface="simplified"][data-theme="light"]{--mystic-header-art:url("./appearance-art/simplified-light-header.webp");--mystic-sidebar-art:url("./appearance-art/simplified-light-sidebar.webp")}
 :root[data-interface="immersive"][data-theme="dark"]{--mystic-header-art:url("./appearance-art/immersive-dark-header.webp");--mystic-sidebar-art:url("./appearance-art/immersive-dark-sidebar.webp")}
 :root[data-interface="immersive"][data-theme="light"]{--mystic-header-art:url("./appearance-art/immersive-light-header.webp");--mystic-sidebar-art:url("./appearance-art/immersive-light-sidebar.webp")}
-:root[data-interface] .desktop-header{
- background:linear-gradient(90deg,var(--body) 12%,color-mix(in srgb,var(--body) 85%,transparent) 40%,transparent 100%),var(--mystic-header-art) right center/contain no-repeat,var(--body)
-}
 @media(max-width:650px){
- :root[data-interface] .desktop-header{background-image:linear-gradient(90deg,var(--body) 20%,color-mix(in srgb,var(--body) 85%,transparent) 55%,transparent 150%),var(--mystic-art)}
 }
+
+/* Full-width narrow artwork; separate readable text from the scene. */
+:root[data-theme=light]{--body:#eae7ef;--panel:#f4f1f6;--input:#e5e0eb;--border:#d1c9dc;--muted:#574d66;--button:#e5e0eb}
+:root[data-interface][data-theme] .desktop-header{
+ aspect-ratio:1414/167;min-height:104px;background:var(--mystic-header-art) center bottom/100% auto no-repeat,var(--body)
+}
+:root[data-interface][data-theme] .desktop-header>div:not(.desktop-logo),:root[data-interface][data-theme] .desktop-header>.status{
+ background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:7px 11px;
+}
+@media(max-width:650px){:root[data-interface][data-theme] .desktop-header{aspect-ratio:auto;padding-bottom:calc(12vw + 12px)}}

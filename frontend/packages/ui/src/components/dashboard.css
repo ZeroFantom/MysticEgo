@@ -1,7 +1,5 @@
 /* Dashboard direction from the original MysticEgo concept boards:
    one focal landscape, quiet metric surfaces, consistent data hierarchy. */
-:root[data-interface] .mystic-workspace .dashboard-hero{position:relative;isolation:isolate;overflow:hidden;display:flex;align-items:center;min-height:184px;border:1px solid var(--mystic-line);border-radius:18px;margin-bottom:18px;padding:clamp(18px,3vw,34px);background:linear-gradient(90deg,var(--mystic-surface) 18%,var(--mystic-veil) 42%,transparent 98%),var(--mystic-art) right center/auto 100% no-repeat,var(--mystic-surface);color:var(--mystic-ink)}
-:root[data-interface=immersive] .mystic-workspace .dashboard-hero{min-height:216px;background:linear-gradient(90deg,var(--mystic-bg) 4%,var(--mystic-veil) 35%,transparent 100%),var(--mystic-art) right center/auto 100% no-repeat,var(--mystic-bg)}
 .dashboard-hero-copy{width:min(100%,660px);min-width:0;display:grid;gap:10px}
 .dashboard-eyebrow{display:flex;gap:7px;align-items:center;color:var(--mystic-primary);font-size:.78rem;font-weight:650;letter-spacing:.055em}
 .dashboard-hero h1{font-size:clamp(26px,3.4vw,40px);letter-spacing:-.04em;line-height:1.12;margin:0;overflow-wrap:anywhere}
@@ -26,9 +24,28 @@
 .dashboard-health-list .line{padding:10px 0}
 @media(max-width:1100px){.dashboard-monitor-grid{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:650px){
- :root[data-interface] .mystic-workspace .dashboard-hero{min-height:0;background:linear-gradient(90deg,var(--mystic-surface) 0%,var(--mystic-veil) 65%,transparent 200%),var(--mystic-entry-art) right center/auto 100% no-repeat,var(--mystic-surface);padding:18px}
  :root[data-interface] .mystic-workspace .dashboard-hero-copy{gap:8px}
  :root[data-interface] .mystic-workspace .dashboard-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
  :root[data-interface] .mystic-workspace .dashboard-metrics .metric{padding:12px;min-height:100px}
 }
 @media(max-width:350px){:root[data-interface] .mystic-workspace .dashboard-metrics{grid-template-columns:minmax(0,1fr)}}
+
+/* Full panorama: an actual aspect-ratio box, not a background squeezed
+   into a short text block. Text is a local card, not a wash over the scene. */
+:root[data-interface] .mystic-workspace .dashboard-hero{
+ position:relative;display:grid;grid-template-columns:minmax(0,1fr);isolation:isolate;overflow:hidden;
+ border:1px solid var(--mystic-line);border-radius:18px;margin-bottom:18px;padding:0;
+ background:var(--mystic-surface);color:var(--mystic-ink);
+}
+.dashboard-landscape{
+ grid-column:1;grid-row:1;width:100%;min-width:0;aspect-ratio:var(--mystic-overview-ratio,3/1);
+ background:var(--mystic-overview-art) center/100% auto no-repeat,var(--mystic-bg);align-self:start;
+}
+:root[data-interface] .mystic-workspace .dashboard-hero-copy{
+ grid-column:1;grid-row:1;align-self:center;justify-self:start;position:relative;
+ width:min(44%,440px);margin:clamp(14px,2.4vw,28px);padding:clamp(14px,2vw,22px);
+ background:var(--mystic-surface);border:1px solid var(--mystic-line);border-radius:14px;
+}
+@media(max-width:1100px){
+ :root[data-interface] .mystic-workspace .dashboard-hero-copy{grid-row:2;width:auto;justify-self:stretch;margin:0;padding:18px;border:0;border-radius:0}
+}

@@ -8,8 +8,8 @@
   border-radius:16px;
 }
 :root[data-interface] :is(.profile-hero,.profile-edit-preview)[data-custom-cover=false]{
-  background-image:linear-gradient(110deg,#100b1eea 5%,#171027b8 52%,#17102780),var(--mystic-art);
-  background-position:center,right center;background-size:auto,auto 100%;background-repeat:no-repeat;
+  background-image:linear-gradient(110deg,#100b1eea 5%,#171027b8 52%,#17102780),var(--mystic-profile-art);
+  background-position:center;background-size:cover;background-repeat:no-repeat;
 }
 :root[data-interface] .profile-hero{min-height:clamp(240px,24vw,340px);gap:16px;padding:clamp(16px,3vw,30px)}
 :root[data-interface] .profile-identity{align-items:center;min-width:0;gap:clamp(12px,2vw,20px)}
@@ -44,4 +44,7 @@
 :root[data-ui-motion=off] dialog.profile-dialog[open]{animation:none!important}
 @media(prefers-reduced-motion:reduce){:root[data-interface] dialog.profile-dialog[open]{animation:none!important}}
 
-@media(max-width:650px){:root[data-interface] :is(.profile-hero,.profile-edit-preview)[data-custom-cover=false]{background-image:linear-gradient(110deg,#100b1eea 5%,#171027b8 52%,#17102780),var(--mystic-entry-art)}}
+
+:root[data-theme=light][data-interface] :is(.profile-hero,.profile-edit-preview)[data-custom-cover=false]{
+ background-image:linear-gradient(90deg,#161023db 0%,#17102788 38%,transparent 100%),var(--mystic-profile-art);
+}

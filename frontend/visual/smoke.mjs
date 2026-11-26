@@ -99,19 +99,31 @@ async function checkArtwork(page,theme,style,selector,kind){
   const data=await page.evaluate(async({theme,style,selector,kind})=>{
     const root=getComputedStyle(document.documentElement);
     const url=raw=>{const match=raw.match(/url\(["']?([^"')]+)["']?\)/);return match?new URL(match[1],document.baseURI).href:null};
-    const hero=url(root.getPropertyValue('--mystic-art')),entry=url(root.getPropertyValue('--mystic-entry-art')),header=url(root.getPropertyValue('--mystic-header-art')),sidebar=url(root.getPropertyValue('--mystic-sidebar-art'));
+    const hero=url(root.getPropertyValue('--mystic-art')),entry=url(root.getPropertyValue('--mystic-entry-art')),header=url(root.getPropertyValue('--mystic-header-art')),sidebar=url(root.getPropertyValue('--mystic-sidebar-art')),overview=url(root.getPropertyValue('--mystic-overview-art')),profile=url(root.getPropertyValue('--mystic-profile-art'));
     const load=async src=>{if(!src)throw Error('Missing artwork URL');const img=new Image();img.src=src;await img.decode();return [img.naturalWidth,img.naturalHeight]};
     const element=document.querySelector(selector);
     if(!element)throw Error('Missing artwork surface '+selector);
-    const active=url(getComputedStyle(element).backgroundImage);
-    const expected={hero,entry,header,sidebar}[kind];
-    return {hero,entry,header,sidebar,active,expected,heroSize:await load(hero),entrySize:await load(entry),headerSize:await load(header),sidebarSize:await load(sidebar),prefix:style+'-'+theme};
+    const css=getComputedStyle(element),active=url(css.backgroundImage),rect=element.getBoundingClientRect();
+    const expected={hero,entry,header,sidebar,overview,profile}[kind];
+    return {hero,entry,header,sidebar,overview,profile,active,expected,heroSize:await load(hero),entrySize:await load(entry),headerSize:await load(header),sidebarSize:await load(sidebar),overviewSize:await load(overview),profileSize:await load(profile),prefix:style+'-'+theme,fit:css.backgroundSize,position:css.backgroundPosition,ratio:rect.width/rect.height,background:root.getPropertyValue('--mystic-bg').trim(),surface:root.getPropertyValue('--mystic-surface').trim()};
   },{theme,style,selector,kind});
   assert.deepEqual(data.heroSize,[1916,821]);assert.deepEqual(data.entrySize,[1122,1402]);
   assert(data.hero.includes(data.prefix+'-hero')&&data.entry.includes(data.prefix+'-entry'),'Incorrect theme artwork');
   assert(data.header.includes(data.prefix+'-header')&&data.sidebar.includes(data.prefix+'-sidebar'),'Wrong narrow artwork');
   assert(data.headerSize[0]/data.headerSize[1]>8&&data.sidebarSize[0]/data.sidebarSize[1]<.25,'Incorrect narrow artwork proportions');
   assert.equal(data.active,data.expected,'Incorrect artwork for '+selector);
+  assert.equal(new Set([data.hero,data.entry,data.header,data.sidebar,data.overview,data.profile]).size,6,'Artwork repeated across different surfaces');
+  assert(data.overview.includes(data.prefix+'-overview'));
+  assert.deepEqual(data.overviewSize,theme==='light'&&style==='immersive'?[1916,821]:[2172,724]);
+  assert.deepEqual(data.profileSize,[1916,821]);
+  if(kind==='header'||selector==='.dashboard-landscape'){
+    // A color-only final background layer serializes as ", auto" in Chromium.
+    const imageFit=data.fit.split(',')[0].trim();
+    assert(['100%','100% auto'].includes(imageFit),'Image must span the entire width: '+data.fit);
+  }
+  if(selector==='.dashboard-landscape')assert(Math.abs(data.ratio-data.overviewSize[0]/data.overviewSize[1])<.06,'Overview image box must preserve native proportions: '+data.ratio);
+  if(theme==='light'){assert.equal(data.background,'#eae7ef');assert.equal(data.surface,'#f4f1f6')}
+
 }
 async function capture(page,label){
   await page.evaluate(()=>document.fonts.ready);
@@ -197,15 +209,22 @@ try{
               for(const [theme,style] of combinations){
                 await switchAppearance(page,theme,style);
                 await noHorizontalOverflow(page);
-                await checkArtwork(page,theme,style,'.dashboard-hero',viewport.width<=650?'entry':'hero');
-                await checkArtwork(page,theme,style,'.orchestral-topbar',viewport.width<=650?'hero':'header');
+                await checkArtwork(page,theme,style,'.dashboard-landscape','overview');
+                await checkArtwork(page,theme,style,'.orchestral-topbar','header');
                 await checkArtwork(page,theme,style,'.sidebar','sidebar');
                 await capture(page,prefix+'-overview-'+theme+'-'+style);
               }
             });
             if(role==='orchestra')for(const [route,selector] of [['profile','.profile-hero'],['nodes','.network-card'],['diagnostics','.chart-line'],['collective','.chat-thread']])await check(page,prefix+'-'+route,async()=>{
               await page.goto(origin+'/'+route,{waitUntil:'domcontentloaded'});await visible(page.locator(selector).first());
-              if(route==='profile'){await page.getByRole('button',{name:'Оформление',exact:true}).click();await visible(page.getByRole('dialog',{name:'Оформление профиля'}));await capture(page,prefix+'-profile-dialog');await page.keyboard.press('Escape');await page.getByRole('dialog',{name:'Оформление профиля'}).waitFor({state:'hidden'})}
+              if(route==='profile'){
+                for(const [theme,style] of combinations){
+                  await switchAppearance(page,theme,style);
+                  await checkArtwork(page,theme,style,'.profile-hero','profile');
+                  await noHorizontalOverflow(page);
+                  await capture(page,prefix+'-profile-'+theme+'-'+style);
+                }
+                await page.getByRole('button',{name:'Оформление',exact:true}).click();await visible(page.getByRole('dialog',{name:'Оформление профиля'}));await capture(page,prefix+'-profile-dialog');await page.keyboard.press('Escape');await page.getByRole('dialog',{name:'Оформление профиля'}).waitFor({state:'hidden'})}
               if(route==='diagnostics'){await visible(page.locator('.chart-gap-bridge').first());assert.equal(await page.locator('.chart-line').first().getAttribute('class'),'chart-line')}
               if(route==='collective'){await page.locator('.chat-thread').first().click();await visible(page.getByRole('textbox',{name:'Сообщение',exact:true}));await visible(page.locator('.chat-message').first());await page.getByRole('button',{name:'Эмодзи'}).click();await visible(page.locator('.emoji-menu'));await page.keyboard.press('Escape');await page.locator('.emoji-menu').waitFor({state:'hidden'})}
               await capture(page,prefix+'-'+route);
@@ -222,6 +241,7 @@ try{
             for(const [theme,style] of combinations){
               await switchAppearance(page,theme,style);
               await scene.scrollIntoViewIfNeeded();
+              await checkArtwork(page,theme,style,'.studio-hero-cover','overview');
               const image=await scene.locator('img').evaluate(async img=>{await img.decode();const rect=img.getBoundingClientRect();return {src:img.currentSrc,ratio:rect.width/rect.height,fit:getComputedStyle(img).objectFit}});
               assert(image.src.includes(style+'-'+theme+'-hero'));
               assert(Math.abs(image.ratio-21/9)<.08&&image.fit==='contain');

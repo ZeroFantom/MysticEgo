@@ -100,11 +100,30 @@ assert(cinematic.includes('IntersectionObserver')&&cinematic.includes('visibilit
 assert(cinematic.includes("state==='playing'")&&cinematic.includes('data-running={running}')&&!cinematic.includes('autoPlay'));
 assert(cinematic.includes('loading="lazy"')&&motion.includes('aspect-ratio:16/9')&&motion.includes('object-fit:contain'));
 
-assert(web.includes('var(--mystic-entry-art) right center/auto 100%')&&web.includes('@media(max-width:780px)'));
+assert(web.includes('var(--mystic-entry-art) center/cover no-repeat')&&web.includes('@media(max-width:780px)'));
 assert(motion.includes('data-playing=false]{aspect-ratio:21/9}'));
 
-for(const css of [web,desktopCss,cloudCss])assert(css.includes('var(--mystic-header-art) right center/contain no-repeat'));
+for(const css of [web,desktopCss,cloudCss])assert(css.includes('var(--mystic-header-art) center bottom/100% auto no-repeat'));
 for(const css of [web,cloudCss])assert(css.includes('var(--mystic-sidebar-art) center bottom/contain no-repeat'));
 assert(cinematic.includes('Смотреть сцену')&&cinematic.includes('Остановить')&&cinematic.includes('mystic-scene-haze'));
 assert(motion.includes('.cinematic-live[data-running=false]')&&motion.includes('animation-play-state:paused')&&motion.includes('aspect-ratio:21/9;max-height:none'));
 assert(!cinematic.includes('.webm')&&cinematic.includes('key={poster+\':\'+allowed}'));
+
+const dashboardCss=read('frontend/packages/ui/src/components/dashboard.css');
+const dashboardHero=read('frontend/packages/ui/src/components/DashboardHero.tsx');
+assert(dashboardHero.includes('className="dashboard-landscape"')&&dashboardCss.includes('aspect-ratio:var(--mystic-overview-ratio,3/1)'));
+assert(dashboardCss.includes('var(--mystic-overview-art) center/100% auto no-repeat'));
+assert(!dashboardCss.includes('var(--mystic-art) right center/auto 100%'));
+assert(web.includes('--mystic-bg:#eae7ef')&&web.includes('--mystic-veil:#f4f1f65c'));
+assert(!shell.includes('style={bannerStyle(personal?.profile.coverUrl)}'));
+assert(profileCss.includes('var(--mystic-profile-art)'));
+for(const [name,width,height] of [
+ ['simplified-dark-overview.webp',2172,724],['simplified-light-overview.webp',2172,724],['immersive-dark-overview.webp',2172,724],['immersive-light-overview.webp',1916,821],
+ ['simplified-dark-profile.webp',1916,821],['light-profile.webp',1916,821],['immersive-dark-profile.webp',1916,821]
+]){
+ const art=bytes(groups[0][1]+'/'+name);
+ assert(web.includes(name),name+' missing from appearance mapping');
+ assert.equal(art.subarray(0,4).toString(),'RIFF');assert.equal(art.subarray(8,12).toString(),'WEBP');
+ assert.equal(art.subarray(12,16).toString(),'VP8 ');assert.equal(art.subarray(23,26).toString('hex'),'9d012a');
+ assert.equal(art.readUInt16LE(26)&0x3fff,width);assert.equal(art.readUInt16LE(28)&0x3fff,height);
+}
