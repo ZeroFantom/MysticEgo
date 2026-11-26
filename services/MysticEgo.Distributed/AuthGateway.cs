@@ -14,8 +14,12 @@ internal static class AuthGateway
             app.MapPost("/api/auth/" + action, (HttpContext context, IHttpClientFactory clients) =>
                 Forward(context, clients, node.AuthUrl, action)).AllowAnonymous();
         if (node.Kind is NodeKind.AuditOrchestra or NodeKind.Orchestra)
+        {
             app.MapPost("/api/auth/audit/register", (HttpContext context, IHttpClientFactory clients) =>
                 Forward(context, clients, node.AuthUrl, "audit/register")).AllowAnonymous();
+            app.MapGet("/api/auth/audit/registration-documents", (HttpContext context, IHttpClientFactory clients) =>
+                Forward(context, clients, node.AuthUrl, "audit/registration-documents")).AllowAnonymous();
+        }
     }
 
     private static async Task Forward(HttpContext context, IHttpClientFactory factory, string auth, string action)
@@ -23,11 +27,14 @@ internal static class AuthGateway
         if (context.Features.Get<IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } limit)
             limit.MaxRequestBodySize = 16_384;
         using var client = factory.CreateClient("mysticego-logged-api");
-        using var request = new HttpRequestMessage(HttpMethod.Post, auth.TrimEnd('/') + "/api/auth/" + action);
+        using var request = new HttpRequestMessage(new HttpMethod(context.Request.Method), auth.TrimEnd('/') + "/api/auth/" + action);
         if (context.Connection.RemoteIpAddress is { } caller)
             request.Headers.TryAddWithoutValidation("X-Forwarded-For", caller.ToString());
-        request.Content = new StreamContent(context.Request.Body);
-        request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+        if (HttpMethods.IsPost(context.Request.Method))
+        {
+            request.Content = new StreamContent(context.Request.Body);
+            request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+        }
         try
         {
             using var timer = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);

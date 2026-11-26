@@ -122,6 +122,26 @@ public static class ServiceCollectionExtensions
             : "CREATE TABLE IF NOT EXISTS managed_identities (\"Id\" TEXT NOT NULL PRIMARY KEY, \"Name\" TEXT NOT NULL, \"Kind\" TEXT NOT NULL, \"SecretHash\" TEXT NOT NULL, \"Enabled\" INTEGER NOT NULL, \"CreatedUtc\" TEXT NOT NULL, \"LastAuthenticatedUtc\" TEXT NULL)";
         await db.Database.ExecuteSqlRawAsync(tableDdl,ct);
 
+        // Existing databases predate the registration acceptance table.
+        var acceptanceDdl = db.Database.IsNpgsql()
+            ? """
+              CREATE TABLE IF NOT EXISTS audit_registration_acceptances (
+                  "UserId" uuid PRIMARY KEY REFERENCES users("Id") ON DELETE CASCADE,
+                  "TermsVersion" varchar(40) NOT NULL,
+                  "PrivacyVersion" varchar(40) NOT NULL,
+                  "AcceptedUtc" timestamp with time zone NOT NULL
+              )
+              """
+            : """
+              CREATE TABLE IF NOT EXISTS audit_registration_acceptances (
+                  "UserId" TEXT NOT NULL PRIMARY KEY REFERENCES users("Id") ON DELETE CASCADE,
+                  "TermsVersion" TEXT NOT NULL,
+                  "PrivacyVersion" TEXT NOT NULL,
+                  "AcceptedUtc" TEXT NOT NULL
+              )
+              """;
+        await db.Database.ExecuteSqlRawAsync(acceptanceDdl, ct);
+
         await AuthSeeder.SeedAsync(db, opt, logger, ct);
 
         var discovery = sp.GetRequiredService<IToolDiscoveryService>();

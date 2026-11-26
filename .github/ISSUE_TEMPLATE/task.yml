@@ -1,0 +1,23 @@
+name: Задача MysticEgo
+description: Оформить конкретную работу по продукту, инфраструктуре или игре
+title: "[Задача] "
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Какой результат нужен
+      description: Укажите компонент и пользователя или сценарий, для которого делается изменение.
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Как проверить готовность
+      placeholder: |
+        - [ ] ...
+    validations:
+      required: true
+  - type: textarea
+    id: references
+    attributes:
+      label: Связанные задачи и обсуждения

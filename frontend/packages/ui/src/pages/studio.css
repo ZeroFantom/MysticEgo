@@ -83,3 +83,90 @@
 .workspace-project { margin: 0 16px 8px; }
 .auth-project { border-top: 1px solid var(--line); padding-top: 14px; }
 .workspace-project a:hover, .auth-project a:hover { text-decoration: underline; }
+
+.studio-site {
+  --studio-bg: #161517;
+  --studio-panel: #201e22;
+  --studio-text: #f4ede5;
+  --studio-muted: #c5b9b4;
+  --studio-line: #4d4248;
+  --studio-accent: #f5b878;
+}
+.studio-content { max-width: 1320px; }
+.studio-hero h1 { font-family: Georgia, serif; font-weight: 400; letter-spacing: -.055em; }
+.studio-hero-cover {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  min-height: clamp(460px, 64vw, 670px);
+  align-items: end;
+  background: #17141a;
+}
+.studio-hero-cover::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(85deg, #100e14ee, #100e1490 48%, #100e140c), linear-gradient(0deg, #100e14aa, transparent 60%);
+}
+.studio-hero-image { position: absolute; z-index: -2; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.studio-hero-cover > div { max-width: 670px; }
+.studio-hero-cover p { font-size: clamp(16px, 2vw, 20px); }
+.studio-button { border-color: #8f7666; text-align: start; }
+button.studio-button { background: transparent; color: inherit; }
+.studio-button.primary { background: var(--studio-accent); color: #211711; }
+.studio-section > h2, .studio-section-heading h2 { font: 400 clamp(32px, 5vw, 56px)/1.04 Georgia, serif; }
+.studio-section-heading { margin: 0 0 24px; max-width: 65ch; }
+.studio-section-heading h2 { margin: 0; }
+.studio-card { border-radius: 4px; transition: border-color .2s ease, translate .2s ease; }
+.studio-steps { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; }
+.studio-steps li { display: grid; gap: 10px; border-top: 2px solid var(--studio-accent); padding: 16px 8px 12px 0; }
+.studio-steps li strong { font-size: 1.2rem; }
+.studio-steps li span { color: var(--studio-muted); line-height: 1.4; }
+.developer-hero { align-items: start; background: radial-gradient(ellipse at 85% 5%, #503036, transparent 72%), #231b24; }
+.developer-links { display: grid; gap: 8px; margin: 12px 0 24px; }
+.developer-links a { padding: 11px; border: 1px solid var(--studio-line); border-radius: 8px; background: #18141caa; }
+.developer-links a span { flex: 1; min-width: 0; }
+.developer-links small { display: block; color: var(--studio-muted); overflow-wrap: anywhere; }
+.economics-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 18px; }
+.economics fieldset, .economics-results { min-width: 0; margin: 0; padding: clamp(12px, 3vw, 22px); border: 1px solid var(--studio-line); border-radius: 12px; background: var(--studio-panel); }
+.economics legend { padding: 0 6px; }
+.economics label { display: grid; gap: 5px; margin-bottom: 12px; }
+.economics label span, .economics-metrics dt { color: var(--studio-muted); font-size: .82rem; }
+.economics input { min-width: 0; width: 100%; padding: 8px; border: 1px solid var(--studio-line); border-radius: 6px; color: inherit; background: var(--studio-bg); }
+.economics-metrics { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; margin: 0 0 18px; }
+.economics-metrics dd { margin: 5px 0 0; font-weight: 750; overflow-wrap: anywhere; }
+.economics figure { margin: 0; }
+.economics figcaption { margin-bottom: 12px; }
+.economics-row { display: grid; grid-template-columns: 3.4rem minmax(28px,1fr) minmax(5.3rem,auto); gap: 8px; align-items: center; padding: 5px 0; font-size: .82rem; font-variant-numeric: tabular-nums; }
+.economics-row > :last-child { text-align: end; overflow-wrap: anywhere; }
+.economics-track { display: block; position: relative; height: 11px; border-radius: 3px; background: linear-gradient(90deg,#33242f 49%,#b89485 50%,#33242f 51%); }
+.economics-track > span { position: absolute; height: 100%; border-radius: 2px; transition: width .28s ease; }
+.economics-track .loss { right: 50%; background: #e08499; }
+.economics-track .gain { left: 50%; background: var(--studio-accent); }
+@media (prefers-reduced-motion: no-preference) {
+  .studio-hero > div, .developer-hero > aside { animation: studio-enter .6s ease-out both; }
+  .developer-hero > aside { animation-delay: .12s; }
+  .studio-hero-image { animation: studio-image .95s ease-out both; }
+  .studio-card:hover, .studio-card:focus-within { translate: 0 -3px; border-color: #8f7666; }
+  @keyframes studio-enter { from { opacity: 0; translate: 0 12px; } to { opacity: 1; translate: 0 0; } }
+  @keyframes studio-image { from { scale: 1.04; opacity: .7; } to { scale: 1; opacity: 1; } }
+}
+@media (max-width: 760px) {
+  .studio-steps { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .economics-layout { grid-template-columns: minmax(0,1fr); }
+  .studio-hero-cover { min-height: 465px; }
+  .studio-hero-image { object-position: 62% center; }
+  .studio-hero-cover::after { background: linear-gradient(0deg, #100e14ee 8%, #100e14bb 55%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .economics-track > span, .studio-card { transition: none; }
+}
+
+.registration-documents { display: grid; gap: 8px; }
+.auth-form .registration-documents label { display: flex; align-items: flex-start; gap: 9px; }
+.auth-form .registration-documents input { width: auto; margin: 3px 0 0; accent-color: var(--accent); }
+.registration-documents a { text-decoration: underline; text-underline-offset: 3px; }
+.developer-hero h1 { font-size: clamp(37px, 5.2vw, 68px); overflow-wrap: anywhere; }
+.developer-meta { font-size: .9rem; }

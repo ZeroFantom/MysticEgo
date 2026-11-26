@@ -32,7 +32,7 @@ package() {
     esac
     local public="$output/MysticEgo-Desktop-$platform.zip"
     local developer="$output/MysticEgo-CloudDesk-$platform.zip"
-    local entries=(LICENSE "$audit" "$agent" "$local_launcher" desktop runtime/app runtime/avatars "$electron" "$dotnet")
+    local entries=(LICENSE docs/legal/commercial.md docs/legal/LICENSE-APACHE-2.0.txt "$audit" "$agent" "$local_launcher" desktop runtime/app runtime/avatars "$electron" "$dotnet")
     for optional in runtime/vision runtime/THIRD_PARTY.md; do
         if [[ -e "$folder/$optional" ]]; then entries+=("$optional"); fi
     done
