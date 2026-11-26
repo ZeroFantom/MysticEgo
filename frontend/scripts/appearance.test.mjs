@@ -10,12 +10,18 @@ const groups=[
 for(const [css,assets,settings] of groups){
  const styles=read(css),controls=read(settings);
  for(const color of ['dark','light'])for(const style of ['immersive','simplified']){
-  const name=style+'-'+color+'.webp';
+  const name=style+'-'+color+'-hero.webp';
   assert(styles.includes('[data-interface="'+style+'"][data-theme="'+color+'"]'),css+' missing '+style+'/'+color);
-  const runtimeName=style==='simplified'&&color==='dark'?'simplified-dark.svg':name;
-  assert(styles.includes(runtimeName),css+' asset missing');
-  if(runtimeName.endsWith('.svg'))assert(read(assets+'/'+runtimeName).includes('<svg'));
-  const art=bytes(assets+'/'+name);assert.equal(art.subarray(0,4).toString(),'RIFF');assert.equal(art.subarray(8,12).toString(),'WEBP');assert(art.length>4000);
+  const entry=style+'-'+color+'-entry.webp';
+  for(const [asset,width,height] of [[name,1916,821],[entry,1122,1402]]){
+    assert(styles.includes(asset),css+' missing '+asset);
+    const art=bytes(assets+'/'+asset);
+    assert.equal(art.subarray(0,4).toString(),'RIFF');assert.equal(art.subarray(8,12).toString(),'WEBP');
+    assert.equal(art.subarray(12,16).toString(),'VP8 ');assert.equal(art.subarray(23,26).toString('hex'),'9d012a');
+    assert.equal(art.readUInt16LE(26)&0x3fff,width);assert.equal(art.readUInt16LE(28)&0x3fff,height);
+    assert(art.equals(bytes(groups[0][1]+'/'+asset)),asset+' differs between clients');
+    assert(read('tools/MysticEgo.CloudDesk/update.sh').includes('src/appearance-art/'+asset));
+  }
  }
  for(const option of ['interfaceStyle','uiMotion','transition','system','simplified','immersive'])assert(controls.includes(option),settings+' missing '+option);
  assert(styles.includes('prefers-reduced-motion')&&styles.includes('data-ui-motion=off'),css+' motion override missing');
@@ -36,7 +42,7 @@ const web=read('frontend/packages/ui/src/app/appearance.css');
 const settings=read('frontend/packages/ui/src/pages/Settings.tsx');
 assert(settings.includes('className="appearance-art-preview"'));
 const preview=web.match(/\.appearance-style-option>\.appearance-art-preview\{([^}]+)\}/)?.[1]??'';
-assert(preview.includes('aspect-ratio:16/9')&&preview.includes('background-size:contain')&&preview.includes('background-repeat:no-repeat'));
+assert(preview.includes('aspect-ratio:21/9')&&preview.includes('background-size:contain')&&preview.includes('background-repeat:no-repeat'));
 assert(!/\.appearance-style-option>span\{height:/.test(web));
 const quick=web.match(/:root \.appearance-quick>button\.icon-btn\{([^}]+)\}/)?.[1]??'';
 assert(quick.includes('border-radius:50%')&&quick.includes('background:transparent'));
@@ -73,10 +79,10 @@ assert(desktopEffects.includes('styleButtons.set(key,button)')&&desktopEffects.i
 assert(desktopEffects.includes('state={...defaults}')&&desktopEffects.includes('sync();'));
 assert(cloudControls.includes('aria-pressed={look.interfaceStyle===value}')&&cloudControls.includes('useLayoutEffect'));
 for(const css of [desktopCss,cloudCss]){
- assert(css.includes('aspect-ratio:16/9')&&css.includes('background-size:contain')&&css.includes('simplified-dark.svg'));
+ assert(css.includes('aspect-ratio:21/9')&&css.includes('background-size:contain')&&css.includes('simplified-dark-hero.webp'));
 }
 assert(desktopCss.includes('object-fit:contain')&&cloudCss.includes('aside .bottom{display:block'));
-assert(overlay.includes('simplified-dark.svg')&&overlay.includes('border-radius:50%'));
+assert(overlay.includes('simplified-dark-hero.webp')&&overlay.includes('border-radius:50%'));
 assert(updater.includes('src/appearance-art/simplified-dark.svg')&&updater.includes('src/AuditPortal.jsx'));
 
 const motion=read('frontend/packages/ui/src/app/motion.css');
@@ -90,3 +96,6 @@ assert(motion.includes('data-ui-motion=off')&&motion.includes('prefers-reduced-m
 assert(cinematic.includes('IntersectionObserver')&&cinematic.includes('visibilitychange')&&cinematic.includes('element.pause()'));
 assert(cinematic.includes('preload="metadata"')&&!cinematic.includes('autoPlay'));
 assert(cinematic.includes('loading="lazy"')&&motion.includes('aspect-ratio:16/9')&&motion.includes('object-fit:contain'));
+
+assert(web.includes('var(--mystic-entry-art) right center/auto 100%')&&web.includes('@media(max-width:780px)'));
+assert(motion.includes('data-playing=false]{aspect-ratio:21/9}'));

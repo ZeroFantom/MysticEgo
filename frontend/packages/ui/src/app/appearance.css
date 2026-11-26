@@ -96,7 +96,7 @@
 :root[data-interface=simplified] .mystic-workspace .orchestral-topbar:not([style*="url"]){background:linear-gradient(90deg,var(--mystic-surface) 35%,transparent 170%),var(--mystic-art) right center/auto 100% no-repeat,var(--mystic-surface)}
 :root[data-interface=immersive] .mystic-workspace .orchestral-topbar:not([style*="url"]){background:linear-gradient(90deg,var(--mystic-surface) 15%,var(--mystic-veil) 42%,transparent 82%),var(--mystic-art) right center/auto 100% no-repeat,var(--mystic-surface)}
 :root[data-interface=immersive] .auth-experience .auth-visual{background:linear-gradient(180deg,var(--mystic-veil) 0%,transparent 30%,transparent 70%,var(--mystic-veil) 100%),var(--mystic-entry-art) right center/auto 100% no-repeat,var(--mystic-bg);animation:none}
-:root[data-interface=simplified] .auth-experience .auth-visual{background:linear-gradient(145deg,var(--mystic-bg) 10%,transparent 140%),var(--mystic-art) center/cover}
+:root[data-interface=simplified] .auth-experience .auth-visual{background:linear-gradient(145deg,var(--mystic-bg) 10%,transparent 140%),var(--mystic-entry-art) right center/auto 100% no-repeat,var(--mystic-bg)}
 :root[data-interface=immersive] .auth-orbit{opacity:0;animation:none!important}
 :root[data-interface=immersive] .auth-brand,:root[data-interface=immersive] .auth-role{position:relative;z-index:2}
 :root[data-interface=immersive] .mystic-share{background:linear-gradient(130deg,var(--mystic-veil),transparent 150%),var(--mystic-art) right center/auto 100% no-repeat,var(--mystic-bg)}

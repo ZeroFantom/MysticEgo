@@ -35,7 +35,7 @@ export function CinematicPreview(){
  return <section className="cinematic-preview" aria-label="Синематика оформления">
  <div><p>Короткая синематика · MysticEgo</p>{allowed&&<button type="button" aria-controls={mediaId} aria-expanded={opened} onClick={()=>setOpenSource(opened?null:source)}>{opened?'Скрыть видео':'Смотреть видео'}</button>}</div>
  <div id={mediaId} className="cinematic-media" data-playing={opened}>
- {opened?<video ref={video} key={source} controls muted playsInline preload="metadata" poster={poster} src={source} aria-label="Анимированный пейзаж MysticEgo"/>:<img src={poster} loading="lazy" decoding="async" alt="Статический пейзаж оформления MysticEgo"/>}
+ {opened?<video ref={video} key={source} controls muted playsInline preload="metadata" poster={poster} src={source??undefined} aria-label="Анимированный пейзаж MysticEgo"/>:<img src={poster} loading="lazy" decoding="async" alt="Статический пейзаж оформления MysticEgo"/>}
  </div>
  {!allowed&&<small className="cinematic-motion-note">{source?'Статический кадр · анимации отключены или ограничены':'Статический пейзаж'}</small>}
  </section>;

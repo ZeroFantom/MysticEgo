@@ -95,6 +95,22 @@ async function checkHeaderNotifications(page,header){
   await page.keyboard.press('Escape');await drawer.waitFor({state:'hidden'});
   assert.equal(await bell.getAttribute('aria-expanded'),'false');
 }
+async function checkArtwork(page,theme,style,selector,kind){
+  const data=await page.evaluate(async({theme,style,selector,kind})=>{
+    const root=getComputedStyle(document.documentElement);
+    const url=raw=>{const match=raw.match(/url\(["']?([^"')]+)["']?\)/);return match?new URL(match[1],document.baseURI).href:null};
+    const hero=url(root.getPropertyValue('--mystic-art')),entry=url(root.getPropertyValue('--mystic-entry-art'));
+    const load=async src=>{if(!src)throw Error('Missing artwork URL');const img=new Image();img.src=src;await img.decode();return [img.naturalWidth,img.naturalHeight]};
+    const element=document.querySelector(selector);
+    if(!element)throw Error('Missing artwork surface '+selector);
+    const active=url(getComputedStyle(element).backgroundImage);
+    const expected=kind==='hero'?hero:entry;
+    return {hero,entry,active,expected,heroSize:await load(hero),entrySize:await load(entry),prefix:style+'-'+theme};
+  },{theme,style,selector,kind});
+  assert.deepEqual(data.heroSize,[1916,821]);assert.deepEqual(data.entrySize,[1122,1402]);
+  assert(data.hero.includes(data.prefix+'-hero')&&data.entry.includes(data.prefix+'-entry'),'Incorrect theme artwork');
+  assert.equal(data.active,data.expected,'Incorrect artwork for '+selector);
+}
 async function capture(page,label){
   await page.evaluate(()=>document.fonts.ready);
   await page.screenshot({path:resolve(output,label+'.png'),animations:'disabled',fullPage:true,timeout:15000});
@@ -118,7 +134,7 @@ try{
           await page.goto(origin+'/settings',{waitUntil:'domcontentloaded'});
           await visible(page.locator('.auth-form-card'));
           for(const [theme,style] of combinations)await check(page,prefix+'-login-'+theme+'-'+style,async()=>{
-            await switchAppearance(page,theme,style);await noHorizontalOverflow(page);await capture(page,prefix+'-login-'+theme+'-'+style);
+            await switchAppearance(page,theme,style);await checkArtwork(page,theme,style,'.auth-visual',viewport.width<=780?'hero':'entry');await noHorizontalOverflow(page);await capture(page,prefix+'-login-'+theme+'-'+style);
           });
           await check(page,prefix+'-login-notifications',async()=>{
             await checkHeaderNotifications(page,'.auth-top-actions');
@@ -136,7 +152,7 @@ try{
             for(const [theme,style] of combinations)await check(page,prefix+'-settings-'+theme+'-'+style,async()=>{
               await switchAppearance(page,theme,style);
               const previews=await page.locator('.appearance-art-preview').evaluateAll(items=>items.map(el=>{const r=el.getBoundingClientRect(),c=getComputedStyle(el);return {ratio:r.width/r.height,fit:c.backgroundSize,repeat:c.backgroundRepeat}}));
-              assert.equal(previews.length,2);for(const preview of previews){assert(Math.abs(preview.ratio-16/9)<.08);assert.equal(preview.fit,'contain');assert.equal(preview.repeat,'no-repeat')}
+              assert.equal(previews.length,2);for(const preview of previews){assert(Math.abs(preview.ratio-21/9)<.08);assert.equal(preview.fit,'contain');assert.equal(preview.repeat,'no-repeat')}
               await noHorizontalOverflow(page);await capture(page,prefix+'-settings-'+theme+'-'+style);
             });
             if(viewport.width<=850)await check(page,prefix+'-drawer',async()=>{
@@ -179,6 +195,7 @@ try{
               for(const [theme,style] of combinations){
                 await switchAppearance(page,theme,style);
                 await noHorizontalOverflow(page);
+                await checkArtwork(page,theme,style,'.dashboard-hero',viewport.width<=650?'entry':'hero');
                 await capture(page,prefix+'-overview-'+theme+'-'+style);
               }
             });
