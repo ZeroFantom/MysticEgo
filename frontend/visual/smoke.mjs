@@ -83,6 +83,18 @@ async function switchAppearance(page,theme,style){
   assert(Math.abs(shape.width-shape.height)<1,'style control must be square before rounding');
   assert(shape.raw.endsWith('%')?shape.radius>=50:shape.radius>=shape.width/2-1,'style control must be circular');
 }
+async function checkHeaderNotifications(page,header){
+  const bell=page.locator(header+' .notification-float[data-placement=header] > .bell-button');
+  await visible(bell);
+  assert.equal(await bell.locator('..').evaluate(el=>getComputedStyle(el).position),'relative','notification control must not float over page inputs');
+  await bell.click();
+  const drawer=page.locator(header+' .notification-drawer.motion-disclosure');
+  await visible(drawer);
+  const bounds=await drawer.evaluate(el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,width:innerWidth}});
+  assert(bounds.left>=-1&&bounds.right<=bounds.width+1,'notification drawer exceeds viewport '+JSON.stringify(bounds));
+  await page.keyboard.press('Escape');await drawer.waitFor({state:'hidden'});
+  assert.equal(await bell.getAttribute('aria-expanded'),'false');
+}
 async function capture(page,label){
   await page.evaluate(()=>document.fonts.ready);
   await page.screenshot({path:resolve(output,label+'.png'),animations:'disabled',fullPage:true,timeout:15000});
@@ -107,6 +119,13 @@ try{
           await visible(page.locator('.auth-form-card'));
           for(const [theme,style] of combinations)await check(page,prefix+'-login-'+theme+'-'+style,async()=>{
             await switchAppearance(page,theme,style);await noHorizontalOverflow(page);await capture(page,prefix+'-login-'+theme+'-'+style);
+          });
+          await check(page,prefix+'-login-notifications',async()=>{
+            await checkHeaderNotifications(page,'.auth-top-actions');
+            const reveal=page.getByRole('button',{name:'Показать пароль',exact:true});
+            await reveal.click();assert.equal(await page.locator('#auth-password').getAttribute('type'),'text');
+            await page.getByRole('button',{name:'Скрыть пароль',exact:true}).click();
+            assert.equal(await page.locator('#auth-password').getAttribute('type'),'password');
           });
           await check(page,prefix+'-authenticated',async()=>{
             await page.locator('#auth-login').fill('visual-user');await page.locator('#auth-password').fill('fixture-password');
@@ -143,6 +162,9 @@ try{
               await select.selectOption('normal');
               await page.waitForFunction(()=>document.documentElement.dataset.uiMotion==='normal');
               await page.emulateMedia({reducedMotion:'reduce'});
+            });
+            await check(page,prefix+'-workspace-notifications',async()=>{
+              await checkHeaderNotifications(page,'.top-actions');
             });
             await check(page,prefix+'-account',async()=>{
               const trigger=page.locator('.account-trigger');await trigger.click();await visible(page.locator('.account-popover'));

@@ -30,3 +30,11 @@ jobs:
           path: ${{ runner.temp }}/mystic-visual
           if-no-files-found: warn
           retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mysticego-design-references
+          path: docs/design/generated/*.png
+          if-no-files-found: warn
+          retention-days: 7
