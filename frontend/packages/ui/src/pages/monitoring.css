@@ -1,0 +1,64 @@
+/* Monitoring uses shared design tokens and keeps the topology viewport fixed while zooming its contents. */
+:root[data-interface] .mystic-workspace .network-zoomed{width:100%;min-width:0}
+:root[data-interface] .mystic-workspace .network-graph-scroll{
+  min-height:260px;max-height:min(66dvh,680px);width:100%;overflow:auto;overscroll-behavior:contain;
+  background:var(--mystic-bg);border:1px solid var(--mystic-line);border-radius:14px;scrollbar-width:thin;
+  scrollbar-color:var(--mystic-primary) var(--mystic-bg);
+}
+:root[data-interface] .mystic-workspace .network-graph{zoom:var(--network-zoom,1);min-width:0;min-height:0;background:radial-gradient(color-mix(in srgb,var(--mystic-primary) 22%,transparent) .8px,transparent .8px) 0 0/18px 18px}
+:root[data-interface] .mystic-workspace .network-edges path{stroke:color-mix(in srgb,var(--mystic-primary) 65%,var(--mystic-line));stroke-width:1.5;vector-effect:non-scaling-stroke}
+:root[data-interface] .mystic-workspace .network-card{background:var(--mystic-surface);border:1px solid var(--mystic-line);border-radius:12px;color:var(--mystic-ink);transition:background-color var(--mystic-time) ease,border-color var(--mystic-time) ease,box-shadow var(--mystic-time) ease}
+:root[data-interface] .mystic-workspace .network-card:is(:hover,.selected){background:var(--mystic-raised);border-color:var(--mystic-primary)}
+:root[data-interface] .mystic-workspace .network-card.selected{box-shadow:0 0 0 2px color-mix(in srgb,var(--mystic-primary) 22%,transparent)}
+:root[data-interface] .mystic-workspace .network-card[data-node-state=disabled]{opacity:.7}
+:root[data-interface] .mystic-workspace .network-card[data-node-state=offline] .network-dot{background:#e17b90}
+:root[data-interface] .mystic-workspace .network-card[data-node-state=pending] .network-dot{background:#d7a64d}
+:root[data-interface] .mystic-workspace .network-card[data-node-state=online] .network-dot{background:#4eb99c;box-shadow:none}
+:root[data-interface] .mystic-workspace .network-card .network-node-icon{flex:none;color:var(--mystic-primary)}
+:root[data-interface] .mystic-workspace .graph-zoom{gap:10px;flex-wrap:wrap;min-height:38px}
+:root[data-interface] .mystic-workspace .graph-zoom input{width:min(140px,50%);accent-color:var(--mystic-primary)}
+:root[data-interface] .mystic-workspace .summary-metric{gap:8px;min-width:0;min-height:128px}
+:root[data-interface] .mystic-workspace .summary-metric strong{font-variant-numeric:tabular-nums;line-height:1.12;overflow-wrap:anywhere}
+:root[data-interface] .mystic-workspace .summary-metric span{line-height:1.4}
+:root[data-interface] .mystic-workspace .organization-bar strong{overflow-wrap:anywhere}
+:root[data-interface] .mystic-workspace .organization-bar div span{min-width:0;height:7px}
+:root[data-interface] .mystic-workspace .organization-bar div b{font-variant-numeric:tabular-nums}
+:root[data-interface] .mystic-workspace .monitor-empty{padding:18px 12px;color:var(--mystic-muted);line-height:1.5;text-align:center;overflow-wrap:anywhere}
+:root[data-interface] .mystic-workspace .diag-summary{align-items:center;gap:10px}
+:root[data-interface] .mystic-workspace .diag-summary>span{border:1px solid var(--mystic-line);background:var(--mystic-surface);border-radius:10px;padding:7px 10px;min-width:0;overflow-wrap:anywhere}
+:root[data-interface] .mystic-workspace .monitor-freshness[data-stale=true]{color:var(--mystic-ink);border-color:#c78b45;background:color-mix(in srgb,#c78b45 13%,var(--mystic-surface))}
+:root[data-interface] .mystic-workspace .telemetry-value{font-size:clamp(20px,3vw,30px);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+:root[data-interface] .mystic-workspace .resource-plot{gap:10px;color:var(--mystic-primary);min-width:0;align-items:stretch}
+:root[data-interface] .mystic-workspace .resource-plot svg{flex:1;min-width:0;width:0;height:112px;overflow:hidden}
+:root[data-interface] .mystic-workspace .resource-plot .chart-gridline{stroke:var(--mystic-line)}
+:root[data-interface] .mystic-workspace .chart-scale{flex:0 0 80px;min-width:0;font-variant-numeric:tabular-nums;color:var(--mystic-muted);overflow-wrap:anywhere}
+:root[data-interface] .mystic-workspace .chart-times{padding-inline-start:90px;font-variant-numeric:tabular-nums;gap:8px}
+:root[data-interface] .mystic-workspace .node-details .row-actions{flex-wrap:wrap}
+@media(max-width:650px){
+  :root[data-interface] .mystic-workspace .network-graph-scroll{min-height:220px;max-height:56dvh}
+  :root[data-interface] .mystic-workspace .summary-metric{min-height:100px}
+  :root[data-interface] .mystic-workspace .chart-scale{flex-basis:64px}
+  :root[data-interface] .mystic-workspace .chart-times{padding-inline-start:74px}
+}
+:root[data-ui-motion=off] .mystic-workspace .network-card{transition:none!important}
+@media(prefers-reduced-motion:reduce){:root[data-interface] .mystic-workspace .network-card{transition:none!important}}
+
+/* Smooth measured series and clearly distinct, unmeasured intervals. */
+.telemetry-chart{--chart-gap-color:#d8ac61;min-width:0}
+:root[data-theme=light] .telemetry-chart{--chart-gap-color:#a46b20}
+.telemetry-chart .chart-line,.telemetry-chart .chart-gap-bridge{
+  fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke
+}
+.telemetry-chart .chart-line{stroke:currentColor}
+.telemetry-chart .chart-gap-bridge{stroke-dasharray:5 4;opacity:.92;animation:chart-gap-appear var(--mystic-time,240ms) ease-out both}
+.telemetry-chart .chart-gap-region{fill:var(--chart-gap-color);opacity:.045;pointer-events:none}
+.telemetry-chart .chart-new-edge{stroke-dasharray:1 1;stroke-dashoffset:0;animation:chart-edge-reveal var(--mystic-time,240ms) var(--mystic-ease,ease-out) both}
+.telemetry-chart .chart-new-point{animation:chart-gap-appear var(--mystic-time,240ms) ease-out both}
+@keyframes chart-edge-reveal{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+@keyframes chart-gap-appear{from{opacity:0}to{opacity:.92}}
+.chart-data-legend{display:flex;gap:6px 14px;flex-wrap:wrap;margin:6px 0 0;color:var(--mystic-muted);font-size:.72rem;line-height:1.45}
+.chart-data-legend>span{display:inline-flex;align-items:center;gap:6px}
+.chart-data-legend i{display:inline-block;width:18px;flex:none;border-radius:4px;border-top:2px solid var(--mystic-primary)}
+.chart-data-legend .chart-legend-gap{border-top:2px dashed var(--chart-gap-color)}
+:root[data-ui-motion=off] .telemetry-chart :is(.chart-new-edge,.chart-new-point,.chart-gap-bridge){animation:none!important;stroke-dashoffset:0}
+@media(prefers-reduced-motion:reduce){.telemetry-chart :is(.chart-new-edge,.chart-new-point,.chart-gap-bridge){animation:none!important;stroke-dashoffset:0}}
