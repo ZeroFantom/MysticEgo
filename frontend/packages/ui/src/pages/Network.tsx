@@ -1,10 +1,11 @@
 import {usePanelPreference} from '../app/panelPreferences';
 import {GlobalTimeweb} from "./GlobalTimeweb";
-import {useMemo,useState,type FormEvent} from 'react';
+import {useMemo,useState,type FormEvent,type CSSProperties} from 'react';
 import {Link,useSearchParams} from 'react-router-dom';
 import {Activity,ArrowUpRight,Building2,Cloud,HardDrive,House,Laptop,Network,Plus,Rows3,ShieldCheck,UserRound} from 'lucide-react';
 import {useApp,useRemote} from '../app/context';
 import {Panel,Header,ErrorBanner,Badge} from '../components/primitives';
+import './monitoring.css';
 
 export type Kind='orchestra'|'global'|'local'|'agent'|'audit';
 export type NodeInfo={id:string;kind:Kind;name:string;parentId:string;ownerId?:string;publicUrl?:string;mode:string;enabled:boolean;applicationId?:string;members?:string[]};
@@ -12,11 +13,13 @@ export type NodeStatus={node:NodeInfo;report?:{seen:string;healthy:string[];erro
 export type NetworkContext={rootId:string;rootName:string;orchestraUrl:string;authUrl:string;developer:boolean;owner?:boolean;actor:string;lan:boolean};
 export const kindNames:Record<Kind,string>={orchestra:'Оркестр',global:'Global',local:'Local',agent:'Agent',audit:'Audit'};
 const icons={orchestra:ShieldCheck,global:Cloud,local:HardDrive,agent:Laptop,audit:House};
-export const online=(row:NodeStatus)=>row.node.kind==='orchestra'||row.report?.healthy.includes(row.node.kind)===true;
+export const online=(row:NodeStatus)=>row.node.enabled&&(row.node.kind==='orchestra'||row.report?.healthy.includes(row.node.kind)===true);
+const nodeState=(row:NodeStatus)=>!row.node.enabled?'disabled':online(row)?'online':row.report?'offline':'pending';
+const nodeLabel=(row:NodeStatus)=>({disabled:'Отключён',online:'В сети',offline:'Нет связи',pending:'Нет отчёта'}[nodeState(row)]);
 export function useNetwork(){
   const {api}=useApp();
   const context=useRemote(()=>api.request<NetworkContext>('/managed/context'),[api]);
-  const topology=useRemote(()=>api.request<NodeStatus[]>('/managed/topology'),[api],5000);
+  const topology=useRemote(()=>api.request<NodeStatus[]>('/managed/topology'),[api],5000,true);
   return {context,topology};
 }
 
@@ -35,18 +38,18 @@ export function OrchestraOverview(){
     <div className="metrics summary-grid">
       {[{icon:Cloud,count:globals.length,label:'Организации Global'},{icon:UserRound,count:people,label:'Участники'},
         {icon:Building2,count:sites,label:'Площадки Local'},{icon:Activity,count:up,label:'Global в сети'}].map(tile=>
-        <article className="metric summary-metric" key={tile.label}><tile.icon size={20}/><strong>{topology.loading?'…':tile.count}</strong><span>{tile.label}</span></article>)}
+        <article className="metric summary-metric" key={tile.label}><tile.icon size={20}/><strong>{topology.value?tile.count:topology.loading?'…':'—'}</strong><span>{tile.label}</span></article>)}
     </div>
     <div className="overview-grid">
-      <Panel title="Организации" aside={<span className="muted">{globals.length} Global</span>}>
-        {globals.length===0&&!topology.loading?<div className="network-empty"><Cloud size={28}/><p>Здесь появятся созданные Global</p>
+      <Panel title="Организации" aside={<span className="muted">{topology.value?globals.length:'—'} Global</span>}>
+        {!topology.value?<p className="monitor-empty">{topology.error?'Данные организаций недоступны':'Загружаем организации…'}</p>:globals.length===0?<div className="network-empty"><Cloud size={28}/><p>Здесь появятся созданные Global</p>
           {(context.value?.owner??context.value?.developer)&&<Link to="/setup" className="btn secondary">Подготовить первую организацию</Link>}</div>:
           <div className="table-wrap"><table><thead><tr><th>Название</th><th>Участники</th><th>Local</th><th>Состояние</th></tr></thead>
             <tbody>{globals.map(row=><tr key={row.node.id}><td><Link className="text-link" to={'/nodes?node='+row.node.id}><Cloud size={15}/>{row.node.name}</Link></td>
-              <td>{row.people}</td><td>{row.sites}</td><td><Badge ok={online(row)} text={online(row)?'В сети':'Ожидает подключения'}/></td></tr>)}</tbody></table></div>}
+              <td>{row.people}</td><td>{row.sites}</td><td><Badge ok={online(row)} text={nodeLabel(row)}/></td></tr>)}</tbody></table></div>}
       </Panel>
       <Panel title="Участники и площадки" aside={<span className="chart-legend"><i/>Люди<i/>Local</span>}>
-        <div className="organization-chart">{globals.length===0?<p className="footnote">Диаграмма появится после создания Global.</p>:
+        <div className="organization-chart">{!topology.value?<p className="monitor-empty">Нет доступных данных</p>:globals.length===0?<p className="footnote">Диаграмма появится после создания Global.</p>:
           globals.map(row=><div key={row.node.id} className="organization-bar">
             <strong>{row.node.name}</strong><div><span style={{width:`${row.people/maximum*100}%`}}/><b>{row.people}</b></div>
             <div><span style={{width:`${row.sites/maximum*100}%`}}/><b>{row.sites}</b></div>
@@ -72,8 +75,8 @@ function TreeGraph({rows,root,selected,choose}:{rows:NodeStatus[];root:string;se
     function visit(row:NodeStatus,depth:number):{row:NodeStatus;x:number;y:number}{
       visited.add(row.node.id);
       const x=24+depth*216;
-      const children=(byParent.get(row.node.id)??[]).filter(next=>!visited.has(next.node.id));
-      const placed=children.map(child=>visit(child,depth+1));
+      const placed:{row:NodeStatus;x:number;y:number}[]=[];
+      for(const child of byParent.get(row.node.id)??[]){if(!visited.has(child.node.id))placed.push(visit(child,depth+1))}
       const y=placed.length?(placed[0].y+placed[placed.length-1].y)/2:24+(leaves++)*94;
       const result={row,x,y};cards.push(result);
       for(const child of placed)edges.push({x1:x+182,y1:y+34,x2:child.x,y2:child.y+34,id:child.row.node.id});
@@ -84,16 +87,16 @@ function TreeGraph({rows,root,selected,choose}:{rows:NodeStatus[];root:string;se
     for(const row of rows)if(!visited.has(row.node.id))visit(row,1);
     return {cards,edges,width:Math.max(240,...cards.map(x=>x.x+204)),height:Math.max(140,...cards.map(x=>x.y+92))};
   },[rows,root]);
-  return <div className="network-graph-scroll" aria-label="Граф узлов"><div className="network-graph" style={{width:columns.width,height:columns.height}}>
+  return <div className="network-graph-scroll" tabIndex={0} role="region" aria-label="Граф узлов, прокрутка по горизонтали и вертикали"><div className="network-graph" style={{width:columns.width,height:columns.height}}>
     <svg width={columns.width} height={columns.height} className="network-edges" aria-hidden="true">
       {columns.edges.map(edge=><path key={edge.id} d={`M ${edge.x1} ${edge.y1} C ${edge.x1+23} ${edge.y1}, ${edge.x2-23} ${edge.y2}, ${edge.x2} ${edge.y2}`}/>)}
     </svg>
     {columns.cards.map(({row,x,y})=>{
       const Icon=icons[row.node.kind];
       return <button className={'network-card '+(selected===row.node.id?'selected':'')} style={{left:x,top:y}} key={row.node.id}
-        onClick={()=>choose(row)} aria-pressed={selected===row.node.id}>
-        <span className="network-node-icon"><Icon size={18}/></span><span><strong title={row.node.name}>{row.node.name}</strong><small>{kindNames[row.node.kind]}</small></span>
-        <i className={online(row)?'network-dot online':'network-dot'}/>
+        onClick={()=>choose(row)} aria-pressed={selected===row.node.id} data-node-state={nodeState(row)} aria-label={row.node.name+' · '+kindNames[row.node.kind]+' · '+nodeLabel(row)}>
+        <span className="network-node-icon"><Icon size={18}/></span><span><strong title={row.node.name}>{row.node.name}</strong><small>{kindNames[row.node.kind]} · {nodeLabel(row)}</small></span>
+        <i aria-hidden="true" className={online(row)?'network-dot online':'network-dot'}/>
       </button>;
     })}
   </div></div>;
@@ -106,7 +109,7 @@ export function NetworkPage(){
   const [view,setView]=usePanelPreference<'graph'|'table'>('network.view','graph',(v):v is 'graph'|'table'=>v==='graph'||v==='table');
   const [filter,setFilter]=usePanelPreference('network.filter','',(v):v is string=>typeof v==='string'&&v.length<=200);
   const [zoom,setZoom]=usePanelPreference('network.zoom',100,(v):v is number=>typeof v==='number'&&Number.isFinite(v)&&v>=50&&v<=200);
-  const [name,setName]=useState('');
+  const [name,setName]=useState<string|null>(null);
   const [enabled,setEnabled]=useState<boolean|null>(null);
   const [member,setMember]=useState('');
   const [message,setMessage]=useState('');
@@ -116,7 +119,7 @@ export function NetworkPage(){
   const rows=useMemo(()=>{
     if(!root)return [];
     const config=context.value!;
-    return [{node:{id:root,kind:'orchestra',name:config.rootName||'Оркестр',parentId:'',mode:'native',enabled:true,publicUrl:config.orchestraUrl},people:0,sites:0} as NodeStatus,...(topology.value??[])];
+    return [{node:{id:root,kind:'orchestra',name:config.rootName||'Оркестр',parentId:'',mode:'native',enabled:true,publicUrl:config.orchestraUrl},people:0,sites:0} as NodeStatus,...(topology.value??[]).filter(item=>item.node.id!==root)];
   },[root,context.value,topology.value]);
   const visible=useMemo(()=>{
     const term=filter.trim().toLowerCase();
@@ -133,11 +136,11 @@ export function NetworkPage(){
   const selectedId=selected?.node.id;
   const audit=useRemote(()=>selectedId&&mode==='orchestra'?api.request<{items:{id:string;at:string;action:string;detail?:string}[]}>('/audit/page?size=5&target='+selectedId):Promise.resolve(null),[api,selectedId,mode]);
   function choose(row:NodeStatus){
-    setParams({node:row.node.id});setName('');setEnabled(null);setMessage('');setError('');setMember('');
+    setParams({node:row.node.id});setName(null);setEnabled(null);setMessage('');setError('');setMember('');
   }
   async function edit(event:FormEvent){
     event.preventDefault();if(!selected)return;setBusy(true);setError('');setMessage('');
-    try{await api.request('/managed/nodes/'+selected.node.id,{method:'PUT',body:JSON.stringify({name:name||selected.node.name,enabled:enabled??selected.node.enabled})});
+    try{await api.request('/managed/nodes/'+selected.node.id,{method:'PUT',body:JSON.stringify({name:(name??selected.node.name).trim(),enabled:enabled??selected.node.enabled})});
       setMessage('Узел обновлён');topology.reload();audit.reload()}
     catch(error){setError(String(error))}
     finally{setBusy(false)}
@@ -155,23 +158,23 @@ export function NetworkPage(){
     <ErrorBanner text={context.error||topology.error||error}/>
     <div className="topology-layout">
       <Panel title="Топология" aside={<div className="segmented">
-        <button className={view==='graph'?'active':''} onClick={()=>setView('graph')}><Network size={16}/> Граф</button>
-        <button className={view==='table'?'active':''} onClick={()=>setView('table')}><Rows3 size={16}/> Таблица</button>
+        <button type="button" aria-pressed={view==='graph'} className={view==='graph'?'active':''} onClick={()=>setView('graph')}><Network size={16}/> Граф</button>
+        <button type="button" aria-pressed={view==='table'} className={view==='table'?'active':''} onClick={()=>setView('table')}><Rows3 size={16}/> Таблица</button>
       </div>}>
         <label className="search"><input aria-label="Фильтр узлов" placeholder="Название или тип узла" value={filter} onChange={event=>setFilter(event.target.value)}/></label>
-        {view==='graph'?<><label className="graph-zoom">Масштаб {zoom}%<input type="range" min={65} max={130} step={5} value={zoom} onChange={event=>setZoom(Number(event.target.value))}/></label>
-          <div className="network-zoomed" style={{zoom:zoom/100}}><TreeGraph rows={visible} root={root} selected={selectedId??''} choose={choose}/></div></>:
+        {!context.value||!topology.value?<p className="monitor-empty">{context.error||topology.error?'Топология недоступна':'Загружаем топологию…'}</p>:view==='graph'?<><label className="graph-zoom">Масштаб {zoom}%<input type="range" min={50} max={200} step={5} value={zoom} onChange={event=>setZoom(Number(event.target.value))}/></label>
+          <div className="network-zoomed" style={{'--network-zoom':zoom/100} as CSSProperties}><TreeGraph rows={visible} root={root} selected={selectedId??''} choose={choose}/></div></>:
           <div className="table-wrap"><table><thead><tr><th>Узел</th><th>Роль</th><th>Родитель</th><th>Статус</th></tr></thead><tbody>
             {visible.map(row=><tr key={row.node.id} className={selectedId===row.node.id?'selected-row':''}>
               <td><button className="text-link table-button" onClick={()=>choose(row)}>{row.node.name}</button></td>
               <td>{kindNames[row.node.kind]}</td><td>{rows.find(x=>x.node.id===row.node.parentId)?.node.name||'—'}</td>
-              <td><Badge ok={online(row)} text={online(row)?'В сети':row.node.enabled?'Ожидание':'Отключён'}/></td>
+              <td><Badge ok={online(row)} text={nodeLabel(row)}/></td>
             </tr>)}
           </tbody></table></div>}
       </Panel>
       <Panel title={selected?.node.name??'Выберите узел'}>
         {selected&&<div className="stack node-details">
-          <Badge ok={online(selected)} text={online(selected)?'В сети':selected.node.enabled?'Ожидание':'Отключён'}/>
+          <Badge ok={online(selected)} text={nodeLabel(selected)}/>
           {mode==="orchestra"&&context.value?.developer&&selected.node.kind==="global"&&<GlobalTimeweb key={selected.node.id} nodeId={selected.node.id}/>}
           <dl><dt>Роль</dt><dd>{kindNames[selected.node.kind]}</dd><dt>ID</dt><dd className="mono">{selectedId}</dd>
             <dt>Адрес панели</dt><dd>{selected.node.publicUrl||'—'}</dd>
@@ -184,7 +187,7 @@ export function NetworkPage(){
             {canEdit&&selected.node.kind!=='agent'&&<Link className="btn secondary" to={'/setup?node='+selectedId}>Конфигурация</Link>}
           </div>
           {canEdit&&<form className="stack" onSubmit={edit}>
-            <label>Название<input value={name||selected.node.name} onChange={event=>setName(event.target.value)} maxLength={64}/></label>
+            <label>Название<input value={name??selected.node.name} required onChange={event=>setName(event.target.value)} maxLength={64}/></label>
             <label className="check-row"><input type="checkbox" checked={enabled??selected.node.enabled} onChange={event=>setEnabled(event.target.checked)}/> Узел включён</label>
             <button className="btn" disabled={busy}>Сохранить изменения</button>
           </form>}
