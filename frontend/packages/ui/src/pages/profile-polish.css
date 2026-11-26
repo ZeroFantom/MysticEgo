@@ -1,0 +1,44 @@
+/* Profile artwork and user content share a legible foreground. */
+:root[data-interface] .profile-page{--profile-accent:var(--mystic-primary);min-width:0;background-repeat:no-repeat;background-size:cover;background-position:center;background-attachment:scroll}
+:root[data-interface] .profile-page[data-custom-background=true]{padding:clamp(10px,2vw,22px)}
+:root[data-interface] :is(.profile-hero,.profile-edit-preview){
+  position:relative;min-width:0;isolation:isolate;background-color:#21172f;
+  background-repeat:no-repeat;background-position:center;background-size:cover;color:#faf5ff;
+  border:1px solid color-mix(in srgb,var(--profile-accent,var(--mystic-primary)) 45%,var(--mystic-line));
+  border-radius:16px;
+}
+:root[data-interface] :is(.profile-hero,.profile-edit-preview)[data-custom-cover=false]{
+  background-image:linear-gradient(110deg,#100b1eea 5%,#171027b8 52%,#17102780),var(--mystic-art);
+}
+:root[data-interface] .profile-hero{min-height:clamp(240px,24vw,340px);gap:16px;padding:clamp(16px,3vw,30px)}
+:root[data-interface] .profile-identity{align-items:center;min-width:0;gap:clamp(12px,2vw,20px)}
+:root[data-interface] .profile-identity>div{min-width:0}
+:root[data-interface] .profile-identity h2{font-size:clamp(23px,3vw,34px);line-height:1.15;overflow-wrap:anywhere}
+:root[data-interface] .profile-identity .profile-avatar{width:clamp(64px,8vw,92px);height:clamp(64px,8vw,92px);border-color:var(--profile-accent,var(--mystic-primary))}
+:root[data-interface] .profile-hero :is(.profile-bio,.social-status){color:#eee7f8;overflow-wrap:anywhere;line-height:1.55}
+:root[data-interface] .profile-hero .social-status{width:fit-content;max-width:100%;padding:6px 12px;border:1px solid #ffffff30;border-radius:12px;background:#160f25b8}
+:root[data-interface] .profile-facts{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+:root[data-interface] .profile-facts>div{border-color:#ffffff28;background:#171124d9;border-radius:11px;min-height:58px}
+:root[data-interface] .profile-facts svg{color:#d8c5ff}
+:root[data-interface] .profile-facts strong{line-height:1.35}
+:root[data-interface] .xp-track{border-color:#ffffff28;border-radius:11px;background:#171124e0}
+:root[data-interface] :is(.xp-track,.meter) progress{accent-color:var(--profile-accent,var(--mystic-primary))}
+:root[data-interface] .profile-edit-preview{display:flex;align-items:center;gap:14px;min-height:138px;padding:18px}
+:root[data-interface] .profile-edit-preview .profile-avatar{width:64px;height:64px}
+:root[data-interface] .profile-edit-preview>div{min-width:0;overflow-wrap:anywhere}
+:root[data-interface] .profile-edit-preview p{color:#eee7f8;margin:6px 0 0;line-height:1.4}
+:root[data-interface] dialog.profile-dialog{
+  position:fixed;inset:0;margin:auto;max-height:min(88dvh,900px);max-width:calc(100vw - 24px);
+  background:var(--mystic-surface);color:var(--mystic-ink);border:1px solid var(--mystic-line);
+  border-radius:18px;padding:clamp(16px,3vw,26px);overscroll-behavior:contain;
+}
+:root[data-interface] dialog.profile-dialog::backdrop{background:#090615ac}
+:root[data-interface] dialog.profile-dialog[open]{animation:var(--mystic-reveal) var(--mystic-time) var(--mystic-ease) both}
+:root[data-interface] dialog.profile-dialog h2{margin:0 0 18px;font-size:20px}
+:root[data-interface] dialog.profile-dialog :is(input,textarea,select){background:var(--mystic-raised);color:var(--mystic-ink);border-color:var(--mystic-line)}
+:root[data-interface] dialog.profile-dialog label{color:var(--mystic-muted)}
+:root[data-interface] dialog.profile-dialog .row-actions{flex-wrap:wrap}
+@media(max-width:760px){:root[data-interface] .profile-facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:390px){:root[data-interface] .profile-hero{padding:14px}:root[data-interface] .profile-facts>div{grid-template-columns:minmax(0,1fr)}:root[data-interface] .profile-facts svg{grid-row:auto}:root[data-interface] .xp-track>div{flex-wrap:wrap}}
+:root[data-ui-motion=off] dialog.profile-dialog[open]{animation:none!important}
+@media(prefers-reduced-motion:reduce){:root[data-interface] dialog.profile-dialog[open]{animation:none!important}}

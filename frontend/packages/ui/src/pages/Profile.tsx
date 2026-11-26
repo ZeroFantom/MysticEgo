@@ -3,6 +3,8 @@ import {Link} from 'react-router-dom';
 import {Clock3,Pencil,Shield,Lock,Layers3,Sparkles,UserRound,Check} from 'lucide-react';
 import {useApp,useRemote,type AccountProfile,type PersonalAccount,type Personality} from '../app/context';
 import {Panel,Header,ErrorBanner} from '../components/primitives';
+import {ProfileDialog} from '../components/ProfileDialog';
+import './profile-polish.css';
 
 export function bannerStyle(url?:string):CSSProperties|undefined{
   if(!url)return undefined;
@@ -131,11 +133,12 @@ export function ProfilePage(){
     catch(error){setError(String(error))}
     finally{setBusy(false)}
   }
-  return <div className="profile-page" style={bannerStyle(profile.backgroundUrl)}>
+  const accent=/^#[\da-f]{6}$/i.test(profile.accent)?profile.accent:undefined;
+  return <div className="profile-page" data-custom-background={Boolean(profile.backgroundUrl)} style={{...bannerStyle(profile.backgroundUrl),'--profile-accent':accent} as CSSProperties}>
     <Header title="Мой профиль" action={<div className="row-actions">{(mode==='audit'||mode==='agent')&&<Link className="btn secondary" to="/avatars">Студия VRM</Link>}
       <button className="btn secondary" onClick={()=>setDraft(profile)}><Pencil size={16}/> Оформление</button></div>}/>
     <ErrorBanner text={error}/>
-    <section className="profile-hero" style={bannerStyle(profile.coverUrl)}>
+    <section className="profile-hero" data-custom-cover={Boolean(profile.coverUrl)} style={bannerStyle(profile.coverUrl)}>
       <div className="profile-identity"><ProfileAvatar url={profile.avatarUrl} name={name} large/><div>
         <h2>{name}</h2><p>{game.nickname===name?'Ether and Chaos':game.nickname}</p>
       </div></div>
@@ -179,8 +182,11 @@ export function ProfilePage(){
       </form>}
       {questStatus&&<p className="success">{questStatus}</p>}
     </Panel>
-    {draft&&<div className="modal-shade" onClick={()=>!busy&&setDraft(null)}><section className="modal" role="dialog" aria-modal="true" aria-label="Оформление профиля" onClick={event=>event.stopPropagation()}>
+    {draft&&<ProfileDialog label="Оформление профиля" busy={busy} onClose={()=>setDraft(null)}>
       <h2>Оформление профиля</h2><form className="stack" onSubmit={save}>
+        <div className="profile-edit-preview" aria-label="Предпросмотр оформления" data-custom-cover={Boolean(draft.coverUrl)} style={bannerStyle(draft.coverUrl)}>
+          <ProfileAvatar url={draft.avatarUrl} name={draft.displayName||game.nickname} large/><div><strong>{draft.displayName||game.nickname}</strong>{draft.statusText&&<p>{draft.statusText}</p>}</div>
+        </div>
         <label>Отображаемое имя<input maxLength={60} value={draft.displayName} onChange={event=>update('displayName',event.target.value)}/></label>
         <label>Статус<input maxLength={100} value={draft.statusText??''} placeholder="Например, «На связи после 18:00»" onChange={event=>update('statusText',event.target.value)}/></label>
         <label>О себе<textarea rows={3} maxLength={600} value={draft.bio} onChange={event=>update('bio',event.target.value)}/></label>
@@ -189,8 +195,8 @@ export function ProfilePage(){
         <label>Акцент карточки<input type="color" value={draft.accent} onChange={event=>update('accent',event.target.value)}/></label>
         <label className="check-row"><input type="checkbox" checked={draft.discoverable} onChange={event=>update('discoverable',event.target.checked)}/> Доступен поиск по игровому никнейму</label>
         <ErrorBanner text={error}/><div className="row-actions"><button className="btn" disabled={busy}>Сохранить</button><button type="button" className="btn secondary" disabled={busy} onClick={()=>setDraft(null)}>Закрыть</button></div>
-      </form></section></div>}
-    {quiz&&<div className="modal-shade" onClick={()=>!busy&&setQuiz(false)}><section className="modal quiz-modal" role="dialog" aria-modal="true" aria-label="Тест личности" onClick={event=>event.stopPropagation()}>
+      </form></ProfileDialog>}
+    {quiz&&<ProfileDialog label="Тест личности" busy={busy} onClose={()=>setQuiz(false)} wide>
       <h2>Тест личности</h2><p className="footnote">Оцените каждое утверждение от 1 (совсем не согласен) до 5 (полностью согласен). Ответы заполняют лепестки игрового стиля.</p>
       <form className="stack" onSubmit={submit}>
         <div className="quiz-progress"><span>Шаг {page+1} / {totalPages}</span><progress aria-label="Ответы теста" max={questions.length} value={Object.keys(answers).length}/></div>
@@ -208,6 +214,6 @@ export function ProfilePage(){
           <button type="button" className="btn secondary" disabled={busy} onClick={()=>setQuiz(false)}>Отмена</button>
         </div>
       </form>
-    </section></div>}
+    </ProfileDialog>}
   </div>;
 }
