@@ -20,6 +20,8 @@ function ResourceChart({points,formatValue,maximum,label,start,end}:{points:Poin
   const width=420,height=112;
   const {segments,gaps}=chartGeometry(points,start,end,top,width,height);
   const latest=segments.at(-1)?.at(-1);
+  const newestSegment=segments.at(-1)??[];
+  const newestEdge=smoothEdges(newestSegment).at(-1);
   const trailing=latest&&end-latest.at>15000;
   const leading=segments[0]?.[0]&&segments[0][0].at-start>15000;
   return <div className="telemetry-chart">
@@ -48,10 +50,10 @@ function ResourceChart({points,formatValue,maximum,label,start,end}:{points:Poin
           return <g key={first.at}>
             {edges.length>0&&<path d={area} fill={`url(#${id}-area)`}/>}
             {edges.length>0&&<path className="chart-line" d={begin+' '+(animate?edges.slice(0,-1):edges).map(edge=>edge.command).join(' ')}/>}
-            {animate&&<path key={last.at} className="chart-line chart-new-edge" pathLength={1} d={`M ${edges.at(-1)!.from.x} ${edges.at(-1)!.from.y} ${edges.at(-1)!.command}`}/>}
             {edges.length===0&&<circle className={newest?'chart-new-point':''} cx={first.x} cy={first.y} r={2.5} fill="currentColor"/>}
           </g>;
         })}
+        {newestEdge&&<path key={newestEdge.to.at} className="chart-line chart-new-edge" pathLength={1} d={`M ${newestEdge.from.x} ${newestEdge.from.y} ${newestEdge.command}`}/>}
         {gaps.map(gap=><path key={gap.from.at+'-'+gap.to.at} className="chart-gap-bridge" d={gapPath(gap)} stroke={`url(#${id}-gap-${gap.from.at}-${gap.to.at})`}><title>Нет замеров: {new Date(gap.from.at).toLocaleTimeString('ru-RU')} — {new Date(gap.to.at).toLocaleTimeString('ru-RU')}</title></path>)}
       </svg>
     </div>
