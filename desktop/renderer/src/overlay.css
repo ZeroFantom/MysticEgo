@@ -31,6 +31,16 @@
 
 :root[data-interface=immersive][data-theme=dark]{--overlay-art:url("../../control/appearance-art/immersive-dark.webp")}
 :root[data-interface=immersive][data-theme=light]{--overlay-art:url("../../control/appearance-art/immersive-light.webp")}
-:root[data-interface=simplified][data-theme=dark]{--overlay-art:url("../../control/appearance-art/simplified-dark.webp")}
+:root[data-interface=simplified][data-theme=dark]{--overlay-art:url("../../control/appearance-art/simplified-dark.svg")}
 :root[data-interface=simplified][data-theme=light]{--overlay-art:url("../../control/appearance-art/simplified-light.webp")}
 :root[data-interface] .settings{background:linear-gradient(90deg,var(--overlay-surface) 45%,transparent 220%),var(--overlay-art) right top/auto 85px no-repeat,var(--overlay-surface)}
+
+/* Keep the transparent avatar stage unchanged; refine only its control surfaces. */
+:root[data-interface] .floating-controls button{border-radius:50%;min-width:30px;min-height:30px;display:grid;place-items:center;transition:background-color var(--mystic-time),color var(--mystic-time),scale var(--mystic-time)}
+:root[data-interface] .floating-controls button:hover{background:color-mix(in srgb,var(--overlay-primary) 18%,var(--overlay-surface))}
+:root[data-interface] .floating-controls button:active{scale:.94}
+:root[data-interface] :is(.settings,.floating-controls) :is(button,input,select,summary):focus-visible{outline:2px solid var(--overlay-primary);outline-offset:2px}
+:root[data-interface] .settings{min-height:0;max-height:55%;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}
+:root[data-interface] .settings label{flex-wrap:wrap;overflow-wrap:anywhere}
+:root[data-ui-motion=off] .floating-controls button:active{scale:1}
+@media(prefers-reduced-motion:reduce){:root[data-interface] .floating-controls button:active{scale:1}}
