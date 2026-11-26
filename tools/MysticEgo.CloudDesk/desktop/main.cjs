@@ -1,4 +1,5 @@
-const {app,BrowserWindow,ipcMain,shell,dialog}=require('electron');
+const {app,BrowserWindow,ipcMain,shell,dialog,clipboard}=require('electron');
+const {createLocalCenter}=require('./local-center.cjs');
 const {spawn}=require('node:child_process'); const fs=require('node:fs'); const path=require('node:path');const readline=require('node:readline');const crypto=require('node:crypto');
 const windows=process.platform==='win32';
 const root=path.join(__dirname,'..');
@@ -39,13 +40,17 @@ function openTerminal(command,args,env=processEnvironment()){
     }
   });
 }
-let backend,win; const pending=new Map();
+let backend,win,center,quitting=false,quitReady=false; const pending=new Map();
 const allowed=new Set(['github.status','github.release','github.enable','github.disconnect','timeweb.status','timeweb.connect','timeweb.restore','timeweb.disconnect','servers','catalog','key.info','key.register','server.create','ssh.prepare','ssh.status','ssh.trust','ssh.cloudKey','ssh.passwordKey','ssh.terminal','ssh.test','ssh.command','deploy','deploy.inspectOrchestra','deploy.restoreOrchestra','deploy.auditPortal','deploy.infrastructure','deploy.reuploadGlobal','deploy.preflight','domains.list','dns.check','dns.prepare','topology.poll','topology.developerPassword','topology.login','topology.logout','topology.discover','dns.suggest','dns.inventory','dns.delete','deploy.reserve','dns.reconcile']);
 function check(e){if(!win||e.sender!==win.webContents||e.senderFrame!==win.webContents.mainFrame)throw Error('IPC denied');}
 function request(action,args){return new Promise((resolve,reject)=>{if(!backend||!backend.stdin.writable)return reject(Error('C# backend недоступен'));const id=crypto.randomUUID();pending.set(id,{resolve,reject,action});backend.stdin.write(JSON.stringify({id,action,args})+'\n',err=>{if(err){pending.delete(id);reject(err);}});});}
 if(!app.requestSingleInstanceLock()){app.quit();}else{
 app.on('second-instance',()=>{if(win){if(win.isMinimized())win.restore();win.focus();}});
 app.whenReady().then(()=>{
+ const dotnet=process.env.CLOUDDESK_DOTNET||'dotnet';
+ const bundle=process.env.CLOUDDESK_BUNDLE_ROOT||path.resolve(root,'../..');
+ center=createLocalCenter({root:bundle,dotnet,home:app.getPath('home'),env:processEnvironment(),openExternal:url=>shell.openExternal(url),openPath:p=>shell.openPath(p),copy:value=>clipboard.writeText(value)});
+ for(const action of ['snapshot','start','stop','save','credentials','link'])ipcMain.handle('local-center:'+action,(e,...args)=>{check(e);return center[action](...args);});
  backend=spawn(process.env.CLOUDDESK_DOTNET||'dotnet',[path.join(root,'out','CloudDesk.dll')],{stdio:['pipe','pipe','pipe'],windowsHide:true,env:processEnvironment()});
  const fail=()=>{for(const p of pending.values())p.reject(Error('Backend остановлен'));pending.clear();};backend.on('error',fail);backend.on('exit',fail);backend.stderr.resume();
  readline.createInterface({input:backend.stdout}).on('line',line=>{try{const r=JSON.parse(line);const p=pending.get(r.id);if(p){
@@ -63,6 +68,10 @@ app.whenReady().then(()=>{
  ipcMain.handle('script',async e=>{check(e);const r=await dialog.showOpenDialog(win,{properties:['openFile'],filters:[{name:'Bash',extensions:['sh']}]});return r.canceled?'':r.filePaths[0];});
  win=new BrowserWindow({width:1320,height:900,minWidth:900,minHeight:650,backgroundColor:'#101016',icon:path.join(__dirname,'icon.png'),webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
  win.webContents.setWindowOpenHandler(()=>({action:'deny'}));win.webContents.on('will-navigate',e=>e.preventDefault());win.loadFile(path.join(root,'dist','index.html'));
-});app.on('window-all-closed',()=>app.quit());app.on('before-quit',()=>{backend?.stdin.end();});
+});app.on('window-all-closed',()=>app.quit());app.on('before-quit',event=>{
+ if(quitReady)return;
+ event.preventDefault();if(quitting)return;quitting=true;
+ Promise.resolve(center?.close()).then(()=>{backend?.stdin.end();quitReady=true;app.quit();}).catch(error=>{quitting=false;dialog.showErrorBox('CloudDesk',error.message);});
+});
 
 }

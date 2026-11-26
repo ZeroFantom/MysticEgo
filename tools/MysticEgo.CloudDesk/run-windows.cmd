@@ -1,6 +1,7 @@
 @echo off
 setlocal
 cd /d "%~dp0"
+set "CLOUDDESK_BUNDLE_ROOT=%~dp0..\.."
 set "CLOUDDESK_DOTNET=%~dp0..\..\runtime\win-x64\dotnet.exe"
 set "CLOUDDESK_ELECTRON=%~dp0..\..\runtime\electron\electron.exe"
 if not exist "%CLOUDDESK_DOTNET%" goto missing

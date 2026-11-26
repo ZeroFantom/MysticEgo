@@ -11,6 +11,7 @@ runtime="${CLOUDDESK_RUNTIME_DIR:-$(cd ../.. && pwd -P)/runtime}"
 if [[ ! -x $runtime/electron-linux/electron && -z ${CLOUDDESK_RUNTIME_DIR:-} && -d ../MysticEgo/runtime ]]; then
   runtime="$(cd ../MysticEgo/runtime && pwd -P)"
 fi
+export CLOUDDESK_BUNDLE_ROOT="$(cd -- "$runtime/.." && pwd -P)"
 electron="$runtime/electron-linux/electron"
 if [[ $(uname -m) != x86_64 || ! -x $electron ]]; then
   echo "Для CloudDesk нужен комплектный Linux x64 Electron: $electron" >&2
@@ -83,7 +84,7 @@ install_apparmor_profile() {
     sudo apparmor_parser -r "$profile_path"
 }
 
-bash ./ensure-hosts.sh
+# Public DNS is the default; test override is explicit.
 ulimit -c 0 || true
 scratch=$(mktemp)
 if "$electron" --disable-setuid-sandbox . 2>"$scratch"; then
