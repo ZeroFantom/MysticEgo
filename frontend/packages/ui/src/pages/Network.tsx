@@ -1,11 +1,14 @@
 import {usePanelPreference} from '../app/panelPreferences';
 import {GlobalTimeweb} from "./GlobalTimeweb";
 import {useMemo,useState,type FormEvent,type CSSProperties} from 'react';
-import {Link,useSearchParams} from 'react-router-dom';
+import {Link,useNavigate,useSearchParams} from 'react-router-dom';
 import {Activity,ArrowUpRight,Building2,Cloud,HardDrive,House,Laptop,Network,Plus,Rows3,ShieldCheck,UserRound} from 'lucide-react';
 import {useApp,useRemote} from '../app/context';
 import {Panel,Header,ErrorBanner,Badge} from '../components/primitives';
 import './monitoring.css';
+import {DashboardHero} from '../components/DashboardHero';
+import {ResourceChart,type Telemetry} from './Diagnostics';
+import {isMeasurement} from './telemetryGeometry';
 
 export type Kind='orchestra'|'global'|'local'|'agent'|'audit';
 export type NodeInfo={id:string;kind:Kind;name:string;parentId:string;ownerId?:string;publicUrl?:string;mode:string;enabled:boolean;applicationId?:string;members?:string[]};
@@ -25,6 +28,7 @@ export function useNetwork(){
 
 export function OrchestraOverview(){
   const {mode}=useApp();
+  const navigate=useNavigate();
   const {context,topology}=useNetwork();
   const globals=topology.value?.filter(x=>x.node.kind==='global')??[];
   const people=globals.reduce((sum,x)=>sum+x.people,0);
@@ -32,14 +36,25 @@ export function OrchestraOverview(){
   const up=globals.filter(online).length;
   const maximum=Math.max(1,...globals.flatMap(x=>[x.people,x.sites]));
   return <>
-    <Header title="Обзор" description={mode==='orchestra'?'Организации и площадки сети MysticEgo':'Доступные организации и площадки'} action={
-      (context.value?.owner??context.value?.developer)&&<Link className="btn" to="/setup"><Plus size={17}/> Развернуть Global</Link>}/>
+    <DashboardHero title={mode==='orchestra'?'Оркестр MysticEgo':mode==='global'?'Обзор организации':'Обзор площадки'} eyebrow={mode==='orchestra'?'ORCHESTRA · ОБЗОР':mode.toUpperCase()+' · ОБЗОР'}
+      description={mode==='orchestra'?'Организации, площадки и состояние сети в едином пространстве.':'Доступные организации и площадки сети MysticEgo.'}
+      status={<span role="status">{topology.error?'Обновление недоступно':topology.value?'Топология получена':'Загрузка топологии…'}</span>}
+      action={<><Link className="btn secondary" to="/nodes"><Network size={17}/> Схема сети</Link>{(context.value?.owner??context.value?.developer)&&<Link className="btn" to="/setup"><Plus size={17}/> Развернуть Global</Link>}</>}/>
     <ErrorBanner text={topology.error}/>
     {topology.value&&topology.error&&<p className="monitor-empty">Показаны последние полученные данные; обновление не удалось.</p>}
-    <div className="metrics summary-grid">
+    <div className="metrics summary-grid dashboard-metrics">
       {[{icon:Cloud,count:globals.length,label:'Организации Global'},{icon:UserRound,count:people,label:'Участники'},
         {icon:Building2,count:sites,label:'Площадки Local'},{icon:Activity,count:up,label:'Global в сети'}].map(tile=>
         <article className="metric summary-metric" key={tile.label}><tile.icon size={20}/><strong>{topology.value?tile.count:topology.loading?'…':'—'}</strong><span>{tile.label}</span></article>)}
+    </div>
+    <div className="dashboard-monitor-grid">
+      <Panel title="Топология сети" aside={<Link className="text-link" to="/nodes">Открыть <ArrowUpRight size={15}/></Link>}>
+        <div className="dashboard-network">{context.value&&topology.value?<TreeGraph root={context.value.rootId} selected="" choose={row=>navigate('/nodes?node='+encodeURIComponent(row.node.id))}
+          rows={[{node:{id:context.value.rootId,kind:'orchestra',name:context.value.rootName||'Оркестр',parentId:'',mode:'native',enabled:true},people:0,sites:0},...topology.value.filter(row=>row.node.id!==context.value!.rootId)]}/>:<p className="monitor-empty">{topology.error||context.error?'Топология недоступна':'Загружаем топологию…'}</p>}</div>
+      </Panel>
+      {mode==='orchestra'?<DashboardTelemetry/>:<Panel title="Состояние организаций">
+        <div className="dashboard-health-list">{globals.length?globals.map(row=><div className="line" key={row.node.id}><Cloud size={18}/><div className="grow"><strong>{row.node.name}</strong></div><Badge ok={online(row)} text={nodeLabel(row)}/></div>):<p className="monitor-empty">{topology.value?'Нет организаций':'Данные недоступны'}</p>}</div>
+      </Panel>}
     </div>
     <div className="overview-grid">
       <Panel title="Организации" aside={<span className="muted">{topology.value?globals.length:'—'} Global</span>}>
@@ -59,6 +74,21 @@ export function OrchestraOverview(){
     </div>
     <Link className="text-link" to="/nodes"><Network size={17}/> Открыть схему сети <ArrowUpRight size={15}/></Link>
   </>;
+}
+
+function DashboardTelemetry(){
+  const {api}=useApp();
+  const data=useRemote(()=>api.request<Telemetry>('/orchestra/telemetry'),[api],5000,true);
+  const ordered=(data.value?.samples??[]).filter(s=>Number.isFinite(Date.parse(s.at))).sort((a,b)=>Date.parse(a.at)-Date.parse(b.at));
+  const last=ordered.at(-1),end=last?Date.parse(last.at):Date.now(),start=end-60_000;
+  const points=ordered.filter(s=>Date.parse(s.at)>=start).map(s=>({at:s.at,value:s.cpuPercent}));
+  const stale=!!last&&(Date.now()-end>20000||!!data.error);
+  return <Panel title="CPU Оркестра · 1 мин" aside={<Link className="text-link" to="/diagnostics">Диагностика <ArrowUpRight size={15}/></Link>}>
+    {last?<><p className="telemetry-value">{isMeasurement(last.cpuPercent)?new Intl.NumberFormat('ru',{maximumFractionDigits:1}).format(last.cpuPercent)+'%':'—'}</p>
+      <ResourceChart points={points} maximum={100} start={start} end={end} label="CPU Оркестра" formatValue={v=>Math.round(v)+'%'}/>
+      <div className="chart-times"><time dateTime={new Date(start).toISOString()}>{new Date(start).toLocaleTimeString('ru-RU')}</time><time dateTime={new Date(end).toISOString()}>{new Date(end).toLocaleTimeString('ru-RU')}</time></div>
+      <p className="dashboard-note" role="status">{stale?'Последний замер устарел':'Последний замер'} · {new Date(end).toLocaleTimeString('ru-RU')}</p></>:<p className="monitor-empty">{data.error?'Телеметрия недоступна':data.loading?'Загружаем замеры…':'Нет замеров'}</p>}
+  </Panel>;
 }
 
 function TreeGraph({rows,root,selected,choose}:{rows:NodeStatus[];root:string;selected:string;choose:(row:NodeStatus)=>void}){
