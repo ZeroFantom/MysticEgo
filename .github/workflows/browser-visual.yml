@@ -1,0 +1,32 @@
+name: Browser visual smoke
+on:
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/browser-visual.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  chromium:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm --prefix frontend ci --ignore-scripts --no-audit
+      - run: npm --prefix frontend run build
+      - run: npm --prefix frontend/visual install --ignore-scripts --no-audit --no-package-lock
+      - run: npm --prefix frontend/visual exec -- playwright install --with-deps chromium
+      - run: npm --prefix frontend/visual test
+        env:
+          VISUAL_OUTPUT: ${{ runner.temp }}/mystic-visual
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mysticego-browser-screenshots
+          path: ${{ runner.temp }}/mystic-visual
+          if-no-files-found: warn
+          retention-days: 14
