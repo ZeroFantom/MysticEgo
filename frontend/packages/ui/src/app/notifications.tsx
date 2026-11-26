@@ -1,4 +1,4 @@
-import {createContext,useCallback,useContext,useEffect,useMemo,useRef,useState,type ReactNode} from 'react';
+import {createContext,useCallback,useContext,useEffect,useId,useMemo,useRef,useState,type ReactNode} from 'react';
 import {Bell,CheckCircle2,Info,TriangleAlert,X,XCircle} from 'lucide-react';
 
 export type NoticeTone='info'|'success'|'warning'|'error';
@@ -48,24 +48,36 @@ export function useNotice(text:string,tone:NoticeTone='error'){
 export function NoticeBell({server=[],onRead}:{server?:Notice[];onRead?:(id:string)=>void}){
   const feed=useNoticeFeed();
   const [open,setOpen]=useState(false);
+  const drawerId=useId();
+  const container=useRef<HTMLDivElement>(null);
+  const trigger=useRef<HTMLButtonElement>(null);
+  const close=useRef<HTMLButtonElement>(null);
+  useEffect(()=>{
+    if(!open)return;
+    close.current?.focus();
+    const outside=(event:PointerEvent)=>{if(event.target instanceof Node&&!container.current?.contains(event.target))setOpen(false)};
+    const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'&&!event.defaultPrevented){setOpen(false);trigger.current?.focus()}};
+    document.addEventListener('pointerdown',outside);document.addEventListener('keydown',escape);
+    return()=>{document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',escape)};
+  },[open]);
   const local=feed?.notices??[];
   const all=[...local,...server].sort((a,b)=>Date.parse(b.at)-Date.parse(a.at));
   const unread=all.filter(row=>!row.read).length;
   const recent=local.find(item=>!item.read);
   const Icon=icons[noticeTone(recent??{})];
-  return <div className="notification-float">
+  return <div className="notification-float" ref={container}>
     {!open&&recent&&<div className="notification-drawer notification-preview" data-tone={noticeTone(recent)} role="status">
       <Icon size={19} aria-hidden="true"/><p>{recent.text}</p>
       <button className="icon-btn" onClick={()=>feed?.read(recent.id)} aria-label="Скрыть уведомление"><X size={16}/></button></div>}
-    {open&&<section className="notification-drawer" aria-label="Уведомления">
-      <header><h2>Уведомления</h2><button className="icon-btn" onClick={()=>setOpen(false)} aria-label="Закрыть уведомления"><X size={20}/></button></header>
+    <section id={drawerId} className="notification-drawer motion-disclosure" data-motion-open={open} inert={!open} aria-hidden={!open} aria-label="Уведомления">
+      <header><h2>Уведомления</h2><button ref={close} type="button" className="icon-btn" onClick={()=>{setOpen(false);trigger.current?.focus()}} aria-label="Закрыть уведомления"><X size={20}/></button></header>
       {all.length===0&&<p className="footnote">Новых уведомлений нет.</p>}
       {all.map(item=><article key={item.id} data-tone={noticeTone(item)}><div><p>{item.text}</p><time>{new Date(item.at).toLocaleString('ru-RU')}</time></div>
         {!item.read&&<button className="icon-btn" onClick={()=>local.some(row=>row.id===item.id)?feed?.read(item.id):onRead?.(item.id)}
           aria-label="Отметить прочитанным">✓</button>}
       </article>)}
-    </section>}
-    <button className="bell-button" aria-label={'Уведомления'+(unread?' · '+unread+' непрочитанных':'')} aria-expanded={open} onClick={()=>{if(!open)feed?.readAll();setOpen(!open)}}>
+    </section>
+    <button ref={trigger} type="button" className="bell-button" aria-controls={drawerId} aria-label={'Уведомления'+(unread?' · '+unread+' непрочитанных':'')} aria-expanded={open} onClick={()=>{if(!open)feed?.readAll();setOpen(!open)}}>
       <Bell size={22}/>{unread>0&&<span>{unread>99?'99+':unread}</span>}
     </button>
   </div>;
