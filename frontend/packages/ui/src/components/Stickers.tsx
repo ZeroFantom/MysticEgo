@@ -60,7 +60,7 @@ export function StickerPicker({send}:{send:(id:string)=>void}){
     <details className="sticker-workshop">
       <summary><Sparkles size={15} aria-hidden="true"/> Создать стикер</summary>
       <div className="stack">
-        <label>Подпись<input required maxLength={18} value={caption} placeholder="Например, «Готово!»"
+        <label>Подпись<input maxLength={18} value={caption} placeholder="Например, «Готово!»"
             onKeyDown={event=>{
               if(event.key!=='Enter'||event.nativeEvent.isComposing)return;
               event.preventDefault();
