@@ -1,5 +1,7 @@
+import {initEffects} from '../control/effects.js';
 const $=id=>document.getElementById(id);
 const api=window.local;
+initEffects($('design'));
 let dirty=false,busy=false;
 async function refresh(){
   const state=await api.status();

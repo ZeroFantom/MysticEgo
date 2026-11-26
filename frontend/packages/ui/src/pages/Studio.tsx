@@ -1,4 +1,5 @@
 import {useEffect} from 'react';
+import {ThemeToggle} from './Settings';
 import {
   ArrowDownRight, ArrowUpRight, Box, Building2, Compass, Github, Send, Users,
   Server, ShieldCheck, Workflow,
@@ -65,7 +66,7 @@ function PublicNavigation({page}: {page: 'studio' | 'developer'}) {
     <nav aria-label="Страницы MysticEgo">
       <a href="/studio" aria-current={page === 'studio' ? 'page' : undefined}>Студия</a>
       <a href="/developer" aria-current={page === 'developer' ? 'page' : undefined}>Разработчик</a>
-      <a href="/">Вход в панель <ArrowUpRight size={15} aria-hidden="true"/></a>
+      <a href="/">Вход в панель <ArrowUpRight size={15} aria-hidden="true"/></a><ThemeToggle/>
     </nav>
   </header>;
 }

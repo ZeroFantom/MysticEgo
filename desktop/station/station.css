@@ -11,3 +11,7 @@ button,input,select{border-radius:9px}
 
 #join-form textarea{width:100%;resize:vertical;background:#101a27;color:inherit;border:1px solid #34465c;border-radius:9px;padding:10px;font:inherit}
 body:has(#provision) main{display:grid;gap:14px}
+
+:root[data-interface] body{background:var(--body);color:var(--ink)}
+:root[data-interface] .desktop-header{border-color:var(--border)}
+:root[data-interface] .desktop-card{border-color:var(--border)}

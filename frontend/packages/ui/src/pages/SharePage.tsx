@@ -1,4 +1,5 @@
 import {ArrowUpRight,Boxes,ShieldCheck} from 'lucide-react';
+import {ThemeToggle} from './Settings';
 import type {NodeMode} from '@mysticego/sdk';
 const roles:Record<NodeMode,{title:string;description:string}>={
   orchestra:{title:'Orchestra',description:'Центр разработки и управления экосистемой.'},
@@ -7,10 +8,10 @@ const roles:Record<NodeMode,{title:string;description:string}>={
   agent:{title:'Agent',description:'Рабочая станция и инструменты диагностики.'},
   audit:{title:'Audit',description:'Личное пространство и профиль MysticEgo.'}
 };
-export function SharePage({mode,portal}:{mode:NodeMode;portal:boolean}){
+export function SharePage({mode,portal,scope}:{mode:NodeMode;portal:boolean;scope:string}){
   const role=roles[mode];
   return <main className="mystic-share" data-share-role={mode}>
-    <section className="mystic-share-card">
+    <section className="mystic-share-card"><ThemeToggle scope={scope}/>
       <p className="mystic-share-brand"><Boxes size={23} aria-hidden="true"/> MysticEgo</p>
       <span className="mystic-share-kicker">CONTROL NETWORK</span>
       <h1>{role.title}</h1>

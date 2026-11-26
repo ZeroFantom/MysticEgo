@@ -43,3 +43,32 @@ button.plain{color:var(--ink)}
 @keyframes desktop-edge{to{background-position:0 0,240% 0}}
 @media(max-width:760px){#design{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(prefers-reduced-motion:reduce){.desktop-header::before,.desktop-header::after,button{animation:none!important}}
+
+:root[data-interface="immersive"][data-theme="dark"]{--mystic-art:url("./appearance-art/immersive-dark.svg")}
+:root[data-interface="immersive"][data-theme="light"]{--mystic-art:url("./appearance-art/immersive-light.svg")}
+:root[data-interface="simplified"][data-theme="dark"]{--mystic-art:url("./appearance-art/simplified-dark.svg")}
+:root[data-interface="simplified"][data-theme="light"]{--mystic-art:url("./appearance-art/simplified-light.svg")}
+:root{--mystic-time:220ms;--mystic-page-time:300ms;--mystic-ease:cubic-bezier(.2,.78,.22,1);--mystic-reveal:mystic-flow}
+:root[data-interface=immersive]{--mystic-time:300ms;--mystic-page-time:420ms}
+:root[data-transition=fade]{--mystic-reveal:mystic-fade}
+:root[data-transition=slide]{--mystic-reveal:mystic-slide}
+:root[data-transition=scale]{--mystic-reveal:mystic-scale}
+:root[data-ui-motion=low]{--mystic-time:140ms;--mystic-page-time:180ms}
+@keyframes mystic-flow{from{opacity:0;translate:0 7px;scale:.99}to{opacity:1;translate:0 0;scale:1}}
+@keyframes mystic-fade{from{opacity:0}to{opacity:1}}
+@keyframes mystic-slide{from{opacity:0;translate:8px 0}to{opacity:1;translate:0 0}}
+@keyframes mystic-scale{from{opacity:0;scale:.975}to{opacity:1;scale:1}}
+@keyframes mystic-mesh-drift{from{background-position:0 50%,right center}to{background-position:0 50%,85% center}}
+
+:root[data-interface] .desktop-header{background:linear-gradient(90deg,var(--body) 8%,transparent 160%),var(--mystic-art) right center/cover;color:var(--ink)}
+:root[data-interface] .desktop-card{background:var(--panel);border-color:var(--border);color:var(--ink);box-shadow:none}
+:root[data-interface=immersive] .desktop-card{background:linear-gradient(145deg,color-mix(in srgb,var(--panel) 91%,var(--accent)),var(--panel) 70%);box-shadow:0 10px 28px #120e3020;border-color:color-mix(in srgb,var(--border) 75%,var(--accent))}
+:root[data-interface] .desktop-card :is(input,select,textarea),:root[data-interface] pre{background:var(--input);border-color:var(--border);color:var(--ink)}
+:root[data-interface] .message{color:var(--ink)}
+:root[data-theme=light][data-interface] button:not(.secondary):not(.plain){background:#6842b9;color:white;border-color:#6842b9}
+:root[data-interface] :is(button,input,select,textarea):focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+:root[data-interface] :is(button,input,select){transition:background-color var(--mystic-time),border-color var(--mystic-time),translate var(--mystic-time)}
+:root[data-interface] :is(.desktop-card,details[open]>#design,form:not([hidden]),.actions>button){animation:var(--mystic-reveal) var(--mystic-time) var(--mystic-ease) backwards}
+:root[data-interface] button:hover:not(:disabled){translate:0 -1px}
+:root[data-ui-motion=off] *, :root[data-ui-motion=off] .desktop-header::before,:root[data-ui-motion=off] .desktop-header::after{animation:none!important;transition:none!important}
+@media(prefers-reduced-motion:reduce){:root[data-interface] *, :root[data-interface] .desktop-header::before,:root[data-interface] .desktop-header::after{animation:none!important;transition:none!important}}
