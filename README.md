@@ -35,6 +35,8 @@ MysticEgo — платформа с доступным исходным кодо
 
 ## Галерея
 
+Подробности обновления: [BETA7 R3.2.30](docs/releases/beta7-r3.2.30.md).
+
 Две визуальные концепции, каждая в светлой и тёмной версии. Насыщенный стиль вдохновлён ночными восточноазиатскими пейзажами и фантастической атмосферой; упрощённый — геометрией сетей и спокойными поверхностями.
 
 <table>
@@ -50,7 +52,7 @@ MysticEgo — платформа с доступным исходным кодо
   </tr>
   <tr>
     <td width="50%" align="center">
-      <a href="frontend/packages/ui/src/app/appearance-art/simplified-dark.webp"><img src="frontend/packages/ui/src/app/appearance-art/simplified-dark.webp" alt="Simplified Dark — тёмная геометрическая графика" width="100%"></a>
+      <a href="frontend/packages/ui/src/app/appearance-art/simplified-dark.svg"><img src="frontend/packages/ui/src/app/appearance-art/simplified-dark.svg" alt="Simplified Dark — тёмная геометрическая графика" width="100%"></a>
       <br><b>03 · SIMPLIFIED DARK</b><br><sub>Геометрия · минимум визуального шума</sub>
     </td>
     <td width="50%" align="center">
