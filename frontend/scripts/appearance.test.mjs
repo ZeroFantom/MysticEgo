@@ -42,3 +42,14 @@ const quick=web.match(/:root \.appearance-quick>button\.icon-btn\{([^}]+)\}/)?.[
 assert(quick.includes('border-radius:50%')&&quick.includes('background:transparent'));
 assert(web.includes('button.icon-btn[aria-pressed=true]'));
 assert(web.includes('.account-avatar>img{display:block;width:100%;height:100%;object-fit:cover'));
+
+const shell=read('frontend/packages/ui/src/app/Shell.tsx');
+const workspace=read('frontend/packages/ui/src/app/workspace-polish.css');
+assert(shell.includes("import './workspace-polish.css'"));
+assert(shell.includes('aria-controls="workspace-navigation"')&&shell.includes('aria-expanded={drawerOpen}'));
+assert(shell.includes('inert={narrow&&!drawerOpen}')&&shell.includes('inert={drawerOpen}'));
+assert(shell.includes("event.key==='Escape'")&&shell.includes('closeDrawer.current?.focus()'));
+assert(shell.includes("document.body.style.overflow=previousOverflow"));
+assert(workspace.includes('object-fit:contain')&&workspace.includes('visibility:hidden')&&workspace.includes('visibility:visible'));
+assert(workspace.includes('prefers-reduced-motion:reduce')&&workspace.includes('data-ui-motion=off'));
+assert(workspace.includes('.auth-recovery')&&workspace.includes('grid-template-columns:minmax(0,1fr)'));

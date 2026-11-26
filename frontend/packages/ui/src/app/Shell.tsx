@@ -5,6 +5,7 @@ import {ServerUpdateProvider,useServerUpdate} from './serverUpdate';
 import {CloudDeskDownloads,PublicDesktopDownloads} from '../pages/DesktopDownloads';
 import {NoticeBell,NotificationProvider,useNotice} from './notifications';
 import './workspace-rail.css';
+import './workspace-polish.css';
 import {ErrorBanner} from '../components/primitives';
 import {accountScope,useBrowserSession} from './browserSession';
 import {ReleaseStatus,ProjectBranches} from '../pages/ProjectConsole';
@@ -104,7 +105,7 @@ function AccountMenu({logout}:{logout:()=>void}){
   },[open]);
   const name=personal?.profile.displayName||personal?.game.nickname||session.username||'Аккаунт';
   return <div className="account-menu" ref={box}>
-    <button className="account-trigger" type="button" aria-expanded={open} onClick={()=>setOpen(value=>!value)}>
+    <button className="account-trigger" type="button" aria-label={'Меню аккаунта: '+name} aria-expanded={open} onClick={()=>setOpen(value=>!value)}>
       <ProfileAvatar url={personal?.profile.avatarUrl} name={name}/><span>{name}</span><ChevronDown size={15}/>
     </button>
     {open&&<div className="account-popover">
@@ -143,10 +144,44 @@ function Workspace({logout}:{logout:()=>void}){
   if(cloudDownloads)nav[0].items.push({to:'/clouddesk-downloads',label:'Скачать CloudDesk',icon:Cloud});
   const current=nav.flatMap(section=>section.items).find(item=>item.to===pathname)?.label??(pathname==='/profile'?'Мой профиль':modes[mode].name);
   const [mobile,setMobile]=useState(false);
+  const [narrow,setNarrow]=useState(()=>matchMedia('(max-width:850px)').matches);
+  const drawer=useRef<HTMLElement>(null);
+  const menuTrigger=useRef<HTMLButtonElement>(null);
+  const closeDrawer=useRef<HTMLButtonElement>(null);
+  const drawerOpen=narrow&&mobile;
+  useEffect(()=>{
+    const media=matchMedia('(max-width:850px)');
+    const sync=()=>{setNarrow(media.matches);if(!media.matches)setMobile(false)};
+    sync();media.addEventListener('change',sync);
+    return()=>media.removeEventListener('change',sync);
+  },[]);
+  useEffect(()=>setMobile(false),[pathname]);
+  useEffect(()=>{
+    if(!drawerOpen)return;
+    const previousOverflow=document.body.style.overflow;
+    document.body.style.overflow='hidden';
+    closeDrawer.current?.focus();
+    const onKey=(event:KeyboardEvent)=>{
+      if(event.key==='Escape'){event.preventDefault();setMobile(false);return}
+      if(event.key!=='Tab')return;
+      const targets=Array.from(drawer.current?.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),[tabindex="0"]')??[]).filter(element=>element.getClientRects().length>0);
+      const first=targets[0],last=targets[targets.length-1];
+      if(!first||!last)return;
+      if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}
+      else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}
+    };
+    document.addEventListener('keydown',onKey);
+    return()=>{
+      document.body.style.overflow=previousOverflow;
+      document.removeEventListener('keydown',onKey);
+      if(menuTrigger.current?.getClientRects().length)menuTrigger.current.focus();
+    };
+  },[drawerOpen]);
   const emblem=modes[mode].icon;
   const ModeIcon=emblem;
-  return <div className="app-shell mystic-workspace" data-workspace={mode}>
-    <aside className={'sidebar '+(mobile?'open':'')}>
+  return <div className="app-shell mystic-workspace" data-workspace={mode} data-drawer-open={drawerOpen}>
+    <aside id="workspace-navigation" ref={drawer} className={'sidebar '+(drawerOpen?'open':'')} inert={narrow&&!drawerOpen} role={drawerOpen?'dialog':undefined} aria-modal={drawerOpen?true:undefined} aria-label="Навигация MysticEgo">
+      <button ref={closeDrawer} className="icon-btn drawer-close" type="button" aria-label="Закрыть меню" onClick={()=>setMobile(false)}><X size={20}/></button>
       <Link to="/" className="brand" aria-label="MysticEgo" onClick={()=>setMobile(false)}><div className="brand-mark"><img src={"/mystic-mark.png"} alt=""/></div><strong>MysticEgo</strong></Link>
       <div className="node-label"><span className="node-icon"><ModeIcon size={18}/></span><div><strong>{modes[mode].name}</strong><small>{modes[mode].subtitle}</small></div></div>
       <nav aria-label="Главная навигация">{nav.map(section=><div className="nav-section" key={section.name}>
@@ -161,11 +196,11 @@ function Workspace({logout}:{logout:()=>void}){
       </footer>
       <ReleaseStatus/>
     </aside>
-    {mobile&&<div className="shade" onClick={()=>setMobile(false)}/>}
-    <div className="main">
+    {drawerOpen&&<div className="shade workspace-shade" aria-hidden="true" onClick={()=>setMobile(false)}/>}
+    <div className="main" inert={drawerOpen}>
       <header className="topbar orchestral-topbar" style={bannerStyle(personal?.profile.coverUrl)}>
         <span className="topbar-light" aria-hidden="true"><span className="topbar-sweep"/></span>
-        <button className="icon-btn mobile-toggle" onClick={()=>setMobile(value=>!value)} aria-label="Открыть меню"><Menu size={22}/></button>
+        <button ref={menuTrigger} type="button" className="icon-btn mobile-toggle" onClick={()=>setMobile(value=>!value)} aria-label="Открыть меню" aria-controls="workspace-navigation" aria-expanded={drawerOpen}><Menu size={22}/></button>
         <div className="breadcrumb"><span>{modes[mode].name}</span><ChevronRight size={14}/><strong>{current}</strong></div>
         <div className="top-actions"><ThemeToggle scope={preferenceScope}/><AccountMenu logout={logout}/></div>
       </header>
@@ -230,7 +265,7 @@ export function MysticApp({mode,defaultApi}:{mode:NodeMode;title:string;defaultA
     if (publicPath === '/desktop-downloads') return <PublicDesktopDownloads scope={scope}/>;
   }
   if(mode==='orchestra'&&location.pathname==='/agent-desktop')return <AgentDesktopEntry scope={scope}/>;
-  if(restoring)return <NotificationProvider><main className="auth-experience"><section className="auth-form-side">
+  if(restoring)return <NotificationProvider><main className="auth-experience auth-recovery"><section className="auth-form-side">
     <div className="auth-form-card">
       <h2>Восстановление входа</h2>
       <p role="status">Проверяем сохранённую сессию. Если сервер ещё запускается, вход восстановится автоматически.</p><ErrorBanner text={restoreError}/>
