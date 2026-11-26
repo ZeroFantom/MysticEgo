@@ -61,7 +61,7 @@ export function Settings(){
  useEffect(()=>{const sync=()=>setStyle(current(scope));sync();window.addEventListener('mystic-appearance',sync);window.addEventListener('storage',sync);return()=>{window.removeEventListener('mystic-appearance',sync);window.removeEventListener('storage',sync)}},[scope]);
  const update=<K extends keyof Style>(field:K,value:Style[K])=>{const next={...current(scope),[field]:value};save(scope,next);setStyle(next)};
  return <><Header title="Настройки" description="Тема, палитра и эффекты оформления" action={<button className="btn secondary" onClick={()=>{save(scope,{...defaults});setStyle({...defaults})}}>Сбросить оформление</button>}/>
-  <div className="two-col">
+  <div className="two-col settings-layout">
    <Panel title="Тема и интерфейс"><div className="stack">
     <label>Тема<select aria-label="Тема" value={style.theme} onChange={event=>update('theme',event.target.value as Style['theme'])}><option value="dark">Тёмная</option><option value="light">Светлая</option><option value="system">Как в системе</option></select></label>
     <div className="appearance-style-options" role="group" aria-label="Стиль интерфейса">{(['simplified','immersive'] as const).map(item=><button key={item} type="button" className="appearance-style-option" data-preview={item} aria-pressed={style.interfaceStyle===item} onClick={()=>update('interfaceStyle',item)}><span className="appearance-art-preview" aria-hidden="true"/><strong>{item==='immersive'?'Насыщенный':'Упрощённый'}</strong><small>{item==='immersive'?'Пейзажи, глубина и мягкое свечение':'Чистые поверхности и спокойная сетка'}</small></button>)}</div>
@@ -70,13 +70,12 @@ export function Settings(){
     <label>Плотность<select aria-label="Плотность" value={style.density} onChange={event=>update('density',event.target.value as Style['density'])}><option value="comfortable">Комфортная</option><option value="compact">Компактная</option></select></label>
     <label>Текст<select aria-label="Текст" value={style.size} onChange={event=>update('size',event.target.value as Style['size'])}><option value="normal">Обычный</option><option value="large">Крупный</option></select></label>
    </div></Panel>
-   <Panel title="Неоновые эффекты (насыщенный стиль)" aside={<Sparkles size={18}/>}><div className="stack">
+   <div className="settings-side"><Panel title="Неоновые эффекты (насыщенный стиль)" aside={<Sparkles size={18}/>}><div className="stack">
     {([['ambient','Анимация фонового свечения'],['wave','Неоновая волна'],['grid','Градиент по затухающей сетке'],['border','Свет по контуру кнопок']] as const).map(([field,label])=>
      <label className="check-row" key={field}><input type="checkbox" checked={style[field]} onChange={event=>update(field,event.target.checked)}/>{label}</label>)}
     <label>Яркость · {style.intensity}%<input type="range" min={10} max={100} value={style.intensity} onChange={event=>update('intensity',Number(event.target.value))}/></label>
     <button type="button" className="btn neon-preview">Предпросмотр кнопки</button>
    </div></Panel>
-  </div>
   <Panel title="Палитра" aside={<Palette size={18}/>}>
    <div className="palette-options">{[...palettes,{id:'custom',name:'Своя палитра',colors:[style.primary,'#444057',style.secondary]}].map(item=>
     <button className={'palette-option '+(style.palette===item.id?'selected':'')} key={item.id} onClick={()=>update('palette',item.id)} aria-pressed={style.palette===item.id}>
@@ -84,6 +83,7 @@ export function Settings(){
     </button>)}</div>
    {style.palette==='custom'&&<div className="form-pair stack custom-colors"><label>Основной цвет<input type="color" value={style.primary} onChange={event=>update('primary',event.target.value)}/></label>
     <label>Второй цвет<input type="color" value={style.secondary} onChange={event=>update('secondary',event.target.value)}/></label></div>}
-  </Panel>
+  </Panel></div>
+  </div>
  </>;
 }
