@@ -116,7 +116,7 @@
 /* Media roles: fit photography without changing its intrinsic proportions. */
 :root .mystic-workspace .account-avatar{aspect-ratio:1;overflow:hidden;flex-shrink:0}
 :root .mystic-workspace .account-avatar>img{display:block;width:100%;height:100%;object-fit:cover;object-position:center;min-width:0;min-height:0}
-:root .mystic-workspace .sticker-image{width:auto;height:auto;max-width:100%;object-fit:contain}
+:root .mystic-workspace .sticker-image{width:auto;height:auto;object-fit:contain}
 :root .mystic-workspace .chat-message .sticker-image{max-width:min(136px,100%)}
 :root[data-ui-motion=off] .appearance-quick *, :root[data-ui-motion=off] .appearance-style-option{transition:none!important;animation:none!important}
 @media(prefers-reduced-motion:reduce){.appearance-quick *, .appearance-style-option{transition:none!important;animation:none!important}}
