@@ -99,16 +99,18 @@ async function checkArtwork(page,theme,style,selector,kind){
   const data=await page.evaluate(async({theme,style,selector,kind})=>{
     const root=getComputedStyle(document.documentElement);
     const url=raw=>{const match=raw.match(/url\(["']?([^"')]+)["']?\)/);return match?new URL(match[1],document.baseURI).href:null};
-    const hero=url(root.getPropertyValue('--mystic-art')),entry=url(root.getPropertyValue('--mystic-entry-art'));
+    const hero=url(root.getPropertyValue('--mystic-art')),entry=url(root.getPropertyValue('--mystic-entry-art')),header=url(root.getPropertyValue('--mystic-header-art')),sidebar=url(root.getPropertyValue('--mystic-sidebar-art'));
     const load=async src=>{if(!src)throw Error('Missing artwork URL');const img=new Image();img.src=src;await img.decode();return [img.naturalWidth,img.naturalHeight]};
     const element=document.querySelector(selector);
     if(!element)throw Error('Missing artwork surface '+selector);
     const active=url(getComputedStyle(element).backgroundImage);
-    const expected=kind==='hero'?hero:entry;
-    return {hero,entry,active,expected,heroSize:await load(hero),entrySize:await load(entry),prefix:style+'-'+theme};
+    const expected={hero,entry,header,sidebar}[kind];
+    return {hero,entry,header,sidebar,active,expected,heroSize:await load(hero),entrySize:await load(entry),headerSize:await load(header),sidebarSize:await load(sidebar),prefix:style+'-'+theme};
   },{theme,style,selector,kind});
   assert.deepEqual(data.heroSize,[1916,821]);assert.deepEqual(data.entrySize,[1122,1402]);
   assert(data.hero.includes(data.prefix+'-hero')&&data.entry.includes(data.prefix+'-entry'),'Incorrect theme artwork');
+  assert(data.header.includes(data.prefix+'-header')&&data.sidebar.includes(data.prefix+'-sidebar'),'Wrong narrow artwork');
+  assert(data.headerSize[0]/data.headerSize[1]>8&&data.sidebarSize[0]/data.sidebarSize[1]<.25,'Incorrect narrow artwork proportions');
   assert.equal(data.active,data.expected,'Incorrect artwork for '+selector);
 }
 async function capture(page,label){
@@ -196,6 +198,8 @@ try{
                 await switchAppearance(page,theme,style);
                 await noHorizontalOverflow(page);
                 await checkArtwork(page,theme,style,'.dashboard-hero',viewport.width<=650?'entry':'hero');
+                await checkArtwork(page,theme,style,'.orchestral-topbar',viewport.width<=650?'hero':'header');
+                await checkArtwork(page,theme,style,'.sidebar','sidebar');
                 await capture(page,prefix+'-overview-'+theme+'-'+style);
               }
             });
@@ -207,6 +211,35 @@ try{
               await capture(page,prefix+'-'+route);
             });
           }
+          if(role==='orchestra'&&viewport.width===1440)await check(page,prefix+'-cinematic',async()=>{
+            await page.goto(origin+'/studio',{waitUntil:'domcontentloaded'});
+            const scene=page.locator('.cinematic-live');
+            await visible(scene);
+            await scene.scrollIntoViewIfNeeded();
+            assert.equal(await scene.getAttribute('data-playing'),'false');
+            assert.equal(await page.locator('.cinematic-effects').count(),0);
+            await page.emulateMedia({reducedMotion:'no-preference'});
+            for(const [theme,style] of combinations){
+              await switchAppearance(page,theme,style);
+              await scene.scrollIntoViewIfNeeded();
+              const image=await scene.locator('img').evaluate(async img=>{await img.decode();const rect=img.getBoundingClientRect();return {src:img.currentSrc,ratio:rect.width/rect.height,fit:getComputedStyle(img).objectFit}});
+              assert(image.src.includes(style+'-'+theme+'-hero'));
+              assert(Math.abs(image.ratio-21/9)<.08&&image.fit==='contain');
+              await page.getByRole('button',{name:'Смотреть сцену',exact:true}).click();
+              await page.waitForFunction(()=>document.querySelector('.cinematic-live')?.getAttribute('data-running')==='true');
+              await page.getByRole('button',{name:'Пауза',exact:true}).click();
+              assert.equal(await scene.getAttribute('data-running'),'false');
+              await page.getByRole('button',{name:'Продолжить',exact:true}).click();
+              await page.waitForFunction(()=>document.querySelector('.cinematic-live')?.getAttribute('data-running')==='true');
+              await page.getByRole('button',{name:'Остановить',exact:true}).click();
+              assert.equal(await page.locator('.cinematic-effects').count(),0);
+              await capture(page,prefix+'-cinematic-'+theme+'-'+style);
+            }
+            await page.getByRole('button',{name:'Смотреть сцену',exact:true}).click();
+            await page.emulateMedia({reducedMotion:'reduce'});
+            await page.waitForFunction(()=>!document.querySelector('.cinematic-effects'));
+            assert.equal(await page.getByRole('button',{name:'Смотреть сцену',exact:true}).count(),0);
+          });
           await check(page,prefix+'-runtime',async()=>assert.deepEqual(errors,[],'uncaught browser exceptions'));
         }catch(error){results.push({label:prefix+'-setup',passed:false,error:String(error)});await page.screenshot({path:resolve(output,prefix+'-setup-failure.png'),timeout:5000}).catch(()=>{})}
         finally{await context.close()}

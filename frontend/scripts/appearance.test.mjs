@@ -13,7 +13,10 @@ for(const [css,assets,settings] of groups){
   const name=style+'-'+color+'-hero.webp';
   assert(styles.includes('[data-interface="'+style+'"][data-theme="'+color+'"]'),css+' missing '+style+'/'+color);
   const entry=style+'-'+color+'-entry.webp';
-  for(const [asset,width,height] of [[name,1916,821],[entry,1122,1402]]){
+  const header=style+'-'+color+'-header.webp',sidebar=style+'-'+color+'-sidebar.webp';
+  const headerHeight=style==='simplified'&&color==='light'?166:167;
+  const sidebarWidth=style==='simplified'&&color==='dark'?169:style==='immersive'&&color==='dark'?173:171;
+  for(const [asset,width,height] of [[name,1916,821],[entry,1122,1402],[header,1414,headerHeight],[sidebar,sidebarWidth,708]]){
     assert(styles.includes(asset),css+' missing '+asset);
     const art=bytes(assets+'/'+asset);
     assert.equal(art.subarray(0,4).toString(),'RIFF');assert.equal(art.subarray(8,12).toString(),'WEBP');
@@ -82,7 +85,7 @@ for(const css of [desktopCss,cloudCss]){
  assert(css.includes('aspect-ratio:21/9')&&css.includes('background-size:contain')&&css.includes('simplified-dark-hero.webp'));
 }
 assert(desktopCss.includes('object-fit:contain')&&cloudCss.includes('aside .bottom{display:block'));
-assert(overlay.includes('simplified-dark-hero.webp')&&overlay.includes('border-radius:50%'));
+assert(overlay.includes('simplified-dark-header.webp')&&overlay.includes('border-radius:50%'));
 assert(updater.includes('src/appearance-art/simplified-dark.svg')&&updater.includes('src/AuditPortal.jsx'));
 
 const motion=read('frontend/packages/ui/src/app/motion.css');
@@ -93,9 +96,15 @@ assert(notifications.includes('data-motion-open={open} inert={!open}')&&notifica
 assert(motion.includes('@starting-style')&&motion.includes('allow-discrete')&&motion.includes('pointer-events:none'));
 assert(motion.includes('var(--mystic-page-time) var(--mystic-ease) backwards')&&motion.includes('--motion-step:0ms'));
 assert(motion.includes('data-ui-motion=off')&&motion.includes('prefers-reduced-motion:reduce'));
-assert(cinematic.includes('IntersectionObserver')&&cinematic.includes('visibilitychange')&&cinematic.includes('element.pause()'));
-assert(cinematic.includes('preload="metadata"')&&!cinematic.includes('autoPlay'));
+assert(cinematic.includes('IntersectionObserver')&&cinematic.includes('visibilitychange')&&cinematic.includes('visible&&pageVisible'));
+assert(cinematic.includes("state==='playing'")&&cinematic.includes('data-running={running}')&&!cinematic.includes('autoPlay'));
 assert(cinematic.includes('loading="lazy"')&&motion.includes('aspect-ratio:16/9')&&motion.includes('object-fit:contain'));
 
 assert(web.includes('var(--mystic-entry-art) right center/auto 100%')&&web.includes('@media(max-width:780px)'));
 assert(motion.includes('data-playing=false]{aspect-ratio:21/9}'));
+
+for(const css of [web,desktopCss,cloudCss])assert(css.includes('var(--mystic-header-art) right center/contain no-repeat'));
+for(const css of [web,cloudCss])assert(css.includes('var(--mystic-sidebar-art) center bottom/contain no-repeat'));
+assert(cinematic.includes('Смотреть сцену')&&cinematic.includes('Остановить')&&cinematic.includes('mystic-scene-haze'));
+assert(motion.includes('.cinematic-live[data-running=false]')&&motion.includes('animation-play-state:paused')&&motion.includes('aspect-ratio:21/9;max-height:none'));
+assert(!cinematic.includes('.webm')&&cinematic.includes('key={poster+\':\'+allowed}'));
