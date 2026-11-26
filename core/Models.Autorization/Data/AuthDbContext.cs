@@ -7,6 +7,7 @@ namespace Models.Autorization.Data
     {
         public AuthDbContext(DbContextOptions<AuthDbContext> options) : base(options) { }
 
+        public DbSet<AuditRegistrationAcceptance> AuditRegistrationAcceptances => Set<AuditRegistrationAcceptance>();
         public DbSet<User> Users => Set<User>();
         public DbSet<Role> Roles => Set<Role>();
         public DbSet<Permission> Permissions => Set<Permission>();
@@ -34,6 +35,17 @@ namespace Models.Autorization.Data
                 e.HasIndex(x => x.Login).IsUnique();
                 e.HasIndex(x => x.IsActive);
                 e.HasIndex(x => x.CreatedByUserId);
+            });
+
+            mb.Entity<AuditRegistrationAcceptance>(e =>
+            {
+                e.ToTable("audit_registration_acceptances");
+                e.HasKey(x => x.UserId);
+                e.Property(x => x.TermsVersion).HasMaxLength(40).IsRequired();
+                e.Property(x => x.PrivacyVersion).HasMaxLength(40).IsRequired();
+                e.HasOne<User>().WithOne()
+                    .HasForeignKey<AuditRegistrationAcceptance>(x => x.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             mb.Entity<Role>(e =>

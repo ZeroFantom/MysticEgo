@@ -7,6 +7,7 @@ import {ErrorBanner} from '../components/primitives';
 import {ThemeToggle} from './Settings';
 import {PanelLoginLinks} from './PanelDirectory';
 import {LicenseLink} from './Studio';
+import {readRegistrationDocuments} from './registration-documents';
 
 export type AuthLogin={accessToken:string;refreshToken:string;user?:{login?:string};expiresAt:string};
 export async function signIn(authUrl:string,login:string,password:string):Promise<AuthLogin>{
@@ -20,6 +21,10 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
  const [login,setLogin]=useState(''),[password,setPassword]=useState(''),[nickname,setNickname]=useState('');
  const [error,setError]=useState(''),[busy,setBusy]=useState(false),[register,setRegister]=useState(false),[reveal,setReveal]=useState(false);
  const [guest,setGuest]=useState(false);
+ const [acceptance,setAcceptance]=useState('');
+ const documents=useRemote(()=>register?readRegistrationDocuments(authUrl):Promise.resolve(null),[register,authUrl]);
+ const policy=documents.value?.required?documents.value:null;
+ const policyKey=policy?JSON.stringify([authUrl,policy.terms.version,policy.privacy.version]):'';
  const available=useRemote(async()=>{
   if(mode!=='agent')return false;
   try{const response=await fetch(session.url+'/api/v1/guest/availability');return response.ok&&(await response.json()).available===true}catch{return false}
@@ -27,6 +32,7 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
  const [title,subtitle]=labels[mode]??labels.audit;
  function selectMode(create:boolean){
   setRegister(create);
+  setAcceptance('');
   setReveal(false);
   setError('');
  }
@@ -34,7 +40,9 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
   event.preventDefault();setBusy(true);setError('');
   try{
    if(register){
-    const response=await fetch(authUrl.replace(/\/$/,'')+'/api/auth/audit/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({login,password,nickname})});
+    if(!documents.value||documents.loading||documents.error||policyKey&&acceptance!==policyKey)
+     throw Error('Сначала ознакомьтесь с документами регистрации.');
+    const response=await fetch(authUrl.replace(/\/$/,'')+'/api/auth/audit/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({login,password,nickname,termsVersion:policy?.terms.version,privacyVersion:policy?.privacy.version})});
     if(!response.ok){const result=await response.json().catch(()=>({}));throw Error(result.error||'Регистрация недоступна, код '+response.status)}
    }
    const result=await signIn(authUrl,login,password);
@@ -76,8 +84,16 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
       </div>
       {register&&<small id="auth-password-hint">Минимум 12 символов</small>}
      </div>
-     <ErrorBanner text={error}/>
-     <button className="btn auth-submit" type="submit" disabled={busy}>{busy?'Подождите…':register?'Создать аккаунт':'Войти'}<ArrowRight size={17}/></button>
+     {register&&policy&&<div className="registration-documents">
+       <label><input type="checkbox" checked={acceptance===policyKey} required
+          onChange={event=>setAcceptance(event.target.checked?policyKey:'')}/>
+        <span>Принимаю <a href={policy.terms.url} target="_blank" rel="noreferrer">условия использования</a>.</span>
+       </label>
+       <a href={policy.privacy.url} target="_blank" rel="noreferrer">Как обрабатываются данные</a>
+     </div>}
+     {register&&documents.loading&&<p className="footnote">Загружаем документы регистрации…</p>}
+     <ErrorBanner text={error||(register?documents.error:'')}/>
+     <button className="btn auth-submit" type="submit" disabled={busy||register&&(!documents.value||documents.loading||!!documents.error||!!policyKey&&acceptance!==policyKey)}>{busy?'Подождите…':register?'Создать аккаунт':'Войти'}<ArrowRight size={17}/></button>
      <details className="auth-connection"><summary>Адрес авторизации</summary><div className="auth-field">
       <label htmlFor="auth-url">API авторизации</label><div className="auth-control"><Network size={17} aria-hidden="true"/>
        <input id="auth-url" type="url" value={authUrl} onChange={e=>setAuthUrl(e.target.value)} required/>

@@ -1,8 +1,10 @@
 import {useEffect} from 'react';
 import {
-  ArrowDownRight, ArrowUpRight, Box, Braces, Building2, Compass, Github,
+  ArrowDownRight, ArrowUpRight, Box, Building2, Compass, Github, Send, Users,
   Server, ShieldCheck, Workflow,
 } from 'lucide-react';
+import {StudioEconomics} from './StudioEconomics';
+import editorialImage from './media/club-editorial.webp';
 import './studio.css';
 
 const repository = 'https://github.com/ZeroFantom/MysticEgo';
@@ -37,7 +39,7 @@ const partnerships = [
   },
 ];
 
-const stack = ['C#', '.NET 10', 'ASP.NET Core', 'SignalR', 'React', 'TypeScript', 'Electron', 'Linux / systemd', 'GitHub Actions', 'SSH', 'MCP'];
+const stack = ['C#', '.NET 10', 'ASP.NET Core', 'SignalR', 'React', 'TypeScript', 'Electron', 'Linux / systemd', 'GitHub Actions', 'SSH', 'MCP', 'EF Core', 'PostgreSQL', 'MS SQL', 'Docker', 'WPF', 'Avalonia'];
 
 function discussion(topic: string) {
   return repository + '/issues/new?' + new URLSearchParams({title: topic});
@@ -45,14 +47,14 @@ function discussion(topic: string) {
 
 export function LicenseLink({className}: {className?: string}) {
   return <a className={className} href={repository + '/blob/main/LICENSE'} target="_blank" rel="noreferrer">
-    Apache 2.0
+    PolyForm Noncommercial 1.0.0
   </a>;
 }
 
 function PublicNavigation({page}: {page: 'studio' | 'developer'}) {
   useEffect(() => {
     const previous = document.title;
-    document.title = page === 'studio' ? 'Студия MysticEgo' : 'Zero Fantom · MysticEgo';
+    document.title = page === 'studio' ? 'Студия MysticEgo' : 'Дмитрий Колыхало · MysticEgo';
     return () => {
       document.title = previous;
     };
@@ -79,21 +81,17 @@ export function StudioPage() {
   return <div className="studio-site">
     <PublicNavigation page="studio"/>
     <main className="studio-content">
-      <section className="studio-hero">
+      <section className="studio-hero studio-hero-cover">
+        <img className="studio-hero-image" src={editorialImage} alt="" fetchPriority="high"/>
         <div>
           <h1>Студия MysticEgo</h1>
-          <p>Создаём открытые инструменты управления рабочими станциями. Параллельно проектируем фэнтезийный мир, в котором история складывается из решений его жителей.</p>
+          <p>Инструменты для клубов, где десятки компьютеров должны работать как одна система. И отдельный игровой замысел о мире, который помнит решения своих жителей.</p>
           <div className="studio-actions">
             <a className="studio-button primary" href="#join">Присоединиться к проекту <ArrowDownRight size={17} aria-hidden="true"/></a>
             <a className="studio-button" href="#partners">Предложить партнёрство</a>
           </div>
         </div>
-        <aside className="studio-hero-aside">
-          <Workflow size={34} aria-hidden="true"/>
-          <h2>MysticEgo в разработке</h2>
-          <p>От панели Orchestra до конкретной рабочей станции. Открытый код, диагностика и проверяемые обновления.</p>
-          <a href={repository + '/releases'}>Смотреть сборки <ArrowUpRight size={15} aria-hidden="true"/></a>
-        </aside>
+
       </section>
 
       <section className="studio-section" aria-labelledby="studio-direction">
@@ -113,9 +111,25 @@ export function StudioPage() {
         </div>
       </section>
 
+      <section className="studio-section" aria-labelledby="studio-workflow">
+        <div className="studio-section-heading">
+          <h2 id="studio-workflow">От оператора до станции</h2>
+          <p>Orchestra отвечает за установки и обновления. Global объединяет площадки, Local знает оборудование каждого клуба, Agent сообщает о состоянии конкретного ПК.</p>
+        </div>
+        <ol className="studio-steps">
+          <li><strong>Orchestra</strong><span>Реестр, версии и состояние развёртывания</span></li>
+          <li><strong>Global</strong><span>Доступ и управление сетью площадок</span></li>
+          <li><strong>Local</strong><span>Регистрация и работа внутри площадки</span></li>
+          <li><strong>Agent</strong><span>Диагностика и разрешённые операции на ПК</span></li>
+        </ol>
+        <p>Приоритет пилота — измерить время подключения станции, восстановления после сбоя и обновления нескольких площадок. Для Ether And Chaos ближайшая цель — небольшой игровой прототип, где событие возникает из действий участников, а его последствия сохраняются.</p>
+      </section>
+
+      <StudioEconomics/>
+
       <section id="join" className="studio-section" aria-labelledby="studio-recruitment">
         <h2 id="studio-recruitment">Присоединиться к разработке</h2>
-        <p>Ищем участников для задач открытого проекта и раннего прототипирования.</p>
+        <p>Ищем участников для задач проекта и раннего прототипирования.</p>
         <div className="studio-grid">
           {roles.map(role => <article className="studio-card" key={role.title}>
             <h3>{role.title}</h3>
@@ -126,7 +140,7 @@ export function StudioPage() {
           <a className="studio-button primary" href={discussion('Участие в разработке MysticEgo')}>Предложить участие <ArrowUpRight size={16} aria-hidden="true"/></a>
           <a className="studio-button" href={repository + '/blob/main/CONTRIBUTING.md'}>Как внести вклад</a>
         </div>
-        <p className="studio-note">Заявка на GitHub будет публичной. Достаточно указать направление и ссылку на открытое портфолио.</p>
+        <p className="studio-note">Тема в GitHub Issues будет публичной. Достаточно указать направление и ссылку на открытое портфолио.</p>
       </section>
 
       <section id="partners" className="studio-section" aria-labelledby="studio-partners">
@@ -139,7 +153,7 @@ export function StudioPage() {
             <a href={discussion(item.title + ' · MysticEgo')}>Начать обсуждение <ArrowUpRight size={15} aria-hidden="true"/></a>
           </article>)}
         </div>
-        <p className="studio-note">Для первого сообщения достаточно описать формат сотрудничества. Условия обсуждаются отдельно.</p>
+        <p className="studio-note">Для первого сообщения достаточно описать формат сотрудничества. Для коммерческих разрешений или непубличного обсуждения напишите <a href="mailto:zero.dark.lie@gmail.com">DarkLie:Zero</a>.</p>
       </section>
     </main>
     <PublicFooter/>
@@ -149,11 +163,12 @@ export function StudioPage() {
 export function DeveloperPage() {
   return <div className="studio-site">
     <PublicNavigation page="developer"/>
-    <main className="studio-content">
-      <section className="studio-hero">
+    <main className="studio-content developer-content">
+      <section className="studio-hero developer-hero">
         <div>
-          <p className="studio-role">C# / .NET · распределённые приложения</p>
-          <h1>Zero Fantom</h1>
+          <p className="studio-role">Zero Fantom · C# / .NET</p>
+          <h1>Колыхало Дмитрий Антонович</h1>
+          <p className="developer-meta">22 года · Разработка серверных и настольных приложений</p>
           <p>Разработчик MysticEgo. Проектирую сервисы для управления парком компьютеров и связываю серверную архитектуру с интерфейсами для администраторов.</p>
           <div className="studio-actions">
             <a className="studio-button primary" href="https://github.com/ZeroFantom"><Github size={18} aria-hidden="true"/>Профиль GitHub</a>
@@ -161,7 +176,11 @@ export function DeveloperPage() {
           </div>
         </div>
         <aside className="studio-hero-aside">
-          <Braces size={34} aria-hidden="true"/>
+          <h2>На связи</h2>
+          <div className="developer-links">
+            <a href="https://t.me/ZeroPhantomLie"><Send size={18} aria-hidden="true"/><span><strong>Telegram</strong><small>@ZeroPhantomLie</small></span><ArrowUpRight size={16} aria-hidden="true"/></a>
+            <a href="https://vk.com/id154351348"><Users size={18} aria-hidden="true"/><span><strong>ВКонтакте</strong><small>Профиль</small></span><ArrowUpRight size={16} aria-hidden="true"/></a>
+          </div>
           <h2>Технический стек</h2>
           <ul className="studio-stack">{stack.map(tech => <li key={tech}>{tech}</li>)}</ul>
         </aside>

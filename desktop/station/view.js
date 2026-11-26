@@ -2,6 +2,8 @@ import {initEffects} from '../control/effects.js';
 const $=id=>document.getElementById(id);
 const api=window.station;
 let initialized=false,centralEdited=false,register=false;
+let documents=null;
+let documentRequest=0;
 initEffects($('design'));
 async function refresh(){
   const state=await api.snapshot();
@@ -61,18 +63,50 @@ async function run(action){
   try{const result=await action();if(typeof result==='string')$('message').textContent=result;await refresh()}
   catch(error){$('message').textContent=error.message}
 }
-$('central').oninput=$('portal-lan').onchange=()=>{centralEdited=true};
+async function loadRegistrationDocuments(){
+  const request=++documentRequest;
+  documents=null;
+  $('registration-document-box').hidden=true;
+  $('accept-terms').checked=false;
+  if(!register)return;
+  await run(async()=>{
+    const result=await api['registration-documents']($('central').value,$('portal-lan').checked);
+    if(request!==documentRequest||!register)return;
+    documents=result;
+    $('registration-document-box').hidden=!result.required;
+  });
+}
+$('central').oninput=()=>{
+  centralEdited=true;
+  documents=null;
+  $('registration-document-box').hidden=true;
+  documentRequest++;
+};
+$('central').onchange=$('portal-lan').onchange=()=>{
+  centralEdited=true;
+  void loadRegistrationDocuments();
+};
+for(const [button,kind] of [['terms-document','terms'],['privacy-document','privacy']]){
+  $(button).onclick=()=>void run(()=>api['registration-document-open'](kind,$('central').value,$('portal-lan').checked));
+}
 $('register').onclick=()=>{
   register=!register;$('nickname-label').hidden=!register;$('nickname').required=register;
   $('login-title').textContent=register?'Создайте аккаунт Audit':'Войдите в MysticEgo';
   $('login-button').textContent=register?'Создать аккаунт':'Войти';
   $('register').textContent=register?'У меня есть аккаунт':'Создать аккаунт';
   $('password').autocomplete=register?'new-password':'current-password';
+  void loadRegistrationDocuments();
 };
 $('login-form').onsubmit=event=>{
   event.preventDefault();$('login-button').disabled=true;
   void run(async()=>{
-    try{return await api.auth({login:$('login').value,password:$('password').value,register,nickname:$('nickname').value,central:$('central').value,lan:$('portal-lan').checked})}
+    try{
+      if(register&&!documents)throw Error('Дождитесь загрузки документов регистрации.');
+      if(register&&documents?.required&&!$('accept-terms').checked)throw Error('Примите условия использования.');
+      return await api.auth({login:$('login').value,password:$('password').value,register,nickname:$('nickname').value,
+        central:$('central').value,lan:$('portal-lan').checked,
+        termsVersion:documents?.terms?.version,privacyVersion:documents?.privacy?.version});
+    }
     finally{$('password').value='';$('login-button').disabled=false}
   });
 };

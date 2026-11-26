@@ -26,6 +26,14 @@
 <label class="checkbox"><input type="checkbox" id="portal-lan"> Тестовый HTTP в локальной сети</label>
 <div class="desktop-columns"><label>Логин<input id="login" autocomplete="username" required></label><label>Пароль<input id="password" type="password" autocomplete="current-password" required></label></div>
 <label id="nickname-label" hidden>Игровой никнейм<input id="nickname" maxlength="60"></label>
+<fieldset id="registration-document-box" hidden>
+  <legend>Документы регистрации</legend>
+  <div class="actions">
+    <button type="button" class="secondary" id="terms-document">Условия</button>
+    <button type="button" class="secondary" id="privacy-document">Обработка данных</button>
+  </div>
+  <label><input id="accept-terms" type="checkbox"> Принимаю условия использования</label>
+</fieldset>
 <div class="actions"><button id="login-button">Войти</button><button class="plain" type="button" id="register">Создать аккаунт</button></div>
 </form>
 <button class="plain" id="portal">Открыть портал Audit</button>
