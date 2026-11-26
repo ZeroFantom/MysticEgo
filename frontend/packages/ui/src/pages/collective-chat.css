@@ -119,3 +119,8 @@ button.chat-thread:active {transform:scale(.98)}
 @media(max-width:760px){:root[data-interface] .mystic-chats .chat-room{border-radius:18px}}
 @media(max-width:500px){:root[data-interface] .chat-room .chat-compose-tools .icon-btn{width:40px;height:40px;min-width:40px;min-height:40px}:root[data-interface] .chat-room .message-list{padding:10px}}
 :root[data-ui-motion=off] .mystic-chats :is(.chat-message,.chat-room,.chat-thread,.chat-action-menu){animation:none!important;transition:none!important}
+
+/* Prevent generic panel padding and shadows from overriding the chat room layout. */
+:root[data-interface] .mystic-workspace .mystic-chats .chat-room{padding:0;margin:0;border:0;box-shadow:none;min-height:0;height:100%;background:var(--mystic-surface)}
+:root[data-interface] .mystic-workspace .mystic-chats .chat-room .chat-compose{flex:none}
+:root[data-interface] .mystic-workspace .mystic-chats .chat-room .message-list{min-height:0}
