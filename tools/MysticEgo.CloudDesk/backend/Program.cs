@@ -35,7 +35,7 @@ async Task Handle(string line) {
 }
 
 sealed partial class CloudDesk {
-    const string Repo = "ZeroFantom/MysticEgo", Tag = "v1.0.0-beta.7-r3.2.12", Asset = "MysticEgo_BETA7_R3.2.12.zip";
+    const string Repo = "ZeroFantom/MysticEgo", Tag = "v1.0.0-beta.7-r3.2.29", Asset = "MysticEgo_BETA7_R3.2.29.zip";
     readonly HttpClient http = new(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(60) };
     string token = "";
     readonly string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -453,6 +453,8 @@ sealed partial class CloudDesk {
         if(method=="") method="native";
         if(method is not ("native" or "docker") || role!="Orchestra" && method=="docker")
             throw new Exception("Выбранный способ развёртывания пока доступен только для Orchestra.");
+        var database=S(a,"databaseMode"); if(database=="")database="sqlite";
+        if(database is not ("sqlite" or "postgres-native" or "postgres-docker" or "postgres-prepared") || role!="Orchestra" && database!="sqlite") throw new Exception("Выберите поддерживаемый способ хранения данных.");
         if(role=="Global") { if(!Uri.TryCreate(orchestra,UriKind.Absolute,out var u)||u.Scheme!="https"||u.UserInfo!=""||u.Query!=""||u.Fragment!="") throw new Exception("Нужен HTTPS URL существующего Orchestra"); if(!File.Exists(script)) throw new Exception("Выберите проверенный bash-скрипт Global"); await RequireDeveloper(orchestra); }
         else script=Path.Combine(AppContext.BaseDirectory,"profiles","orchestra-r3.sh");
         if(!File.Exists(script)) throw new Exception("Скрипт установки не найден");
@@ -475,7 +477,7 @@ sealed partial class CloudDesk {
             progress("Передача установочного скрипта на VPS");
             await Upload(a,script,remote+"/install.sh");
             static string Q(string s)=>"'"+s.Replace("'","'\"'\"'")+"'";
-            var command="test ! -e /opt/mysticego/app && test ! -e /var/lib/mysticego && test ! -e /etc/mysticego/orchestra.env && test ! -e /etc/systemd/system/mysticego-orchestra.service && ! systemctl list-unit-files --no-legend | grep -qi mysticego && bash "+remote+"/install.sh "+Q(remote+"/r3.zip")+" "+Q(domain)+" "+Q(orchestra)+(role=="Orchestra"?" "+Q(digest)+" "+Q(method):"");
+            var command="test ! -e /opt/mysticego/app && test ! -e /var/lib/mysticego && test ! -e /etc/mysticego/orchestra.env && test ! -e /etc/systemd/system/mysticego-orchestra.service && ! systemctl list-unit-files --no-legend | grep -qi mysticego && bash "+remote+"/install.sh "+Q(remote+"/r3.zip")+" "+Q(domain)+" "+Q(orchestra)+(role=="Orchestra"?" "+Q(digest)+" "+Q(method)+" "+Q(database):"");
             SaveBinding(binding with {Phase="installing"});
             progress("Запуск установочного скрипта на VPS");
             void ReportInstallerStep(string line) {

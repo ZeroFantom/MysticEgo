@@ -4,6 +4,8 @@ umask 077
 archive=${1:?archive}; domain=${2:?domain}
 checksum=${4:-2f410003f5c1ad68cc702f8a5d21dc0143cd1d9b92d3709be75ac08fffaf9f28}
 method=${5:-native}
+database=${6:-sqlite}
+[[ $database == sqlite || $database == postgres-native || $database == postgres-docker || $database == postgres-prepared ]]
 [[ $method == native || $method == docker ]]
 [[ $checksum =~ ^[a-f0-9]{64}$ ]]
 [[ $(id -u) == 0 && $(uname -m) == x86_64 ]]
@@ -12,6 +14,13 @@ method=${5:-native}
 [[ $domain =~ ^[A-Za-z0-9][A-Za-z0-9.-]*\.[A-Za-z]{2,63}$ && $domain != *..* ]]
 if [[ -e /opt/mysticego/app || -e /etc/systemd/system/mysticego-orchestra.service ]]; then echo 'Existing installation; refusing to overwrite'; exit 1; fi
 if [[ -e /etc/caddy/Caddyfile ]]; then echo 'Existing Caddy config; use a fresh server'; exit 1; fi
+if [[ $database == sqlite && -d /etc/mysticego/database-staging ]]; then
+  echo 'Prepared database configuration exists. Select prepared PostgreSQL or review it manually.' >&2; exit 1
+fi
+if [[ $database == postgres-prepared ]]; then
+  test -s /etc/mysticego/database-staging/auth-postgres.connection
+  test -s /etc/mysticego/database-staging/orchestra-postgres.connection
+fi
 echo 'CLOUDDESK_STEP:checksum'
 printf '%s  %s\n' "$checksum" "$archive" | sha256sum -c -
 export DEBIAN_FRONTEND=noninteractive
@@ -33,6 +42,25 @@ chmod -R a+rX,go-w "$app"
 mv -T "$app" /opt/mysticego/app
 echo 'CLOUDDESK_STEP:configure'
 id -u mysticego >/dev/null 2>&1 || useradd --system --user-group --no-create-home --home-dir /var/lib/mysticego --shell /usr/sbin/nologin mysticego
+if [[ $database == postgres-native || $database == postgres-docker ]]; then
+  dbstage=$(mktemp -d)
+  component=postgres
+  [[ $database != postgres-native ]] || component=postgres-native
+  cp /opt/mysticego/app/ops/infrastructure/{install.sh,install.py} "$dbstage/"
+  printf '{"component":"%s","bind":"127.0.0.1","cidr":"127.0.0.1/32"}\n' "$component" > "$dbstage/request.json"
+  bash "$dbstage/install.sh"
+  for dbrole in auth orchestra; do
+    printf '{"component":"prepare-postgres","role":"%s","bind":"127.0.0.1"}\n' "$dbrole" > "$dbstage/request.json"
+    bash "$dbstage/install.sh"
+  done
+  rm -rf -- "$dbstage"
+fi
+if [[ $database != sqlite ]]; then
+  install -d -o mysticego -g mysticego -m 0700 /var/lib/mysticego
+  for dbrole in auth orchestra; do
+    install -m 0600 -o mysticego -g mysticego "/etc/mysticego/database-staging/$dbrole-postgres.connection" "/var/lib/mysticego/$dbrole-postgres.connection"
+  done
+fi
 printf 'MYSTICEGO_CENTER_AUTH_URL=https://%s\nMYSTICEGO_CENTER_ORCHESTRA_URL=https://%s\n' "$domain" "$domain" > /etc/mysticego/orchestra.env
 cat > /etc/systemd/system/mysticego-orchestra.service <<'UNIT'
 [Unit]

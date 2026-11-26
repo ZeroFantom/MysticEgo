@@ -22,6 +22,7 @@ public static class RelationalStorage
     {
         var parameter = command.CreateParameter();
         parameter.ParameterName = name;
+        if (value is DBNull) parameter.DbType = System.Data.DbType.String;
         parameter.Value = value;
         command.Parameters.Add(parameter);
     }

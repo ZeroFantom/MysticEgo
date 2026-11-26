@@ -38,7 +38,7 @@ const jobStorage='mysticego.clouddesk.deploy.pending.v1';
 function readJob(){try{const j=JSON.parse(localStorage.getItem(jobStorage)||'null');return j&&j.id&&j.f?.serverId&&['reserve','dns','dns-error','waiting','ssh'].includes(j.phase)?j:null}catch{return null}}
 function App(){
  const [tab,T]=useState(()=>readJob()?'monitor':'local'),[busy,B]=useState(''),[log,L]=useState([]),[token,K]=useState(''),[remember,R]=useState(true),[ready,Q]=useState(false),[authEpoch,E]=useState(0),[authChanging,AC]=useState(false),[operationError,OE]=useState(''),[now,N]=useState(Date.now());
- const [form,H]=useState({name:'mysticego-orchestra',role:'Orchestra',deploymentMethod:'native',network:'ipv4',zone:'',plan:'',os:'',host:'',port:'22',user:'root',domain:'',dnsZone:'',orchestra:'',script:'',command:'uptime'});
+ const [form,H]=useState({name:'mysticego-orchestra',role:'Orchestra',deploymentMethod:'native',databaseMode:'sqlite',network:'ipv4',zone:'',plan:'',os:'',host:'',port:'22',user:'root',domain:'',dnsZone:'',orchestra:'',script:'',command:'uptime'});
  const [installedTarget,setInstalledTarget]=useState(null);
  const [deployment,setDeployment]=useState(null),[notice,setNotice]=useState(null);
  useEffect(()=>{if(!notice)return;const timer=setTimeout(()=>setNotice(null),6500);return()=>clearTimeout(timer);},[notice]);
@@ -148,12 +148,12 @@ function App(){
  const chooseQuickIp=ip=>{PD('');const server=availableCloud.find(s=>serverIp(s)===ip);H(f=>({...f,host:server?ip:'',user:'root',port:'22'}));};
  const startQuick=async({rootUrl,plan,target})=>{
   if(quickLock.current||quickJob||busy||wizBusy||!bothHealthy||!managedDnsOk)return;
-  const f={...form,name:form.name,deploymentMethod:form.role==='Orchestra'?form.deploymentMethod:'native',orchestra:form.role==='Global'?rootUrl:'',user:'root',port:'22',confirm:'DEPLOY'};
+  const f={...form,name:form.name,deploymentMethod:form.role==='Orchestra'?form.deploymentMethod:'native',databaseMode:form.role==='Orchestra'?(form.databaseMode??'sqlite'):'sqlite',orchestra:form.role==='Global'?rootUrl:'',user:'root',port:'22',confirm:'DEPLOY'};
   if(quickMode==='existing'&&(!target||!availableCloud.some(s=>String(s.id)===String(target.id)&&serverIp(s)===target.ip)))return;
   if(quickMode==='new'&&(!quickCanCreate||!plan))return;
   if(form.role==='Orchestra'&&(monitor.origin||monitor.nodes.some(n=>n.role==='Orchestra')||!monitor.discovery.at||Date.now()-monitor.discovery.at>=150000||monitor.discovery.error||monitor.discovery.candidates.length||!monitor.auto||monitor.discovery.truncated))return;
   if(form.role==='Global'&&(!rootUrl||!form.script||!monitor.registry.authenticated||Date.now()-monitor.registry.at>=30000))return;
-  if(!confirm(quickMode==='new'?`Создать платный VPS и развернуть ${f.role}?\n${plan.zone} · ${planText(plan)} · ${hourLabel(plan)}\nПубличный IPv4 оплачивается отдельно. DNS: ${f.domain}${f.dnsZone?' · CloudDesk добавит A/AAAA при необходимости':''}\nБез бэкапов. ${stockNotice(plan)}\nVPS продолжит тарифицироваться при ожидании DNS или SSH.`:`Развернуть ${f.role} на ${target.ip}?\nDNS: ${f.domain}${f.dnsZone?' · CloudDesk добавит A/AAAA при необходимости':''}\nИспользуется существующий VPS. Установка изменит его конфигурацию.`))return;
+  if(!confirm(quickMode==='new'?`Создать платный VPS и развернуть ${f.role}?\n${plan.zone} · ${planText(plan)} · ${hourLabel(plan)}\nПубличный IPv4 оплачивается отдельно. Хранилище: ${f.databaseMode}\nDNS: ${f.domain}${f.dnsZone?' · CloudDesk добавит A/AAAA при необходимости':''}\nБез бэкапов. ${stockNotice(plan)}\nVPS продолжит тарифицироваться при ожидании DNS или SSH.`:`Развернуть ${f.role} на ${target.ip}?\nХранилище: ${f.databaseMode}\nDNS: ${f.domain}${f.dnsZone?' · CloudDesk добавит A/AAAA при необходимости':''}\nИспользуется существующий VPS. Установка изменит его конфигурацию.`))return;
   quickLock.current=true;quickStarted.current='';dnsStarted.current='';reserveStarted.current='';
   try{
    if(f.dnsZone){B('dns.check');J({phase:'checking-dns',f,message:'Проверяем домен и конфликты DNS до заказа.'});const args=quickMode==='existing'?{...f,host:target.ip,serverId:String(target.id)}:{...f,serverId:''};try{await api.rpc('dns.check',args);}catch(e){OE(friendly(e));J(null);return;}finally{B('');}}
