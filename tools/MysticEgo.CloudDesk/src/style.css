@@ -42,7 +42,7 @@
 :root[data-theme=light]{color-scheme:light;--desk-ink:#231d38;--desk-bg:#f7f6fc;--desk-panel:#fff;--desk-raised:#efebf8;--desk-line:#dcd5e9;--desk-muted:#5e5671;--desk-accent:#6842b9;--desk-selected:#eae0fb;--desk-accent-line:#ab96d3;--desk-on:#fff;--desk-good:#176b48;--desk-good-bg:#e7f5ed;--desk-warn:#8a4a12;--desk-warn-bg:#fff1e3;--desk-warn-line:#e6c7a7;--desk-blue:#245e96;--desk-blue-bg:#e3effd;--desk-good-line:#b1d8c3;--desk-veil:#faf8ffed}
 :root[data-interface="immersive"][data-theme="dark"]{--mystic-art:url("./appearance-art/immersive-dark.webp")}
 :root[data-interface="immersive"][data-theme="light"]{--mystic-art:url("./appearance-art/immersive-light.webp")}
-:root[data-interface="simplified"][data-theme="dark"]{--mystic-art:url("./appearance-art/simplified-dark.webp")}
+:root[data-interface="simplified"][data-theme="dark"]{--mystic-art:url("./appearance-art/simplified-dark.svg")}
 :root[data-interface="simplified"][data-theme="light"]{--mystic-art:url("./appearance-art/simplified-light.webp")}
 :root{--mystic-time:220ms;--mystic-page-time:300ms;--mystic-ease:cubic-bezier(.2,.78,.22,1);--mystic-reveal:mystic-flow}
 :root[data-interface=immersive]{--mystic-time:300ms;--mystic-page-time:420ms}
@@ -86,3 +86,52 @@ aside{overflow-y:auto}
 :root[data-interface=immersive] .nav.active{background:linear-gradient(100deg,var(--desk-selected),var(--desk-panel));border-color:var(--desk-accent-line)}
 
 .local-service-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0}.local-service-grid>div{padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--desk-raised)}.local-service-grid .sectiontop{margin-bottom:4px}.local-actions{flex-wrap:wrap;margin-top:12px}.local-center-logs{max-height:330px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;padding:14px;background:var(--desk-bg);color:var(--desk-ink);border-radius:10px}.local-path{overflow-wrap:anywhere}.local-center .section-grid>section{min-width:0}.local-center form>button{margin-top:12px}@media(max-width:1000px){.local-center .section-grid{grid-template-columns:1fr}}
+
+/* Common workspace rhythm and artwork focal points, without stretching assets. */
+:root[data-interface] .layout{grid-template-columns:235px minmax(0,1fr)}
+:root[data-interface] aside{height:100dvh;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+:root[data-interface] aside>*{flex-shrink:0}
+:root[data-interface] .nav{min-width:0;min-height:40px;overflow-wrap:anywhere;line-height:1.35}
+:root[data-interface] .nav span{flex:none}
+:root[data-interface] .nav.active{box-shadow:inset 3px 0 var(--desk-accent)}
+:root[data-interface] main>header{min-height:86px}
+:root[data-interface] main>header>div{min-width:0}
+:root[data-interface] h1{font-size:clamp(23px,3vw,32px);overflow-wrap:anywhere;line-height:1.16}
+:root[data-interface=immersive] main>header{background:linear-gradient(90deg,var(--desk-bg) 15%,var(--desk-veil) 48%,transparent 90%),var(--mystic-art) right center/auto 175% no-repeat,var(--desk-panel)}
+:root[data-interface=immersive] aside{background:linear-gradient(180deg,var(--desk-panel) 65%,transparent 125%),var(--mystic-entry-art) center bottom/100% auto no-repeat,var(--desk-panel)}
+:root[data-interface] .auth-intro{background-repeat:no-repeat;min-width:0}
+:root[data-interface=immersive] .auth-intro{background:linear-gradient(150deg,var(--desk-veil),transparent 170%),var(--mystic-entry-art) center/cover no-repeat,var(--desk-panel)}
+:root[data-interface] .auth-intro h1{font-size:clamp(27px,4vw,44px)}
+:root[data-interface] :is(.actions,.sectiontop,.header-right,.createbar,.monitor-banner){flex-wrap:wrap}
+:root[data-interface] :is(button,input,select,summary):focus-visible{outline:2px solid var(--desk-accent);outline-offset:3px}
+:root[data-interface] .stats section strong{font-size:clamp(24px,3vw,34px);overflow-wrap:anywhere}
+:root[data-interface] .network-canvas{max-width:100%;overscroll-behavior:contain;scrollbar-width:thin;background:radial-gradient(color-mix(in srgb,var(--desk-accent) 18%,transparent) .8px,transparent .8px) 0 0/18px 18px,var(--desk-bg)}
+:root[data-interface] .network-canvas svg{min-width:560px}
+:root[data-interface] .graph-edge,:root[data-interface] .graph-flow{stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.desk-style-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:10px 0}
+:root[data-interface] .desk-style-option{display:grid;gap:6px;align-content:start;text-align:start;padding:6px;min-width:0;border-radius:10px;background:var(--desk-panel);border-color:var(--desk-line);color:var(--desk-ink)}
+:root[data-interface] .desk-style-option[aria-pressed=true]{border-color:var(--desk-accent);box-shadow:0 0 0 1px var(--desk-accent)}
+.desk-style-option strong{font-size:11px;overflow-wrap:anywhere}
+.desk-art-preview{display:block;width:100%;aspect-ratio:16/9;background-size:contain;background-position:center;background-repeat:no-repeat;background-color:var(--desk-bg);border-radius:6px}
+.desk-style-option[data-preview=simplified] .desk-art-preview{background-image:url("./appearance-art/simplified-dark.svg")}
+.desk-style-option[data-preview=immersive] .desk-art-preview{background-image:url("./appearance-art/immersive-dark.webp")}
+:root[data-theme=light] .desk-style-option[data-preview=simplified] .desk-art-preview{background-image:url("./appearance-art/simplified-light.webp")}
+:root[data-theme=light] .desk-style-option[data-preview=immersive] .desk-art-preview{background-image:url("./appearance-art/immersive-light.webp")}
+aside .desk-style-options{grid-template-columns:minmax(0,1fr)}
+aside .desk-art-preview{max-height:84px}
+@media(max-width:1000px){:root[data-interface] .layout{grid-template-columns:185px minmax(0,1fr)}}
+@media(max-width:700px){
+  :root[data-interface] .layout{grid-template-columns:minmax(0,1fr)}
+  :root[data-interface] aside{height:auto;max-height:46dvh;position:static;border-right:0;border-bottom:1px solid var(--desk-line);padding:12px}
+  :root[data-interface] aside .brand{margin:4px 6px 8px}
+  :root[data-interface] aside .bottom{display:block;margin-top:4px;padding-top:10px}
+  :root[data-interface] aside .bottom .sideaccount,:root[data-interface] aside .bottom .version{display:none}
+  :root[data-interface] aside .desk-style-options{grid-template-columns:repeat(2,minmax(0,1fr))}
+  :root[data-interface] main{padding:16px 12px}
+  :root[data-interface] .monitor-counts{grid-template-columns:repeat(2,minmax(0,1fr))}
+  :root[data-interface] .stats section:last-child{grid-column:auto}
+  :root[data-interface] .local-service-grid{grid-template-columns:minmax(0,1fr)}
+  :root[data-interface] .auth-wrap{padding:16px;gap:16px}
+}
+:root[data-ui-motion=off] :is(button,.nav,.plan):is(:hover,:active){transform:none!important}
+@media(prefers-reduced-motion:reduce){:root[data-interface] :is(button,.nav,.plan):is(:hover,:active){transform:none!important}}
