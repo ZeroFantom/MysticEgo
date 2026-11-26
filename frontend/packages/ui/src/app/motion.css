@@ -1,0 +1,65 @@
+/* Shared motion: animate only presentation, not data or route state. */
+:root{
+  --mystic-fast:var(--mystic-time,180ms);
+  --mystic-enter:var(--mystic-time,220ms);
+  --mystic-page:var(--mystic-page-time,300ms);
+  --motion-step:28ms;
+  --motion-disclosure-distance:6px;
+}
+:root[data-ui-motion=low]{--motion-step:0ms;--motion-disclosure-distance:0px}
+/* A completed animation must not create a permanent transformed containing block. */
+:root[data-interface] .mystic-workspace .page-motion{
+  animation:var(--mystic-reveal) var(--mystic-page-time) var(--mystic-ease) backwards;
+}
+:root[data-interface] :is(.mystic-workspace,.auth-experience,.studio-site,.mystic-share) :is(.account-trigger,.bell-button,.btn,.icon-btn,.studio-button,.nav-link){
+  transition-property:background-color,border-color,color,box-shadow,translate,scale;
+  transition-duration:var(--mystic-time);
+  transition-timing-function:var(--mystic-ease);
+}
+:root[data-interface] :is(.mystic-workspace,.auth-experience,.studio-site,.mystic-share) :is(.btn,.icon-btn,.studio-button,.account-trigger,.bell-button):active:not(:disabled):not([aria-disabled=true]){
+  scale:.97;translate:0 1px;
+}
+/* Persistent disclosures remain inert while closing. Older engines close immediately. */
+:root[data-interface] .motion-disclosure[data-motion-open]{
+  display:block;opacity:1;translate:0 0;scale:1;animation:none!important;
+  transition:opacity var(--mystic-time) var(--mystic-ease),translate var(--mystic-time) var(--mystic-ease),scale var(--mystic-time) var(--mystic-ease),display var(--mystic-time) allow-discrete;
+}
+:root[data-interface] .motion-disclosure[data-motion-open=false]{
+  display:none;opacity:0;translate:0 calc(-1 * var(--motion-disclosure-distance));scale:.985;pointer-events:none;
+}
+:root[data-interface] .account-popover.motion-disclosure{transform-origin:top right;z-index:5}
+:root[data-interface] .notification-drawer.motion-disclosure{transform-origin:bottom right;position:absolute;bottom:100%;right:0}
+:root[data-interface] .notification-drawer.motion-disclosure[data-motion-open=false]{translate:0 var(--motion-disclosure-distance)}
+/* Preview toasts are separate from the persistent drawer; don't overlap an exiting drawer. */
+:root[data-interface] .notification-float:has(.motion-disclosure[data-motion-open=false]) .notification-preview{animation:var(--mystic-reveal) var(--mystic-time) var(--mystic-ease) backwards}
+@starting-style{
+  :root[data-interface] .motion-disclosure[data-motion-open=true]{opacity:0;translate:0 calc(-1 * var(--motion-disclosure-distance));scale:.985}
+  :root[data-interface] .notification-drawer.motion-disclosure[data-motion-open=true]{translate:0 var(--motion-disclosure-distance)}
+}
+/* Small stagger applies to newly inserted action nodes, not repeated polling rows. */
+:root[data-interface] :is(.mystic-workspace,.auth-experience) :is(.row-actions,.page-header,.auth-form,.panel-directory-grid)>:is(button.btn,a.btn,.panel-login-card){
+  animation:var(--mystic-reveal) var(--mystic-time) var(--mystic-ease) backwards;
+}
+:root[data-interface] :is(.mystic-workspace,.auth-experience) :is(.row-actions,.page-header,.auth-form,.panel-directory-grid)>:is(button.btn,a.btn,.panel-login-card):nth-child(2){animation-delay:var(--motion-step)!important}
+:root[data-interface] :is(.mystic-workspace,.auth-experience) :is(.row-actions,.page-header,.auth-form,.panel-directory-grid)>:is(button.btn,a.btn,.panel-login-card):nth-child(3){animation-delay:calc(var(--motion-step) * 2)!important}
+:root[data-interface] :is(.mystic-workspace,.auth-experience) :is(.row-actions,.page-header,.auth-form,.panel-directory-grid)>:is(button.btn,a.btn,.panel-login-card):nth-child(4){animation-delay:calc(var(--motion-step) * 3)!important}
+:root[data-interface] :is(.sticker-picker,.emoji-menu,.chat-action-menu,.chat-compose-context,.chat-forward,.voice-draft,.auth-field-new){
+  animation:var(--mystic-reveal) var(--mystic-time) var(--mystic-ease) backwards;transform-origin:bottom left
+}
+:root[data-interface] .cinematic-preview video{animation:var(--mystic-reveal) var(--mystic-page-time) var(--mystic-ease) backwards}
+:root[data-interface=immersive][data-ui-motion=normal][data-ambient=true] .auth-visual{
+  background-position:center,center;animation:mystic-art-drift 18s ease-in-out infinite alternate
+}
+@keyframes mystic-art-drift{from{background-position:center,center 47%}to{background-position:center,center 53%}}
+/* Don't animate any controls or decorative pseudo-elements if motion is disabled. */
+:root[data-ui-motion=off] :is(.motion-disclosure,.page-motion,.cinematic-preview video,.notification-preview,.sticker-picker,.emoji-menu,.chat-action-menu,.chat-compose-context,.chat-forward,.voice-draft,.auth-visual,.appearance-quick button,.btn,.icon-btn,.account-trigger,.bell-button,.studio-button,.nav-link){
+  animation:none!important;transition:none!important;translate:none!important;scale:1!important
+}
+:root[data-ui-motion=off] .page-motion::before{display:none!important}
+:root[data-ui-motion=off] .mystic-workspace label.check-row input[type=checkbox]::before{transition:none!important}
+@media(prefers-reduced-motion:reduce){
+  :root[data-interface] :is(.motion-disclosure,.page-motion,.cinematic-preview video,.notification-preview,.sticker-picker,.emoji-menu,.chat-action-menu,.chat-compose-context,.chat-forward,.voice-draft,.auth-visual,.appearance-quick button,.btn,.icon-btn,.account-trigger,.bell-button,.studio-button,.nav-link){
+    animation:none!important;transition:none!important;translate:none!important;scale:1!important
+  }
+  :root[data-interface] .page-motion::before{display:none!important}
+}
