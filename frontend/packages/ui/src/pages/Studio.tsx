@@ -54,7 +54,7 @@ export function LicenseLink({className}: {className?: string}) {
 function PublicNavigation({page}: {page: 'studio' | 'developer'}) {
   useEffect(() => {
     const previous = document.title;
-    document.title = page === 'studio' ? 'Студия MysticEgo' : 'Дмитрий Колыхало · MysticEgo';
+    document.title = page === 'studio' ? 'Студия MysticEgo' : 'Дмитрий Колыхалов · MysticEgo';
     return () => {
       document.title = previous;
     };
@@ -167,7 +167,7 @@ export function DeveloperPage() {
       <section className="studio-hero developer-hero">
         <div>
           <p className="studio-role">Zero Fantom · C# / .NET</p>
-          <h1>Колыхало Дмитрий Антонович</h1>
+          <h1>Колыхалов Дмитрий Антонович</h1>
           <p className="developer-meta">22 года · Разработка серверных и настольных приложений</p>
           <p>Разработчик MysticEgo. Проектирую сервисы для управления парком компьютеров и связываю серверную архитектуру с интерфейсами для администраторов.</p>
           <div className="studio-actions">
