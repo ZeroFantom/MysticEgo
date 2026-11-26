@@ -1,3 +1,4 @@
+import {DashboardHero} from '../components/DashboardHero';
 import {useEffect,useState,type FormEvent} from 'react';
 import {Link,useSearchParams} from 'react-router-dom';
 import {ArrowRight,Check,Cloud,Download,HardDrive,House,Server,Terminal} from 'lucide-react';
@@ -31,7 +32,7 @@ export function OrganizationRequests({overview=false}:{overview?:boolean}){
     catch(error){setError(String(error))}
     finally{setBusy(false)}
   }
-  return <>{overview&&<Header title="Обзор Audit" description="Личный аккаунт и доступ к организациям MysticEgo"/>}
+  return <>{overview&&<DashboardHero title="Личное пространство MysticEgo" eyebrow="AUDIT · ОБЗОР" description="Личный аккаунт и доступ к организациям MysticEgo." action={<Link className="btn secondary" to="/profile">Мой профиль</Link>}/>}
     {!overview&&<Header title="Организации" description="Подайте заявку на Global и откройте панель своей организации."/>}
     <ErrorBanner text={error||data.error}/>
     <div className="two-col">
