@@ -128,7 +128,7 @@ function NotificationsFloat(){
     try{await api.request('/collective/notifications/'+id+'/read',{method:'POST'});setProblem('');data.reload()}
     catch(error){setProblem(String(error))}
   }
-  return <NoticeBell server={data.value??[]} onRead={id=>void read(id)}/>;
+  return <NoticeBell placement="header" server={data.value??[]} onRead={id=>void read(id)}/>;
 }
 
 function AnimatedArea({children}:{children:ReactNode}){
@@ -204,7 +204,7 @@ function Workspace({logout}:{logout:()=>void}){
         <span className="topbar-light" aria-hidden="true"><span className="topbar-sweep"/></span>
         <button ref={menuTrigger} type="button" className="icon-btn mobile-toggle" onClick={()=>setMobile(value=>!value)} aria-label="Открыть меню" aria-controls="workspace-navigation" aria-expanded={drawerOpen}><Menu size={22}/></button>
         <div className="breadcrumb"><span>{modes[mode].name}</span><ChevronRight size={14}/><strong>{current}</strong></div>
-        <div className="top-actions"><ThemeToggle scope={preferenceScope}/><AccountMenu logout={logout}/></div>
+        <div className="top-actions"><ThemeToggle scope={preferenceScope}/><AccountMenu logout={logout}/><NotificationsFloat/></div>
       </header>
       <main className="content"><AnimatedArea><Routes>
         <Route path="/" element={mode==='orchestra'||mode==='global'||mode==='local'?<OrchestraOverview/>:mode==='audit'?<OrganizationRequests overview/>:<Overview/>}/>
@@ -239,7 +239,6 @@ function Workspace({logout}:{logout:()=>void}){
         <Route path="/deploy-native" element={<Navigate to="/setup" replace/>}/>
         <Route path="*" element={<div className="empty"><p>Страница не найдена</p><Link className="btn secondary" to="/">К обзору</Link></div>}/>
       </Routes></AnimatedArea></main>
-      <NotificationsFloat/>
       {(mode==='agent'||mode==='audit')&&pathname!=='/assistant'&&<AssistantCompanion/>}
     </div>
   </div>;
@@ -277,7 +276,7 @@ export function MysticApp({mode,defaultApi}:{mode:NodeMode;title:string;defaultA
   </section></main><NoticeBell/></NotificationProvider>;
   if(!session.token){
     if(mode==='agent'&&guestToken)return <NotificationProvider><GuestPortal apiUrl={session.url} token={guestToken} onExit={()=>setGuestToken('')}/><NoticeBell/></NotificationProvider>;
-    return <NotificationProvider><SignIn mode={mode} session={session} onLogin={setSession} onGuest={setGuestToken}/><NoticeBell/></NotificationProvider>;
+    return <NotificationProvider><SignIn mode={mode} session={session} onLogin={setSession} onGuest={setGuestToken}/></NotificationProvider>;
   }
   return <CTX.Provider value={{mode,session,setSession,api,portal,preferenceScope:scope,personal:profile.value?.scope===scope?profile.value.account:null,profileError:profile.error,reloadProfile:profile.reload}}>
     <BrowserRouter basename={portal?'/audit-portal':undefined}><NotificationProvider key={scope}><ServerUpdateProvider><Workspace logout={logout}/></ServerUpdateProvider></NotificationProvider></BrowserRouter>

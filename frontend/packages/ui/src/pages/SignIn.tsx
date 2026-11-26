@@ -5,6 +5,7 @@ import {useRemote} from '../app/context';
 import {GuestEntry} from './GuestPortal';
 import {ErrorBanner} from '../components/primitives';
 import {ThemeToggle} from './Settings';
+import {NoticeBell} from '../app/notifications';
 import {PanelLoginLinks} from './PanelDirectory';
 import {LicenseLink} from './Studio';
 import {readRegistrationDocuments} from './registration-documents';
@@ -58,7 +59,7 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
    <div className="auth-role"><span><Network size={16}/>{title}</span><h1>{subtitle}</h1></div>
   </section>
   <section className="auth-form-side">
-   <ThemeToggle/>
+   <div className="auth-top-actions"><ThemeToggle/><NoticeBell placement="header"/></div>
    <div className="auth-form-card">
     <p className="auth-eyeline"><Sparkles size={17}/> {title}</p>
     <h2>{guest?'Гостевой сеанс':register?'Создать аккаунт':'Войти в MysticEgo'}</h2>

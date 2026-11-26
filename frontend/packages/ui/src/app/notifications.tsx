@@ -45,7 +45,7 @@ export function useNotice(text:string,tone:NoticeTone='error'){
   return !!notify;
 }
 
-export function NoticeBell({server=[],onRead}:{server?:Notice[];onRead?:(id:string)=>void}){
+export function NoticeBell({server=[],onRead,placement='floating'}:{server?:Notice[];onRead?:(id:string)=>void;placement?:'floating'|'header'}){
   const feed=useNoticeFeed();
   const [open,setOpen]=useState(false);
   const drawerId=useId();
@@ -65,7 +65,7 @@ export function NoticeBell({server=[],onRead}:{server?:Notice[];onRead?:(id:stri
   const unread=all.filter(row=>!row.read).length;
   const recent=local.find(item=>!item.read);
   const Icon=icons[noticeTone(recent??{})];
-  return <div className="notification-float" ref={container}>
+  return <div className="notification-float" data-placement={placement} ref={container}>
     {!open&&recent&&<div className="notification-drawer notification-preview" data-tone={noticeTone(recent)} role="status">
       <Icon size={19} aria-hidden="true"/><p>{recent.text}</p>
       <button className="icon-btn" onClick={()=>feed?.read(recent.id)} aria-label="Скрыть уведомление"><X size={16}/></button></div>}
