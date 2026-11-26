@@ -35,28 +35,28 @@ MysticEgo — платформа с доступным исходным кодо
 
 ## Галерея
 
-Подробности обновления: [BETA7 R3.2.30](docs/releases/beta7-r3.2.30.md).
+Подробности обновления: [BETA7 R3.2.31](docs/releases/beta7-r3.2.31.md).
 
 Две визуальные концепции, каждая в светлой и тёмной версии. Насыщенный стиль вдохновлён ночными восточноазиатскими пейзажами и фантастической атмосферой; упрощённый — геометрией сетей и спокойными поверхностями.
 
 <table>
   <tr>
     <td width="50%" align="center">
-      <a href="frontend/packages/ui/src/app/appearance-art/immersive-dark.webp"><img src="frontend/packages/ui/src/app/appearance-art/immersive-dark.webp" alt="Immersive Dark — ночной фантастический пейзаж" width="100%"></a>
+      <a href="frontend/packages/ui/src/app/appearance-art/immersive-dark-hero.webp"><img src="frontend/packages/ui/src/app/appearance-art/immersive-dark-hero.webp" alt="Immersive Dark — ночной фантастический пейзаж" width="100%"></a>
       <br><b>01 · IMMERSIVE DARK</b><br><sub>Лунный свет · глубина · фиолетовые акценты</sub>
     </td>
     <td width="50%" align="center">
-      <a href="frontend/packages/ui/src/app/appearance-art/immersive-light.webp"><img src="frontend/packages/ui/src/app/appearance-art/immersive-light.webp" alt="Immersive Light — светлый фантастический пейзаж" width="100%"></a>
+      <a href="frontend/packages/ui/src/app/appearance-art/immersive-light-hero.webp"><img src="frontend/packages/ui/src/app/appearance-art/immersive-light-hero.webp" alt="Immersive Light — светлый фантастический пейзаж" width="100%"></a>
       <br><b>02 · IMMERSIVE LIGHT</b><br><sub>Светлые поверхности · мягкие оттенки</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center">
-      <a href="frontend/packages/ui/src/app/appearance-art/simplified-dark.svg"><img src="frontend/packages/ui/src/app/appearance-art/simplified-dark.svg" alt="Simplified Dark — тёмная геометрическая графика" width="100%"></a>
+      <a href="frontend/packages/ui/src/app/appearance-art/simplified-dark-hero.webp"><img src="frontend/packages/ui/src/app/appearance-art/simplified-dark-hero.webp" alt="Simplified Dark — лаконичный ночной пейзаж" width="100%"></a>
       <br><b>03 · SIMPLIFIED DARK</b><br><sub>Геометрия · минимум визуального шума</sub>
     </td>
     <td width="50%" align="center">
-      <a href="frontend/packages/ui/src/app/appearance-art/simplified-light.webp"><img src="frontend/packages/ui/src/app/appearance-art/simplified-light.webp" alt="Simplified Light — светлая абстрактная графика" width="100%"></a>
+      <a href="frontend/packages/ui/src/app/appearance-art/simplified-light-hero.webp"><img src="frontend/packages/ui/src/app/appearance-art/simplified-light-hero.webp" alt="Simplified Light — лаконичный светлый пейзаж" width="100%"></a>
       <br><b>04 · SIMPLIFIED LIGHT</b><br><sub>Чистые поверхности · лёгкие акценты</sub>
     </td>
   </tr>
