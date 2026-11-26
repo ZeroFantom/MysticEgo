@@ -170,3 +170,64 @@ button.studio-button { background: transparent; color: inherit; }
 .registration-documents a { text-decoration: underline; text-underline-offset: 3px; }
 .developer-hero h1 { font-size: clamp(37px, 5.2vw, 68px); overflow-wrap: anywhere; }
 .developer-meta { font-size: .9rem; }
+
+/* Public pages are editorial landings, not another application workspace.
+   Full-bleed sections, natural document scrolling, no scroll-jacking. */
+.studio-landing{--landing-gutter:clamp(20px,6vw,112px);width:100%;min-width:0}
+.studio-landing .studio-nav,.studio-landing .studio-footer{max-width:none;width:100%;padding-inline:var(--landing-gutter)}
+.studio-landing .studio-nav{position:relative;z-index:2;min-height:76px;background:var(--studio-bg);border-bottom:1px solid var(--studio-line)}
+.studio-landing .studio-nav nav{min-width:0}
+.studio-landing .studio-content{max-width:none;width:100%;padding:0;margin:0}
+.studio-landing .landing-hero{position:relative;isolation:isolate;display:flex;align-items:flex-end;justify-content:flex-start;width:100%;min-height:calc(100vh - 76px);min-height:calc(100svh - 76px);padding:clamp(44px,9vh,110px) var(--landing-gutter);border:0;border-radius:0;overflow:hidden}
+.studio-landing .landing-hero-copy{width:min(100%,780px);max-width:780px;min-width:0;position:relative;z-index:1}
+.studio-landing .landing-hero h1{font-family:Georgia,serif;font-size:clamp(58px,9.4vw,150px);font-weight:400;line-height:.94;letter-spacing:-.065em;margin:0;overflow-wrap:anywhere}
+.studio-landing .developer-hero h1{font-size:clamp(44px,6.8vw,108px)}
+.studio-landing .landing-hero p:not(.landing-kicker){font-size:clamp(16px,1.45vw,22px);max-width:52ch;line-height:1.55;margin:20px 0}
+.studio-landing .landing-kicker{font:650 .76rem/1.5 system-ui,sans-serif;letter-spacing:.17em;text-transform:uppercase;margin:0 0 18px;color:var(--studio-accent)}
+.studio-landing .landing-hero .studio-actions{margin-top:24px;gap:12px}
+.studio-landing .landing-hero .studio-button{min-height:48px;border-radius:999px;padding:12px 20px}
+.studio-landing .landing-scroll{margin-top:clamp(28px,6vh,60px);font-size:.88rem;font-weight:600;gap:10px}
+.studio-landing .landing-index{position:absolute;right:var(--landing-gutter);bottom:clamp(44px,9vh,110px);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:#f4eaffb8}
+.studio-landing .studio-section{width:100%;max-width:none;margin:0;padding:clamp(54px,8vw,120px) var(--landing-gutter);scroll-margin-top:16px;border-bottom:1px solid var(--studio-line)}
+.studio-landing .studio-section h2{font-size:clamp(36px,5vw,72px);letter-spacing:-.045em;margin-bottom:22px}
+.studio-landing .studio-section-heading{max-width:70ch}
+.studio-landing .landing-project-grid{gap:clamp(16px,3vw,36px)}
+.studio-landing .landing-project{padding:0;gap:0;overflow:hidden;border-radius:16px}
+.studio-landing .landing-project-image,.studio-landing .landing-world-image{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;min-width:0;background-color:var(--studio-bg)}
+.studio-landing .landing-world-image{background:var(--mystic-profile-art) center/cover no-repeat}
+.studio-landing .landing-project-copy{padding:clamp(18px,3vw,36px);display:grid;gap:12px}
+.studio-landing .landing-project-copy h3{font-size:clamp(22px,2.5vw,36px);line-height:1.12}
+.studio-landing .landing-project-copy .landing-kicker{margin:0}
+.studio-landing .landing-scene{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.6fr);gap:clamp(24px,5vw,80px);align-items:center}
+.studio-landing .landing-scene .cinematic-preview{width:100%;max-width:none;margin:0;padding:12px}
+.studio-landing .landing-band{background:var(--studio-panel)}
+.studio-landing .studio-steps{gap:clamp(14px,3vw,40px)}
+.studio-landing .studio-steps li{padding-top:22px}
+.studio-landing .studio-card:not(.landing-project){border-radius:12px}
+.studio-landing .landing-contact{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:clamp(24px,6vw,80px);align-items:start}
+.studio-landing .landing-tech h2{font:400 clamp(25px,3vw,42px)/1.1 Georgia,serif}
+.studio-landing .studio-stack{gap:10px}
+.studio-landing .studio-stack li{padding:9px 13px;border-color:var(--studio-line);border-radius:999px;background:var(--studio-panel);font-size:.86rem}
+.studio-landing .studio-ideas{padding-block:clamp(64px,12vw,160px)}
+.studio-landing .studio-button:focus-visible,.studio-landing a:focus-visible{outline-offset:4px}
+@media(max-width:900px){
+ .studio-landing .landing-scene,.studio-landing .landing-contact{grid-template-columns:minmax(0,1fr)}
+ .studio-landing .landing-index{display:none}
+}
+@media(max-width:760px){
+ .studio-landing{--landing-gutter:clamp(16px,5vw,36px)}
+ .studio-landing .studio-nav{min-height:0;gap:8px;padding-block:12px}
+ .studio-landing .studio-nav nav{gap:4px 12px}
+ .studio-landing .landing-hero{min-height:calc(100svh - 112px);padding:clamp(30px,7vh,64px) var(--landing-gutter);align-items:flex-end}
+ .studio-landing .landing-hero h1{font-size:clamp(44px,11vw,76px)}
+ .studio-landing .developer-hero h1{font-size:clamp(38px,9vw,65px)}
+ .studio-landing .landing-hero .studio-button{min-height:44px;padding:10px 14px;max-width:100%;overflow-wrap:anywhere}
+ .studio-landing .landing-hero p:not(.landing-kicker){font-size:1rem;margin:14px 0}
+ .studio-landing .landing-kicker{letter-spacing:.1em}
+ .studio-landing .landing-scroll{margin-top:24px}
+ .studio-landing .studio-section{padding-block:48px}
+ .studio-landing .studio-section h2{font-size:clamp(30px,8vw,48px)}
+ .studio-landing .economics-metrics{grid-template-columns:repeat(auto-fit,minmax(95px,1fr))}
+}
+:root[data-ui-motion=off] .studio-landing :is(.landing-hero-copy,.studio-card,.economics-track>span){animation:none!important;transition:none!important;translate:none!important}
+@media(prefers-reduced-motion:reduce){.studio-landing :is(.landing-hero-copy,.studio-card,.economics-track>span){animation:none!important;transition:none!important;translate:none!important}}

@@ -127,3 +127,9 @@ for(const [name,width,height] of [
  assert.equal(art.subarray(12,16).toString(),'VP8 ');assert.equal(art.subarray(23,26).toString('hex'),'9d012a');
  assert.equal(art.readUInt16LE(26)&0x3fff,width);assert.equal(art.readUInt16LE(28)&0x3fff,height);
 }
+
+const landing=read('frontend/packages/ui/src/pages/Studio.tsx');
+const landingCss=read('frontend/packages/ui/src/pages/studio.css');
+assert(landing.includes('data-landing="studio"')&&landing.includes('data-landing="developer"')&&landing.includes('id="experience"')&&landing.includes('<StudioEconomics/>'));
+assert(landingCss.includes('min-height:calc(100svh - 76px)')&&landingCss.includes('max-width:none;width:100%;padding:0'));
+assert(web.includes('background:transparent;color:#fff9ff;text-shadow:')&&web.includes('--landing-art:var(--mystic-profile-art)'));

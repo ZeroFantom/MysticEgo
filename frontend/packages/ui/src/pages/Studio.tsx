@@ -80,41 +80,59 @@ function PublicFooter() {
 }
 
 export function StudioPage({scope=''}:{scope?:string}={}) {
-  return <div className="studio-site">
+  return <div className="studio-site studio-landing" data-landing="studio">
     <PublicNavigation page="studio" scope={scope}/>
     <main className="studio-content">
-      <section className="studio-hero studio-hero-cover">
-        <img className="studio-hero-image" src={editorialImage} alt="" fetchPriority="high"/>
-        <div>
-          <h1>Студия MysticEgo</h1>
+      <section className="studio-hero studio-hero-cover landing-hero" aria-labelledby="studio-title">
+        <div className="landing-hero-copy">
+          <p className="landing-kicker">MysticEgo / Независимая студия</p>
+          <h1 id="studio-title">Студия<br/>MysticEgo</h1>
           <p>Инструменты для клубов, где десятки компьютеров должны работать как одна система. И отдельный игровой замысел о мире, который помнит решения своих жителей.</p>
           <div className="studio-actions">
             <a className="studio-button primary" href="#join">Присоединиться к проекту <ArrowDownRight size={17} aria-hidden="true"/></a>
             <a className="studio-button" href="#partners">Предложить партнёрство</a>
           </div>
+          <a className="landing-scroll" href="#projects">Исследовать проекты <ArrowDownRight size={19} aria-hidden="true"/></a>
         </div>
-
+        <span className="landing-index" aria-hidden="true">01 / 02</span>
       </section>
 
-      <CinematicPreview/>
-      <section className="studio-section" aria-labelledby="studio-direction">
+      <section id="projects" className="studio-section landing-projects" aria-labelledby="studio-direction">
         <h2 id="studio-direction">Над чем работаем</h2>
-        <div className="studio-grid two">
-          <article className="studio-card">
+        <div className="studio-grid two landing-project-grid">
+          <article className="studio-card landing-project">
+            <img className="landing-project-image" src={editorialImage} alt="Рабочие станции компьютерного клуба" loading="lazy" decoding="async"/>
+            <div className="landing-project-copy">
+            <span className="landing-kicker">01 / Инфраструктура</span>
             <Server size={24} aria-hidden="true"/>
             <h3>Инфраструктура MysticEgo</h3>
             <p>Orchestra, организации Global, площадки Local и агенты на ПК. Ближайшая цель — сделать настройку, обновление и диагностику устойчивыми при развёртывании на нескольких площадках.</p>
+            <a href={repository}>Исходный код <ArrowUpRight size={16} aria-hidden="true"/></a>
+            </div>
           </article>
-          <article className="studio-card">
+          <article className="studio-card landing-project">
+            <div className="landing-world-image" aria-hidden="true"/>
+            <div className="landing-project-copy">
+            <span className="landing-kicker">02 / Игровой замысел</span>
             <Compass size={24} aria-hidden="true"/>
             <h3>Ether And Chaos</h3>
             <p>Концепция живого мира, где игроки и самостоятельные персонажи участвуют в общих событиях. Решения порождают локальные истории, а открытия развивают цивилизации в рамках законов мира.</p>
             <p>Одна из идей — непрерывная история мира с возможностью его перерождения после гибели.</p>
+            </div>
           </article>
         </div>
       </section>
 
-      <section className="studio-section" aria-labelledby="studio-workflow">
+      <section className="studio-section landing-scene" aria-labelledby="scene-title">
+        <div className="studio-section-heading">
+          <p className="landing-kicker">Атмосфера / Оформление</p>
+          <h2 id="scene-title">Мир MysticEgo</h2>
+          <p>Живой пейзаж, свет и движение. Воспроизведение по желанию.</p>
+        </div>
+        <CinematicPreview/>
+      </section>
+
+      <section id="architecture" className="studio-section landing-band" aria-labelledby="studio-workflow">
         <div className="studio-section-heading">
           <h2 id="studio-workflow">От оператора до станции</h2>
           <p>Orchestra отвечает за установки и обновления. Global объединяет площадки, Local знает оборудование каждого клуба, Agent сообщает о состоянии конкретного ПК.</p>
@@ -164,31 +182,39 @@ export function StudioPage({scope=''}:{scope?:string}={}) {
 }
 
 export function DeveloperPage({scope=''}:{scope?:string}={}) {
-  return <div className="studio-site">
+  return <div className="studio-site studio-landing" data-landing="developer">
     <PublicNavigation page="developer" scope={scope}/>
     <main className="studio-content developer-content">
-      <section className="studio-hero developer-hero">
-        <div>
-          <p className="studio-role">Zero Fantom · C# / .NET</p>
-          <h1>Колыхалов Дмитрий Антонович</h1>
+      <section className="studio-hero developer-hero landing-hero" aria-labelledby="developer-title">
+        <div className="landing-hero-copy">
+          <p className="studio-role landing-kicker">Zero Fantom / C# · .NET</p>
+          <h1 id="developer-title">Колыхалов<br/>Дмитрий<br/>Антонович</h1>
           <p className="developer-meta">22 года · Разработка серверных и настольных приложений</p>
           <p>Разработчик MysticEgo. Проектирую сервисы для управления парком компьютеров и связываю серверную архитектуру с интерфейсами для администраторов.</p>
           <div className="studio-actions">
             <a className="studio-button primary" href="https://github.com/ZeroFantom"><Github size={18} aria-hidden="true"/>Профиль GitHub</a>
             <a className="studio-button" href={repository}>Код MysticEgo <ArrowUpRight size={17} aria-hidden="true"/></a>
           </div>
+          <a className="landing-scroll" href="#experience">Смотреть проекты <ArrowDownRight size={19} aria-hidden="true"/></a>
         </div>
-        <aside className="studio-hero-aside">
-          <h2>На связи</h2>
+        <span className="landing-index" aria-hidden="true">Zero / Developer</span>
+      </section>
+      <section id="developer-contact" className="studio-section landing-contact" aria-labelledby="contact-title">
+        <div className="studio-section-heading">
+          <p className="landing-kicker">Контакты / Стек</p>
+          <h2 id="contact-title">На связи</h2>
           <div className="developer-links">
             <a href="https://t.me/ZeroPhantomLie"><Send size={18} aria-hidden="true"/><span><strong>Telegram</strong><small>@ZeroPhantomLie</small></span><ArrowUpRight size={16} aria-hidden="true"/></a>
             <a href="https://vk.com/id154351348"><Users size={18} aria-hidden="true"/><span><strong>ВКонтакте</strong><small>Профиль</small></span><ArrowUpRight size={16} aria-hidden="true"/></a>
           </div>
+        </div>
+        <div className="landing-tech">
           <h2>Технический стек</h2>
           <ul className="studio-stack">{stack.map(tech => <li key={tech}>{tech}</li>)}</ul>
-        </aside>
+        </div>
       </section>
-      <section className="studio-section">
+      <section id="experience" className="studio-section landing-band landing-experience">
+        <p className="landing-kicker">Практика / Разработка</p>
         <h2>Проекты и опыт</h2>
         <div className="studio-grid">
           <article className="studio-card">

@@ -166,29 +166,44 @@
 :root[data-theme=light][data-interface] :is(.topbar-light,.auth-visual)::after,
 :root[data-theme=light][data-interface] .topbar-sweep{opacity:.08}
 :root[data-interface][data-theme] .auth-experience .auth-visual{
- background:var(--mystic-entry-art) center/cover no-repeat,var(--mystic-bg);animation:none;
+ background:linear-gradient(180deg,#130d24d9 0%,#130d2466 15%,transparent 34%,transparent 56%,#130d2499 76%,#130d24f0 100%),var(--mystic-entry-art) center/cover no-repeat,var(--mystic-bg);animation:none;
 }
+/* Bare typography over local edge shading, not opaque title cards. */
 :root[data-interface][data-theme] .auth-experience :is(.auth-brand,.auth-role){
- width:fit-content;max-width:100%;padding:12px 16px;border:1px solid var(--mystic-line);border-radius:12px;
- background:var(--mystic-surface);color:var(--mystic-ink);text-shadow:none;
+ width:fit-content;max-width:100%;min-width:0;padding:0;border:0;border-radius:0;
+ background:transparent;color:#fff9ff;text-shadow:0 2px 14px #110b20c9;
 }
-:root[data-interface][data-theme] .auth-experience .auth-role :is(span,h1){color:var(--mystic-ink)}
-/* Studio's banner is a different scene from its cinematic poster. */
-:root[data-interface][data-theme] .studio-site :is(.studio-hero,.developer-hero){
- background:var(--mystic-overview-art) center/cover no-repeat,var(--mystic-surface);
+:root[data-interface][data-theme] .auth-experience .auth-role :is(span,h1){color:#fff9ff}
+:root[data-interface][data-theme] .auth-experience .auth-brand svg{color:#e5c9ff}
+/* Full-bleed editorial hero: local dark shading keeps text legible in both
+   palettes, while sections below follow the selected theme. */
+:root[data-interface][data-theme] .studio-landing .landing-hero{
+ --landing-art:var(--mystic-overview-art);
+ background:linear-gradient(90deg,#100b20eb 0%,#100b20b0 30%,#100b2040 56%,transparent 78%),linear-gradient(0deg,#100b20da 0%,transparent 52%),var(--landing-art) center/cover no-repeat,#100b20;
+ color:#fff9ff;
 }
-:root[data-interface][data-theme] .studio-site .studio-hero>div{
- background:var(--mystic-surface);color:var(--mystic-ink);padding:clamp(16px,3vw,28px);border-radius:14px;border:1px solid var(--mystic-line);min-width:0;
+:root[data-interface][data-theme] .studio-landing .developer-hero{--landing-art:var(--mystic-profile-art)}
+:root[data-interface][data-theme] .studio-landing .landing-hero-copy{
+ background:transparent;color:#fff9ff;padding:0;border:0;border-radius:0;min-width:0;
 }
-:root[data-interface][data-theme] .studio-site .studio-hero>div p{color:var(--mystic-muted)}
+:root[data-interface][data-theme] .studio-landing .landing-hero-copy p{color:#f3eafa}
+:root[data-interface][data-theme] .studio-landing .landing-hero-copy .landing-kicker{color:#e3c8ff}
+:root[data-interface][data-theme] .studio-landing .landing-hero .studio-button:not(.primary){color:#fff9ff;background:#1a102c85;border-color:#f0dfff90}
+:root[data-interface][data-theme] .studio-landing .landing-hero .studio-button.primary{background:#e7d2ff;color:#241334;border-color:#e7d2ff}
+:root[data-interface][data-theme] .studio-landing .landing-scroll{color:#f3eafa}
+@media(max-width:760px){
+ :root[data-interface][data-theme] .studio-landing .landing-hero{
+  background:linear-gradient(0deg,#100b20f5 0%,#100b20e8 32%,#100b2070 72%,#100b2022 100%),var(--landing-art) center/cover no-repeat,#100b20;
+ }
+}
 :root[data-interface][data-theme] .desktop-download-hero{
  background:linear-gradient(90deg,var(--mystic-surface) 0%,transparent 75%),var(--mystic-profile-art) center/cover no-repeat,var(--mystic-surface);
 }
 @media(max-width:780px){
- :root[data-interface][data-theme] .auth-experience .auth-visual{background-image:var(--mystic-art)}
+ :root[data-interface][data-theme] .auth-experience .auth-visual{background-image:linear-gradient(90deg,#130d24dc 0%,#130d24a0 35%,transparent 76%),var(--mystic-art)}
 }
 @media(max-width:650px){
  :root[data-interface][data-theme] .mystic-workspace .orchestral-topbar{aspect-ratio:auto;min-height:0;padding-bottom:calc(12vw + 10px);align-items:flex-start}
  :root[data-interface][data-theme] .mystic-workspace .orchestral-topbar .breadcrumb{padding:5px 7px}
- :root[data-interface][data-theme] .auth-experience :is(.auth-brand,.auth-role){padding:8px 10px}
+
 }

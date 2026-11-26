@@ -148,7 +148,11 @@ try{
           await page.goto(origin+'/settings',{waitUntil:'domcontentloaded'});
           await visible(page.locator('.auth-form-card'));
           for(const [theme,style] of combinations)await check(page,prefix+'-login-'+theme+'-'+style,async()=>{
-            await switchAppearance(page,theme,style);await checkArtwork(page,theme,style,'.auth-visual',viewport.width<=780?'hero':'entry');await noHorizontalOverflow(page);await capture(page,prefix+'-login-'+theme+'-'+style);
+            await switchAppearance(page,theme,style);await checkArtwork(page,theme,style,'.auth-visual',viewport.width<=780?'hero':'entry');
+            const typography=await page.locator('.auth-visual :is(.auth-brand,.auth-role)').evaluateAll(items=>items.map(el=>{const c=getComputedStyle(el);return {bg:c.backgroundColor,border:c.borderTopWidth,padding:c.paddingTop,color:c.color}}));
+            assert.equal(typography.length,2);
+            for(const item of typography){assert.equal(item.bg,'rgba(0, 0, 0, 0)');assert.equal(item.border,'0px');assert.equal(item.padding,'0px');assert.equal(item.color,'rgb(255, 249, 255)')}
+            await noHorizontalOverflow(page);await capture(page,prefix+'-login-'+theme+'-'+style);
           });
           await check(page,prefix+'-login-notifications',async()=>{
             await checkHeaderNotifications(page,'.auth-top-actions');
@@ -230,6 +234,27 @@ try{
               await capture(page,prefix+'-'+route);
             });
           }
+          if(role==='orchestra')for(const route of ['studio','developer'])await check(page,prefix+'-landing-'+route,async()=>{
+            await page.goto(origin+'/'+route,{waitUntil:'domcontentloaded'});
+            const hero=page.locator('.landing-hero'),nav=page.locator('.studio-nav');
+            await visible(hero);
+            for(const [theme,style] of combinations){
+              await switchAppearance(page,theme,style);
+              await checkArtwork(page,theme,style,'.landing-hero',route==='studio'?'overview':'profile');
+              const size=await hero.evaluate(el=>{const r=el.getBoundingClientRect(),n=document.querySelector('.studio-nav').getBoundingClientRect(),copy=getComputedStyle(el.querySelector('.landing-hero-copy'));return {width:r.width,height:r.height,navHeight:n.height,viewportWidth:document.documentElement.clientWidth,viewportHeight:innerHeight,copyBg:copy.backgroundColor,copyBorder:copy.borderTopWidth}});
+              assert(Math.abs(size.width-size.viewportWidth)<=2,'Landing must span viewport width');
+              assert(size.height+size.navHeight>=size.viewportHeight-45,'First screen must fill viewport');
+              assert.equal(size.copyBg,'rgba(0, 0, 0, 0)');assert.equal(size.copyBorder,'0px');
+              await noHorizontalOverflow(page);
+              await capture(page,prefix+'-landing-'+route+'-'+theme+'-'+style);
+            }
+            const target=route==='studio'?'projects':'experience';
+            await hero.locator('a[href="#'+target+'"]').click();
+            assert.equal(new URL(page.url()).hash,'#'+target);
+            await visible(page.locator('#'+target));
+            if(route==='studio'){await visible(page.locator('#model'));await visible(page.locator('#partners'))}
+            else await visible(page.locator('#developer-contact'));
+          });
           if(role==='orchestra'&&viewport.width===1440)await check(page,prefix+'-cinematic',async()=>{
             await page.goto(origin+'/studio',{waitUntil:'domcontentloaded'});
             const scene=page.locator('.cinematic-live');
