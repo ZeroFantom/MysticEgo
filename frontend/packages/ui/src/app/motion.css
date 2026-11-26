@@ -98,3 +98,6 @@
   :root[data-interface] .mystic-workspace .top-actions{gap:5px}
   .auth-top-actions{top:10px;right:12px;gap:6px}
 }
+
+/* The generated still is a 21:9 panorama; the original videos retain their own media frame. */
+.cinematic-preview>.cinematic-media[data-playing=false]{aspect-ratio:21/9}

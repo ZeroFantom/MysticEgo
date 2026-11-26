@@ -2,9 +2,10 @@ import {useEffect,useId,useRef,useState} from 'react';
 import dark from './appearance-art/immersive-dark.webm';
 import light from './appearance-art/immersive-light.webm';
 import simple from './appearance-art/simplified-light.webm';
-import darkPoster from './appearance-art/immersive-dark-entry.webp';
-import lightPoster from './appearance-art/immersive-light-entry.webp';
-import simplePoster from './appearance-art/simplified-light.webp';
+import darkPoster from './appearance-art/immersive-dark-hero.webp';
+import lightPoster from './appearance-art/immersive-light-hero.webp';
+import simplePoster from './appearance-art/simplified-light-hero.webp';
+import simpleDarkPoster from './appearance-art/simplified-dark-hero.webp';
 function useVariant(){
  const read=()=>{const d=document.documentElement.dataset;return {theme:d.theme??'dark',style:d.interface??'simplified',motion:d.uiMotion??'normal',reduced:matchMedia('(prefers-reduced-motion: reduce)').matches}};
  const [variant,setVariant]=useState(read);
@@ -14,7 +15,7 @@ function useVariant(){
 export function CinematicPreview(){
  const variant=useVariant();
  const source=variant.style==='immersive'?(variant.theme==='light'?light:dark):variant.theme==='light'?simple:null;
- const poster=variant.style==='immersive'?(variant.theme==='light'?lightPoster:darkPoster):simplePoster;
+ const poster=variant.style==='immersive'?(variant.theme==='light'?lightPoster:darkPoster):variant.theme==='light'?simplePoster:simpleDarkPoster;
  const allowed=!!source&&!variant.reduced&&variant.motion==='normal';
  const [openSource,setOpenSource]=useState<string|null>(null);
  const opened=allowed&&source===openSource;
@@ -31,12 +32,11 @@ export function CinematicPreview(){
   observer?.observe(element);
   return()=>{observer?.disconnect();document.removeEventListener('visibilitychange',pauseHidden);element.pause()};
  },[opened]);
- if(!source)return null;
  return <section className="cinematic-preview" aria-label="Синематика оформления">
  <div><p>Короткая синематика · MysticEgo</p>{allowed&&<button type="button" aria-controls={mediaId} aria-expanded={opened} onClick={()=>setOpenSource(opened?null:source)}>{opened?'Скрыть видео':'Смотреть видео'}</button>}</div>
- <div id={mediaId} className="cinematic-media">
- {opened?<video ref={video} key={source} controls muted playsInline preload="metadata" poster={poster} src={source} aria-label="Анимированный пейзаж MysticEgo"/>:<img src={poster} loading="lazy" decoding="async" alt="Статический пейзаж оформления MysticEgo"/>}
+ <div id={mediaId} className="cinematic-media" data-playing={opened}>
+ {opened?<video ref={video} key={source} controls muted playsInline preload="metadata" poster={poster} src={source??undefined} aria-label="Анимированный пейзаж MysticEgo"/>:<img src={poster} loading="lazy" decoding="async" alt="Статический пейзаж оформления MysticEgo"/>}
  </div>
- {!allowed&&<small className="cinematic-motion-note">Статический кадр · анимации отключены или ограничены</small>}
+ {!allowed&&<small className="cinematic-motion-note">{source?'Статический кадр · анимации отключены или ограничены':'Статический пейзаж'}</small>}
  </section>;
 }

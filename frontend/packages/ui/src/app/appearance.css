@@ -1,7 +1,7 @@
-:root[data-interface="immersive"][data-theme="dark"]{--mystic-art:url("./appearance-art/immersive-dark.webp")}
-:root[data-interface="immersive"][data-theme="light"]{--mystic-art:url("./appearance-art/immersive-light.webp")}
-:root[data-interface="simplified"][data-theme="dark"]{--mystic-art:url("./appearance-art/simplified-dark.svg")}
-:root[data-interface="simplified"][data-theme="light"]{--mystic-art:url("./appearance-art/simplified-light.webp")}
+:root[data-interface="immersive"][data-theme="dark"]{--mystic-art:url("./appearance-art/immersive-dark-hero.webp")}
+:root[data-interface="immersive"][data-theme="light"]{--mystic-art:url("./appearance-art/immersive-light-hero.webp")}
+:root[data-interface="simplified"][data-theme="dark"]{--mystic-art:url("./appearance-art/simplified-dark-hero.webp")}
+:root[data-interface="simplified"][data-theme="light"]{--mystic-art:url("./appearance-art/simplified-light-hero.webp")}
 :root{--mystic-time:220ms;--mystic-page-time:300ms;--mystic-ease:cubic-bezier(.2,.78,.22,1);--mystic-reveal:mystic-flow}
 :root[data-interface=immersive]{--mystic-time:300ms;--mystic-page-time:420ms}
 :root[data-transition=fade]{--mystic-reveal:mystic-fade}
@@ -52,12 +52,12 @@
 .appearance-style-option:focus-visible{outline:2px solid var(--mystic-primary);outline-offset:3px}
 @media(hover:hover){.appearance-style-option:hover{border-color:var(--mystic-primary)}}
 .appearance-style-option[aria-pressed=true]{border-color:var(--mystic-primary);box-shadow:inset 0 0 0 1px var(--mystic-primary)}
-.appearance-style-option>.appearance-art-preview{display:block;width:100%;aspect-ratio:16/9;min-width:0;border-radius:9px;background-position:center;background-size:contain;background-repeat:no-repeat;background-color:var(--mystic-bg)}
+.appearance-style-option>.appearance-art-preview{display:block;width:100%;aspect-ratio:21/9;min-width:0;border-radius:9px;background-position:center;background-size:contain;background-repeat:no-repeat;background-color:var(--mystic-bg)}
 .appearance-style-option small{color:var(--mystic-muted);line-height:1.45}
-.appearance-style-option[data-preview=immersive]>.appearance-art-preview{background-image:url('./appearance-art/immersive-dark.webp')}
-.appearance-style-option[data-preview=simplified]>.appearance-art-preview{background-image:url('./appearance-art/simplified-dark.svg')}
-:root[data-theme=light] .appearance-style-option[data-preview=immersive]>.appearance-art-preview{background-image:url('./appearance-art/immersive-light.webp')}
-:root[data-theme=light] .appearance-style-option[data-preview=simplified]>.appearance-art-preview{background-image:url('./appearance-art/simplified-light.webp')}
+.appearance-style-option[data-preview=immersive]>.appearance-art-preview{background-image:url('./appearance-art/immersive-dark-hero.webp')}
+.appearance-style-option[data-preview=simplified]>.appearance-art-preview{background-image:url('./appearance-art/simplified-dark-hero.webp')}
+:root[data-theme=light] .appearance-style-option[data-preview=immersive]>.appearance-art-preview{background-image:url('./appearance-art/immersive-light-hero.webp')}
+:root[data-theme=light] .appearance-style-option[data-preview=simplified]>.appearance-art-preview{background-image:url('./appearance-art/simplified-light-hero.webp')}
 :root[data-interface] :is(.mystic-workspace .page-motion,.studio-site .studio-hero>div,.mystic-share-card,.auth-form-card){animation:var(--mystic-reveal) var(--mystic-page-time) var(--mystic-ease) both}
 :root[data-interface] :is(.account-popover,.notification-drawer,.chat-action-menu,.emoji-menu,.modal,.auth-field-new,.panel-login-card,.row-actions>button,.row-actions>a.btn){animation:var(--mystic-reveal) var(--mystic-time) var(--mystic-ease) backwards}
 :root[data-interface] :is(.btn,.icon-btn,.nav-link,.panel-login-card){transition-duration:var(--mystic-time)}
@@ -86,19 +86,20 @@
 
 :root[data-interface=immersive][data-theme=dark]{--mystic-entry-art:url("./appearance-art/immersive-dark-entry.webp")}
 :root[data-interface=immersive][data-theme=light]{--mystic-entry-art:url("./appearance-art/immersive-light-entry.webp")}
-:root[data-interface=simplified]{--mystic-entry-art:var(--mystic-art)}
+:root[data-interface=simplified][data-theme=dark]{--mystic-entry-art:url("./appearance-art/simplified-dark-entry.webp")}
+:root[data-interface=simplified][data-theme=light]{--mystic-entry-art:url("./appearance-art/simplified-light-entry.webp")}
 
 /* Generated artwork: retain real UI, text and telemetry above decorative art. */
 :root[data-theme=dark]{--mystic-bg:#0e0b17;--mystic-surface:#181323;--mystic-raised:#231b32;--mystic-line:#3e3154;--mystic-veil:#100d1de8;--mystic-primary:#c4a3fa}
 :root[data-theme=light]{--mystic-bg:#f8f5fc;--mystic-surface:#fffdfd;--mystic-raised:#f0ebfa;--mystic-line:#dfd3ef;--mystic-veil:#fcf9ffeb;--mystic-primary:#6842b9}
 
 :root[data-interface=simplified] .mystic-workspace .orchestral-topbar:not([style*="url"]){background:linear-gradient(90deg,var(--mystic-surface) 35%,transparent 170%),var(--mystic-art) right center/auto 100% no-repeat,var(--mystic-surface)}
-:root[data-interface=immersive] .mystic-workspace .orchestral-topbar:not([style*="url"]){background:linear-gradient(90deg,var(--mystic-surface) 15%,var(--mystic-veil) 42%,transparent 82%),var(--mystic-art) right center/auto 160% no-repeat,var(--mystic-surface)}
-:root[data-interface=immersive] .auth-experience .auth-visual{background:linear-gradient(180deg,var(--mystic-veil) 0%,transparent 30%,transparent 70%,var(--mystic-veil) 100%),var(--mystic-entry-art) center/cover no-repeat,var(--mystic-bg);animation:none}
-:root[data-interface=simplified] .auth-experience .auth-visual{background:linear-gradient(145deg,var(--mystic-bg) 10%,transparent 140%),var(--mystic-art) center/cover}
+:root[data-interface=immersive] .mystic-workspace .orchestral-topbar:not([style*="url"]){background:linear-gradient(90deg,var(--mystic-surface) 15%,var(--mystic-veil) 42%,transparent 82%),var(--mystic-art) right center/auto 100% no-repeat,var(--mystic-surface)}
+:root[data-interface=immersive] .auth-experience .auth-visual{background:linear-gradient(180deg,var(--mystic-veil) 0%,transparent 30%,transparent 70%,var(--mystic-veil) 100%),var(--mystic-entry-art) right center/auto 100% no-repeat,var(--mystic-bg);animation:none}
+:root[data-interface=simplified] .auth-experience .auth-visual{background:linear-gradient(145deg,var(--mystic-bg) 10%,transparent 140%),var(--mystic-entry-art) right center/auto 100% no-repeat,var(--mystic-bg)}
 :root[data-interface=immersive] .auth-orbit{opacity:0;animation:none!important}
 :root[data-interface=immersive] .auth-brand,:root[data-interface=immersive] .auth-role{position:relative;z-index:2}
-:root[data-interface=immersive] .mystic-share{background:linear-gradient(130deg,var(--mystic-veil),transparent 150%),var(--mystic-entry-art) center/cover}
+:root[data-interface=immersive] .mystic-share{background:linear-gradient(130deg,var(--mystic-veil),transparent 150%),var(--mystic-art) right center/auto 100% no-repeat,var(--mystic-bg)}
 :root[data-interface=immersive] .mystic-workspace .nav-link.active{background:linear-gradient(110deg,color-mix(in srgb,var(--accent) 22%,var(--raised)),var(--raised));border-color:color-mix(in srgb,var(--accent) 52%,var(--line));box-shadow:0 3px 16px #754bc72a}
 :root[data-interface] .mystic-workspace .brand-mark{border-color:color-mix(in srgb,var(--accent) 40%,var(--line))}
 :root[data-interface=immersive] .mystic-workspace :is(.panel,.metric,.network-card,.deployment-node){border-radius:14px;box-shadow:0 6px 22px #25134222}
@@ -121,3 +122,14 @@
 :root[data-ui-motion=off] .appearance-quick *, :root[data-ui-motion=off] .appearance-style-option{transition:none!important;animation:none!important}
 @media(prefers-reduced-motion:reduce){.appearance-quick *, .appearance-style-option{transition:none!important;animation:none!important}}
 @media(max-width:650px){:root .appearance-quick>button.icon-btn{flex-basis:34px;width:34px;height:34px;min-width:34px;min-height:34px}.appearance-quick{padding:2px;gap:2px}}
+
+/* Independently composed artwork: landscape for wide surfaces, portrait for tall ones.
+   Keep the complete scene at its native aspect ratio; the surrounding gradient fills spare space. */
+:root[data-interface] .auth-experience .auth-visual{background:linear-gradient(145deg,var(--mystic-veil),transparent 135%),var(--mystic-entry-art) right center/auto 100% no-repeat,var(--mystic-bg);animation:none}
+:root[data-interface] .mystic-share{background:linear-gradient(130deg,var(--mystic-veil),transparent 150%),var(--mystic-art) right center/auto 100% no-repeat,var(--mystic-bg)}
+:root[data-interface] .studio-site :is(.studio-hero,.developer-hero),:root[data-interface] .desktop-download-hero{background-size:auto,auto 100%;background-position:center,right center;background-repeat:no-repeat;background-color:var(--mystic-bg)}
+@media(max-width:780px){
+ :root[data-interface] .auth-experience .auth-visual{background-image:linear-gradient(90deg,var(--mystic-veil),transparent 135%),var(--mystic-art);background-position:center,right center;background-size:auto,auto 100%}
+ :root[data-interface] .mystic-share{background-image:linear-gradient(130deg,var(--mystic-veil),transparent 150%),var(--mystic-entry-art)}
+ :root[data-interface] .studio-site :is(.studio-hero,.developer-hero),:root[data-interface] .desktop-download-hero{background-image:linear-gradient(90deg,var(--mystic-veil),transparent 160%),var(--mystic-entry-art)}
+}
