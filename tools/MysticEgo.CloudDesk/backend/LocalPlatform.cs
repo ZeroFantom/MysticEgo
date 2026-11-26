@@ -84,11 +84,10 @@ sealed partial class CloudDesk
         var tmp=path+"."+Guid.NewGuid().ToString("N");
         try
         {
-            using(var output=new FileStream(tmp,FileMode.CreateNew,FileAccess.Write,FileShare.None))
-            {
-                SetPrivateMode(tmp,Private);
-                output.Write(bytes);
-            }
+            // Close the initial file handle before setting Windows ACLs. The enclosing directory is private.
+            using(var output=new FileStream(tmp,FileMode.CreateNew,FileAccess.Write,FileShare.None)) { }
+            SetPrivateMode(tmp,Private);
+            File.WriteAllBytes(tmp,bytes);
             File.Move(tmp,path,true);
         }
         finally{if(File.Exists(tmp))File.Delete(tmp);}

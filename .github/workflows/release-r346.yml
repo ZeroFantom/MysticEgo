@@ -26,6 +26,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Check platform prerequisites
+        run: ssh -V
       - name: Publish backend and exercise local platform operations
         run: |
           dotnet publish tools/MysticEgo.CloudDesk/backend/CloudDesk.csproj -c Release -o platform-out
