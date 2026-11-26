@@ -78,3 +78,15 @@ for(const css of [desktopCss,cloudCss]){
 assert(desktopCss.includes('object-fit:contain')&&cloudCss.includes('aside .bottom{display:block'));
 assert(overlay.includes('simplified-dark.svg')&&overlay.includes('border-radius:50%'));
 assert(updater.includes('src/appearance-art/simplified-dark.svg')&&updater.includes('src/AuditPortal.jsx'));
+
+const motion=read('frontend/packages/ui/src/app/motion.css');
+const notifications=read('frontend/packages/ui/src/app/notifications.tsx');
+const cinematic=read('frontend/packages/ui/src/app/CinematicPreview.tsx');
+assert(shell.includes("import './motion.css'")&&shell.includes('data-motion-open={open} inert={!open}'));
+assert(notifications.includes('data-motion-open={open} inert={!open}')&&notifications.includes('aria-controls={drawerId}'));
+assert(motion.includes('@starting-style')&&motion.includes('allow-discrete')&&motion.includes('pointer-events:none'));
+assert(motion.includes('var(--mystic-page-time) var(--mystic-ease) backwards')&&motion.includes('--motion-step:0ms'));
+assert(motion.includes('data-ui-motion=off')&&motion.includes('prefers-reduced-motion:reduce'));
+assert(cinematic.includes('IntersectionObserver')&&cinematic.includes('visibilitychange')&&cinematic.includes('element.pause()'));
+assert(cinematic.includes('preload="metadata"')&&!cinematic.includes('autoPlay'));
+assert(cinematic.includes('loading="lazy"')&&motion.includes('aspect-ratio:16/9')&&motion.includes('object-fit:contain'));
