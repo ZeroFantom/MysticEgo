@@ -128,6 +128,22 @@ try{
               await page.waitForFunction(()=>document.querySelector('.main')?.inert===false);
               assert.equal(await trigger.getAttribute('aria-expanded'),'false');
             });
+            await check(page,prefix+'-appearance-persistence',async()=>{
+              await page.reload({waitUntil:'domcontentloaded'});
+              await visible(page.locator('.appearance-style-options'));
+              await rootState(page,'light','simplified');
+            });
+            if(role==='orchestra'&&viewport.width===1440)await check(page,prefix+'-motion-preferences',async()=>{
+              await page.emulateMedia({reducedMotion:'no-preference'});
+              const select=page.getByLabel('Анимации',{exact:true});
+              await select.selectOption('off');
+              await page.waitForFunction(()=>document.documentElement.dataset.uiMotion==='off');
+              const duration=await page.locator('.account-trigger').evaluate(el=>getComputedStyle(el).transitionDuration);
+              assert(duration.split(',').every(v=>parseFloat(v)===0),'off must disable control transitions');
+              await select.selectOption('normal');
+              await page.waitForFunction(()=>document.documentElement.dataset.uiMotion==='normal');
+              await page.emulateMedia({reducedMotion:'reduce'});
+            });
             await check(page,prefix+'-account',async()=>{
               const trigger=page.locator('.account-trigger');await trigger.click();await visible(page.locator('.account-popover'));
               await page.keyboard.press('Escape');await page.locator('.account-popover').waitFor({state:'hidden'});
