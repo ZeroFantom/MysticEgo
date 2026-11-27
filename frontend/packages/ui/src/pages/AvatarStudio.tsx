@@ -4,7 +4,8 @@ import {Bot,Download,Play,Sparkles} from 'lucide-react';
 import {Panel,Header,ErrorBanner} from '../components/primitives';
 import {useApp,useRemote} from '../app/context';
 import {AvatarStage,type AvatarMotion} from '../avatar/AvatarStage';
-import {createWaveVrma} from '../avatar/createWaveVrma';
+import {createMotionVrma,type GeneratedMotion} from '../avatar/createWaveVrma';
+const generatedMotions:GeneratedMotion[]=['wave','nod','walk','sit','perch','idle','dance'];
 import {createStarterVrm} from '../avatar/createStarterVrm';
 import {inferVisualMood,useAvatarVoice,useMusicBeat} from '../avatar/avatarAudio';
 import {startVoiceInput} from '../avatar/avatarSpeechInput';
@@ -48,6 +49,7 @@ export function AvatarStudio(){
  },[library?.assets,added]);
  const [selection,setSelection]=useState('bundled'),[mapping,setMapping]=useState<NonNullable<Selection['motions']>>({});
  const [appearance,setAppearance]=useState(defaultAppearance),[style,setStyle]=useState<MotionStyle>('calm');
+ const [generated,setGenerated]=useState<GeneratedMotion>('wave'),[tempo,setTempo]=useState(1);
  const [motion,setMotion]=useState<AvatarMotion>('idle'),[message,setMessage]=useState('Привет! Чем могу помочь?'),[play,setPlay]=useState(0);
  const [error,setError]=useState(''),[status,setStatus]=useState(''),[busy,setBusy]=useState(false);
  const voice=useAvatarVoice(),music=useMusicBeat(),face=useFaceTracking();
@@ -189,14 +191,16 @@ export function AvatarStudio(){
          </div>
        </details>
        <details className="avatar-generator">
-         <summary>Локальная анимация «Приветствие»</summary>
-         <p className="footnote">Создаёт клип VRMA в браузере. Для применения нужен гуманоидный VRM.</p>
+         <summary>Локальный генератор анимаций VRMA</summary>
+         <p className="footnote">Создаёт процедурный клип VRMA в браузере, без внешнего ИИ-сервиса. Для применения нужен гуманоидный VRM.</p>
+         <label>Движение<select value={generated} onChange={event=>setGenerated(event.target.value as GeneratedMotion)}>{generatedMotions.map(id=><option key={id} value={id}>{motions[id]}</option>)}</select></label>
+         <label>Темп {tempo.toFixed(2)}×<input type="range" min=".5" max="2" step=".05" value={tempo} onChange={event=>setTempo(Number(event.target.value))}/></label>
          <div className="row-actions motion-actions">
            {!organization&&<button className="btn secondary" disabled={busy||!library||selection==='org'} onClick={()=>{
-             setMotion('wave');void upload(createWaveVrma(),'animation','wave');
-           }}><Sparkles size={16}/> Добавить в приветствие</button>}
+             setMotion(generated);void upload(()=>Promise.resolve(createMotionVrma(generated,tempo)),'animation',generated);
+           }}><Sparkles size={16}/> Создать и назначить</button>}
            <button className="btn secondary" onClick={()=>{
-             const file=createWaveVrma();saveFile(file,file.name);
+             const file=createMotionVrma(generated,tempo);saveFile(file,file.name);
            }}><Download size={16}/> Скачать VRMA</button>
          </div>
        </details>
