@@ -21,6 +21,13 @@ public static partial class CredentialPolicy
     /// <summary>New login: 4–40 ASCII characters, alphanumeric at both ends.</summary>
     public static bool ValidLogin(string? login) => login is not null && LoginPattern().IsMatch(login);
 
+    /// <summary>Expose policy metadata, not credentials. API and MCP use the same source.</summary>
+    public static object Describe(PasswordPolicy policy) => new
+    {
+        login = new { minLength = 4, maxLength = 40, characters = "ASCII letters, digits, dot, underscore, hyphen", alphanumericEnds = true, caseSensitive = true },
+        password = new { minLength = Math.Max(MinimumPasswordLength,policy.MinLength), maxLength = Math.Min(MaximumPasswordLength,policy.MaxLength), unicode = true, spaces = true, policy.RequireDigit, policy.RequireLowercase, policy.RequireUppercase, policy.RequireNonAlphanumeric }
+    };
+
     /// <summary>Returns a stable validation code, or null. Never logs or modifies the password.</summary>
     public static string? PasswordError(string? password, string? login, PasswordPolicy policy)
     {
