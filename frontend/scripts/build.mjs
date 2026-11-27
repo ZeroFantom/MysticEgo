@@ -10,7 +10,13 @@ const root=fileURLToPath(new URL('../',import.meta.url));
 const temp=await mkdtemp(join(tmpdir(),'mysticego-ui-'));
 
 try{
-  await build({root,plugins:[react()],publicDir:false,build:{outDir:temp,emptyOutDir:true}});
+  const tags=await Promise.all(Object.keys(roles).map(async role=>JSON.parse(await readFile(join(root,'apps',role,'public','release-info.json'),'utf8')).installed));
+  const tag=tags[0];
+  if(!tag||tags.some(t=>t!==tag))throw Error('Panel release tags must match the shared build');
+  const match=/^v\d+\.\d+\.\d+-beta\.(\d+)-r(\d+(?:\.\d+)*)$/.exec(tag);
+  if(!match)throw Error('Invalid panel release tag');
+  const notes=await readFile(join(root,'..','docs','releases',`beta${match[1]}-r${match[2]}.md`),'utf8');
+  await build({root,plugins:[react()],publicDir:false,define:{__MYSTIC_BUILD_RELEASE__:JSON.stringify({tag,notes:notes.slice(0,12000)})},build:{outDir:temp,emptyOutDir:true}});
   await cp(join(root,'faq'),join(temp,'faq'),{recursive:true});
   const template=await readFile(join(temp,'index.html'),'utf8');
   await writeSocialAssets(temp);

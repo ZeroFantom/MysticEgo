@@ -1,3 +1,12 @@
+# CloudDesk — Orchestra update and maintenance recovery fix
+
+- GitHub verification checks exact repository identity and recognized visibility, not a mandatory private flag. Authenticated GitHub API access and release SHA-256 checks remain required.
+- Electron now permits the existing fixed maintenance recovery RPC and forwards its progress. Recovery verifies the Timeweb IP, SSH host key, domain, local health ID and trusted installed release. It does not replace the application or database.
+- Update now shows the exact candidate tag from the server updater status and submits it, with its SHA-256 digest, to the existing owner-only Orchestra update API. The SSH health ID must match the authenticated Orchestra session. No partial DLL overlay, implicit downgrade or repeated approval. A queued request is not a successful installation.
+- If no candidate is available, inspect the updater status, repair maintenance if necessary, and recheck. Older installations without protocol 2 must be upgraded by the documented supported path; no unsafe fallback.
+- For server diagnostics (read only): `systemctl status mysticego-orchestra.service mysticego-orchestra-updater.timer mysticego-infrastructure-reconcile.timer mysticego-local-setup.socket --no-pager`, `journalctl -u mysticego-orchestra-updater.service -n 80 --no-pager`, `cat /var/lib/mysticego-orchestra-updater/status.json`. Do not share secrets from logs.
+- Recovery CI builds CloudDesk and tests public/private repository matching, exact release tags/digests, IPC routing and recovery progress. Actual VPS recovery and update are not exercised by CI.
+
 # CloudDesk 0.5.0 — единый центр управления
 
 Локальные Auth/Orchestra, Audit, учётные данные, LAN-настройки и журналы объединены с облачной инфраструктурой. Локальный режим доступен без входа в облако. Папка данных прежнего центрального приложения сохраняется; автоматического запуска и остановки внешних процессов нет. См. [PORTABLE.md](PORTABLE.md).

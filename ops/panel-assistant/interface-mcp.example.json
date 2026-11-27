@@ -1,0 +1,19 @@
+{
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "mysticego-access-token",
+      "description": "MysticEgo user access token",
+      "password": true
+    }
+  ],
+  "servers": {
+    "mysticego-interface": {
+      "type": "http",
+      "url": "https://orchestra.isdarkline.ru/api/v1/interface-control/mcp",
+      "headers": {
+        "Authorization": "Bearer ${input:mysticego-access-token}"
+      }
+    }
+  }
+}

@@ -1,4 +1,7 @@
-import {app,BrowserWindow,ipcMain,shell} from 'electron';
+import interfaceMcp from '../interface-mcp.cjs';
+import {app,BrowserWindow,ipcMain,shell,dialog} from 'electron';
+import pairing from '../browser-pairing.cjs';
+import updater from '../desktop-updates.cjs';
 import {launch,json} from '../control/center.mjs';
 import {getDotnet} from '../launch-runtime.mjs';
 import {mkdirSync} from 'node:fs';
@@ -14,6 +17,7 @@ const view=pathToFileURL(path.join(here,'index.html')).href;
 mkdirSync(home,{recursive:true,mode:0o700});
 app.setName('LocalDesktop');
 app.setPath('userData',path.join(home,'electron'));
+const highlights=updater.createReleaseHighlights({app,root,product:'LocalDesktop'});
 
 const guid=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 let window,connection,profile,runner,closing=false,busy=false,online=false;
@@ -73,7 +77,7 @@ async function connect({global,login,password}){
   if(!rows.some(({node})=>node.kind==='global'&&node.id===runtime.nodeId&&node.enabled))
     throw Error('Укажите зарегистрированный Global.');
   const sites=rows.map(row=>row.node).filter(node=>node.kind==='local'&&node.enabled&&node.mode==='native'&&node.parentId===runtime.nodeId);
-  connection={base,headers,sites};
+  connection={base,headers,sites,refreshToken:auth.refreshToken,expiresAt:Date.parse(auth.expiresAt),login:auth.user?.login||login};
   return sites.map(({id,name,publicUrl})=>({id,name,publicUrl}));
 }
 async function provision(id){
@@ -98,16 +102,21 @@ function handle(name,action,mutating=true){
   });
 }
 async function open(){
+  await highlights.load();
   try{profile=validate(JSON.parse(await fs.readFile(profileFile,'utf8')))}catch(error){if(error.code!=='ENOENT')log(error.message)}
   window=new BrowserWindow({title:'LocalDesktop · MysticEgo',icon:path.join(here,'local-icon.png'),width:900,height:700,autoHideMenuBar:true,
     webPreferences:{preload:path.join(here,'preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false}});
   window.webContents.setWindowOpenHandler(()=>({action:'deny'}));
   window.webContents.on('will-navigate',event=>event.preventDefault());
+  pairing.installBrowserPairing({product:'LocalDesktop',window:()=>window,
+    getSession:()=>connection?.refreshToken&&Date.now()<connection.expiresAt?{origin:connection.base,identity:connection.headers.Authorization,login:connection.login,refreshToken:connection.refreshToken}:null,
+    approve:pairing.approveSession});
   handle('connect',connect);
   handle('provision',provision);
+  handle('release-highlights-dismiss',tag=>highlights.dismiss(tag),false);
   handle('status',async()=>{
     online=await health();
-    return {online,running:!!runner,name:profile?.name,global:profile?.endpoints.globalUrl,address:profile?.endpoints.publicUrl,logs};
+    return {releaseHighlights:highlights.get(),online,running:!!runner,name:profile?.name,global:profile?.endpoints.globalUrl,address:profile?.endpoints.publicUrl,logs};
   },false);
   handle('start',async()=>{if(!await health())start()});
   handle('stop',stop);
@@ -118,11 +127,12 @@ async function open(){
     void stop().finally(()=>window.close());
   });
   await window.loadURL(view);
+  interfaceMcp.installInterfaceMcp(window,'LocalDesktop');
   if(!await health())start();
 }
 if(!app.requestSingleInstanceLock())app.quit();
 else{
   app.on('second-instance',()=>window?.focus());
   app.on('window-all-closed',()=>app.quit());
-  app.whenReady().then(open).catch(error=>{console.error(error);app.quit()});
+  app.whenReady().then(async()=>{await open();updater.startDesktopUpdates({app,dialog,root,product:'LocalDesktop',window:()=>window,canRestart:()=>!closing&&!busy})}).catch(error=>{console.error(error);app.quit()});
 }

@@ -1,0 +1,34 @@
+name: Control graphs and service accounting
+on:
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - 'services/Api.Orchestra/**'
+      - 'ops/infrastructure/**'
+      - 'ops/orchestra-updater/**'
+      - 'tools/MysticEgo.CloudDesk/**'
+      - 'tests/DiagnosticReportSmoke/**'
+      - '.github/workflows/control-graphs.yml'
+permissions:
+  contents: read
+jobs:
+  control-graphs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: python3 -m unittest discover -s ops/infrastructure -p 'test_*.py'
+      - run: python3 -m unittest discover -s ops/orchestra-updater -p 'test_*.py'
+      - run: python3 -m py_compile ops/infrastructure/record-oneshot.py
+      - run: bash -n ops/infrastructure/install-local.sh && bash -n ops/orchestra-updater/install-worker.sh
+      - run: dotnet run --project tests/DiagnosticReportSmoke/DiagnosticReportSmoke.csproj -c Release
+      - run: npm ci --prefix frontend
+      - run: npm run build --prefix frontend
+      - run: npm install --prefix tools/MysticEgo.CloudDesk --ignore-scripts --no-audit --no-fund
+      - run: npm run build --prefix tools/MysticEgo.CloudDesk

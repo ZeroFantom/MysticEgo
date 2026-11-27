@@ -1,3 +1,4 @@
+import {renderReleaseHighlights} from '../control/release-highlights.js';
 import {initEffects} from '../control/effects.js';
 import {applyPresentation,captureStatic,fonts,languages,t} from '../control/presentation.js';
 const $=id=>document.getElementById(id);
@@ -38,6 +39,7 @@ async function bindOwner(next,expected){
 }
 async function refresh(){
   const state=await api.snapshot();
+  renderReleaseHighlights(state.releaseHighlights,api['release-highlights-dismiss']);
   const node=state.node,authorized=Boolean(state.actor);
   await bindOwner(state.actor?JSON.stringify([state.central,state.actor]):null,state.accountGeneration);
   document.body.dataset.product=state.isAgent?'agent':'audit';

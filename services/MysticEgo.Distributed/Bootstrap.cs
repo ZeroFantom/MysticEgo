@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Models.Autorization.Security;
 using Models.Commands.Mcp;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
@@ -22,6 +23,7 @@ public static class Bootstrap
         builder.Services.AddSingleton<AvatarHandoffQueue>();
         builder.Services.AddLocalAssistant();
         builder.Services.AddScoped<DiagnosticMcpService>();
+        builder.Services.AddSingleton<InterfaceAutomation>();
         builder.Services.AddEther();
         builder.Services.AddSetup();
         builder.Services.AddControllers().AddApplicationPart(typeof(NodeController).Assembly);
@@ -34,6 +36,7 @@ public static class Bootstrap
         builder.Services.AddSignalR().AddJsonProtocol(p=>p.PayloadSerializerOptions=Models.Commands.SignalR.ContractsJsonOptions.Create());
         
         builder.Services.AddCommandServerCore().AddExecutionDispatcherFor<ClusterAgentHub>();
+        builder.Services.AddTrafficProtection(builder.Configuration);
         NodeSecurity.AddSecurity(builder,opt);
         builder.Services.AddCors(cors=>cors.AddPolicy("ui",p=>
         {
@@ -58,7 +61,8 @@ public static class Bootstrap
             app.UseStaticFiles(new StaticFileOptions { RequestPath = "/bundled", FileProvider =
                 new Microsoft.Extensions.FileProviders.PhysicalFileProvider(bundle), ContentTypeProvider = types });
         }
-        app.UseCors("ui");app.UseAuthentication();app.UseAuthorization();
+        app.UseRouting();
+        app.UseCors("ui");app.UseRateLimiter();app.UseAuthentication();app.UseAuthorization();
         var node = app.Services.GetRequiredService<NodeOptions>();
         // Validate the selected database before reporting service readiness.
         _ = app.Services.GetRequiredService<NodeState>();

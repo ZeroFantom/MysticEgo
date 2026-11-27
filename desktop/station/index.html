@@ -3,10 +3,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>AuditDesktop</title>
 <link rel="stylesheet" href="../control/style.css"><link rel="stylesheet" href="./station.css"></head>
 <body>
-<div id="embedded" class="embedded-toolbar" hidden><button id="back" class="secondary">← Приложение</button><strong>MysticEgo</strong></div>
+<div id="embedded" class="embedded-toolbar" hidden><button id="back" data-interface-id="back" class="secondary">← Приложение</button><strong>MysticEgo</strong></div>
 <div id="workspace">
 <header class="desktop-header"><img id="product-icon" class="product-icon" src="audit-icon.png" alt=""><div><h1 id="product-title">AuditDesktop</h1><p id="product-subtitle">Личный профиль MysticEgo</p></div><span id="state" class="status">Ожидание подключения</span></header>
 <main>
+<section class="desktop-card release-highlights" id="release-highlights" hidden aria-label="Что нового"><div class="row"><h2>Что нового</h2><button type="button" class="secondary">Ознакомился</button></div><pre></pre></section>
 <div class="desktop-columns">
 <section class="desktop-card account-card">
 <div id="identity" hidden><div class="row"><h2 id="identity-name"></h2><button class="plain" id="logout">Выйти</button></div>
@@ -61,7 +62,7 @@
 <div class="actions"><button id="record" class="secondary">Начать запись</button><button id="finish" class="secondary" disabled>Сохранить сценарий</button></div>
 </section>
 <section class="desktop-card"><div class="row"><h2>Журнал запуска</h2><button id="folder" class="plain">Открыть папку</button></div><pre id="logs"></pre></section>
-<details class="desktop-card"><summary>Оформление</summary><div id="presentation-controls"></div><p id="presentation-status" role="status"></p><div id="design"></div></details>
+<details class="desktop-card"><summary data-interface-id="appearance">Оформление</summary><div id="presentation-controls"></div><p id="presentation-status" role="status"></p><div id="design"></div></details>
 <p id="message" class="message" role="status"></p>
 </main></div><script type="module" src="view.js"></script></body></html>
 

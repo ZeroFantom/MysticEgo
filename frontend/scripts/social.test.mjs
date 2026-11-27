@@ -9,6 +9,8 @@ for(const role of Object.keys(roles)){
     for(const tag of ['og:title','og:description','og:image','og:url','og:image:width','twitter:card'])assert(html.includes(tag),role+' '+tag);
     assert.equal((html.match(/property="og:image"/g)||[]).length,1);
     assert(html.includes('<!-- mysticego-social-start -->'));
+    if(role==='orchestra'&&Object.hasOwn(publicPages,page)){assert(html.includes('<h1>'));assert(html.includes('index,follow,max-image-preview:large'));assert(html.includes('href="/desktop-downloads"'));}
+    else assert(html.includes('noindex,follow'));
     assert(html.includes('content="1200"')&&html.includes('content="630"'));
   }
   const png=coverPng(role);

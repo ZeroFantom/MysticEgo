@@ -10,9 +10,11 @@ internal static class AuthGateway
 {
     public static void MapAuthGateway(this WebApplication app, NodeOptions node)
     {
-        foreach (var action in new[] { "login", "refresh", "logout" })
+        foreach (var action in new[] { "login", "refresh", "logout", "desktop/approve", "desktop/redeem" })
             app.MapPost("/api/auth/" + action, (HttpContext context, IHttpClientFactory clients) =>
                 Forward(context, clients, node.AuthUrl, action)).AllowAnonymous();
+        app.MapGet("/api/auth/credential-policy", (HttpContext context, IHttpClientFactory clients) =>
+            Forward(context, clients, node.AuthUrl, "credential-policy")).AllowAnonymous();
         app.MapGet("/api/auth/presentation", (HttpContext context, IHttpClientFactory clients) =>
             Forward(context, clients, node.AuthUrl, "presentation")).RequireAuthorization();
         app.MapPost("/api/auth/presentation", (HttpContext context, IHttpClientFactory clients) =>

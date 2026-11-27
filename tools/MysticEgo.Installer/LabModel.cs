@@ -12,10 +12,15 @@ internal static class LabModel
         {
             Timeout = Timeout.InfiniteTimeSpan
         };
+        // Preserve API authentication for an already configured local LM Studio.
+        var token=Environment.GetEnvironmentVariable("MYSTICEGO_LMSTUDIO_TOKEN");
+        if(!string.IsNullOrWhiteSpace(token))
+            http.DefaultRequestHeaders.Authorization=new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer",token);
         var catalog = await Probe(http, ct);
         var lms = FindCli();
         if (catalog is null)
         {
+            if(OperatingSystem.IsLinux())await EnsureLinuxRuntime(ct);
             var hadCli = lms is not null;
             lms ??= await Install(ct);
             PrepareTemporaryDirectory();
@@ -111,11 +116,36 @@ internal static class LabModel
             .Where(Path.IsPathFullyQualified).Select(path => Path.Combine(path, name)).FirstOrDefault(File.Exists);
     }
 
+    /// <summary>Load-check libatomic before llmster, asking the desktop privilege broker only if needed.
+    /// Never launch the model daemon or downloaded installer as root.</summary>
+    private static async Task EnsureLinuxRuntime(CancellationToken ct)
+    {
+        if(System.Runtime.InteropServices.NativeLibrary.TryLoad("libatomic.so.1",out var handle))
+        {System.Runtime.InteropServices.NativeLibrary.Free(handle);return;}
+        if(!File.Exists("/usr/bin/apt-get")||!File.Exists("/usr/bin/pkexec"))
+            throw new IOException("LM Studio requires libatomic.so.1. Automatic dependency installation requires Ubuntu/Debian apt and a graphical PolicyKit agent.");
+        if(string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY"))&&string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY")))
+            throw new IOException("Missing libatomic1. Open the desktop installer in a graphical session to authorize dependency installation.");
+        Console.WriteLine("LM Studio: подтвердите системную установку libatomic1 в диалоге PolicyKit.");
+        using var deadline=CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadline.CancelAfter(TimeSpan.FromMinutes(5));
+        await LabPackage.RunTool("/usr/bin/pkexec",["/usr/bin/apt-get","-o","DPkg::Lock::Timeout=120","install","-y","--no-install-recommends","libatomic1"],Environment.CurrentDirectory,deadline.Token);
+        if(!System.Runtime.InteropServices.NativeLibrary.TryLoad("libatomic.so.1",out handle))
+            throw new IOException("libatomic1 installed but cannot be loaded.");
+        System.Runtime.InteropServices.NativeLibrary.Free(handle);
+    }
+
     private static async Task<string> Install(CancellationToken ct)
     {
-        if (OperatingSystem.IsWindows()) await WindowsModelService.Install(ct);
+        if (OperatingSystem.IsWindows())
+        {
+            if(System.Runtime.InteropServices.RuntimeInformation.OSArchitecture!=System.Runtime.InteropServices.Architecture.X64)
+                throw new IOException("Автоматическая установка LM Studio использует проверенный архив Windows x64.");
+            await WindowsModelService.Install(ct);
+        }
         else if (OperatingSystem.IsLinux())
         {
+            await EnsureLinuxRuntime(ct);
             Console.WriteLine("LM Studio: скачиваю и устанавливаю службу llmster.");
             var script = Path.Combine(Path.GetTempPath(), "mysticego-llmster-" + Guid.NewGuid().ToString("N") + ".sh");
             try

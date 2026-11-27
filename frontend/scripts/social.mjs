@@ -33,13 +33,17 @@ export function metadata(role,page='root'){
     meta('og:image',image),meta('og:image:type','image/png'),meta('og:image:width','1200'),meta('og:image:height','630'),
     meta('og:image:alt','MysticEgo — '+info.title),meta('twitter:card','summary_large_image','name'),
     meta('twitter:title',title,'name'),meta('twitter:description',description,'name'),meta('twitter:image',image,'name'),
-    ...(!extra?[meta('robots','noindex','name')]:[]),'<!-- mysticego-social-end -->'].join('\n');
+    meta('robots',extra?'index,follow,max-image-preview:large':'noindex,follow','name'),'<!-- mysticego-social-end -->'].join('\n');
 }
 export function panelHtml(template,role,page='root'){
   if(!template.includes('data-role="orchestra"')||!template.includes('<title>MysticEgo</title>')||!template.includes('</head>'))
     throw Error('Shared Vite HTML template changed');
   const title=(role==='orchestra'?publicPages[page]?.title:undefined)??'MysticEgo · '+roles[role].title;
-  return template.replace('data-role="orchestra"','data-role="'+role+'"')
+  const extra=role==='orchestra'?publicPages[page]:undefined;
+  const links=Object.entries(publicPages).map(([path,entry])=>'<li><a href="/'+path+'">'+escape(entry.title)+'</a> — '+escape(entry.description)+'</li>').join('');
+  // The same public content is readable before React starts, for users and crawlers alike.
+  const fallback=extra?'<main><h1>'+escape(extra.title)+'</h1><p>'+escape(extra.description)+'</p><nav aria-label="Публичные страницы"><ul>'+links+'</ul></nav><p><a href="https://github.com/ZeroFantom/MysticEgo">Исходный код MysticEgo</a></p></main>':'';
+  return template.replace('<div id="root"></div>','<div id="root">'+fallback+'</div>').replace('data-role="orchestra"','data-role="'+role+'"')
     .replace('<title>MysticEgo</title>','<title>'+escape(title)+'</title>')
     .replace('</head>',metadata(role,page)+'\n</head>');
 }

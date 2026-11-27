@@ -1,5 +1,7 @@
 import {useLocale} from '../app/presentation';
 import {useState,type FormEvent} from 'react';
+import {browserKind,browserLabels} from '../app/browserPolicy';
+import {DesktopSignIn} from '../app/DesktopSignIn';
 import {ArrowRight,Boxes,Eye,EyeOff,KeyRound,Network,Shield,Sparkles,UserRound} from 'lucide-react';
 import type {Session} from '../app/context';
 import {useRemote} from '../app/context';
@@ -24,6 +26,7 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
  const [login,setLogin]=useState(''),[password,setPassword]=useState(''),[nickname,setNickname]=useState('');
  const [error,setError]=useState(''),[busy,setBusy]=useState(false),[register,setRegister]=useState(false),[reveal,setReveal]=useState(false);
  const [guest,setGuest]=useState(false);
+ const [pairingBusy,setPairingBusy]=useState(false);
  const [acceptance,setAcceptance]=useState('');
  const [enabledScopes,setEnabledScopes]=useState<string[]>([]);
  const documents=useRemote(()=>register?readRegistrationDocuments(authUrl):Promise.resolve(null),[register,authUrl]);
@@ -41,7 +44,7 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
   setError('');
  }
  async function submit(event:FormEvent){
-  event.preventDefault();setBusy(true);setError('');
+  event.preventDefault();if(pairingBusy)return;if(browserKind()==='unsupported'){setError('Браузер не поддерживается.');return;}setBusy(true);setError('');
   try{
    if(register){
     if(!documents.value||documents.loading||documents.error||policyKey&&acceptance!==policyKey)
@@ -65,11 +68,13 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
    <div className="auth-top-actions"><ThemeToggle/><NoticeBell placement="header"/></div>
    <div className="auth-form-card">
     <p className="auth-eyeline"><Sparkles size={17}/> {title}</p>
+    <small>Браузер: {browserLabels[browserKind()]}</small>
     <h2>{guest?t("Гостевой сеанс"):register?t("Создать аккаунт"):t("Войти в MysticEgo")}</h2>
     {mode==='orchestra'&&<PanelLoginLinks/>}
+    <DesktopSignIn session={session} authUrl={authUrl} onLogin={onLogin} disabled={busy||register||guest} onBusy={setPairingBusy}/>
     {mode==='audit'&&<div className="auth-tabs" role="group" aria-label={t("Режим авторизации")} data-register={register}>
-      <button type="button" aria-pressed={!register} onClick={()=>selectMode(false)}>{t("Вход")}</button>
-      <button type="button" aria-pressed={register} onClick={()=>selectMode(true)}>{t("Регистрация")}</button>
+      <button type="button" aria-pressed={!register} disabled={pairingBusy} onClick={()=>selectMode(false)}>{t("Вход")}</button>
+      <button type="button" aria-pressed={register} disabled={pairingBusy} onClick={()=>selectMode(true)}>{t("Регистрация")}</button>
     </div>}
     {guest&&onGuest&&available.value?<GuestEntry apiUrl={session.url} onLogin={onGuest}/>:<form className="stack auth-form" onSubmit={submit}>
      <div className="auth-field">
@@ -83,10 +88,10 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
      <div className="auth-field">
       <label htmlFor="auth-password">{t("Пароль")}</label>
       <div className="auth-control auth-password"><KeyRound size={17} aria-hidden="true"/>
-       <input id="auth-password" name="password" type={reveal?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} required minLength={register?12:1} autoComplete={register?'new-password':'current-password'} aria-describedby={register?'auth-password-hint':undefined}/>
+       <input id="auth-password" name="password" type={reveal?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} required minLength={register?15:1} autoComplete={register?'new-password':'current-password'} aria-describedby={register?'auth-password-hint':undefined}/>
        <button className="icon-btn" type="button" aria-label={reveal?t("Скрыть пароль"):t("Показать пароль")} onClick={()=>setReveal(value=>!value)}>{reveal?<EyeOff size={17}/>:<Eye size={17}/>}</button>
       </div>
-      {register&&<small id="auth-password-hint">{t("Минимум 12 символов")}</small>}
+      {register&&<small id="auth-password-hint">{t("Минимум 15 символов")}</small>}
      </div>
      {register&&policy&&<div className="registration-documents">
        <label><input type="checkbox" checked={acceptance===policyKey} required
@@ -103,13 +108,13 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
      </div>}
      {register&&documents.loading&&<p className="footnote">{t("Загружаем документы регистрации…")}</p>}
      <ErrorBanner text={error||(register?documents.error:'')}/>
-     <button className="btn auth-submit" type="submit" disabled={busy||register&&(!documents.value||documents.loading||!!documents.error||!!policyKey&&acceptance!==policyKey)}>{busy?t("Подождите…"):register?t("Создать аккаунт"):t("Войти")}<ArrowRight size={17}/></button>
+     <button className="btn auth-submit" type="submit" disabled={busy||pairingBusy||register&&(!documents.value||documents.loading||!!documents.error||!!policyKey&&acceptance!==policyKey)}>{busy?t("Подождите…"):register?t("Создать аккаунт"):t("Войти")}<ArrowRight size={17}/></button>
      <details className="auth-connection"><summary>{t("Адрес авторизации")}</summary><div className="auth-field">
       <label htmlFor="auth-url">{t("API авторизации")}</label><div className="auth-control"><Network size={17} aria-hidden="true"/>
-       <input id="auth-url" type="url" value={authUrl} onChange={e=>setAuthUrl(e.target.value)} required/>
+       <input id="auth-url" type="url" disabled={pairingBusy} value={authUrl} onChange={e=>setAuthUrl(e.target.value)} required/>
       </div></div></details>
     </form>}
-    {available.value&&onGuest&&<button className="btn secondary" onClick={()=>setGuest(value=>!value)}>{guest?t("Войти в аккаунт"):t("Временный аккаунт гостя")}</button>}
+    {available.value&&onGuest&&<button className="btn secondary" disabled={pairingBusy} onClick={()=>setGuest(value=>!value)}>{guest?t("Войти в аккаунт"):t("Временный аккаунт гостя")}</button>}
     <footer className="auth-project">
       {mode === 'orchestra' && <a href="/studio">{t("Студия и команда")}</a>}
       <LicenseLink/>

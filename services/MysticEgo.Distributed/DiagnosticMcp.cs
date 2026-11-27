@@ -11,7 +11,7 @@ using Models.Commands.SignalR.Hub;
 namespace MysticEgo.Distributed;
 
 public sealed class DiagnosticMcpService(IMcpDispatcher dispatcher, ICapabilityStore capabilities, INodeCommandService commands,
-    IAssistantProposalStore proposals, NodeOptions node, IConfiguration config, UiAutomationBridge ui)
+    IAssistantProposalStore proposals, NodeOptions node, IConfiguration config, IHttpClientFactory clients, UiAutomationBridge ui)
 {
     private static readonly HashSet<string> ReadOnlyTools = ["system.info", "system.health", "system.drives", "rgb.status", "integrations.status"];
     private bool Desktop => node.Kind is NodeKind.Agent or NodeKind.AuditOrchestra;
@@ -39,6 +39,7 @@ public sealed class DiagnosticMcpService(IMcpDispatcher dispatcher, ICapabilityS
                 tool.InputSchema.Properties["targetId"] = new McpPropertySchema { Type = "string", Format = "uuid", Description = "ClientId из /api/v1/agents" };
                 tool.InputSchema.Required.Add("targetId"); tool.Annotations.ReadOnlyHint = true;
             }
+            dynamic.Add(BuiltIn("auth.credential_policy", "Read current central Auth login and password requirements; no credentials accepted", true));
             dynamic.Add(BuiltIn("node.status", "Текущий узел, ОС, память процесса и время работы", true));
             if (node.Kind is NodeKind.Agent or NodeKind.Local)
                 dynamic.Add(BuiltIn("club.info", "Описание и адрес клуба из конфигурации Local", true));
@@ -72,6 +73,7 @@ public sealed class DiagnosticMcpService(IMcpDispatcher dispatcher, ICapabilityS
         if (UiAutomationController.IsOperation(tool))
             return Desktop && localConsole && ui.IsEnabled && string.Equals(ui.Owner, actor, StringComparison.Ordinal)
                 ? await ui.CallAsync(tool, args, ct) : McpCallToolResult.Fail("Local owner consent required.");
+        if (tool == "auth.credential_policy") return await ReadCredentialPolicy(ct);
         if (tool == "node.status")
         {
             using var process = Process.GetCurrentProcess();
@@ -96,6 +98,25 @@ public sealed class DiagnosticMcpService(IMcpDispatcher dispatcher, ICapabilityS
         var run = (CommandExecutionResult)await commands.Dispatch(new(target, tool, "", null, 15), actor, ct);
         return run.Success ? run.StructuredOutput is null ? McpCallToolResult.Ok(run.Output ?? "OK") : Output(run.StructuredOutput)
             : McpCallToolResult.Fail(run.ErrorMessage ?? "Ошибка диагностики");
+    }
+
+    /// <summary>Read the public policy from the configured Auth service, without forwarding user tokens.</summary>
+    private async Task<McpCallToolResult> ReadCredentialPolicy(CancellationToken ct)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(5));
+        try
+        {
+            using var client=clients.CreateClient("mysticego-logged-api");
+            using var response=await client.GetAsync(node.AuthUrl.TrimEnd('/')+"/api/auth/credential-policy",timeout.Token);
+            if(!response.IsSuccessStatusCode)return McpCallToolResult.Fail("Central Auth policy unavailable.");
+            var json=await response.Content.ReadAsStringAsync(timeout.Token);
+            if(json.Length>8192)return McpCallToolResult.Fail("Invalid policy response.");
+            using var parsed=JsonDocument.Parse(json);
+            return Output(parsed.RootElement);
+        }
+        catch(Exception error) when(error is HttpRequestException or JsonException || error is OperationCanceledException && !ct.IsCancellationRequested)
+        {return McpCallToolResult.Fail("Central Auth policy unavailable.");}
     }
 
     private async Task<McpCallToolResult> ReadWindows(CancellationToken ct)

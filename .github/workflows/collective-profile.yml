@@ -1,0 +1,24 @@
+name: Collective profile integration
+on:
+  pull_request:
+    paths:
+      - 'services/Api.Orchestra/**'
+      - 'services/MysticEgo.Distributed/**'
+      - 'services/MysticEgo.Soul/**'
+      - 'core/Models.Data/**'
+      - 'frontend/**'
+      - 'tests/CollectiveHttpSmoke/**'
+      - '.github/workflows/collective-profile.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  collective:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet run --project tests/CollectiveHttpSmoke/CollectiveHttpSmoke.csproj -c Release

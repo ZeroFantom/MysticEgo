@@ -74,7 +74,9 @@ namespace Models.Autorization.Data
                     return;
                 }
 
-                var hasher = new BCryptPasswordHasher();
+                if (!CredentialPolicy.ValidLogin(opt.Bootstrap.Login) || CredentialPolicy.PasswordError(opt.Bootstrap.Password,opt.Bootstrap.Login,opt.PasswordPolicy) is not null)
+                    throw new InvalidOperationException("Bootstrap credentials do not meet the account policy.");
+                var hasher = new VersionedPasswordHasher();
 
                 var user = new User
                 {
