@@ -1,0 +1,29 @@
+name: Auth security
+on:
+  pull_request:
+    paths:
+      - 'core/Models.Autorization/**'
+      - 'core/Api.Auth/**'
+      - 'tests/AuthSmoke/**'
+      - '.github/workflows/auth-security.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'core/Models.Autorization/**'
+      - 'core/Api.Auth/**'
+      - 'tests/AuthSmoke/**'
+      - '.github/workflows/auth-security.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  auth-security:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet build core/Api.Auth/Api.Auth.csproj -c Release
+      - run: dotnet run --project tests/AuthSmoke/AuthSmoke.csproj -c Release
