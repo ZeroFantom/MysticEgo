@@ -26,7 +26,34 @@ sealed partial class CloudDesk {
     async Task<object> InspectOrchestra(JsonObject args)
     {
         var domain=await InstalledOrchestraDomain(args);
-        return new {domain,host=S(args,"host"),serverId=Num(args,"serverId")};
+        // Status is published by the existing root-owned updater. No package is modified here.
+        JsonObject? update=null;
+        try
+        {
+            var status=await SSH(args,"test -f /var/lib/mysticego-orchestra-updater/status.json && test $(stat -c %s /var/lib/mysticego-orchestra-updater/status.json) -le 16384 && cat /var/lib/mysticego-orchestra-updater/status.json",1);
+            update=JsonNode.Parse(status) as JsonObject;
+        }
+        catch(Exception e) when(e is not OperationCanceledException) { }
+        var candidate=update?["candidate"] as JsonObject;
+        var ready=update is not null && S(update,"phase") is ("ready" or "failed") &&
+            candidate is not null && ValidUpdateCandidate(S(candidate,"tag"),S(candidate,"digest")) &&
+            S(candidate,"asset")=="MysticEgo-Orchestra-linux-x64.zip" &&
+            (update["targets"] as JsonArray)?.Any(t=>t?.ToString()=="orchestra")==true;
+        return new {domain,host=S(args,"host"),serverId=Num(args,"serverId"),current=update is null?"":S(update,"current"),
+            updatePhase=update is null?"unavailable":S(update,"phase"),candidateTag=ready?S(candidate!,"tag"):"",candidateDigest=ready?S(candidate!,"digest"):""};
+    }
+
+    /// <summary>Only exact published project releases with a SHA-256 digest can be approved.</summary>
+    static bool ValidUpdateCandidate(string tag,string digest)=>
+        System.Text.RegularExpressions.Regex.IsMatch(tag,@"\Av\d+\.\d+\.\d+-beta\.\d+-r\d+(?:\.\d+){0,7}\z")&&
+        System.Text.RegularExpressions.Regex.IsMatch(digest,@"\Asha256:[a-f0-9]{64}\z");
+
+    static object UpdateCandidateSelftest()
+    {
+        var tag="v1.0.0-beta.7-r3.2.57";var digest="sha256:"+new string('a',64);
+        if(!ValidUpdateCandidate(tag,digest)||ValidUpdateCandidate(tag+"\n",digest)||ValidUpdateCandidate("../main",digest)||
+           ValidUpdateCandidate(tag,"sha256:bad"))throw new Exception("Update candidate validation failed");
+        return new{passed=4};
     }
 
     async Task<object> RecoverOrchestraMaintenance(JsonObject args, Action<string> progress)
@@ -52,7 +79,7 @@ sealed partial class CloudDesk {
             progress("Проверка SHA-256 и восстановление двух системных служб");
             var command="cd "+remote+" && printf '%s  recover-maintenance.sh\\n' "+digest+
                 " | sha256sum -c - && bash recover-maintenance.sh "+node.ToString("D");
-            var output=await SSH(args,command,10);
+            var output=await SSH(args,command,10,line=>progress(Redact(line)));
             if(!output.Split('\n').Any(line=>line.Trim()=="MAINTENANCE_RECOVERY_OK"))
                 throw new Exception("Служба не подтвердила восстановление.");
             progress("Сокет и таймеры активны. Orchestra отвечает с прежним ID.");
@@ -62,51 +89,40 @@ sealed partial class CloudDesk {
         }
     }
 
-    async Task<object> RestoreOrchestraUpdater(JsonObject args, Action<string> progress) {
+    /// <summary>Submit the exact release selected by the owner to the existing transactional update worker.
+    /// Never copy partial DLL sets, downgrade, or initiate a second independent update.</summary>
+    async Task<object> RestoreOrchestraUpdater(JsonObject args, Action<string> progress)
+    {
         if(S(args,"confirm")!="RESTORE_ORCHESTRA")throw new Exception("Подтвердите обновление Orchestra.");
-        if(S(args,"user")!="root")throw new Exception("Для установки обновлятора нужен доверенный SSH root.");
+        var tag=S(args,"candidateTag");var digest=S(args,"candidateDigest");
+        if(!ValidUpdateCandidate(tag,digest))throw new Exception("Сначала определите доступный релиз Orchestra и подтвердите его версию.");
         var domain=await InstalledOrchestraDomain(args);
         if(!domain.Equals(S(args,"domain"),StringComparison.OrdinalIgnoreCase))
             throw new Exception("Домен установки изменился. Проверьте VPS повторно.");
-        var source=Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,"..","..","..","ops","orchestra-updater"));
-        string[] required=["bootstrap-r31.sh","baseline.sha256","install-worker.sh","update-orchestra.py",
-            "mysticego-orchestra-updater.service","mysticego-orchestra-updater.timer","payload/Api.Orchestra.dll",
-            "payload/MysticEgo.Distributed.dll","payload/MysticEgo.WorldAI.dll","payload/MysticEgo.Installer.dll","payload/web/index.html","payload/web/release-info.json","payload/web/favicon.ico","payload/web/mystic-mark.png"];
-        var defaultModel=new Dictionary<string,string> {
-            ["model/install-default-model.sh"]="../panel-assistant/install-default-model.sh",
-            ["model/infrastructure/install.sh"]="../infrastructure/install.sh",
-            ["model/infrastructure/install.py"]="../infrastructure/install.py",
-            ["model/infrastructure/install-local.sh"]="../infrastructure/install-local.sh",
-            ["model/infrastructure/local-runner.py"]="../infrastructure/local-runner.py"
-        };
-        if(required.Concat(defaultModel.Values).Any(file=>!File.Exists(Path.Combine(source,file))))throw new Exception("Распакуйте полный архив с обновлятором Orchestra.");
-        var assets=Directory.GetFiles(Path.Combine(source,"payload","web","assets"));
-        if(assets.Length==0)throw new Exception("В архиве отсутствует собранная панель Orchestra.");
-        var local=Directory.CreateTempSubdirectory("mysticego-restore-").FullName;
-        var remote="/root/.clouddesk-restore-"+Guid.NewGuid().ToString("N");
-        try {
-            var zip=Path.Combine(local,"updater.zip");
-            using(var package=ZipFile.Open(zip,ZipArchiveMode.Create)) {
-                foreach(var file in required)package.CreateEntryFromFile(Path.Combine(source,file),file);
-                foreach(var file in defaultModel)package.CreateEntryFromFile(Path.Combine(source,file.Value),file.Key);
-                foreach(var file in assets)package.CreateEntryFromFile(file,"payload/web/assets/"+Path.GetFileName(file));
-            }
-            using var stream=File.OpenRead(zip);
-            var digest=Convert.ToHexString(await SHA256.HashDataAsync(stream)).ToLowerInvariant();
-            progress("Проверка установленной Orchestra и её домена");
-            await SSH(args,"test \"$(id -u)\" = 0 && grep -Fxq "+ShellQuote("MYSTICEGO_CENTER_ORCHESTRA_URL=https://"+domain)+" /etc/mysticego/orchestra.env && systemctl is-active --quiet mysticego-orchestra.service && curl -fsS --max-time 5 http://127.0.0.1:5500/health/live >/dev/null",1);
-            await SSH(args,"umask 077; mkdir -m 700 "+remote,1);
-            try {
-                progress("Передача обновлятора Orchestra через SCP");
-                await Upload(args,zip,remote+"/updater.zip");
-                progress("Проверка пакета, установка и проверка health");
-                var command="cd "+remote+" && printf '%s  updater.zip\\n' "+digest+" | sha256sum -c - && unzip -q updater.zip && (command -v gh >/dev/null || (apt-get update && apt-get install -y gh)) && bash bootstrap-r31.sh";
-                var output=await SSH(args,"flock -n /run/lock/mysticego-clouddesk-deploy.lock bash -c "+ShellQuote(command),12);
-                return new {domain,output};
-            } finally {
-                try { await SSH(args,"rm -rf -- "+remote,1); } catch { }
-            }
-        } finally { Directory.Delete(local,true); }
+        var info=JsonNode.Parse(await SSH(args,"curl -fsS --max-time 5 http://127.0.0.1:5500/health/live",1)) as JsonObject;
+        if(info is null||S(info,"status")!="alive"||!S(info,"kind").Equals("orchestra",StringComparison.OrdinalIgnoreCase)||
+            !Guid.TryParse(S(info,"node"),out var node)||node==Guid.Empty)throw new Exception("Не подтверждён ID Orchestra по SSH.");
+        var origin=TopologyOrigin("https://"+domain);
+        progress("Проверка сессии владельца Orchestra");
+        await RequireDeveloper(origin,ownerOnly:true);
+        await topologyGate.WaitAsync();
+        try
+        {
+            if(topologyOrigin!=origin||topologyAccess.Length==0||!Guid.TryParse(topologyRootId,out var root)||root!=node)
+                throw new Exception("Сессия относится к другой Orchestra.");
+            var status=(await TopologyRequest(origin,"/api/v1/orchestra/update",topologyAccess)).AsObject();
+            var candidate=status["candidate"] as JsonObject;
+            if(S(status,"phase") is not ("ready" or "failed")||candidate is null||
+                S(candidate,"tag")!=tag||S(candidate,"digest")!=digest||
+                S(candidate,"asset")!="MysticEgo-Orchestra-linux-x64.zip"||
+                (status["targets"] as JsonArray)?.Any(x=>x?.ToString()=="orchestra")!=true)
+                throw new Exception("Релиз изменился или недоступен. Обновите сведения о сервере; повторно подтвердите версию.");
+            progress("Передача подтверждённого релиза штатной службе обновления: "+tag);
+            var response=(await TopologyRequest(origin,"/api/v1/orchestra/update",topologyAccess,new{tag,digest,confirmed=true,target="orchestra"})).AsObject();
+            if(!Bool(response,"accepted",true))throw new Exception("Orchestra не подтвердила постановку обновления в очередь.");
+            return new {domain,tag,queued=true,output="Обновление поставлено в очередь. Проверьте результат в панели Orchestra; установка ещё не подтверждена."};
+        }
+        finally{topologyGate.Release();}
     }
 
     async Task<JsonNode> QueueGlobalReupload(JsonObject args) {
