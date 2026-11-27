@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {classifyBrowser} from '../packages/ui/src/app/browserPolicy.ts';
+assert.equal(classifyBrowser('Mozilla/5.0 Firefox/140.0'),'firefox');
+assert.equal(classifyBrowser('Chrome/140.0 YaBrowser/25.0'),'yandex');
+assert.equal(classifyBrowser('Chrome/140.0 Edg/140.0'),'edge');
+assert.equal(classifyBrowser('Chrome/140.0',['Chromium','Google Chrome']),'chrome');
+assert.equal(classifyBrowser('Chrome/140.0',['Chromium']),'unsupported');
+assert.equal(classifyBrowser('Chrome/140.0',[],true),'unsupported');
+assert.equal(classifyBrowser('Chrome/140.0 OPR/100.0'),'unsupported');
+assert.equal(classifyBrowser('Version/18.0 Safari/605.1.15'),'unsupported');
+assert.equal(classifyBrowser('Chrome/140.0 Electron/38.0.0'),'desktop');
+assert.equal(classifyBrowser('Firefox/140.0 Waterfox/6.5'),'unsupported');
+console.log('Browser compatibility checks passed');

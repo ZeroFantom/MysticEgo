@@ -9,6 +9,8 @@ install -d -o mysticego -g mysticego -m 0700 /var/lib/mysticego/update-inbox
 stage=$(mktemp /usr/local/libexec/mysticego/.updater.XXXXXXXX)
 install -o root -g root -m 0644 update-orchestra.py "$stage"
 mv -T "$stage" /usr/local/libexec/mysticego/orchestra-updater.py
+install -d -o root -g root -m 0755 /var/lib/mysticego-infrastructure-status/oneshot
+install -o root -g root -m 0644 ../infrastructure/record-oneshot.py /usr/local/libexec/mysticego/record-oneshot.py
 install -m 0644 mysticego-orchestra-updater.{service,timer} /etc/systemd/system/
 if [[ ! -e /var/lib/mysticego-orchestra-updater/current.json ]]; then
   printf '{"tag":"%s"}\n' "$1" > /var/lib/mysticego-orchestra-updater/current.json

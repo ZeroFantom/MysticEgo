@@ -47,5 +47,31 @@ class MaintenanceTests(unittest.TestCase):
         repair.assert_not_called()
         self.assertEqual(publish.call_args.args[:2], ("postgres-service", "external"))
 
+class ModelDependencyTests(unittest.TestCase):
+    @patch.object(reconcile.install, "system_packages")
+    @patch.object(reconcile.install.shutil, "which", return_value="/usr/bin/curl")
+    @patch.object(reconcile.install.subprocess, "run")
+    def test_missing_libatomic_is_installed(self, run, which, packages):
+        run.return_value = Mock(returncode=1, stdout="")
+        reconcile.install.lmstudio_dependencies()
+        packages.assert_called_once_with("libatomic1")
+
+    @patch.object(reconcile.install, "system_packages")
+    @patch.object(reconcile.install.shutil, "which", return_value="/usr/bin/curl")
+    @patch.object(reconcile.install.subprocess, "run")
+    def test_installed_dependencies_skip_apt(self, run, which, packages):
+        run.return_value = Mock(returncode=0, stdout="install ok installed")
+        reconcile.install.lmstudio_dependencies()
+        packages.assert_not_called()
+
+    @patch.object(reconcile.install, "system_packages")
+    @patch.object(reconcile.install.shutil, "which", return_value=None)
+    @patch.object(reconcile.install.subprocess, "run")
+    def test_minimal_host_dependencies_installed_together(self, run, which, packages):
+        run.return_value = Mock(returncode=1, stdout="")
+        reconcile.install.lmstudio_dependencies()
+        packages.assert_called_once_with("libatomic1", "curl", "ca-certificates")
+
+
 if __name__ == "__main__":
     unittest.main()

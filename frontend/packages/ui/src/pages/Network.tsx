@@ -1,8 +1,10 @@
 import {usePanelPreference} from '../app/panelPreferences';
+import {ControlGraph} from '../components/ControlGraph';
+import type {GraphNode,GraphEdge} from '../components/ControlGraph';
 import {GlobalTimeweb} from "./GlobalTimeweb";
-import {useMemo,useState,type FormEvent,type CSSProperties} from 'react';
+import {useMemo,useState,type FormEvent} from 'react';
 import {Link,useNavigate,useSearchParams} from 'react-router-dom';
-import {Activity,ArrowUpRight,Building2,Cloud,HardDrive,House,Laptop,Network,Plus,Rows3,ShieldCheck,UserRound} from 'lucide-react';
+import {Activity,ArrowUpRight,Building2,Cloud,Network,Plus,Rows3,UserRound} from 'lucide-react';
 import {useApp,useRemote} from '../app/context';
 import {Panel,Header,ErrorBanner,Badge} from '../components/primitives';
 import './monitoring.css';
@@ -15,7 +17,6 @@ export type NodeInfo={id:string;kind:Kind;name:string;parentId:string;ownerId?:s
 export type NodeStatus={node:NodeInfo;report?:{seen:string;healthy:string[];error?:string;link?:{latencyMs?:number;mbps?:number;measuredAt:string}};people:number;sites:number};
 export type NetworkContext={rootId:string;rootName:string;orchestraUrl:string;authUrl:string;developer:boolean;owner?:boolean;actor:string;lan:boolean};
 export const kindNames:Record<Kind,string>={orchestra:'Оркестр',global:'Global',local:'Local',agent:'Agent',audit:'Audit'};
-const icons={orchestra:ShieldCheck,global:Cloud,local:HardDrive,agent:Laptop,audit:House};
 export const online=(row:NodeStatus)=>row.node.enabled&&(row.node.kind==='orchestra'||row.report?.healthy.includes(row.node.kind)===true);
 const nodeState=(row:NodeStatus)=>!row.node.enabled?'disabled':online(row)?'online':row.report?'offline':'pending';
 const nodeLabel=(row:NodeStatus)=>({disabled:'Отключён',online:'В сети',offline:'Нет связи',pending:'Нет отчёта'}[nodeState(row)]);
@@ -49,7 +50,7 @@ export function OrchestraOverview(){
     </div>
     <div className="dashboard-monitor-grid">
       <Panel title="Топология сети" aside={<Link className="text-link" to="/nodes">Открыть <ArrowUpRight size={15}/></Link>}>
-        <div className="dashboard-network">{context.value&&topology.value?<TreeGraph root={context.value.rootId} selected="" choose={row=>navigate('/nodes?node='+encodeURIComponent(row.node.id))}
+        <div className="dashboard-network">{context.value&&topology.value?<TreeGraph compact root={context.value.rootId} selected="" choose={row=>navigate('/nodes?node='+encodeURIComponent(row.node.id))}
           rows={[{node:{id:context.value.rootId,kind:'orchestra',name:context.value.rootName||'Оркестр',parentId:'',mode:'native',enabled:true},people:0,sites:0},...topology.value.filter(row=>row.node.id!==context.value!.rootId)]}/>:<p className="monitor-empty">{topology.error||context.error?'Топология недоступна':'Загружаем топологию…'}</p>}</div>
       </Panel>
       {mode==='orchestra'?<DashboardTelemetry/>:<Panel title="Состояние организаций">
@@ -91,46 +92,22 @@ function DashboardTelemetry(){
   </Panel>;
 }
 
-function TreeGraph({rows,root,selected,choose}:{rows:NodeStatus[];root:string;selected:string;choose:(row:NodeStatus)=>void}){
-  const columns=useMemo(()=>{
-    const byParent=new Map<string,NodeStatus[]>();
-    for(const row of rows){
-      if(row.node.id===root)continue;
-      const key=row.node.parentId||root;
-      byParent.set(key,[...(byParent.get(key)??[]),row]);
-    }
-    const cards:{row:NodeStatus;x:number;y:number}[]=[];
-    const edges:{x1:number;y1:number;x2:number;y2:number;id:string}[]=[];
-    const visited=new Set<string>();
-    let leaves=0;
-    function visit(row:NodeStatus,depth:number):{row:NodeStatus;x:number;y:number}{
-      visited.add(row.node.id);
-      const x=24+depth*216;
-      const placed:{row:NodeStatus;x:number;y:number}[]=[];
-      for(const child of byParent.get(row.node.id)??[]){if(!visited.has(child.node.id))placed.push(visit(child,depth+1))}
-      const y=placed.length?(placed[0].y+placed[placed.length-1].y)/2:24+(leaves++)*94;
-      const result={row,x,y};cards.push(result);
-      for(const child of placed)edges.push({x1:x+182,y1:y+34,x2:child.x,y2:child.y+34,id:child.row.node.id});
-      return result;
-    }
-    const base=rows.find(x=>x.node.id===root);
-    if(base)visit(base,0);
-    for(const row of rows)if(!visited.has(row.node.id))visit(row,1);
-    return {cards,edges,width:Math.max(240,...cards.map(x=>x.x+204)),height:Math.max(140,...cards.map(x=>x.y+92))};
-  },[rows,root]);
-  return <div className="network-graph-scroll" tabIndex={0} role="region" aria-label="Граф узлов, прокрутка по горизонтали и вертикали"><div className="network-graph" style={{width:columns.width,height:columns.height}}>
-    <svg width={columns.width} height={columns.height} className="network-edges" aria-hidden="true">
-      {columns.edges.map(edge=><path key={edge.id} d={`M ${edge.x1} ${edge.y1} C ${edge.x1+23} ${edge.y1}, ${edge.x2-23} ${edge.y2}, ${edge.x2} ${edge.y2}`}/>)}
-    </svg>
-    {columns.cards.map(({row,x,y})=>{
-      const Icon=icons[row.node.kind];
-      return <button className={'network-card '+(selected===row.node.id?'selected':'')} style={{left:x,top:y}} key={row.node.id}
-        onClick={()=>choose(row)} aria-pressed={selected===row.node.id} data-node-state={nodeState(row)} aria-label={row.node.name+' · '+kindNames[row.node.kind]+' · '+nodeLabel(row)}>
-        <span className="network-node-icon"><Icon size={18}/></span><span><strong title={row.node.name}>{row.node.name}</strong><small>{kindNames[row.node.kind]} · {nodeLabel(row)}</small></span>
-        <i aria-hidden="true" className={online(row)?'network-dot online':'network-dot'}/>
-      </button>;
-    })}
-  </div></div>;
+export function TreeGraph({rows,root,selected,choose,zoom=100,compact=false}:{rows:NodeStatus[];root:string;selected:string;choose:(row:NodeStatus)=>void;zoom?:number;compact?:boolean}){
+ const layout=useMemo(()=>{
+  const byParent=new Map<string,NodeStatus[]>(),visited=new Set<string>(),nodes:GraphNode[]=[],edges:GraphEdge[]=[];let leaf=0;
+  for(const row of rows){if(row.node.id===root)continue;const key=row.node.parentId||root;byParent.set(key,[...(byParent.get(key)??[]),row])}
+  function visit(row:NodeStatus,depth:number):GraphNode{
+   visited.add(row.node.id);
+   const children=(byParent.get(row.node.id)??[]).filter(x=>!visited.has(x.node.id)).flatMap(child=>visited.has(child.node.id)?[]:[visit(child,depth+1)]);
+   const n={id:row.node.id,title:row.node.name,subtitle:kindNames[row.node.kind]+' · '+nodeLabel(row),state:nodeState(row),x:24+depth*274,y:children.length?(children[0].y+children[children.length-1].y)/2:24+leaf++*112};
+   nodes.push(n);for(const child of children)edges.push({from:n.id,to:child.id,kind:'business'});
+   return n;
+  }
+  const base=rows.find(r=>r.node.id===root);if(base)visit(base,0);
+  for(const row of rows)if(!visited.has(row.node.id))visit(row,1);
+  return {nodes,edges};
+ },[rows,root]);
+ return <ControlGraph nodes={layout.nodes} edges={layout.edges} scope="business" selected={selected} zoom={zoom} compact={compact} choose={id=>{const row=rows.find(r=>r.node.id===id);if(row)choose(row)}}/>;
 }
 
 export function NetworkPage(){
@@ -184,7 +161,7 @@ export function NetworkPage(){
     finally{setBusy(false)}
   }
   return <>
-    <Header title="Узлы сети" description="Оркестр, организации, площадки и рабочие станции" action={
+    <Header title="Граф бизнес-логики" description="Организации, площадки, рабочие станции и их принадлежность" action={
       <Link to="/setup" className="btn"><Plus size={17}/>{mode==='local'?'Комплект Agent':mode==='global'?'Создать Local':'Развернуть Global'}</Link>}/>
     <ErrorBanner text={context.error||topology.error||error}/>
     {topology.value&&topology.error&&<p className="monitor-empty">Показана последняя полученная топология; обновление не удалось.</p>}
@@ -195,7 +172,7 @@ export function NetworkPage(){
       </div>}>
         <label className="search"><input aria-label="Фильтр узлов" placeholder="Название или тип узла" value={filter} onChange={event=>setFilter(event.target.value)}/></label>
         {!context.value||!topology.value?<p className="monitor-empty">{context.error||topology.error?'Топология недоступна':'Загружаем топологию…'}</p>:view==='graph'?<><label className="graph-zoom">Масштаб {zoom}%<input type="range" min={50} max={200} step={5} value={zoom} onChange={event=>setZoom(Number(event.target.value))}/></label>
-          <div className="network-zoomed" style={{'--network-zoom':zoom/100} as CSSProperties}><TreeGraph rows={visible} root={root} selected={selectedId??''} choose={choose}/></div></>:
+          <TreeGraph rows={visible} root={root} selected={selectedId??''} choose={choose} zoom={zoom}/></>:
           <div className="table-wrap"><table><thead><tr><th>Узел</th><th>Роль</th><th>Родитель</th><th>Статус</th></tr></thead><tbody>
             {visible.map(row=><tr key={row.node.id} className={selectedId===row.node.id?'selected-row':''}>
               <td><button className="text-link table-button" onClick={()=>choose(row)}>{row.node.name}</button></td>

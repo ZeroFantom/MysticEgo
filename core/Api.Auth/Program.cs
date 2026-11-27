@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using System.Text.Json.Serialization;
 using Api.Auth.Middleware;
 using Models.Autorization.Extensions;
+using Models.Autorization.Security;
 
 namespace Api.Auth;
 
@@ -63,6 +64,7 @@ public static class Program
         });
 
         builder.Services.AddHealthChecks();
+        builder.Services.AddTrafficProtection(builder.Configuration);
         builder.Services.AddRateLimiter(options=>
         {
             options.RejectionStatusCode=429;
@@ -89,6 +91,9 @@ public static class Program
 
         app.MapControllers();
         app.MapAuditRegistration();
+        // Public metadata only. Never accepts or returns a password.
+        app.MapGet("/api/auth/credential-policy", (Models.Autorization.Configuration.AuthorizationOptions options) =>
+            Results.Ok(Models.Autorization.Security.CredentialPolicy.Describe(options.PasswordPolicy))).AllowAnonymous();
 
         app.MapGet("/health", () => Results.Json(new
         {

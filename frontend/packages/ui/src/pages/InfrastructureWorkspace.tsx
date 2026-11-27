@@ -2,7 +2,7 @@ import {Activity,ArrowUpRight,BrainCircuit,Container,Database,Mic,Radio,ServerCo
 import {Link,NavLink} from 'react-router-dom';
 import {useState} from 'react';
 import {useApp,useRemote} from '../app/context';
-import type {UpdateState} from '../app/serverUpdate';
+import {ServiceMaintenance,ReportDownload} from './ServiceMaintenance';
 import {ErrorBanner,Panel} from '../components/primitives';
 import {InfrastructureSetup} from './InfrastructureSetup';
 import {labels,names,useMaintenance,workerMessage,type Maintenance} from './MaintenanceStatus';
@@ -26,22 +26,13 @@ function StatusCard({component,name}:{component?:Component;name:string}){
     <h3>{names[name]??name}</h3>
     <p>{component?.message??'Пока нет подтверждённого замера этого компонента.'}</p>
     <small>{component?'Проверено '+new Date(component.checkedAt).toLocaleString('ru-RU'):'Ожидание отчёта сервера'}</small>
+    <ReportDownload scope={name}/>
   </article>;
 }
 
 export function InfrastructureWorkspace({section}:{section:InfrastructureSection}){
   const page=sections[section];
   const {api}=useApp();
-  const update=useRemote(()=>section==='services'?api.request<UpdateState>('/orchestra/update'):Promise.resolve(null),[api,section],4000);
-  const recovery=useRemote(()=>section==='services'?api.request<{available:boolean;automatic:boolean;queued?:boolean;independent?:{state:string;checkedAt:string}}>('/orchestra/update/maintenance'):Promise.resolve(null),[api,section],4000);
-  const [repairing,setRepairing]=useState(false),[repairMessage,setRepairMessage]=useState('');
-  async function requestRepair(){
-    setRepairing(true);setRepairMessage('');
-    try{await api.request('/orchestra/update/maintenance',{method:'POST',body:'{}'});setRepairMessage('Запрос принят. Служба обновления автоматически проверит установку и восстановление.');update.reload();recovery.reload()}
-    catch(error){setRepairMessage(error instanceof Error?error.message:String(error))}
-    finally{setRepairing(false)}
-  }
-  const maintenance=update.value?.maintenance;
   const state=useMaintenance();
   const data=state.value;
   const status=data?.components??[];
@@ -61,18 +52,11 @@ export function InfrastructureWorkspace({section}:{section:InfrastructureSection
     </div>}
     {!!page.components.length&&<div className="infra-status-grid">{page.components.filter(name=>name!=='worker'||!!worker).map(name=><StatusCard key={name} name={name} component={status.find(c=>c.name===name)}/>)}</div>}
     {section==='metrics'&&<div className="infra-status-grid"><article className="infra-status-card"><Radio size={24}/><h3>Prometheus</h3><p>Сбор метрик Orchestra. Локальный endpoint на VPS: порт 9090.</p></article><article className="infra-status-card"><Activity size={24}/><h3>Grafana</h3><p>Панели наблюдения. Локальный endpoint на VPS: порт 3000.</p></article></div>}
+    {section==='services'&&<ServiceMaintenance/>}
     <div className="infra-actions-grid">
       <InfrastructureSetup key={section} initial={page.initial} allowed={page.actions} title={page.actionTitle}/>
       <Panel title={section==='services'?'Автоматическое обслуживание':section==='ai'?'Вычислительный контур':section==='database'?'Безопасность данных':'Просмотр диагностики'}>
-        {section==='services'&&<><p>Служба обновления устанавливает и восстанавливает обслуживание Orchestra из проверенного релиза. Повторные проверки происходят автоматически, без CloudDesk и SSH.</p>
-          <p><strong>{maintenance?({ready:'Установлена',waiting:'Ожидается отчёт',repairing:'Установка / восстановление',degraded:'Повторная попытка запланирована',unavailable:'Пакет обслуживания недоступен'} as Record<string,string>)[maintenance.state]??'Состояние уточняется':'Обновление службы обслуживания требуется'}</strong></p>
-          {maintenance?.release&&<p className="footnote">Версия: {maintenance.release} · {new Date(maintenance.checkedAt).toLocaleString('ru-RU')}</p>}
-          <button className="btn secondary" disabled={repairing||maintenance?.state==='repairing'||recovery.value?.queued||recovery.value?.independent?.state==='repairing'} onClick={()=>void requestRepair()}><RefreshCw size={16}/> Восстановить службу обслуживания</button>
-          {recovery.value?.queued&&<p role="status">Запрос ожидает запуска системной службы.</p>}
-          {recovery.value?.independent&&<p className="footnote">Независимый канал: {recovery.value.independent.state==='ready'?'готов':recovery.value.independent.state==='repairing'?'восстановление':'требует внимания'}.</p>}
-          {recovery.value&&!recovery.value.available&&<p>Если привилегированная служба не установлена, откройте CloudDesk → Обновление узлов → Восстановить службу обслуживания. Переустановка Orchestra не требуется.</p>}
-          {repairMessage&&<p role="status">{repairMessage}</p>}
-          <Link className="infra-link" to="/diagnostics">Скачать диагностический отчёт <ArrowUpRight size={16}/></Link></>}
+        {section==='services'&&<p>Проверенные релизы устанавливаются автоматически. Состояние и отчёты доступны выше.</p>}
         {section==='ai'&&<><p>Распознавание речи устанавливается автоматически при достаточных ресурсах VPS. Явно настроенный внешний сервис сохраняется.</p><Link className="infra-link" to="/assistant?tab=models">Вычислительные узлы и тест модели <ArrowUpRight size={16}/></Link></>}
         {section==='database'&&<><p>Существующая база и её учётные данные сохраняются. Перенос SQLite в PostgreSQL доступен только как автономная подготовка; переключение рабочей базы пока не автоматизировано.</p><p className="footnote">Не создавайте пустую замену действующей базе. Требуется проверяемая резервная копия и отдельное подтверждение.</p></>}
         {section==='metrics'&&<><p>Здесь настраиваются источники и системы сбора. Текущая нагрузка, графики ресурсов и состояние сетевых связей отображаются отдельно.</p><Link className="infra-link" to="/diagnostics">Открыть диагностику <ArrowUpRight size={16}/></Link></>}

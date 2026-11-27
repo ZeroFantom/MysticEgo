@@ -1,5 +1,7 @@
 import interfaceMcp from '../interface-mcp.cjs';
 import {app,BrowserWindow,WebContentsView,dialog,ipcMain,Menu,shell} from 'electron';
+import pairing from '../browser-pairing.cjs';
+import updater from '../desktop-updates.cjs';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
@@ -363,6 +365,9 @@ async function open(){
       actor:actor?.login,team:actor?teamStatus:null,globals:playerGlobals.map(({id,name})=>({id,name})),central:current()?.central||assignment?.orchestraUrl||lastConnection.central,
       lan:profile?.endpoints.allowLanHttp===true||assignment?.allowLanHttp===true||lastConnection.lan,platform:process.platform,logs:[...logs]};
   });
+  pairing.installBrowserPairing({product,window:()=>window,
+    getSession:()=>actor?.refreshToken&&Date.now()<actor.expiration?{origin:actor.central,login:actor.login,identity:actor.token,refreshToken:actor.refreshToken}:null,
+    approve:pairing.approveSession});
   handle('auth',userSession);
   handle('logout',async()=>{
     accountGeneration++;
@@ -471,7 +476,7 @@ async function open(){
 if(!app.requestSingleInstanceLock())app.quit();
 else{
   app.on('second-instance',()=>window?.focus());
-  app.whenReady().then(open).catch(error=>{dialog.showErrorBox(product,error.message);app.quit()});
+  app.whenReady().then(async()=>{await open();updater.startDesktopUpdates({app,dialog,root,product,window:()=>window})}).catch(error=>{dialog.showErrorBox(product,error.message);app.quit()});
   app.on('window-all-closed',()=>app.quit());
 }
 

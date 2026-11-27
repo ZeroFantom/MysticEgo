@@ -9,9 +9,15 @@ namespace MysticEgo.Api.Orchestra.Controllers;
 
 [ApiController, Authorize(Policy = "operator"), Route("api/v1/collective")]
 public sealed class CollectiveController(
-    SocialService social, ISocialAccessPolicy access, ISoulService souls, IConfiguration config, NodeState state, CollectiveVoice voice) : ControllerBase
+    SocialService social, ISocialAccessPolicy access, ISoulService souls, IConfiguration config, NodeState state, CollectiveVoice voice, ILogger<CollectiveController> logger) : ControllerBase
 {
-    private Guid Actor() => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    private Guid Actor()
+    {
+        if(User.Identity?.IsAuthenticated!=true||User.HasClaim("token_use","device")||
+            !Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier),out var id)||id==Guid.Empty)
+            throw new NodeApiException(401,"Сеанс не содержит действительного ID аккаунта. Войдите повторно.");
+        return id;
+    }
     private string Nickname => User.FindFirstValue("nickname") ?? User.Identity?.Name ?? "Игрок";
     private static readonly (string Id, string Label)[] Axes =
     [
@@ -22,7 +28,7 @@ public sealed class CollectiveController(
 
     [HttpGet("me")]
     [ApiCapability("collective.profile.read", "Прочитать профиль, игровой статус и анкету", "all")]
-    public async Task<IActionResult> Me(CancellationToken ct)
+    public Task<IActionResult> Me(CancellationToken ct) => Run<object>(async () =>
     {
         var id = Actor();
         var profile = await social.EnsureAccount(id, Nickname, User.Identity!.Name!, access.Level(User), ct);
@@ -31,14 +37,18 @@ public sealed class CollectiveController(
             ? registered : soul.Created;
         var immortal = soul.State == "EgoShard";
         var progress = GameProgress.Calculate(soul);
-        return Ok(new
+        return new
         {
             profile, progress, game = new { id, nickname = Nickname, progress.Rank, progress.Level, soul.State,
                 created, immortal, ageHours = Math.Max(0, soul.AgeHours), expiresAt = (DateTimeOffset?)null },
             stats = GameProgress.Attributes(soul),
             personality = Survey(soul)
-        });
-    }
+        };
+    });
+
+    [HttpGet("profile")]
+    public Task<IActionResult> BasicProfile(CancellationToken ct)=>Run(async()=>
+        await social.EnsureAccount(Actor(),Nickname,User.Identity?.Name??Nickname,access.Level(User),ct));
 
     [HttpPost("shard/attributes"), ApiCapability("game.attributes.allocate", "Распределить очки развития осколка", "all", RequiresConfirmation = true)]
     public async Task<IActionResult> Allocate(AllocateAttributes input, CancellationToken ct)
@@ -231,13 +241,13 @@ public sealed class CollectiveController(
     }
 
     [HttpGet("shard/quests")]
-    public async Task<IActionResult> Quests(CancellationToken ct)
+    public Task<IActionResult> Quests(CancellationToken ct) => Run<object>(async () =>
     {
         var soul = await souls.Register(Actor().ToString(), ct);
-        return Ok(SoulEngine.Quests.Select(item => new { id = item.Key, title = item.Value.Name,
+        return SoulEngine.Quests.Select(item => new { id = item.Key, title = item.Value.Name,
             item.Value.Npc, item.Value.Prompt, item.Value.Difficulty, stat = item.Value.Stat, experience = GameProgress.ExperienceFor(item.Value.Difficulty),
-            attempt = soul.Attempts.GetValueOrDefault(item.Key) }));
-    }
+            attempt = soul.Attempts.GetValueOrDefault(item.Key) }).ToArray();
+    });
 
     [HttpPost("shard/quests")]
     public async Task<IActionResult> Quest(QuestAnswers input, CancellationToken ct)
@@ -254,6 +264,12 @@ public sealed class CollectiveController(
     {
         try { return Ok(await action()); }
         catch (NodeApiException ex) { return StatusCode(ex.StatusCode, new { error = ex.Message }); }
+        catch(Exception ex) when(ex is System.Data.Common.DbException or IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidOperationException)
+        {
+            var trace=HttpContext.TraceIdentifier;
+            logger.LogError("Collective operation failed: {Action} {ExceptionType} trace={Trace}", ControllerContext.ActionDescriptor.ActionName,ex.GetType().Name,trace);
+            return StatusCode(503,new{error="Хранилище аккаунта временно недоступно. Данные не сбрасываются. Код: "+trace,trace});
+        }
     }
 
     public sealed record PersonalityAnswers(string Version, bool Consent, Dictionary<string, int> Answers);

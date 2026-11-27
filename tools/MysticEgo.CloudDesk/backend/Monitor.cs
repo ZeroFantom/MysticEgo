@@ -44,6 +44,22 @@ sealed partial class CloudDesk {
         }finally{topologyGate.Release();}
     }
     async Task<object> TopologyLogout(){await topologyGate.WaitAsync();try{ClearTopologySession();return new{connected=false};}finally{topologyGate.Release();}}
+    string PairingIdentity()=>Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(topologyAccess)));
+    async Task<object> BrowserPairingStatus(){
+        await topologyGate.WaitAsync();try{
+            if(topologyOrigin.Length==0||topologyRefresh.Length==0||topologyRootId.Length==0||topologyExpires<=DateTimeOffset.UtcNow)
+                return new{available=false};
+            return new{available=true,origin=topologyOrigin,identity=PairingIdentity()};
+        }finally{topologyGate.Release();}
+    }
+    async Task<object> BrowserPairingApprove(JsonObject args){
+        var origin=TopologyOrigin(S(args,"origin"));var challenge=S(args,"challenge");
+        if(!System.Text.RegularExpressions.Regex.IsMatch(challenge,@"\A[a-f0-9]{64}\z"))throw new Exception("Invalid browser challenge");
+        await topologyGate.WaitAsync();try{
+            if(topologyOrigin!=origin||topologyRefresh.Length==0||topologyRootId.Length==0||topologyExpires<=DateTimeOffset.UtcNow||PairingIdentity()!=S(args,"identity"))throw new Exception("Desktop session changed");
+            return await TopologyRequest(origin,"/api/auth/desktop/approve",body:new{refreshToken=topologyRefresh,challenge});
+        }finally{topologyGate.Release();}
+    }
     static string Role(string value)=>value.ToLowerInvariant() switch{"orchestra"=>"Orchestra","global"=>"Global","local"=>"Local","agent"=>"Agent","audit" or "auditorchestra"=>"Audit",_=>""};
     static string RequiredParent(string role)=>role switch{"Global" or "Audit"=>"Orchestra","Local"=>"Global","Agent"=>"Local",_=>""};
     static string RealId(string value)=>Guid.TryParse(value,out var id)&&id!=Guid.Empty?id.ToString():"";

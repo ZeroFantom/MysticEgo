@@ -203,6 +203,7 @@ sealed partial class CloudDesk {
             case "github.status": return await GitProfile();
             case "github.release": return new {tag=Tag, asset=Asset, sha256=await GithubReleaseDigest()};
             case "github.selftest": return GithubSelftest();
+            case "update.candidate.selftest": return UpdateCandidateSelftest();
             case "platform.selftest": return await PlatformSelftest();
             case "github.enable": Init(); File.Delete(GitDisabled); return new { enabled=true };
             case "github.disconnect": Init(); await File.WriteAllTextAsync(GitDisabled,"1"); return new { connected=false };
@@ -222,6 +223,8 @@ sealed partial class CloudDesk {
             }
             case "timeweb.status": return await TimeProfile();
             case "timeweb.disconnect": token=""; try { await ClearTimewebToken(); } catch { return new {connected=false,warning="Не удалось проверить удаление токена из системного хранилища."}; } return new {connected=false};
+            case "browser.pairingStatus": return await BrowserPairingStatus();
+            case "browser.pairingApprove": return await BrowserPairingApprove(a);
             case "topology.discover": return await DiscoverTopology(a);
             case "dns.suggest": return await SuggestDns(a);
             case "dns.inventory": return await DnsInventory(a);
@@ -286,6 +289,10 @@ sealed partial class CloudDesk {
             case "ssh.test": return await SSH(a,"uname -a; id; uptime",1);
             case "ssh.command": return await SSH(a,S(a,"command"),5);
             case "topology.developerPassword": return await RevealDeveloperPassword(a);
+            case "deploy.maintenanceReport": return await MaintenanceReportDownload(a);
+            case "deploy.maintenanceAuto": return await ConfigureMaintenanceAuto(a);
+            case "deploy.maintenancePlan": return await ReadMaintenancePlan(a);
+            case "deploy.executeMaintenance": return await ExecuteMaintenancePlan(a,progress ?? (_ => {}));
             case "deploy.inspectOrchestra": return await InspectOrchestra(a);
             case "deploy.restoreOrchestra": return await RestoreOrchestraUpdater(a,progress ?? (_ => {}));
             case "deploy.recoverMaintenance": return await RecoverOrchestraMaintenance(a,progress ?? (_ => {}));

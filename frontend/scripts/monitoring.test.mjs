@@ -30,10 +30,11 @@ for(const edge of edges){
 }
 assert.equal(smoothEdges([points[0]]).length,0);
 assert(diagnostics.includes('Date.parse(s.at)>=start')&&diagnostics.includes('data-stale={stale}'));
-assert(network.includes('row.node.enabled&&')&&network.includes('data-node-state={nodeState(row)}'));
+const graph=readFileSync(new URL('../packages/ui/src/components/ControlGraph.tsx',import.meta.url),'utf8');
+assert(network.includes('row.node.enabled&&')&&graph.includes('data-node-state={n.state}'));
 assert(network.includes("topology.value?tile.count:topology.loading?'…':'—'"));
-assert(network.includes('if(!visited.has(child.node.id))')&&network.includes('item.node.id!==root'));
-assert(network.includes("'--network-zoom':zoom/100")&&css.includes('zoom:var(--network-zoom,1)'));
+assert(network.includes('visited.has(child.node.id)')&&network.includes('item.node.id!==root'));
+assert(graph.includes("transform:'scale('+zoom/100+')'")&&graph.includes('onPointerMove={move}')&&graph.includes('onKeyDown={e=>key(e,n)}'));
 assert(network.includes('min={50} max={200}')&&network.includes('value={name??selected.node.name}'));
 assert(agents.includes('!filtered.length')&&agents.includes('a.host??'));
 assert(css.includes('prefers-reduced-motion:reduce')&&css.includes('data-ui-motion=off'));

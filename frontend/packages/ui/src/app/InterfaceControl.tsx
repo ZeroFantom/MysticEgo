@@ -81,10 +81,10 @@ export function InterfaceControl(){
   useEffect(()=>{
     localAction=async path=>{
       const version=epoch.current;
-      if(!active.current||running.current)return false;
+      if(!active.current||running.current||Date.now()>=Date.parse(active.current.expiresAt))return false;
       running.current=true;
       try{
-        const clicked=await visibleNavigation(path,()=>!!active.current&&version===epoch.current);
+        const clicked=await visibleNavigation(path,()=>!!active.current&&version===epoch.current&&Date.now()<Date.parse(active.current.expiresAt));
         return clicked&&current.current===path;
       }finally{running.current=false}
     };
@@ -92,6 +92,7 @@ export function InterfaceControl(){
   },[api]);
   useEffect(()=>{
     if(!session)return;
+    const expiry=window.setTimeout(()=>{stopLocal();setMessage('Срок разрешения истёк.');},Math.max(0,Date.parse(session.expiresAt)-Date.now()));
     let stopped=false,timer:number|undefined,result:Outcome|undefined;
     const id=session.id,version=epoch.current;
     async function tick(){
@@ -116,7 +117,7 @@ export function InterfaceControl(){
       if(!stopped)timer=window.setTimeout(tick,900);
     }
     void tick();
-    return()=>{stopped=true;window.clearTimeout(timer)};
+    return()=>{stopped=true;window.clearTimeout(timer);window.clearTimeout(expiry)};
   },[session?.id,api]);
   async function start(){
     if(busy||active.current)return;
