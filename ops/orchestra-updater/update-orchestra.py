@@ -459,6 +459,38 @@ def main():
         run_locked()
 
 
+def automatic_enabled():
+    """Read only a fixed bounded policy from the existing application inbox; default off."""
+    try:
+        directory = os.open(INBOX, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            fd = os.open("auto-update.json", os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
+            with os.fdopen(fd, "rb") as file:
+                return stat.S_ISREG(os.fstat(file.fileno()).st_mode) and file.read(128) == b'{"enabled":true}'
+        finally:
+            os.close(directory)
+    except OSError:
+        return False
+
+
+def automatic_target(candidate, targets, last):
+    if not candidate or "orchestra" not in targets or not automatic_enabled():
+        return None
+    if last.get("candidate") == candidate and last.get("phase") in ("downloading", "switching", "failed"):
+        return None
+    # Persistent root-owned guard survives temporary GitHub outages and process restarts.
+    try:
+        prior = json.loads((STATE / "automatic-attempt.json").read_text())
+        if prior.get("tag") == candidate["tag"]:
+            return None
+    except (OSError, ValueError, AttributeError):
+        pass
+    # No unattended retries of a failed release. Do not race active dependency provisioning.
+    if system_ok("is-active", "--quiet", "mysticego-infrastructure-reconcile.service"):
+        return None
+    return "orchestra"
+
+
 def run_locked():
     file = STATE / "status.json"
     last = json.loads(file.read_text()) if file.exists() else {}
@@ -483,6 +515,10 @@ def run_locked():
             apply(candidate, installed, targets, target)
         elif last.get("phase") in ("downloading", "switching", "failed") and last.get("candidate") == candidate:
             status("failed", installed, candidate, targets, "Обновление остановилось. Проверьте журнал службы на VPS.", last.get("lastTarget"))
+        elif (automatic := automatic_target(candidate, targets, last)):
+            target = automatic
+            write("automatic-attempt.json", {"tag": candidate["tag"]})
+            apply(candidate, installed, targets, target)
         else:
             status("ready", installed, candidate, targets)
     except Exception as error:

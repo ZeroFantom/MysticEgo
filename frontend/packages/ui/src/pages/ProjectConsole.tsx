@@ -5,7 +5,7 @@ import './project-console.css';
 import {useApp,useRemote} from '../app/context';
 import {Header,Panel,ErrorBanner} from '../components/primitives';
 import {useNotice} from '../app/notifications';
-import {targetLabel,useServerUpdate,type UpdateState,type UpdateTarget as Target} from '../app/serverUpdate';
+import {ServiceMaintenance} from './ServiceMaintenance';
 
 type Release={tag:string;publishedAt?:string;prerelease?:boolean};
 type PublishedRelease=Release&{name:string;publishedAt:string;url:string;notes:string;installable:boolean};
@@ -99,57 +99,7 @@ const phases:Record<string,string>={ready:'Доступно обновление
   downloading:'Скачиваем и проверяем релиз',switching:'Применяем обновление и проверяем панели',
   unavailable:'Связь службы обновления с GitHub недоступна',failed:'Обновление прервано'};
 
-function ReleaseUpdate(){
-  const {api}=useApp();
-  const update=useServerUpdate();
-  const [confirmation,setConfirmation]=useState<{tag:string;digest:string;target:Target}|null>(null);
-  const state=useRemote(()=>api.request<UpdateState>('/orchestra/update'),[api],4000);
-  const [error,setError]=useState('');
-  const status=state.value;
-  const candidate=status?.candidate;
-  const canApprove=status?.phase==='ready'||status?.phase==='failed';
-  const waiting=!!update?.pending;
-  const targets=status?.protocol===2 ? status.targets??[] : ['orchestra'] as Target[];
-
-  const pendingConfirmation=canApprove&&!waiting&&confirmation&&candidate&&
-    confirmation.tag===candidate.tag&&confirmation.digest===candidate.digest&&targets.includes(confirmation.target)
-    ?confirmation:null;
-  const failed=status?.phase==='failed'||status?.phase==='unavailable';
-  useNotice(error||(!waiting?state.error:''));
-
-  async function approve(){
-    if(!pendingConfirmation||!update||!status)return;
-    setConfirmation(null);setError('');
-    try{await update.approve(pendingConfirmation,status)}
-    catch(e){setError(e instanceof Error?e.message:String(e));}
-  }
-
-  return <section className="panel github-update">
-    <div className="github-section-head"><ArrowDownToLine size={21}/><div><h2>Обновление сервера</h2>
-      <p>Обновление Orchestra включает установку и восстановление службы обслуживания. Дополнительные команды на VPS не нужны при работающей службе обновления.</p></div></div>
-    <div className="github-installed">
-      <div><small>Orchestra</small><strong>{status?.current??'—'}</strong></div>
-      <div><small>Audit на этом VPS</small><strong>{status?.currentAudit??'—'}</strong></div>
-      <div><small>Релиз для установки</small><strong>{candidate?.tag??'—'}</strong></div>
-    </div>
-    <p role="status">{update?.reloading?'Обновление проверено. Перезагружаем страницу…':waiting&&state.error?'Orchestra перезапускается. Проверяем связь…':waiting&&canApprove?'Подтверждено. Ожидаем службу обновления.':
-      status?(phases[status.phase]??status.phase):state.loading?'Проверяем службу обновления…':''}</p>
-    {status?.message&&(!failed||!waiting)&&<p>{status.message}</p>}
-    {status?.maintenance&&<p>Служба обслуживания Orchestra: {({ready:"установлена",waiting:"ожидается отчёт",repairing:"устанавливается",degraded:"повторная попытка запланирована",unavailable:"пакет недоступен"} as Record<string,string>)[status.maintenance.state]??"состояние уточняется"}.</p>}
-    {status&&status.protocol!==2&&<p>Обновите службу на VPS через CloudDesk, чтобы включить отдельное обновление Audit.</p>}
-    {canApprove&&candidate&&<div className="row-actions">{targets.map(target=><button key={target}
-      className={'btn '+(target===targets.at(-1)?'':'secondary')} disabled={waiting||!!pendingConfirmation} onClick={()=>setConfirmation({tag:candidate.tag,digest:candidate.digest,target})}>
-      <ArrowDownToLine size={16}/> Обновить {targetLabel[target]}</button>)}</div>}
-    {pendingConfirmation&&<div className="stack">
-      <p>Установить {pendingConfirmation.tag} для {targetLabel[pendingConfirmation.target]}?
-        {pendingConfirmation.target!=='audit'&&' Orchestra кратковременно перезапустится.'}</p>
-      <div className="row-actions">
-        <button type="button" className="btn" onClick={()=>void approve()}>Подтвердить обновление</button>
-        <button type="button" className="btn secondary" onClick={()=>setConfirmation(null)}>Отмена</button>
-      </div>
-    </div>}
-  </section>;
-}
+function ReleaseUpdate(){return <ServiceMaintenance/>;}
 
 function ReleaseCard({release,latest=false}:{release:PublishedRelease;latest?:boolean}){
   return <article className={'github-release'+(latest?' github-release-latest':'')}>

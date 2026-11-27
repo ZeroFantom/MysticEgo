@@ -287,6 +287,10 @@ sealed partial class CloudDesk {
             case "ssh.test": return await SSH(a,"uname -a; id; uptime",1);
             case "ssh.command": return await SSH(a,S(a,"command"),5);
             case "topology.developerPassword": return await RevealDeveloperPassword(a);
+            case "deploy.maintenanceReport": return await MaintenanceReportDownload(a);
+            case "deploy.maintenanceAuto": return await ConfigureMaintenanceAuto(a);
+            case "deploy.maintenancePlan": return await ReadMaintenancePlan(a);
+            case "deploy.executeMaintenance": return await ExecuteMaintenancePlan(a,progress ?? (_ => {}));
             case "deploy.inspectOrchestra": return await InspectOrchestra(a);
             case "deploy.restoreOrchestra": return await RestoreOrchestraUpdater(a,progress ?? (_ => {}));
             case "deploy.recoverMaintenance": return await RecoverOrchestraMaintenance(a,progress ?? (_ => {}));

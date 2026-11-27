@@ -35,12 +35,115 @@ sealed partial class CloudDesk {
         }
         catch(Exception e) when(e is not OperationCanceledException) { }
         var candidate=update?["candidate"] as JsonObject;
+        var identity=JsonNode.Parse(await SSH(args,"curl -fsS --max-time 5 http://127.0.0.1:5500/health/live",1)) as JsonObject;
+        if(identity is null||S(identity,"status")!="alive"||S(identity,"kind").ToLowerInvariant()!="orchestra"||!Guid.TryParse(S(identity,"node"),out var node))
+            throw new Exception("Не подтверждён ID Orchestra.");
+        var serviceState=await SSH(args,"if systemctl is-active --quiet mysticego-local-setup.socket && systemctl is-active --quiet mysticego-infrastructure-reconcile.timer && systemctl is-active --quiet mysticego-orchestra-updater.timer; then echo ready; else echo missing; fi",1);
         var ready=update is not null && S(update,"phase") is ("ready" or "failed") &&
             candidate is not null && ValidUpdateCandidate(S(candidate,"tag"),S(candidate,"digest")) &&
             S(candidate,"asset")=="MysticEgo-Orchestra-linux-x64.zip" &&
             (update["targets"] as JsonArray)?.Any(t=>t?.ToString()=="orchestra")==true;
-        return new {domain,host=S(args,"host"),serverId=Num(args,"serverId"),current=update is null?"":S(update,"current"),
+        return new {domain,node=node.ToString("D"),serviceState,host=S(args,"host"),serverId=Num(args,"serverId"),current=update is null?"":S(update,"current"),
             updatePhase=update is null?"unavailable":S(update,"phase"),candidateTag=ready?S(candidate!,"tag"):"",candidateDigest=ready?S(candidate!,"digest"):""};
+    }
+
+    /// <summary>Read the shared owner-only plan over HTTPS; never poll privileged SSH in a loop.</summary>
+    async Task<object> ReadMaintenancePlan(JsonObject args)
+    {
+        var origin=TopologyOrigin("https://"+Need(args,"domain",DnsNamePattern));
+        var root=await RequireDeveloper(origin,ownerOnly:true);
+        if(!Guid.TryParse(root,out var id)||!Guid.TryParse(S(args,"node"),out var expected)||id!=expected)throw new Exception("Сессия относится к другой Orchestra.");
+        await topologyGate.WaitAsync();
+        try
+        {
+            if(topologyOrigin!=origin||topologyRootId!=root||topologyAccess.Length==0)throw new Exception("Сессия изменена.");
+            try{return await TopologyRequest(origin,"/api/v1/orchestra/update/plan",topologyAccess);}
+            catch(HttpRequestException e) when(e.StatusCode==HttpStatusCode.NotFound)
+            {
+                var update=await TopologyRequest(origin,"/api/v1/orchestra/update",topologyAccess);
+                var report=await TopologyRequest(origin,"/api/v1/managed/infrastructure-maintenance",topologyAccess);
+                var candidate=update["candidate"];
+                var available=candidate is JsonObject c&&ValidUpdateCandidate(S(c,"tag"),S(c,"digest"))&&S(c,"tag")!=update["current"]?.ToString()&&
+                    (update["targets"] as JsonArray)?.Any(x=>x?.ToString()=="orchestra")==true&&update["phase"]?.ToString() is ("ready" or "failed");
+                var missing=report["socketAvailable"]?.GetValue<bool>()!=true;
+                var action=update["phase"]?.ToString() is ("switching" or "downloading")?"busy":available?"update":missing?"legacy-repair":"unknown";
+                return new{action,reason=action=="update"?"Доступен новый релиз":action=="legacy-repair"?"Не найден сокет обслуживания":"Старый сервер: ожидается проверка или новый релиз.",update,components=report["components"],services=Array.Empty<object>(),legacy=true};
+            }
+        }
+        finally{topologyGate.Release();}
+    }
+
+    async Task<object> ExecuteMaintenancePlan(JsonObject args,Action<string> progress)
+    {
+        if(S(args,"confirm")!="MAINTENANCE_PLAN")throw new Exception("Подтвердите обслуживание.");
+        var action=S(args,"planAction");
+        var domain=await InstalledOrchestraDomain(args);
+        if(domain!=S(args,"domain"))throw new Exception("Домен изменился.");
+        var plan=System.Text.Json.JsonSerializer.SerializeToNode(await ReadMaintenancePlan(args))!.AsObject();
+        if(S(plan,"action")!=action)throw new Exception("Состояние изменилось. Повторите проверку.");
+        if(action=="legacy-repair")
+        {
+            var copy=(JsonObject)args.DeepClone();copy["confirm"]="RECOVER_MAINTENANCE";
+            return await RecoverOrchestraMaintenance(copy,progress);
+        }
+        if(action=="update"&&Bool(plan,"legacy",false))
+        {
+            var copy=(JsonObject)args.DeepClone();copy["confirm"]="RESTORE_ORCHESTRA";
+            return await RestoreOrchestraUpdater(copy,progress);
+        }
+        if(action is not ("repair" or "update"))throw new Exception("Обслуживание сейчас не требуется.");
+        var origin=TopologyOrigin("https://"+domain);
+        var root=await RequireDeveloper(origin,ownerOnly:true);
+        await topologyGate.WaitAsync();
+        try
+        {
+            if(topologyOrigin!=origin||topologyRootId!=root||topologyAccess.Length==0||root!=S(args,"node"))throw new Exception("Сессия изменена.");
+            var result=await TopologyRequest(origin,"/api/v1/orchestra/update/plan",topologyAccess,new{action,confirmed=true,tag=S(args,"candidateTag"),digest=S(args,"candidateDigest")});
+            return new{queued=true,result};
+        }
+        finally{topologyGate.Release();}
+    }
+
+    /// <summary>Export only owner-authorized sanitized reports from the bound Orchestra.</summary>
+    async Task<object> MaintenanceReportDownload(JsonObject args)
+    {
+        var format=Need(args,"format",@"\A(?:xlsx|json|txt)\z");
+        var scope=Need(args,"scope",@"\A[a-zA-Z0-9@_.-]{1,80}\z");
+        var origin=TopologyOrigin("https://"+Need(args,"domain",DnsNamePattern));
+        var root=await RequireDeveloper(origin,ownerOnly:true);
+        if(!Guid.TryParse(root,out var id)||!Guid.TryParse(S(args,"node"),out var expected)||id!=expected)throw new Exception("Сессия относится к другой Orchestra.");
+        await topologyGate.WaitAsync();
+        try
+        {
+            if(topologyOrigin!=origin||topologyRootId!=root||topologyAccess.Length==0)throw new Exception("Сессия изменена.");
+            using var request=new HttpRequestMessage(HttpMethod.Get,origin+"/api/v1/orchestra/diagnostics/report?format="+format+"&scope="+Uri.EscapeDataString(scope));
+            request.Headers.Authorization=new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer",topologyAccess);
+            using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(25));
+            using var response=await topologyHttp.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,timeout.Token);
+            response.EnsureSuccessStatusCode();
+            using var input=await response.Content.ReadAsStreamAsync(timeout.Token);
+            using var output=new MemoryStream();var chunk=new byte[8192];int count;
+            while((count=await input.ReadAsync(chunk.AsMemory(),timeout.Token))>0)
+            {if(output.Length+count>4*1024*1024)throw new Exception("Отчёт превышает лимит 4 MiB. Выберите отдельную службу.");output.Write(chunk,0,count);}
+            return new{content=Convert.ToBase64String(output.ToArray()),format,scope};
+        }
+        finally{topologyGate.Release();}
+    }
+
+    async Task<object> ConfigureMaintenanceAuto(JsonObject args)
+    {
+        if(S(args,"confirm")!="AUTO_UPDATE"||args["enabled"] is not JsonValue enabled||!enabled.TryGetValue<bool>(out var value))
+            throw new Exception("Подтвердите политику обновлений.");
+        var origin=TopologyOrigin("https://"+Need(args,"domain",DnsNamePattern));
+        var root=await RequireDeveloper(origin,ownerOnly:true);
+        if(!Guid.TryParse(root,out var id)||!Guid.TryParse(S(args,"node"),out var expected)||id!=expected)throw new Exception("Сессия относится к другой Orchestra.");
+        await topologyGate.WaitAsync();
+        try
+        {
+            if(topologyOrigin!=origin||topologyRootId!=root||topologyAccess.Length==0)throw new Exception("Сессия изменена.");
+            return await TopologyRequest(origin,"/api/v1/orchestra/update/automatic",topologyAccess,new{enabled=value,confirmed=true});
+        }
+        finally{topologyGate.Release();}
     }
 
     /// <summary>Only exact published project releases with a SHA-256 digest can be approved.</summary>
