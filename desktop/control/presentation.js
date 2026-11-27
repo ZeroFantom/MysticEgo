@@ -740,9 +740,9 @@ const catalog={
     "약관"
   ],
   "Обработка данных": [
-    "Data processing",
-    "数据处理",
-    "데이터 처리"
+    "Privacy notice",
+    "隐私声明",
+    "개인정보 처리 안내"
   ],
   "Принимаю условия использования": [
     "I accept the terms of use",
@@ -988,12 +988,191 @@ const catalog={
     "All effects",
     "全部效果",
     "모든 효과"
+  ],
+  "permission.avatar-desktop": [
+    "Desktop avatar",
+    "桌面虚拟形象",
+    "데스크톱 아바타",
+    "Аватар на рабочем столе"
+  ],
+  "permission.browser-control": [
+    "Browser control",
+    "浏览器控制",
+    "브라우저 제어",
+    "Управление браузером"
+  ],
+  "permission.desktop-control": [
+    "Desktop applications",
+    "桌面应用控制",
+    "데스크톱 앱 제어",
+    "Управление приложениями"
+  ],
+  "permission.screen-capture": [
+    "Screen capture",
+    "屏幕捕获",
+    "화면 캡처",
+    "Захват экрана"
+  ],
+  "permission.recording": [
+    "Record actions",
+    "录制操作",
+    "동작 기록",
+    "Запись действий"
+  ],
+  "permission.replay": [
+    "Replay scenarios",
+    "重放场景",
+    "시나리오 재생",
+    "Воспроизведение сценариев"
+  ],
+  "permission.peripherals": [
+    "Peripheral settings",
+    "外设设置",
+    "주변기기 설정",
+    "Настройка периферии"
+  ],
+  "permission.vendor-updates": [
+    "Driver and vendor updates",
+    "驱动与厂商软件更新",
+    "드라이버 및 제조사 업데이트",
+    "Обновления драйверов и ПО"
+  ],
+  "permission.game-control": [
+    "Game control",
+    "游戏控制",
+    "게임 제어",
+    "Управление играми"
+  ],
+  "Безопасность аккаунта": [
+    "Account security",
+    "账户安全",
+    "계정 보안"
+  ],
+  "Сессии, документы и разрешения устройств": [
+    "Sessions, documents and device permissions",
+    "会话、文件与设备权限",
+    "세션, 문서 및 기기 권한"
+  ],
+  "Активные сессии": [
+    "Active sessions",
+    "活动会话",
+    "활성 세션"
+  ],
+  "Сессия считается активной до выхода, отзыва или истечения срока. Последняя активность — время обновления токена.": [
+    "A session remains active until sign-out, revocation or expiry. Last activity means last token refresh.",
+    "会话在退出、撤销或到期前有效。最后活动时间为令牌刷新时间。",
+    "로그아웃, 취소 또는 만료 전까지 세션이 유지됩니다. 마지막 활동은 토큰 갱신 시간입니다."
+  ],
+  "Текущая сессия": [
+    "Current session",
+    "当前会话",
+    "현재 세션"
+  ],
+  "Старая сессия": [
+    "Legacy session",
+    "旧版会话",
+    "이전 세션"
+  ],
+  "Другая сессия": [
+    "Other session",
+    "其他会话",
+    "다른 세션"
+  ],
+  "Неизвестное устройство": [
+    "Unknown device",
+    "未知设备",
+    "알 수 없는 기기"
+  ],
+  "Последняя активность": [
+    "Last activity",
+    "最后活动",
+    "마지막 활동"
+  ],
+  "Создана": [
+    "Created",
+    "创建时间",
+    "생성 시간"
+  ],
+  "Истекает": [
+    "Expires",
+    "到期时间",
+    "만료 시간"
+  ],
+  "Завершить сессию": [
+    "End session",
+    "结束会话",
+    "세션 종료"
+  ],
+  "Завершить все остальные сессии": [
+    "End all other sessions",
+    "结束其他所有会话",
+    "다른 모든 세션 종료"
+  ],
+  "Все остальные устройства выйдут из аккаунта. Текущая сессия сохранится.": [
+    "All other sessions will be signed out. This session will remain active.",
+    "其他所有会话将退出登录。当前会话将保留。",
+    "다른 모든 세션이 로그아웃됩니다. 현재 세션은 유지됩니다."
+  ],
+  "Подтвердите завершение выбранной сессии.": [
+    "Confirm ending the selected session.",
+    "确认结束选定会话。",
+    "선택한 세션의 종료를 확인하세요."
+  ],
+  "Подтвердить": [
+    "Confirm",
+    "确认",
+    "확인"
+  ],
+  "Документы и разрешения аккаунта": [
+    "Account documents and permissions",
+    "账户文件与权限",
+    "계정 문서 및 권한"
+  ],
+  "Актуальные документы приняты.": [
+    "Current documents accepted.",
+    "已接受当前文件。",
+    "최신 문서에 동의했습니다."
+  ],
+  "Необходимо ознакомиться с актуальными документами.": [
+    "Review the current documents.",
+    "请查阅当前文件。",
+    "최신 문서를 확인하세요."
+  ],
+  "Подтверждаю ознакомление с условиями, политикой обработки данных и лицензией.": [
+    "I accept the terms, privacy notice and license.",
+    "我接受使用条款、隐私声明和许可证。",
+    "이용약관, 개인정보 처리 안내 및 라이선스에 동의합니다."
+  ],
+  "Выберите возможности. Разрешение конкретного устройства потребуется отдельно.": [
+    "Choose optional features. Each device requires separate approval.",
+    "选择可选功能。每台设备需要单独授权。",
+    "선택 기능을 설정하세요. 각 기기에는 별도 승인이 필요합니다."
+  ],
+  "Разрешения ассистента": [
+    "Assistant permissions",
+    "助手权限",
+    "어시스턴트 권한"
+  ],
+  "Разрешения устройств": [
+    "Device permissions",
+    "设备权限",
+    "기기 권한"
+  ],
+  "Отозвать разрешение": [
+    "Revoke permission",
+    "撤销权限",
+    "권한 취소"
+  ],
+  "Нет подтверждённых разрешений устройств.": [
+    "No approved device permissions.",
+    "没有已批准的设备权限。",
+    "승인된 기기 권한이 없습니다."
   ]
 };
 export const languages=[['en','English'],['zh-CN','简体中文'],['ko','한국어'],['ru','Русский']];
 export const fonts=[['modern','Современный'],['editorial','Редакционный'],['system','Системный'],['mono','Моноширинный']];
 let language='en',font='modern';
-export function t(source){const row=Object.hasOwn(catalog,source)?catalog[source]:undefined;return !row||language==='ru'?source:row[language==='en'?0:language==='zh-CN'?1:2]}
+export function t(source){const row=Object.hasOwn(catalog,source)?catalog[source]:undefined;return !row?source:language==='ru'?(row[3]??source):row[language==='en'?0:language==='zh-CN'?1:2]}
 const fixed=[];
 export function captureStatic(root){
  const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
