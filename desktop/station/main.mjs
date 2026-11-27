@@ -397,12 +397,14 @@ async function open(){
     if(actor&&Date.now()-lastTopology>18000){lastTopology=Date.now();void topology().catch(()=>{})}
     const [online,personalOnline]=await Promise.all([health(),personalProfile?health(current(personalProfile)):false]);
     return {isAgent,node:current(),online,running:!!runner,personalOnline,personalRunning:!!personalRunner,recording:!!recording,features,beacon,clubAvailable,embedded:!!embedded,
-      actor:actor?.login,team:actor?teamStatus:null,globals:playerGlobals.map(({id,name})=>({id,name})),central:current()?.central||assignment?.orchestraUrl||lastConnection.central,
+      actor:actor?.login,accountGeneration,team:actor?teamStatus:null,globals:playerGlobals.map(({id,name})=>({id,name})),central:current()?.central||assignment?.orchestraUrl||lastConnection.central,
       lan:profile?.endpoints.allowLanHttp===true||assignment?.allowLanHttp===true||lastConnection.lan,platform:process.platform,logs:[...logs]};
   });
-  handle('presentation',async patch=>{
+  handle('presentation',async (expected,patch)=>{
     const generation=accountGeneration;
+    if(expected!==generation)throw Error('Account changed');
     const session=await authorized();
+    if(generation!==accountGeneration)throw Error('Account changed');
     const value=await json(session.central+'/api/auth/presentation',{
       method:patch?'POST':'GET',headers:{Authorization:'Bearer '+session.token,...(patch?{'Content-Type':'application/json'}:{})},body:patch?JSON.stringify(patch):undefined
     });
