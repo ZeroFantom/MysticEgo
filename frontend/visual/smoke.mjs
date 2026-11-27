@@ -72,6 +72,7 @@ async function isolate(page,origin){
     if(url.origin!==origin)return route.abort();
     return route.continue();
   });
+  return presentation;
 }
 const results=[];
 async function check(page,label,fn){
@@ -153,7 +154,7 @@ try{
         const errors=[];page.on('pageerror',e=>errors.push(String(e)));
         const prefix=role+'-'+viewport.width;
         try{
-          await isolate(page,origin);
+          const serverAppearance=await isolate(page,origin);
           await page.goto(origin+'/settings',{waitUntil:'domcontentloaded'});
           await visible(page.locator('.auth-form-card'));
           const highlights=page.getByRole('complementary',{name:'Обновления MysticEgo'});
@@ -202,10 +203,15 @@ try{
               assert.equal(await trigger.getAttribute('aria-expanded'),'false');
             });
             await check(page,prefix+'-appearance-persistence',async()=>{
-              await page.waitForFunction(()=>!document.querySelector('.presentation-quick [role="status"]'));
+              // Observe the server patch, not only the optimistic browser state.
+              for(let n=0;n<50&&(serverAppearance.theme!=='light'||serverAppearance.interfaceStyle!=='simplified');n++)await page.waitForTimeout(100);
+              assert.equal(serverAppearance.theme,'light');
+              assert.equal(serverAppearance.interfaceStyle,'simplified');
               await page.reload({waitUntil:'domcontentloaded'});
               await visible(page.locator('.appearance-style-options'));
               await rootState(page,'light','simplified');
+              // Empty/partial server responses must not erase the per-account local cache.
+              delete serverAppearance.theme;delete serverAppearance.interfaceStyle;
               // A second reload must retain the same saved account settings.
               await page.reload({waitUntil:'domcontentloaded'});
               await visible(page.locator('.appearance-style-options'));
