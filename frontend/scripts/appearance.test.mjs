@@ -31,7 +31,8 @@ for(const [css,assets,settings] of groups){
 }
 assert(read('desktop/local/index.html').includes('type="module" src="view.js"'));
 assert(read('desktop/local/view.js').includes("initEffects($('design'))"));
-assert(read('desktop/station/view.js').includes("initEffects($('design'))"));
+const station=read('desktop/station/view.js');
+assert(station.includes("initEffects($('design'),{onChange:")&&station.includes('effects?.applyAccount(prefs)')&&station.includes('api.presentation(expected,patch)'));
 assert(read('desktop/control/view.js').includes("initEffects($('design'))"));
 assert(read('desktop/renderer/src/main.tsx').includes('overlay-appearance'));
 assert(read('tools/MysticEgo.CloudDesk/update.sh').includes('src/appearance-art/simplified-light.webp'));
