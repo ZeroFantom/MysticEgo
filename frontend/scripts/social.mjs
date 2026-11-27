@@ -4,7 +4,7 @@ import {mkdir,writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 
 export const roles={
-  orchestra:{title:'Orchestra',description:'Центр разработки и управления экосистемой MysticEgo.',tone:[151,126,255]},
+  orchestra:{title:'Orchestra',description:'MysticEgo Orchestra — единый центр управления инфраструктурой, разработкой, площадками и персональными ассистентами.',tone:[151,126,255]},
   global:{title:'Global',description:'Панель управления организацией и сетью площадок MysticEgo.',tone:[89,202,230]},
   local:{title:'Local',description:'Управление площадкой, оборудованием и рабочими станциями MysticEgo.',tone:[94,216,172]},
   agent:{title:'Agent',description:'Рабочая станция и инструменты диагностики MysticEgo.',tone:[240,181,109]},
@@ -33,7 +33,7 @@ export function metadata(role,page='root'){
     meta('og:image',image),meta('og:image:type','image/png'),meta('og:image:width','1200'),meta('og:image:height','630'),
     meta('og:image:alt','MysticEgo — '+info.title),meta('twitter:card','summary_large_image','name'),
     meta('twitter:title',title,'name'),meta('twitter:description',description,'name'),meta('twitter:image',image,'name'),
-    meta('robots',extra?'index,follow,max-image-preview:large':'noindex,follow','name'),'<!-- mysticego-social-end -->'].join('\n');
+    meta('robots',extra?'index,follow,max-image-preview:large':'noindex,follow,max-image-preview:large','name'),'<!-- mysticego-social-end -->'].join('\n');
 }
 export function panelHtml(template,role,page='root'){
   if(!template.includes('data-role="orchestra"')||!template.includes('<title>MysticEgo</title>')||!template.includes('</head>'))
@@ -42,7 +42,7 @@ export function panelHtml(template,role,page='root'){
   const extra=role==='orchestra'?publicPages[page]:undefined;
   const links=Object.entries(publicPages).map(([path,entry])=>'<li><a href="/'+path+'">'+escape(entry.title)+'</a> — '+escape(entry.description)+'</li>').join('');
   // The same public content is readable before React starts, for users and crawlers alike.
-  const fallback=extra?'<main><h1>'+escape(extra.title)+'</h1><p>'+escape(extra.description)+'</p><nav aria-label="Публичные страницы"><ul>'+links+'</ul></nav><p><a href="https://github.com/ZeroFantom/MysticEgo">Исходный код MysticEgo</a></p></main>':'';
+  const fallback=extra?'<main><h1>'+escape(extra.title)+'</h1><p>'+escape(extra.description)+'</p><nav aria-label="Публичные страницы"><ul>'+links+'</ul></nav><p><a href="https://github.com/ZeroFantom/MysticEgo">Исходный код MysticEgo</a></p></main>':'<main><h1>'+escape(title)+'</h1><p>'+escape(roles[role].description)+'</p></main>';
   return template.replace('<div id="root"></div>','<div id="root">'+fallback+'</div>').replace('data-role="orchestra"','data-role="'+role+'"')
     .replace('<title>MysticEgo</title>','<title>'+escape(title)+'</title>')
     .replace('</head>',metadata(role,page)+'\n</head>');
@@ -117,7 +117,8 @@ export function auditCaddyHtml(template,page='root'){
   const html=panelHtml(template,'audit',page);
   return html.replace(/<!-- mysticego-social-start -->[\s\S]*?<!-- mysticego-social-end -->/,block=>
     block.replace(/(content|href)="(\/[a-zA-Z0-9/_.-]*)"/g,(_all,attribute,path)=>
-      attribute+'="{{placeholder "http.vars.mystic_public_origin"}}/audit-portal'+path+'"'));
+      attribute+'="{{placeholder "http.vars.mystic_public_origin"}}/audit-portal'+path+'"')
+    .replace(/(<meta property="og:image" content="[\s\S]*?"\/>)/,'$1\n'+ '<meta property="og:image:secure_url" content="{{placeholder "http.vars.mystic_public_origin"}}/audit-portal/og/audit.png"/>'));
 }
 export async function writeSocialAssets(root){
   const folder=join(root,'og');await mkdir(folder,{recursive:true});

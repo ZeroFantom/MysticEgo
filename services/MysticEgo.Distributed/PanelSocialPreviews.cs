@@ -11,6 +11,25 @@ public static class PanelSocialPreviews
 {
     private const string Start = "<!-- mysticego-social-start -->";
     private const string End = "<!-- mysticego-social-end -->";
+    // Only known UI routes receive the role-level preview; never reflect private IDs,
+    // query parameters, cookies, forwarded headers, or arbitrary request paths.
+    private static readonly HashSet<string> PanelRoutes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "/profile", "/account-security", "/collective", "/organizations", "/nodes",
+        "/setup", "/commands", "/automation", "/faq", "/audit", "/diagnostics",
+        "/settings", "/notifications", "/agents", "/assistant", "/avatars",
+        "/system", "/software", "/identities", "/users", "/updates", "/presets",
+        "/deploy-native", "/development-team", "/development-workspace",
+        "/model-workers", "/clouddesk-downloads", "/panels", "/project-branches",
+        "/developer-assistant", "/orchestra-update", "/infrastructure/services",
+        "/infrastructure/ai", "/infrastructure/database", "/infrastructure/metrics",
+        "/infrastructure/capacity", "/infrastructure/self-tests",
+        "/infrastructure/graphs/macro", "/infrastructure/graphs/micro"
+    };
+    private static bool KnownRoute(string path) => PanelRoutes.Contains(path) ||
+        (path.StartsWith("/agents/", StringComparison.OrdinalIgnoreCase) &&
+         Guid.TryParse(path["/agents/".Length..], out _));
+
     public static string Render(string html, string? publicUrl, bool embeddedAudit = false)
     {
         var start = html.IndexOf(Start, StringComparison.Ordinal);
@@ -28,6 +47,12 @@ public static class PanelSocialPreviews
                 path = "/audit-portal" + path;
             return match.Groups["attr"].Value + "=\"" + HtmlEncoder.Default.Encode(origin + path) + "\"";
         });
+        // The secure image property is only meaningful for an HTTPS origin.
+        if (origin.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            block = Regex.Replace(block, "(<meta property=\"og:image\" content=\"([^\"]+)\"/>)",
+                "$1\n<meta property=\"og:image:secure_url\" content=\"$2\"/>");
+        }
         return html[..start] + block + html[end..];
     }
 
@@ -66,23 +91,31 @@ public static class PanelSocialPreviews
                 !context.Request.Headers.ContainsKey("X-Forwarded-Proto"))
             { await next(context); return; }
 
-            if (node.Kind == NodeKind.Orchestra && path == "/audit-portal/og/audit.png")
+            var role = node.Kind == NodeKind.AuditOrchestra ? "audit" : node.Kind.ToString().ToLowerInvariant();
+            var web = app.Environment.WebRootPath;
+            var embeddedCover = node.Kind == NodeKind.Orchestra && path == "/audit-portal/og/audit.png";
+            var normalCover = path == "/og/" + role + ".png";
+            // Cover assets are public, fixed paths. Return a real PNG or 404, never SPA HTML.
+            if (embeddedCover || normalCover)
             {
-                var auditRoot = app.Configuration["Managed:AuditWebRoot"];
-                var cover = auditRoot is null ? null : Path.Combine(auditRoot, "og", "audit.png");
+                var coverRoot = embeddedCover ? app.Configuration["Managed:AuditWebRoot"] : web;
+                var cover = coverRoot is null ? null : Path.Combine(coverRoot, "og", (embeddedCover ? "audit" : role) + ".png");
                 if (cover is null || !File.Exists(cover))
                 { context.Response.StatusCode = 404; return; }
                 context.Response.ContentType = "image/png";
                 context.Response.ContentLength = new FileInfo(cover).Length;
-                context.Response.Headers.CacheControl = "public, max-age=3600";
+                context.Response.Headers.CacheControl = "public, max-age=300";
+                context.Response.Headers["X-Content-Type-Options"] = "nosniff";
                 if (!HttpMethods.IsHead(context.Request.Method))
                     await context.Response.SendFileAsync(cover, context.RequestAborted);
                 return;
             }
 
-            var web = app.Environment.WebRootPath;
             var audit = node.Kind == NodeKind.Orchestra &&
-                (path == "/audit-portal" || path == "/audit-portal/share" || path == "/audit-portal/index.html");
+                (path == "/audit-portal" || path == "/audit-portal/share" ||
+                 path == "/audit-portal/index.html" ||
+                 (path.StartsWith("/audit-portal/", StringComparison.Ordinal) &&
+                  KnownRoute(path["/audit-portal".Length..])));
             if (audit) web = app.Configuration["Managed:AuditWebRoot"];
             var relative = path switch
             {
@@ -92,6 +125,7 @@ public static class PanelSocialPreviews
                 "/studio" when node.Kind == NodeKind.Orchestra => "social/studio.html",
                 "/developer" when node.Kind == NodeKind.Orchestra => "social/developer.html",
                 "/desktop-downloads" when node.Kind == NodeKind.Orchestra => "social/desktop-downloads.html",
+                _ when KnownRoute(path) || (audit && KnownRoute(path["/audit-portal".Length..])) => "index.html",
                 _ => null
             };
             if (relative is null || web is null || (path.StartsWith("/audit-portal", StringComparison.Ordinal) && !audit))
@@ -109,9 +143,11 @@ public static class PanelSocialPreviews
             var rendered = Render(html, node.PublicUrl, audit);
             context.Response.ContentType = "text/html; charset=utf-8";
             context.Response.Headers.CacheControl = "no-cache";
-            if (HttpMethods.IsHead(context.Request.Method))
-                context.Response.ContentLength = System.Text.Encoding.UTF8.GetByteCount(rendered);
-            else await context.Response.WriteAsync(rendered, context.RequestAborted);
+            // Login/workspace content remains non-indexable, but the public cover is fetchable.
+            if (relative == "index.html" || relative == "social/share.html")
+                context.Response.Headers["X-Robots-Tag"] = "noindex, follow, max-image-preview:large";
+            context.Response.ContentLength = System.Text.Encoding.UTF8.GetByteCount(rendered);
+            if (!HttpMethods.IsHead(context.Request.Method)) await context.Response.WriteAsync(rendered, context.RequestAborted);
         });
     }
 }
