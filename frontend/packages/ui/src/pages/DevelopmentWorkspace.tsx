@@ -3,7 +3,7 @@ import './development-workspace.css';
 import {useApp,useRemote} from '../app/context';
 import {Header,Panel,ErrorBanner} from '../components/primitives';
 type Item={id:string;kind:'issue'|'discussion';title:string;body:string;status:string;assignee?:string;remoteAssignees?:string[];creator:string;githubNumber?:number;syncState:string;updatedAt:string};
-type View={items:Item[];connected:boolean;writesEnabled:boolean;lastSync:string;syncError?:string};
+type View={owner?:boolean;items:Item[];connected:boolean;writesEnabled:boolean;lastSync:string;syncError?:string};
 type Comment={id:string;parentId?:string;author:string;body:string;at:string;syncState:string};
 type Thread={comments:Comment[];syncedAt?:string;remoteUnavailable:boolean;truncated:boolean};
 function DiscussionThread({item,writes}:{item:Item;writes:boolean}){
@@ -38,10 +38,12 @@ export function DevelopmentWorkspace(){
  const [search,setSearch]=useState(''),[filter,setFilter]=useState('all'),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [expanded,setExpanded]=useState<string|null>(null),[board,setBoard]=useState(true);
  const [publish,setPublish]=useState<string|null>(null);
+ const [category,setCategory]=useState(''),[number,setNumber]=useState(''),[reconcile,setReconcile]=useState<string|null>(null);
+ const categories=useRemote(()=>remote.value?.writesEnabled&&kind==='discussion'?api.request<{id:string;name:string}[]>('/managed/development-workspace/categories'):Promise.resolve([]),[api,kind,remote.value?.writesEnabled]);
  async function action(path:string,data:unknown={}){
   setBusy(true);setError('');
   try{await api.request('/managed/development-workspace'+path,{method:'POST',body:JSON.stringify(data)});remote.reload();return true}
-  catch(e){setError(String(e));return false}finally{setBusy(false);setPublish(null)}
+  catch(e){setError(String(e));return false}finally{setBusy(false);setPublish(null);setReconcile(null)}
  }
  const rows=(remote.value?.items??[]).filter(x=>x.kind===kind&&(filter==='all'||x.status===filter)&&(x.title+' '+x.body).toLowerCase().includes(search.toLowerCase()));
  return <>
@@ -67,9 +69,13 @@ export function DevelopmentWorkspace(){
     <div className="actions">
      {(item.syncState==='local'||item.syncState==='synced'&&remote.value?.writesEnabled)&&item.kind==='issue'&&item.status==='open'&&<button className="btn secondary" disabled={busy} onClick={()=>void action('/'+item.id+'/take')}>Take task</button>}
      {(item.syncState==='local'||item.syncState==='synced'&&remote.value?.writesEnabled)&&item.status==='in-progress'&&<><button className="btn secondary" disabled={busy} onClick={()=>void action('/'+item.id+'/release')}>Release</button><button className="btn" disabled={busy} onClick={()=>void action('/'+item.id+'/complete')}>Complete</button></>}
-     {item.syncState==='local'&&remote.value?.writesEnabled&&<button className="btn secondary" disabled={busy} onClick={()=>setPublish(item.id)}>Publish to GitHub</button>}
+     {item.syncState==='local'&&remote.value?.writesEnabled&&<button className="btn secondary" disabled={busy} onClick={()=>{setCategory('');setPublish(item.id)}}>Publish to GitHub</button>}
     </div>
-    {publish===item.id&&<div role="alert"><p>Publish this title and description to the configured GitHub repository? Check for private information first.</p><button className="btn" disabled={busy} onClick={()=>void action('/'+item.id+'/publish')}>Confirm publication</button> <button className="btn secondary" onClick={()=>setPublish(null)}>Cancel</button></div>}
+    {publish===item.id&&<div role="alert"><p>Publish this title and description to the configured GitHub repository? Check for private information first.</p>
+     {item.kind==='discussion'&&<><ErrorBanner text={categories.error}/><label>Discussion category<select value={category} onChange={e=>setCategory(e.target.value)}><option value="">Select category</option>{categories.value?.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label></>}
+     <button className="btn" disabled={busy||item.kind==='discussion'&&!category} onClick={()=>void action('/'+item.id+'/publish',{categoryId:category||null})}>Confirm publication</button> <button className="btn secondary" onClick={()=>setPublish(null)}>Cancel</button></div>}
+    {item.syncState==='publishing'&&remote.value?.owner&&<button className="btn secondary" onClick={()=>{setNumber('');setReconcile(item.id)}}>Reconcile publication</button>}
+    {reconcile===item.id&&<div role="alert"><p>Verify the exact title and body on GitHub before linking. No new remote item is created. Existing duplicate links require manual review.</p><label>GitHub item number<input type="number" min={1} step={1} value={number} onChange={e=>setNumber(e.target.value)}/></label><button className="btn" disabled={busy||!Number.isSafeInteger(Number(number))||Number(number)<1} onClick={()=>void action('/'+item.id+'/reconcile',{number:Number(number),confirmed:true})}>Confirm link</button><button className="btn secondary" onClick={()=>setReconcile(null)}>Cancel</button></div>}
     <button className="btn secondary" onClick={()=>setExpanded(expanded===item.id?null:item.id)}>{expanded===item.id?'Hide thread':'Open thread'}</button>
     {expanded===item.id&&<DiscussionThread item={item} writes={remote.value?.writesEnabled===true}/>}
    </article>)}</section>)}</div>

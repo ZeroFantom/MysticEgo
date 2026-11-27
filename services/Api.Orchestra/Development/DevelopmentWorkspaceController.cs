@@ -13,13 +13,24 @@ public sealed class DevelopmentWorkspaceController(DevelopmentWorkspace workspac
         !User.HasClaim("token_use","device")&&Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier),out var id)&&
         (team.IsOwner(User)||await team.IsMember(User,ct))?id:null;
     [HttpGet]
-    public async Task<IActionResult> List(CancellationToken ct)=>await Actor(ct) is null?Forbid():Ok(await workspace.List(ct));
+    public async Task<IActionResult> List(CancellationToken ct)
+    {
+        if(await Actor(ct) is null)return Forbid();
+        var view=await workspace.List(ct);
+        return Ok(new{view.Items,view.Connected,view.WritesEnabled,view.LastSync,view.SyncError,Owner=team.IsOwner(User)});
+    }
     [HttpPost,RequestSizeLimit(65536)]
     public Task<IActionResult> Create(DevelopmentWorkspace.CreateInput input,CancellationToken ct)=>Run((actor)=>workspace.Create(actor,input,ct),ct);
     [HttpPost("{id:guid}/{operation:regex(^(take|release|complete)$)}"),RequestSizeLimit(1024)]
     public Task<IActionResult> Change(Guid id,string operation,CancellationToken ct)=>Run(actor=>workspace.Change(id,actor,team.IsOwner(User),operation,ct),ct);
-    [HttpPost("{id:guid}/publish"),RequestSizeLimit(1024)]
-    public Task<IActionResult> Publish(Guid id,CancellationToken ct)=>Run(actor=>workspace.Publish(id,actor,team.IsOwner(User),ct),ct);
+    public sealed record PublishInput(string? CategoryId=null);
+    public sealed record ReconcileInput(int Number,bool Confirmed);
+    [HttpGet("categories")]
+    public Task<IActionResult> Categories(CancellationToken ct)=>Run(actor=>workspace.Categories(ct),ct);
+    [HttpPost("{id:guid}/publish"),RequestSizeLimit(2048)]
+    public Task<IActionResult> Publish(Guid id,PublishInput input,CancellationToken ct)=>Run(actor=>workspace.Publish(id,actor,team.IsOwner(User),ct,input.CategoryId),ct);
+    [HttpPost("{id:guid}/reconcile"),RequestSizeLimit(1024)]
+    public Task<IActionResult> Reconcile(Guid id,ReconcileInput input,CancellationToken ct)=>Run(actor=>input.Confirmed?workspace.Reconcile(id,input.Number,actor,team.IsOwner(User),ct):throw new ArgumentException("Confirm exact remote item"),ct);
     [HttpGet("{id:guid}/comments")]
     public Task<IActionResult> Comments(Guid id,CancellationToken ct)=>Run(actor=>threads.Read(id,ct),ct);
     [HttpPost("{id:guid}/comments"),RequestSizeLimit(32768)]
