@@ -29,6 +29,23 @@ public sealed class DynamicEntityStore
 
     private DbConnection Open() => RelationalStorage.Open(_connectionString);
 
+    public string Provider => RelationalStorage.IsPostgres(_connectionString) ? "PostgreSQL" : "SQLite";
+
+    // This probe cannot create a new SQLite database or change the selected provider.
+    public async Task<bool> CheckHealthAsync(CancellationToken ct = default)
+    {
+        using DbConnection connection = RelationalStorage.IsPostgres(_connectionString)
+            ? new Npgsql.NpgsqlConnection(new Npgsql.NpgsqlConnectionStringBuilder(_connectionString)
+                { Timeout = 3, CommandTimeout = 3 }.ConnectionString)
+            : new Microsoft.Data.Sqlite.SqliteConnection(new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder(_connectionString)
+                { Mode = Microsoft.Data.Sqlite.SqliteOpenMode.ReadOnly, DefaultTimeout = 3 }.ConnectionString);
+        await connection.OpenAsync(ct);
+        using var command = connection.CreateCommand();
+        command.CommandTimeout = 3;
+        command.CommandText = "SELECT 1";
+        return Convert.ToInt32(await command.ExecuteScalarAsync(ct)) == 1;
+    }
+
     public async Task EnsureSchemaAsync<T>(CancellationToken ct = default) where T : class
     {
         var descriptor = EntityMetadata.Describe<T>();

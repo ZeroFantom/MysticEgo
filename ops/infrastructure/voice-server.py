@@ -2,10 +2,12 @@
 import json
 from email import policy
 from email.parser import BytesParser
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from threading import BoundedSemaphore
 import tempfile
 from faster_whisper import WhisperModel
 
+GATE = BoundedSemaphore(1)
 MODEL = WhisperModel("base", device="cpu", compute_type="int8", cpu_threads=2, num_workers=1)
 
 class Handler(BaseHTTPRequestHandler):
@@ -27,6 +29,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path != "/v1/audio/transcriptions":
             return self.reply(404, {})
+        if not GATE.acquire(blocking=False):
+            return self.reply(503, {"error": "busy"})
         try:
             length = int(self.headers.get("Content-Length", "0"))
             kind = self.headers.get("Content-Type", "")
@@ -48,6 +52,8 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(200, {"text": text})
         except Exception:
             self.reply(422, {"error": "transcription failed"})
+        finally:
+            GATE.release()
 
 if __name__ == "__main__":
-    HTTPServer(("127.0.0.1", 1237), Handler).serve_forever()
+    ThreadingHTTPServer(("127.0.0.1", 1237), Handler).serve_forever()
