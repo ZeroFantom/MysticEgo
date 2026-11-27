@@ -77,6 +77,7 @@ public static class ServiceCollectionExtensions
                     ValidAudience = opt.Jwt.Audience,
                     ValidateLifetime = true,
                     ValidateIssuerSigningKey = true,
+                    ValidAlgorithms = [string.IsNullOrWhiteSpace(opt.Jwt.PublicKeyPath) ? SecurityAlgorithms.HmacSha256 : SecurityAlgorithms.RsaSha256],
                     IssuerSigningKey = JwtSigningKeys.VerificationKey(opt.Jwt),
                     ClockSkew = TimeSpan.FromSeconds(opt.Jwt.ClockSkewSeconds),
                 };
