@@ -38,10 +38,13 @@ foreach(var f in Directory.GetFiles(Path.Combine(root,"services"),"*.cs",SearchO
 var queue = new MysticEgo.Distributed.AvatarHandoffQueue();
 Check(queue.Request("owner", new("shell", .5)) is null, "Reject unknown avatar motion");
 Check(queue.Request("owner", new("walk", double.NaN)) is null, "Reject invalid position");
-var handoff = queue.Request("owner", new("walk", .5)) ?? throw new Exception("Handoff not created");
+Check(queue.Request("owner", new("walk", .5, double.NaN)) is null, "Reject invalid motion phase");
+Check(queue.Request("owner", new("walk", .5, 0, "unknown")) is null, "Reject unknown visual mood");
+var handoff = queue.Request("owner", new("walk", .5, 1.25, "happy")) ?? throw new Exception("Handoff not created");
 Check(queue.Status("other", handoff.Id) is null && queue.Claim("other") is null, "Handoff owner isolation");
 Check(queue.Request("owner", new("perch", .3)) is null, "Single pending handoff");
 var claim = queue.Claim("owner") ?? throw new Exception("No claim");
+Check(claim.Request.PhaseSeconds == 1.25 && claim.Request.Mood == "happy", "Handoff preserves motion phase and visual mood");
 Check(queue.Claim("owner") is null, "No duplicate claim");
 Check(!queue.Complete("owner", handoff.Id, new("wrong", true)), "Reject invalid claim proof");
 Check(!queue.Complete("other", handoff.Id, new(claim.Proof, true)), "Reject wrong owner completion");
