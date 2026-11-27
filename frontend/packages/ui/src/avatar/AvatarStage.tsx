@@ -10,15 +10,15 @@ import type {AvatarAppearance} from './PersonalAvatar';
 export type AvatarMood='neutral'|'happy'|'sad'|'angry'|'surprised';
 export type AvatarMotion='idle'|'wave'|'nod'|'dance'|'talk'|'sit'|'walk'|'lean'|'perch'|'bump'|'listen';
 export type Viseme='aa'|'ih'|'ou'|'ee'|'oh';
-export function AvatarStage({url,mime,motion='idle',mood='neutral',speech=0,viseme='aa',beat=0,gaze,animations,intensity=1,appearance,play=0}: 
+export function AvatarStage({url,mime,motion='idle',mood='neutral',speech=0,viseme='aa',beat=0,gaze,animations,intensity=1,appearance,play=0,initialPhase=0,onPlayback,onReady}: 
   {url?:string;mime?:string;motion?:AvatarMotion;mood?:AvatarMood;speech?:number;viseme?:Viseme;beat?:number;gaze?:FaceMotion;
-    animations?:Partial<Record<AvatarMotion,ClipAsset>>;intensity?:number;appearance?:AvatarAppearance;play?:number}){
+    animations?:Partial<Record<AvatarMotion,ClipAsset>>;intensity?:number;appearance?:AvatarAppearance;play?:number;initialPhase?:number;onPlayback?:(motion:AvatarMotion,seconds:number)=>void;onReady?:()=>void}){
  const mount=useRef<HTMLDivElement>(null);
  const [notice,setNotice]=useState('');
  const [phase,setPhase]=useState('waiting');
  const [imported,setImported]=useState(false);
- const state=useRef({motion,mood,speech,viseme,beat,gaze,intensity,appearance,play});
- useEffect(()=>{state.current={motion,mood,speech,viseme,beat,gaze,intensity,appearance,play}},[motion,mood,speech,viseme,beat,gaze,intensity,appearance,play]);
+ const state=useRef({motion,mood,speech,viseme,beat,gaze,intensity,appearance,play,initialPhase,onPlayback,onReady});
+ useEffect(()=>{state.current={motion,mood,speech,viseme,beat,gaze,intensity,appearance,play,initialPhase,onPlayback,onReady}},[motion,mood,speech,viseme,beat,gaze,intensity,appearance,play,initialPhase,onPlayback,onReady]);
  useEffect(()=>{
   const host=mount.current;if(!host)return;
   setNotice('');
@@ -98,9 +98,10 @@ export function AvatarStage({url,mime,motion='idle',mood='neutral',speech=0,vise
    if(size.lengthSq()>0){const scale=1.6/Math.max(size.y,size.x*.68,.01);root.scale.multiplyScalar(scale);root.position.set(-center.x*scale,-bounds.min.y*scale,-center.z*scale)}
   }
   let frame=0,t=0,previous=performance.now(),lastPlay=-1,lastMotion:AvatarMotion|undefined;
+  let readyReported=false;
   const tick=(now=performance.now())=>{if(dead)return;const s=state.current;
    const dt=Math.min((now-previous)/1000,.05);previous=now;
-   if(s.motion!==lastMotion||s.play!==lastPlay)t=0;
+   if(s.motion!==lastMotion||s.play!==lastPlay)t=lastMotion===undefined?Math.max(0,s.initialPhase):0;
    t+=dt*(s.appearance?.speed??1);
    const center=.84+(s.appearance?.vertical??0);
    camera.position.set(0,center,3.45*Math.max(1,.72/camera.aspect)/(s.appearance?.zoom??1));camera.lookAt(0,center,0);
@@ -119,6 +120,8 @@ export function AvatarStage({url,mime,motion='idle',mood='neutral',speech=0,vise
      if(s.motion==='wave'||s.motion==='bump'){currentClip.setLoop(THREE.LoopOnce,1);currentClip.clampWhenFinished=true}
      else currentClip.setLoop(THREE.LoopRepeat,Infinity);
      currentClip.play();
+     const duration=currentClip.getClip().duration;
+     if(duration>0)currentClip.time=s.motion==='wave'||s.motion==='bump'?Math.min(t,duration):t%duration;
     }
    }
    if(subject){
@@ -153,7 +156,9 @@ export function AvatarStage({url,mime,motion='idle',mood='neutral',speech=0,vise
     }
     vrm.update(dt);
    }
-   renderer.render(scene,camera);frame=requestAnimationFrame(tick);
+   renderer.render(scene,camera);
+   if(subject){s.onPlayback?.(s.motion,t);if(!readyReported){readyReported=true;s.onReady?.()}}
+   frame=requestAnimationFrame(tick);
   };tick();
   return ()=>{dead=true;cancelAnimationFrame(frame);ro.disconnect();mixer?.stopAllAction();VRMUtils.deepDispose(pivot);renderer.dispose();renderer.domElement.remove();};
  },[url,mime,animations]);
