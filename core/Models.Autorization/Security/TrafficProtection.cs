@@ -35,7 +35,8 @@ public static class TrafficProtection
     public static string Category(PathString path)
     {
         if(path.StartsWithSegments("/hub")) return "hub";
-        if(path.Equals("/api/auth/login",StringComparison.OrdinalIgnoreCase) ||
+        if(path.StartsWithSegments("/api/auth/desktop") ||
+           path.Equals("/api/auth/login",StringComparison.OrdinalIgnoreCase) ||
            path.Equals("/api/auth/audit/register",StringComparison.OrdinalIgnoreCase) ||
            path.StartsWithSegments("/api/users") && path.Value!.EndsWith("/password",StringComparison.OrdinalIgnoreCase))
             return "sensitive";

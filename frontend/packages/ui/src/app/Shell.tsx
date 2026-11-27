@@ -1,10 +1,15 @@
+import {InterfaceControl} from './InterfaceControl';
 import './panel-surface.css';
 import './cinematic.css';
 import {SharePage} from '../pages/SharePage';
 import {ServerUpdateProvider,useServerUpdate} from './serverUpdate';
+import {BrowserPreferences} from './BrowserPreferences';
+import {ReleaseHighlights} from './ReleaseHighlights';
 import {CloudDeskDownloads,PublicDesktopDownloads} from '../pages/DesktopDownloads';
 import {NoticeBell,NotificationProvider,useNotice} from './notifications';
 import {MaintenanceNotices} from '../pages/MaintenanceStatus';
+import {RuntimeTests} from '../pages/RuntimeTests';
+import {ControlGraphs} from '../pages/ControlGraphs';
 import {InfrastructureWorkspace,type InfrastructureSection} from '../pages/InfrastructureWorkspace';
 import './workspace-rail.css';
 import './workspace-polish.css';
@@ -36,8 +41,8 @@ import {Identities} from '../pages/Identities';
 import {Users} from '../pages/Users';
 import {Diagnostics} from '../pages/Diagnostics';
 import {CommandCenter} from '../pages/CommandCenter';
+import {DevelopmentWorkspace} from '../pages/DevelopmentWorkspace';
 import {DevelopmentTeam} from '../pages/DevelopmentTeam';
-import {DeveloperWorkspace} from '../pages/DeveloperWorkspace';
 import {AgentUpdates} from '../pages/AgentUpdates';
 import {AssistantPage} from '../pages/Assistant';
 import {AutomationPage} from '../pages/Automation';
@@ -67,7 +72,7 @@ function navigation(mode:NodeMode,portal:boolean):Section[]{
   return [
     {name:'Рабочая область',items:[
       {to:'/',label:'Обзор',icon:LayoutDashboard},
-      ...(manager?[{to:'/nodes',label:'Узлы сети',icon:Network}]:[]),
+      ...(manager?[{to:'/nodes',label:'Бизнес-граф',icon:Network}]:[]),
       ...(manager||device?[
         {to:'/commands',label:'Быстрые команды',icon:Sparkles},
         {to:'/automation',label:'Автоматизация',icon:Clapperboard}
@@ -123,10 +128,10 @@ function AccountMenu({logout}:{logout:()=>void}){
 type Notification={id:string;text:string;read:boolean;at:string};
 function NotificationsFloat(){
   const {api}=useApp();
-  const data=useRemote(()=>api.request<Notification[]>('/collective/notifications'),[api],10000);
+  const data=useRemote(()=>api.request<Notification[]>('/collective/notifications'),[api],10000,true);
   const [problem,setProblem]=useState('');
   const pending=useServerUpdate()?.pending;
-  useNotice(problem||(!pending?data.error:''));
+  useNotice(problem?('Уведомления: '+problem):(!pending&&data.error?'Уведомления: '+data.error:''));
   async function read(id:string){
     try{await api.request('/collective/notifications/'+id+'/read',{method:'POST'});setProblem('');data.reload()}
     catch(error){setProblem(String(error))}
@@ -145,10 +150,10 @@ function Workspace({logout}:{logout:()=>void}){
   const cloudDownloads=mode==='orchestra'&&(developer.value?.owner||developer.value?.membership?.status==='approved');
   const {pathname}=useLocation();
   const nav=navigation(mode,portal);
+  if(cloudDownloads)nav.splice(nav.length-1,0,{name:'Development',items:[{to:'/development-workspace',label:'Tasks & discussions',icon:UsersRound}]});
   const infrastructureOwner=mode==='orchestra'&&developer.value?.owner===true;
-  if(infrastructureOwner)nav.splice(nav.length-1,0,{name:'Инфраструктура',items:[{to:'/infrastructure/services',label:'Сервисы',icon:Container},{to:'/infrastructure/ai',label:'AI и речь',icon:BrainCircuit},{to:'/infrastructure/database',label:'Базы данных',icon:Database},{to:'/infrastructure/metrics',label:'Мониторинг',icon:Radio}]});
+  if(infrastructureOwner)nav.splice(nav.length-1,0,{name:'Инфраструктура',items:[{to:'/infrastructure/services',label:'Сервисы',icon:Container},{to:'/infrastructure/ai',label:'AI и речь',icon:BrainCircuit},{to:'/infrastructure/database',label:'Базы данных',icon:Database},{to:'/infrastructure/metrics',label:'Мониторинг',icon:Radio},{to:'/infrastructure/graphs/macro',label:'Макро контроль',icon:Network},{to:'/infrastructure/graphs/micro',label:'Микро контроль',icon:Network},{to:'/infrastructure/self-tests',label:'Автотесты',icon:Activity}]});
   if(mode==='orchestra')nav[0].items.push({to:'/project-branches',label:'Ветки GitHub',icon:Network});
-  if(cloudDownloads)nav[0].items.push({to:'/developer-workspace',label:'Development workspace',icon:UsersRound});
   if(cloudDownloads)nav[0].items.push({to:'/clouddesk-downloads',label:'Скачать CloudDesk',icon:Cloud});
   const current=nav.flatMap(section=>section.items).find(item=>item.to===pathname)?.label??(pathname==='/profile'?'Мой профиль':modes[mode].name);
   const [mobile,setMobile]=useState(false);
@@ -194,7 +199,7 @@ function Workspace({logout}:{logout:()=>void}){
       <div className="node-label"><span className="node-icon"><ModeIcon size={18}/></span><div><strong>{modes[mode].name}</strong><small>{modes[mode].subtitle}</small></div></div>
       <nav aria-label="Главная навигация">{nav.map(section=><div className="nav-section" key={section.name}>
         <div className="nav-title">{section.name}</div>
-        {section.items.map(item=><NavLink key={item.to} to={item.to} aria-label={item.label} title={item.label} end={item.to==='/'} onClick={()=>setMobile(false)} className={({isActive})=>'nav-link '+(isActive?'active':'')}>
+        {section.items.map(item=><NavLink key={item.to} to={item.to} data-interface-path={item.to} aria-label={item.label} title={item.label} end={item.to==='/'} onClick={()=>setMobile(false)} className={({isActive})=>'nav-link '+(isActive?'active':'')}>
           <item.icon size={17}/><span>{item.label}</span>
         </NavLink>)}
       </div>)}</nav>
@@ -210,16 +215,16 @@ function Workspace({logout}:{logout:()=>void}){
         <span className="topbar-light" aria-hidden="true"><span className="topbar-sweep"/></span>
         <button ref={menuTrigger} type="button" className="icon-btn mobile-toggle" onClick={()=>setMobile(value=>!value)} aria-label="Открыть меню" aria-controls="workspace-navigation" aria-expanded={drawerOpen}><Menu size={22}/></button>
         <div className="breadcrumb"><span>{modes[mode].name}</span><ChevronRight size={14}/><strong>{current}</strong></div>
-        <div className="top-actions"><MaintenanceNotices enabled={mode==='orchestra'&&developer.value?.owner===true}/><ThemeToggle scope={preferenceScope}/><AccountMenu logout={logout}/><NotificationsFloat/></div>
+        <div className="top-actions"><InterfaceControl/><MaintenanceNotices enabled={mode==='orchestra'&&developer.value?.owner===true}/><ThemeToggle scope={preferenceScope}/><AccountMenu logout={logout}/><NotificationsFloat/></div>
       </header>
       <main className="content"><AnimatedArea><Routes>
         <Route path="/" element={mode==='orchestra'||mode==='global'||mode==='local'?<OrchestraOverview/>:mode==='audit'?<OrganizationRequests overview/>:<Overview/>}/>
         {['audit','orchestra'].includes(mode)&&<Route path="/development-team" element={<DevelopmentTeam/>}/>}
+        {mode==='orchestra'&&<Route path="/development-workspace" element={cloudDownloads?<DevelopmentWorkspace/>:<p>Development team access required.</p>}/>}
         {mode==='orchestra'&&<Route path="/model-workers" element={<Navigate to="/assistant?tab=models" replace/>}/>}
         {mode==='orchestra'&&<Route path="/clouddesk-downloads" element={cloudDownloads?<CloudDeskDownloads/>:
           <p role="status">{developer.loading?'Проверяем доступ…':'Скачивание CloudDesk доступно команде разработки.'}</p>}/>}
         {mode==='orchestra'&&<Route path="/panels" element={<PanelDirectory/>}/>}
-        {mode==='orchestra'&&<Route path="/developer-workspace" element={cloudDownloads?<DeveloperWorkspace key={preferenceScope}/>:<p role="status">Developer team access required.</p>}/>}
         {mode==='orchestra'&&<Route path="/project-branches" element={<ProjectBranches/>}/>}
         {mode==='orchestra'&&<Route path="/developer-assistant" element={<Navigate to="/assistant?tab=developer" replace/>}/>}
         <Route path="/profile" element={<ProfilePage/>}/>
@@ -233,6 +238,8 @@ function Workspace({logout}:{logout:()=>void}){
         <Route path="/faq" element={<Faq/>}/>
         <Route path="/audit" element={<Audit/>}/>
         <Route path="/diagnostics" element={<Diagnostics/>}/>
+        {mode==='orchestra'&&(['macro','micro'] as const).map(kind=><Route key={kind} path={'/infrastructure/graphs/'+kind} element={infrastructureOwner?<ControlGraphs key={kind} kind={kind}/>:<p>Требуется доступ владельца.</p>}/>)}
+        {mode==='orchestra'&&<Route path="/infrastructure/self-tests" element={infrastructureOwner?<RuntimeTests/>:<p>Требуется доступ владельца.</p>}/>}
         {mode==='orchestra'&&(['services','ai','database','metrics'] as InfrastructureSection[]).map(section=><Route key={section} path={'/infrastructure/'+section} element={infrastructureOwner?<InfrastructureWorkspace key={section} section={section}/>:<p role="status">{developer.loading?'Проверяем доступ…':'Управление инфраструктурой доступно владельцу Orchestra.'}</p>}/>)}
         <Route path="/settings" element={<Settings/>}/>
         <Route path="/notifications" element={<NotificationsPage/>}/>
@@ -252,7 +259,12 @@ function Workspace({logout}:{logout:()=>void}){
   </div>;
 }
 
-export function MysticApp({mode,defaultApi}:{mode:NodeMode;title:string;defaultApi:string}){
+export function MysticApp(props:{mode:NodeMode;title:string;defaultApi:string}){
+ const path=location.pathname.replace(/\/$/,'');
+ const publicPage=path==='/share'||path==='/audit-portal/share'||props.mode==='orchestra'&&['/studio','/developer','/desktop-downloads'].includes(path);
+ return <BrowserPreferences publicPage={publicPage}><MysticAppContent {...props}/>{!publicPage&&<ReleaseHighlights mode={props.mode} portal={path==='/audit-portal'||path.startsWith('/audit-portal/')}/>}</BrowserPreferences>;
+}
+function MysticAppContent({mode,defaultApi}:{mode:NodeMode;title:string;defaultApi:string}){
   const runtime=window.__MYSTIC_CONFIG__??{};
   const portal=location.pathname==='/audit-portal'||location.pathname.startsWith('/audit-portal/');
   const storageKey='mysticego.session.v1.'+mode+(portal?'.portal':'');

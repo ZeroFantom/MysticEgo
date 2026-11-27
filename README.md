@@ -188,7 +188,9 @@ npm run test:social --prefix frontend
 
 ## Документация
 
-Актуальный статус разработки, готовые возможности, экспериментальные ветки и критерии завершения: [Development roadmap](docs/development-roadmap.md). Не все описанные в дорожной карте возможности уже доступны в релизе.
+[Состояние разработки и дорожная карта](docs/development-roadmap.md) · [Development Workspace и GitHub](docs/development-workspace.md) · [Безопасность учётных данных](docs/credential-security.md)
+
+Экспериментальные возможности отмечены отдельно от изменений, влитых в main.
 
 | Раздел | Руководство |
 | :--- | :--- |
@@ -197,10 +199,6 @@ npm run test:social --prefix frontend
 | Чаты и профиль | [Коллектив: голосовые, ответы, редактирование, удаление и пересылка](docs/collective-chat.md) |
 | Аватары и стикеры | [Создание VRM / VRMA и стикеров](docs/avatar-creation.md) |
 | Ассистент | [Установка и настройка](ops/panel-assistant/README.md) |
-| Безопасность учётных данных | [Credential security](docs/credential-security.md) |
-| DDoS и перегрузка | [Traffic protection](docs/traffic-protection.md) |
-| Корпоративное пространство (в разработке) | [Developer workspace](docs/developer-workspace.md) |
-| План развития и незавершённые функции | [Development roadmap](docs/development-roadmap.md) |
 | Развёртывание | [Инфраструктура](ops/infrastructure/README.md) |
 | Обновления | [Orchestra Updater](ops/orchestra-updater/README.md) |
 | История эксплуатации | [Operations notes](docs/operations-notes.md) |
@@ -231,7 +229,7 @@ MysticEgo развивается как инфраструктурный про�
 
 <sub>DarkLie:Zero · Infrastructure / Software / Worlds</sub>
 
-[Сайт](https://orchestra.isdarkline.ru/studio) · [Релизы](https://github.com/ZeroFantom/MysticEgo/releases) · [Задачи](https://github.com/ZeroFantom/MysticEgo/issues) · [Обсуждения](https://github.com/ZeroFantom/MysticEgo/discussions)
+[Сайт](https://orchestra.isdarkline.ru/studio) · [Релизы](https://github.com/ZeroFantom/MysticEgo/releases) · [Задачи и обсуждения](https://github.com/ZeroFantom/MysticEgo/issues)
 
 </div>
 

@@ -37,7 +37,8 @@ function AppCard({app,downloads,loading}:{app:typeof cloudDesk;downloads?:Downlo
           {asset?<a className="btn secondary" href={asset.url} rel="noreferrer" aria-label={`Скачать ${app.name} для ${os} на GitHub`}><Download size={16} aria-hidden="true"/>{os} · {format.toUpperCase()}</a>:
             <span className="desktop-download-os">{os}</span>}
           <small>{asset?.tag??(loading?'Проверяем GitHub…':'Сборка недоступна')}</small>
-          {asset&&<code>{format==='zip'?app[platform]:format==='run'?`bash ${asset.fileName??'установщик.run'}`:'Запустите установщик EXE'}</code>}
+          {asset&&<code>{format==='zip'?app[platform]:format==='run'?`bash ./MysticEgo-${app.name}-linux-x64.run`:'Запустите установщик EXE'}</code>}
+          {asset&&format==='run'&&<small>Откройте терминал в папке загрузки. Запускайте через bash без sudo; скачанный файл может не иметь права выполнения.</small>}
           {asset&&format==='zip'&&<small>Резервный ZIP-комплект</small>}
         </div>;
       })}

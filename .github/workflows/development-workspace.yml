@@ -1,25 +1,18 @@
-name: Developer workspace
+name: Development workspace
 on:
   pull_request:
     paths:
       - 'services/Api.Orchestra/**'
       - 'frontend/**'
-      - 'tests/DeveloperWorkspaceSmoke/**'
-      - '.github/workflows/developer-workspace.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'services/Api.Orchestra/**'
-      - 'frontend/**'
-      - 'tests/DeveloperWorkspaceSmoke/**'
-      - '.github/workflows/developer-workspace.yml'
+      - 'tests/DevelopmentWorkspaceSmoke/**'
+      - '.github/workflows/development-workspace.yml'
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  developer-workspace:
+  workspace:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -29,6 +22,6 @@ jobs:
         with:
           node-version: '24'
       - run: dotnet build services/Api.Orchestra/Api.Orchestra.csproj -c Release
-      - run: dotnet run --project tests/DeveloperWorkspaceSmoke/DeveloperWorkspaceSmoke.csproj -c Release
+      - run: dotnet run --project tests/DevelopmentWorkspaceSmoke/DevelopmentWorkspaceSmoke.csproj -c Release
       - run: npm ci --prefix frontend
       - run: npm run build --prefix frontend

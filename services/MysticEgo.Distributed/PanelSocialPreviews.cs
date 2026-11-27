@@ -40,6 +40,23 @@ public static class PanelSocialPreviews
             { await next(context); return; }
 
             var path = context.Request.Path.Value?.TrimEnd('/') ?? "";
+            if(path is "/robots.txt" or "/sitemap.xml")
+            {
+                var valid=Uri.TryCreate(node.PublicUrl,UriKind.Absolute,out var uri)&&uri.Scheme=="https"&&
+                    string.IsNullOrEmpty(uri.UserInfo)&&string.IsNullOrEmpty(uri.Query)&&string.IsNullOrEmpty(uri.Fragment);
+                var origin=valid?uri!.GetLeftPart(UriPartial.Authority):"";
+                var indexable=node.Kind==NodeKind.Orchestra&&valid;
+                var pages=new[]{"/studio","/developer","/desktop-downloads"};
+                if(path=="/sitemap.xml"&&!indexable){context.Response.StatusCode=404;return;}
+                var content=path=="/robots.txt"?
+                    "User-agent: *\nDisallow: /api/\nDisallow: /hub/\nDisallow: /mcp/\n"+(indexable?"Sitemap: "+origin+"/sitemap.xml\n":""):
+                    "<?xml version=\"1.0\" encoding=\"UTF-8\"?><urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">"+
+                    string.Concat(pages.Select(p=>"<url><loc>"+System.Security.SecurityElement.Escape(origin+p)+"</loc></url>"))+"</urlset>";
+                context.Response.ContentType=path=="/robots.txt"?"text/plain; charset=utf-8":"application/xml; charset=utf-8";
+                context.Response.Headers.CacheControl="public, max-age=300";
+                if(!HttpMethods.IsHead(context.Request.Method))await context.Response.WriteAsync(content,context.RequestAborted);
+                return;
+            }
             // Keep the updater's existing local byte-for-byte health check intact.
             // This branch never constructs URLs from the Host header.
             if (path == "/audit-portal" && !context.Request.IsHttps &&
@@ -77,7 +94,11 @@ public static class PanelSocialPreviews
                 _ => null
             };
             if (relative is null || web is null || (path.StartsWith("/audit-portal", StringComparison.Ordinal) && !audit))
-            { await next(context); return; }
+            {
+                if(!path.StartsWith("/api/",StringComparison.OrdinalIgnoreCase)&&!path.StartsWith("/assets/",StringComparison.OrdinalIgnoreCase)&&!Path.HasExtension(path))
+                    context.Response.Headers["X-Robots-Tag"]="noindex, follow";
+                await next(context); return;
+            }
 
             var file = Path.Combine(web, relative);
             if (!File.Exists(file)) { await next(context); return; }

@@ -51,5 +51,17 @@ fi
 verify "$target" && [[ $(cat "$target/.installer-sha256" 2>/dev/null) == "$digest" ]] || { echo "Existing installation does not match: $target" >&2; exit 1; }
 printf 'Installed: %s\n' "$target"
 [[ $mode == --install-only ]] && exit 0
+# Downloads need not retain executable mode; extracted binaries do. Never bypass a noexec mount.
+if command -v findmnt >/dev/null 2>&1; then
+  options=$(findmnt -n -o OPTIONS -T "$target" 2>/dev/null || true)
+  if [[ ,$options, == *,noexec,* ]]; then
+    printf 'Installation is on a noexec filesystem: %s\nUse XDG_DATA_HOME on an executable filesystem. Do not run as root.\n' "$target" >&2
+    exit 1
+  fi
+fi
+if [[ ! -x "$target/launch.sh" || ! -x "$target/runtime/electron-linux/electron" ]]; then
+  echo 'Installed launcher or Electron is not executable. Check file permissions and mount options.' >&2
+  exit 1
+fi
 exec "$target/launch.sh"
 __MYSTICEGO_PAYLOAD__

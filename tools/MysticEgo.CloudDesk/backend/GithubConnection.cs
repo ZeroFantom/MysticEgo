@@ -71,7 +71,8 @@ sealed partial class CloudDesk {
         ["visibility"]=raw["visibility"]?.ToString().ToUpperInvariant()??"UNKNOWN",
         ["defaultBranchRef"]=new JsonObject{["name"]=raw["default_branch"]?.DeepClone()}
     };
-    static bool GithubPrivate(JsonObject view)=>S(view,"nameWithOwner").Equals(Repo,StringComparison.OrdinalIgnoreCase)&&S(view,"visibility")=="PRIVATE";
+    // Verify the exact repository, independently of its current visibility.
+    static bool GithubRepositoryMatches(JsonObject view)=>S(view,"nameWithOwner").Equals(Repo,StringComparison.OrdinalIgnoreCase)&&S(view,"visibility") is ("PRIVATE" or "PUBLIC" or "INTERNAL");
     void ClearGithubCache() { githubUserCache=null;githubRepoCache=null;githubVerifiedAt=0; }
     async Task<object> GitProfile() {
         string secret;
@@ -86,9 +87,9 @@ sealed partial class CloudDesk {
             githubUserCache=Pick(user,"login","name","id","public_repos","followers","created_at");
             userOk=true;
             githubRepoCache=GithubRepoView(await GithubGet("repos/"+Repo,secret));
-            githubVerifiedAt=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            bool valid=GithubPrivate(githubRepoCache);
-            return new {connected=true,online=true,repoReady=valid,profile=githubUserCache,repo=githubRepoCache,verifiedAt=githubVerifiedAt,warning=valid?"":"Ожидался доступ к приватному репозиторию "+Repo};
+            bool valid=GithubRepositoryMatches(githubRepoCache);
+            if(valid)githubVerifiedAt=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            return new {connected=true,online=true,repoReady=valid,profile=githubUserCache,repo=githubRepoCache,verifiedAt=githubVerifiedAt,warning=valid?"":"Не подтверждён доступ к репозиторию "+Repo};
         } catch(GithubFailure e) {
             if(e.Kind=="unauthorized") { ClearGithubCache();return new {connected=false,online=true,repoReady=false,warning=e.Message}; }
             if(e.Kind is "forbidden" or "not-found") { githubRepoCache=null;githubVerifiedAt=0;if(!userOk) githubUserCache=null; }
@@ -100,12 +101,12 @@ sealed partial class CloudDesk {
     async Task GitCheck() {
         var secret=await GithubLocalToken();
         var repo=GithubRepoView(await GithubGet("repos/"+Repo,secret));
-        if(!GithubPrivate(repo)) throw new Exception("Ожидался приватный репозиторий "+Repo);
+        if(!GithubRepositoryMatches(repo)) throw new Exception("Не подтверждён репозиторий "+Repo);
     }
     async Task<string> GithubReleaseDigest() {
         var secret=await GithubLocalToken();
         var repository=GithubRepoView(await GithubGet("repos/"+Repo,secret));
-        if(!GithubPrivate(repository)) throw new Exception("Ожидался приватный репозиторий "+Repo);
+        if(!GithubRepositoryMatches(repository)) throw new Exception("Не подтверждён репозиторий "+Repo);
         var release=await GithubGet("repos/"+Repo+"/releases/tags/"+Tag,secret);
         var file=(release["assets"] as JsonArray)?.OfType<JsonObject>().SingleOrDefault(item=>S(item,"name")==Asset);
         var digest=file is null ? "" : S(file,"digest");
@@ -119,8 +120,11 @@ sealed partial class CloudDesk {
         Test(GithubHttpKind(403,true)=="rate-limit");Test(GithubHttpKind(429,false)=="rate-limit");
         Test(GithubHttpKind(404,false)=="not-found");Test(GithubHttpKind(503,false)=="temporary");
         var repo=GithubRepoView(new JsonObject{["full_name"]=Repo,["visibility"]="private",["default_branch"]="main"});
-        Test(GithubPrivate(repo)&&repo["defaultBranchRef"]?["name"]?.ToString()=="main");
-        repo["visibility"]="PUBLIC";Test(!GithubPrivate(repo));
+        Test(GithubRepositoryMatches(repo)&&repo["defaultBranchRef"]?["name"]?.ToString()=="main");
+        repo["visibility"]="PUBLIC";Test(GithubRepositoryMatches(repo));
+        repo["visibility"]="INTERNAL";Test(GithubRepositoryMatches(repo));
+        repo["visibility"]="UNKNOWN";Test(!GithubRepositoryMatches(repo));
+        repo["visibility"]="PUBLIC";repo["nameWithOwner"]="other/MysticEgo";Test(!GithubRepositoryMatches(repo));
         return new {passed};
     }
 }

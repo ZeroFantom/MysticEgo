@@ -32,6 +32,12 @@ jobs:
       - run: npm --prefix tools/MysticEgo.CloudDesk install --ignore-scripts --no-audit
       - run: npm --prefix tools/MysticEgo.CloudDesk run build
       - run: |
+          node --check desktop/interface-mcp.cjs
+          node --check tools/MysticEgo.CloudDesk/desktop/interface-mcp.cjs
+          node --check tools/MysticEgo.CloudDesk/desktop/main.cjs
+          node --check desktop/local/main.mjs
+          node --check desktop/station/main.mjs
+          cmp desktop/interface-mcp.cjs tools/MysticEgo.CloudDesk/desktop/interface-mcp.cjs
           node --check desktop/control/effects.js
           node --check desktop/control/view.js
           node --input-type=module --check < desktop/local/view.js

@@ -104,5 +104,64 @@ class MaintenanceTests(unittest.TestCase):
         self.assertFalse(updater.take_maintenance_request())
         self.assertTrue(target.exists())
 
+    @patch.object(updater, "system_ok", return_value=False)
+    def test_auto_default_and_no_retry(self, system_ok):
+        candidate = {"tag": "v1.0.0-beta.7-r3.2.39"}
+        self.assertEqual(updater.automatic_target(candidate, ["orchestra"], {}), "orchestra")
+        (self.inbox / "auto-update.json").write_text('{"enabled":false}')
+        self.assertEqual(updater.automatic_target(candidate, ["orchestra"], {}), "orchestra")
+        self.assertIsNone(updater.automatic_target(candidate, ["audit"], {}))
+        self.assertIsNone(updater.automatic_target(candidate, ["orchestra"], {"candidate": candidate, "phase": "failed"}))
+        (self.state / "automatic-attempt.json").write_text(json.dumps(candidate))
+        self.assertIsNone(updater.automatic_target(candidate, ["orchestra"], {}))
+        (self.inbox / "auto-update.json").unlink()
+        target = self.state / "unsafe"
+        target.write_text('{"enabled":true}')
+        (self.inbox / "auto-update.json").symlink_to(target)
+        self.assertTrue(updater.automatic_enabled())
+
+    @staticmethod
+    def published_release(suffix, draft=False, digest="sha256:"+"a"*64):
+        return {"tag_name":"v1.0.0-beta.7-r3.2."+suffix,"draft":draft,
+                "published_at":"2026-01-01T00:00:00Z",
+                "assets":[{"name":"MysticEgo-Orchestra-linux-x64.zip","state":"uploaded",
+                           "size":123,"digest":digest,"id":int(suffix)}]}
+
+    def test_recovery_choices_exact_and_ordered(self):
+        releases=[self.published_release(n) for n in ("38","36","37","35")]
+        releases += [self.published_release("39",draft=True),self.published_release("40",digest="bad")]
+        options=updater.recovery_choices((self.release,None),releases)
+        self.assertEqual([r["tag"] for r in options["cycle"]],
+                         ["v1.0.0-beta.7-r3.2.36",self.release,"v1.0.0-beta.7-r3.2.38"])
+        self.assertEqual(options["reinstall"],[options["cycle"][1]])
+        latest=updater.recovery_choices(("v1.0.0-beta.7-r3.2.38",None),releases)
+        self.assertEqual(latest["cycle"][1],latest["cycle"][2])
+        self.assertEqual(updater.recovery_choices(("v1.0.0-beta.7-r3.2.99",None),releases),{})
+
+    @patch.object(updater,"ensure_maintenance")
+    @patch.object(updater,"ensure_rescue")
+    @patch.object(updater,"system_ok",return_value=False)
+    @patch.object(updater,"apply")
+    @patch.object(updater,"newest",return_value=(None,[]))
+    @patch.object(updater,"published_releases")
+    @patch.object(updater,"versions",return_value=("v1.0.0-beta.7-r3.2.37",None))
+    def test_cycle_requires_exact_plan_and_backup(self,versions,published,newest,apply,system_ok,rescue,maintenance):
+        published.return_value=[self.published_release(n) for n in ("36","37","38")]
+        steps=updater.recovery_choices(versions.return_value,published.return_value)["cycle"]
+        request={"recovery":"cycle","installed":self.release,"releases":steps,"backupConfirmed":False}
+        (self.inbox/"pending.json").write_text(json.dumps(request))
+        updater.run_locked()
+        apply.assert_not_called()
+        request["backupConfirmed"]=True
+        (self.inbox/"pending.json").write_text(json.dumps({**request,"releases":steps[::-1]}))
+        updater.run_locked()
+        apply.assert_not_called()
+        (self.inbox/"pending.json").write_text(json.dumps(request))
+        updater.run_locked()
+        self.assertEqual([c.args[0] for c in apply.call_args_list],steps)
+        self.assertEqual([c.kwargs["intermediate"] for c in apply.call_args_list],[True,True,False])
+        result=json.loads((self.state/"recovery-run.json").read_text())
+        self.assertEqual((result["phase"],result["completed"]),("success",3))
+
 if __name__ == "__main__":
     unittest.main()

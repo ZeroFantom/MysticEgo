@@ -1,4 +1,7 @@
+import interfaceMcp from '../interface-mcp.cjs';
 import {app,BrowserWindow,WebContentsView,dialog,ipcMain,Menu,shell} from 'electron';
+import pairing from '../browser-pairing.cjs';
+import updater from '../desktop-updates.cjs';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
@@ -21,6 +24,7 @@ const userData=path.join(home,'electron');
 mkdirSync(userData,{recursive:true,mode:0o700});
 app.setPath('userData',userData);
 app.setName(product);
+const highlights=updater.createReleaseHighlights({app,root,product});
 const runtime=path.join(root,'runtime','app','bin');
 const installer=path.join(runtime,'MysticEgo.Installer.dll');
 const layout=path.join(here,'index.html');
@@ -328,6 +332,7 @@ function handle(name,action){
 }
 async function open(){
   Menu.setApplicationMenu(null);
+  await highlights.load();
   await fs.mkdir(home,{recursive:true,mode:0o700});
   const local=path.join(home,'station.json');
   if(isAgent)for(const file of [local,path.join(legacyHome,'station.json')]){
@@ -354,14 +359,18 @@ async function open(){
     if(companion)companion.child.kill();
     await Promise.all([stop(),stopRunner(personalRunner)]);window.close();
   });
+  handle('release-highlights-dismiss',tag=>highlights.dismiss(tag));
   handle('snapshot',async()=>{
     void refreshTeam();
     if(actor&&Date.now()-lastTopology>18000){lastTopology=Date.now();void topology().catch(()=>{})}
     const [online,personalOnline]=await Promise.all([health(),personalProfile?health(current(personalProfile)):false]);
-    return {isAgent,node:current(),online,running:!!runner,personalOnline,personalRunning:!!personalRunner,recording:!!recording,features,beacon,clubAvailable,embedded:!!embedded,
+    return {releaseHighlights:highlights.get(),isAgent,node:current(),online,running:!!runner,personalOnline,personalRunning:!!personalRunner,recording:!!recording,features,beacon,clubAvailable,embedded:!!embedded,
       actor:actor?.login,team:actor?teamStatus:null,globals:playerGlobals.map(({id,name})=>({id,name})),central:current()?.central||assignment?.orchestraUrl||lastConnection.central,
       lan:profile?.endpoints.allowLanHttp===true||assignment?.allowLanHttp===true||lastConnection.lan,platform:process.platform,logs:[...logs]};
   });
+  pairing.installBrowserPairing({product,window:()=>window,
+    getSession:()=>actor?.refreshToken&&Date.now()<actor.expiration?{origin:actor.central,login:actor.login,identity:actor.token,refreshToken:actor.refreshToken}:null,
+    approve:pairing.approveSession});
   handle('auth',userSession);
   handle('logout',async()=>{
     accountGeneration++;
@@ -464,12 +473,13 @@ async function open(){
   handle('finish-record',async()=>{await authorized();if(recording){recording.child.stdin.end('\n');await recording.done;return 'Запись завершена.'}});
   handle('folder',async()=>{await authorized();const result=await shell.openPath(current()?path.join(home,current().id):home);if(result)throw Error(result)});
   await window.loadFile(layout);
+  interfaceMcp.installInterfaceMcp(window,product);
   void followClub();
 }
 if(!app.requestSingleInstanceLock())app.quit();
 else{
   app.on('second-instance',()=>window?.focus());
-  app.whenReady().then(open).catch(error=>{dialog.showErrorBox(product,error.message);app.quit()});
+  app.whenReady().then(async()=>{await open();updater.startDesktopUpdates({app,dialog,root,product,window:()=>window,canRestart:()=>!closing&&!recording&&!savingInvitation&&!discovering&&!openingAudit})}).catch(error=>{dialog.showErrorBox(product,error.message);app.quit()});
   app.on('window-all-closed',()=>app.quit());
 }
 

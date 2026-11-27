@@ -50,6 +50,9 @@ public sealed class DynamicEntityStore
     {
         var descriptor = EntityMetadata.Describe<T>();
         using var connection = Open();
+        // Ordinary reads of an already current schema must not acquire a write lock or rewrite metadata.
+        // This also lets a read-only connection read existing, compatible entities.
+        if (await SchemaCurrentAsync(connection, descriptor, ct).ConfigureAwait(false)) return;
         using var transaction = connection.BeginTransaction();
         if (RelationalStorage.IsPostgres(_connectionString))
         {
@@ -84,7 +87,23 @@ public sealed class DynamicEntityStore
         transaction.Commit();
     }
 
-    private static async Task<(int Version, string Json)?> ReadSchemaAsync(DbConnection c, DbTransaction tx, string id, CancellationToken ct)
+    private static async Task<bool> SchemaCurrentAsync(DbConnection connection, EntityDescriptor descriptor, CancellationToken ct)
+    {
+        try
+        {
+            var previous = await ReadSchemaAsync(connection, null, descriptor.Id, ct).ConfigureAwait(false);
+            if (previous is null) return false;
+            if (previous.Value.Version != descriptor.Version || previous.Value.Json != descriptor.SchemaJson) return false;
+            using var check = connection.CreateCommand();
+            check.CommandText = $"SELECT id,payload,schema_version,updated_at FROM {Table(descriptor.Id)} LIMIT 0";
+            await check.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            return true;
+        }
+        catch (Microsoft.Data.Sqlite.SqliteException e) when (e.SqliteErrorCode == 1 && e.Message.Contains("no such table", StringComparison.OrdinalIgnoreCase)) { return false; }
+        catch (Npgsql.PostgresException e) when (e.SqlState == "42P01") { return false; }
+    }
+
+    private static async Task<(int Version, string Json)?> ReadSchemaAsync(DbConnection c, DbTransaction? tx, string id, CancellationToken ct)
     {
         using var command = c.CreateCommand();
         command.Transaction = tx;

@@ -24,6 +24,19 @@ for platform in linux-x64 win-x64; do
       LocalDesktop) linux='./local-desktop'; win='runtime\electron\electron.exe desktop\local';;
       CloudDesk) linux='bash tools/MysticEgo.CloudDesk/run.sh'; win='call tools\MysticEgo.CloudDesk\run-windows.cmd';;
     esac
+    # Embed notes for the exact installer tag, including offline first launch.
+    python3 - "$root" "$stage" "$version" <<'PY'
+import json, pathlib, re, sys
+root, stage = map(pathlib.Path, sys.argv[1:3])
+tag = sys.argv[3]
+match = re.fullmatch(r"v\d+\.\d+\.\d+-beta\.(\d+)-r(\d+(?:\.\d+)*)", tag)
+notes = ""
+if match:
+    source = root / "docs" / "releases" / f"beta{match[1]}-r{match[2]}.md"
+    if source.is_file():
+        notes = source.read_text(encoding="utf-8")[:12000]
+(stage / "desktop" / "release-highlights.json").write_text(json.dumps({"tag": tag, "notes": notes}, ensure_ascii=False), encoding="utf-8")
+PY
     name="MysticEgo-$product-$platform"
     if [[ $platform == linux-x64 ]]; then
       printf '#!/bin/sh\nset -eu\ncd -- "$(dirname -- "$0")"\nexec %s\n' "$linux" > "$stage/launch.sh"

@@ -21,10 +21,6 @@ public sealed class GitHubPanel(IHttpClientFactory clients, IConfiguration confi
 
     private string? Token() => File.Exists(TokenFile) ? File.ReadAllText(TokenFile).Trim() : EnvironmentToken;
 
-    /// <summary>Server-only credential access for repository integrations; never serialize this value.</summary>
-    internal string? ReadCredential() => Token();
-    internal bool HasCredential => !string.IsNullOrWhiteSpace(Token());
-
     public object Connection() => new {
         connected = !string.IsNullOrWhiteSpace(Token()),
         source = File.Exists(TokenFile) ? "panel" : string.IsNullOrWhiteSpace(EnvironmentToken) ? "none" : "environment"
