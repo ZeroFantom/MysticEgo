@@ -5,4 +5,7 @@
     <Nullable>enable</Nullable>
     <OutputType>Exe</OutputType>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../services/MysticEgo.Distributed/AvatarHandoffQueue.cs" Link="AvatarHandoffQueue.cs" />
+  </ItemGroup>
 </Project>
