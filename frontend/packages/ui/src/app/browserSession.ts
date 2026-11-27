@@ -76,7 +76,13 @@ export function useBrowserSession(key:string,initial:Session){
     const data=await response.json();
     if(typeof data.accessToken!=='string'||!data.accessToken||(!session.browserSession&&(typeof data.refreshToken!=='string'||!data.refreshToken)))
      throw Error('Сервер вернул неполную сессию.');
-    const next={...session,token:data.accessToken,refreshToken:session.browserSession?undefined:data.refreshToken,username:data.user?.login??session.username};
+    // A host-wide cookie can be replaced by an explicit sign-in in another tab.
+   // Do not silently transfer this workspace to that other account.
+   if(session.browserSession&&session.username&&data.user?.login!==session.username){
+    if(active&&current.current===session){setSession({...session,token:'',browserSession:undefined,refreshToken:undefined,username:undefined});setRestoreError('Account changed in another tab. Sign in again.');}
+    return;
+   }
+   const next={...session,token:data.accessToken,refreshToken:session.browserSession?undefined:data.refreshToken,username:data.user?.login??session.username};
     if(!active||current.current!==session){if(!session.browserSession)void revoke(next);return;}
     setRestoreError('');
     setSession(next);
