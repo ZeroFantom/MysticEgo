@@ -17,3 +17,9 @@ assert(ui.includes("runSSH('deploy.executeMaintenance'"));
 assert(ui.includes("candidateTag:candidate?.tag??'',candidateDigest:candidate?.digest??''"));
 assert(updater.includes('/api/v1/orchestra/update/plan'));
 console.log('CloudDesk recovery IPC and update approval contracts passed.');
+
+const reports=read('tools/MysticEgo.CloudDesk/src/MaintenanceReports.jsx');
+const reportCss=read('tools/MysticEgo.CloudDesk/src/maintenance-reports.css');
+assert(ui.includes('<MaintenanceReports plan={maintenancePlan}'));
+assert(reports.includes('maintenance-card-grid')&&reports.includes('onReport(s.unit)')&&reports.includes('onReport(c.name)'));
+assert(reportCss.includes('minmax(min(100%,245px),1fr)')&&reportCss.includes('overflow-wrap:anywhere'));
