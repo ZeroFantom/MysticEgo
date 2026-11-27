@@ -36,6 +36,7 @@ export function AssistantChat({status,compact=false,patrol=false}:{status?:Assis
   const voice=useAvatarVoice(),music=useMusicBeat();
   const [handoff,setHandoff]=useState<Handoff|null>(null),[handoffBusy,setHandoffBusy]=useState(false),[onDesktop,setOnDesktop]=useState(false);
   const scene=useRef<HTMLDivElement>(null);
+  const playback=useRef<{motion:AvatarMotion;seconds:number}>({motion:'idle',seconds:0});
   const list=useRef<HTMLDivElement>(null);
   const editor=useRef<HTMLTextAreaElement>(null);
   const messages=stored??history.value??[];
@@ -50,7 +51,7 @@ export function AssistantChat({status,compact=false,patrol=false}:{status?:Assis
     try{
       const rect=scene.current?.getBoundingClientRect();
       const horizontal=rect?Math.max(0,Math.min(1,(rect.left+rect.width/2)/Math.max(1,window.innerWidth))):0.5;
-      setHandoff(await api.request<Handoff>('/managed/avatar-handoff/request',{method:'POST',body:JSON.stringify({motion,horizontal})}));
+      setHandoff(await api.request<Handoff>('/managed/avatar-handoff/request',{method:'POST',body:JSON.stringify({motion,horizontal,phaseSeconds:playback.current.motion===motion?Math.min(3600,playback.current.seconds):0,mood:inferVisualMood(expression)})}));
     }catch(problem){setError('Не удалось передать аватар локальному Agent/Audit: '+String(problem));}
     finally{setHandoffBusy(false);}
   }
@@ -111,7 +112,7 @@ export function AssistantChat({status,compact=false,patrol=false}:{status?:Assis
       <button type="button" className="icon-btn" aria-label="Очистить историю" disabled={busy||!messages.length} onClick={()=>setClearing(value=>!value)}><Trash2 size={17}/></button>
     </div>
     {visible&&!onDesktop&&<div className="assistant-scene" ref={scene}>
-      <AvatarStage url={media.model?.url} mime={media.model?.mime} motion={moving} mood={inferVisualMood(expression)}
+      <AvatarStage url={media.model?.url} mime={media.model?.mime} motion={moving} mood={inferVisualMood(expression)} onPlayback={(motion,seconds)=>{playback.current={motion,seconds}}}
         speech={view.animateReplies?voice.speech:0} viseme={voice.viseme} beat={music.beat} animations={media.clips}
         appearance={view} intensity={intensityByStyle[selection?.motionStyle??'calm']}/>
       <div className="assistant-scene-tools"><Link to="/avatars" className="btn secondary tiny">Студия VRM</Link>
