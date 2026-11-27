@@ -131,16 +131,16 @@ async function registrationDocuments(central, lan){
   const response=await fetch(base+'/api/auth/audit/registration-documents',{
     cache:'no-store',redirect:'error',signal:AbortSignal.timeout(8000)
   });
-  if(response.status===404)return {required:false};
   if(!response.ok)throw Error('Документы регистрации недоступны.');
   const documents=await response.json();
   if(documents.required===true){
-    for(const item of [documents.terms,documents.privacy]){
+    for(const item of [documents.terms,documents.privacy,documents.license]){
       const url=new URL(item.url);
       if(!item.version||url.protocol!=='https:'||url.username||url.password)
         throw Error('Сервер вернул неверную ссылку на документы.');
     }
-  }else if(documents.required!==false)throw Error('Неверные данные регистрации.');
+    if(!documents.permissionPolicyVersion||!Array.isArray(documents.scopes))throw Error('Invalid permission policy');
+  }else throw Error('Registration documents unavailable');
   return documents;
 }
 
@@ -152,7 +152,7 @@ async function userSession(input){
     if(isAgent)throw Error('Регистрация доступна в AuditDesktop.');
     const nickname=String(input?.nickname??'').trim();
     await json(base+'/api/auth/audit/register',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({login,password,nickname,termsVersion:input.termsVersion,privacyVersion:input.privacyVersion})});
+      body:JSON.stringify({login,password,nickname,termsVersion:input.termsVersion,privacyVersion:input.privacyVersion,licenseVersion:input.licenseVersion,permissionPolicyVersion:input.permissionPolicyVersion,enabledScopes:input.enabledScopes})});
   }
   const data=await json(base+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({login,password})});
@@ -464,7 +464,7 @@ async function open(){
   });
   handle('registration-documents',registrationDocuments);
   handle('registration-document-open',async(kind,central,lan)=>{
-    if(!['terms','privacy'].includes(kind))throw Error('Неизвестный документ.');
+    if(!['terms','privacy','license'].includes(kind))throw Error('Неизвестный документ.');
     const documents=await registrationDocuments(central,lan);
     if(documents.required)await shell.openExternal(documents[kind].url);
   });
