@@ -34,3 +34,17 @@ foreach(var f in Directory.GetFiles(Path.Combine(root,"services"),"*.cs",SearchO
     var body=File.ReadAllText(f);
     Check(!System.Text.RegularExpressions.Regex.IsMatch(body,@"\.Map(Get|Post|Put|Delete|Patch)\s*\("),"Attribute MVC routes: "+Path.GetRelativePath(root,f));
 }
+
+var queue = new MysticEgo.Distributed.AvatarHandoffQueue();
+Check(queue.Request("owner", new("shell", .5)) is null, "Reject unknown avatar motion");
+Check(queue.Request("owner", new("walk", double.NaN)) is null, "Reject invalid position");
+var handoff = queue.Request("owner", new("walk", .5)) ?? throw new Exception("Handoff not created");
+Check(queue.Status("other", handoff.Id) is null && queue.Claim("other") is null, "Handoff owner isolation");
+Check(queue.Request("owner", new("perch", .3)) is null, "Single pending handoff");
+var claim = queue.Claim("owner") ?? throw new Exception("No claim");
+Check(queue.Claim("owner") is null, "No duplicate claim");
+Check(!queue.Complete("owner", handoff.Id, new("wrong", true)), "Reject invalid claim proof");
+Check(!queue.Complete("other", handoff.Id, new(claim.Proof, true)), "Reject wrong owner completion");
+Check(queue.Complete("owner", handoff.Id, new(claim.Proof, true)), "Accept valid handoff completion");
+Check(queue.Status("owner", handoff.Id)?.Status == "started", "Started state visible to owner");
+Check(!queue.Complete("owner", handoff.Id, new(claim.Proof, true)), "No replay of completion");
