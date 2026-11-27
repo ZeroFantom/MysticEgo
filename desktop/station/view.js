@@ -6,7 +6,7 @@ let initialized=false,centralEdited=false,register=false;
 let documents=null;
 let documentRequest=0;
 initEffects($('design'));
-let prefs={language:'en',font:'modern'},owner=null,preferenceGeneration=0,loadingPreferences=false;
+let prefs={language:'en',font:'modern'},owner=null,preferenceGeneration=0;
 try{prefs={...prefs,...JSON.parse(localStorage.getItem('mysticego.desktop.guest.presentation')||'{}')}}catch{}
 const host=$('presentation-controls');
 const languageSelect=document.createElement('select'),fontSelect=document.createElement('select');
@@ -16,7 +16,7 @@ for(const [caption,input] of [['Язык',languageSelect],['Шрифт',fontSele
  const label=document.createElement('label');label.textContent=caption;label.append(input);host.append(label);
 }
 captureStatic(document.body);
-function applyPrefs(){applyPresentation(prefs);languageSelect.value=prefs.language;fontSelect.value=prefs.font;$('global-panel').dataset.options='';}
+function applyPrefs(){applyPresentation(prefs);languageSelect.value=prefs.language;fontSelect.value=prefs.font;$('global-panel').dataset.options='';$('login-title').textContent=t(register?'Создайте аккаунт Audit':'Войдите в MysticEgo');$('login-button').textContent=t(register?'Создать аккаунт':'Войти');$('register').textContent=t(register?'У меня есть аккаунт':'Создать аккаунт');}
 applyPrefs();
 async function savePref(patch){
  const generation=preferenceGeneration;prefs={...prefs,...patch};applyPrefs();
@@ -30,11 +30,11 @@ async function bindOwner(next){
  if(next===owner)return;
  owner=next;const generation=++preferenceGeneration;
  prefs={language:'en',font:'modern'};applyPrefs();$('presentation-status').textContent='';
- if(!next){try{prefs={...prefs,...JSON.parse(localStorage.getItem('mysticego.desktop.guest.presentation')||'{}')}}catch{}applyPrefs();return}
- loadingPreferences=true;languageSelect.disabled=fontSelect.disabled=true;
+ if(!next){languageSelect.disabled=fontSelect.disabled=false;try{prefs={...prefs,...JSON.parse(localStorage.getItem('mysticego.desktop.guest.presentation')||'{}')}}catch{}applyPrefs();return}
+ languageSelect.disabled=fontSelect.disabled=true;
  try{const result=await api.presentation();if(generation===preferenceGeneration){prefs={...prefs,...result};applyPrefs()}}
  catch{if(generation===preferenceGeneration)$('presentation-status').textContent=t('Настройки не синхронизированы')}
- finally{if(generation===preferenceGeneration){loadingPreferences=false;languageSelect.disabled=fontSelect.disabled=false}}
+ finally{if(generation===preferenceGeneration){languageSelect.disabled=fontSelect.disabled=false}}
 }
 async function refresh(){
   const state=await api.snapshot();
