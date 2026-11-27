@@ -6,6 +6,10 @@ on:
       - '.github/workflows/ui-automation-smoke.yml'
       - 'services/MysticEgo.Distributed/**'
       - 'core/Models.Commands.Mcp/**'
+      - 'frontend/packages/ui/src/avatar/**'
+      - 'frontend/packages/ui/src/pages/AvatarStudio.tsx'
+      - 'frontend/scripts/avatar-motion.test.mjs'
+      - 'desktop/**'
   workflow_dispatch:
 permissions:
   contents: read
@@ -37,3 +41,23 @@ jobs:
       - run: dotnet build tools/MysticEgo.UiAutomation/native/UiAutomation.Native.csproj
       - run: dotnet build services/Api.Agent/Api.Agent.csproj
       - run: dotnet build services/Api.AuditOrchestra/Api.AuditOrchestra.csproj
+
+  avatar-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: npm ci --prefix frontend
+      - run: node --test frontend/scripts/avatar-motion.test.mjs
+      - run: npm run build --prefix frontend
+      - run: npm install --prefix desktop --no-audit --no-fund
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: npm run build --prefix desktop
+      - run: dotnet run --project tests/ApiArchitectureSmoke/ApiArchitectureSmoke.csproj
