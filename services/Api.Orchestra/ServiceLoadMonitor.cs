@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Text.Json;
 
 namespace MysticEgo.Api.Orchestra;
 
@@ -12,7 +13,7 @@ public sealed class ServiceLoadMonitor : BackgroundService
         "docker.service","containerd.service","postgresql@16-mysticego.service","postgresql.service","caddy.service",
         "mysticego-default-model.service","mysticego-maintenance-rescue.service","mysticego-maintenance-rescue.path",
         "mysticego-orchestra-updater.timer","mysticego-infrastructure-reconcile.timer","mysticego-local-setup.socket"];
-    public sealed record Sample(string Unit,DateTimeOffset At,double? CpuPercent,long? MemoryBytes,long? Tasks,string? LoadState,string? ActiveState,string? SubState,string? Type=null,string? Result=null,long? LastCpuMilliseconds=null,long? LastPeakBytes=null,long? LastDurationMilliseconds=null,DateTimeOffset? LastFinishedAt=null,string? Measurement=null);
+    public sealed record Sample(string Unit,DateTimeOffset At,double? CpuPercent,long? MemoryBytes,long? Tasks,string? LoadState,string? ActiveState,string? SubState,string? Type=null,string? Result=null,long? LastCpuMilliseconds=null,long? LastPeakBytes=null,long? LastDurationMilliseconds=null,DateTimeOffset? LastFinishedAt=null,string? Measurement=null,string? LastResult=null);
     private Sample[] latest=[];
     private readonly Dictionary<string,Sample> lastRuns=new(StringComparer.Ordinal);
     public static bool KnownUnit(string unit)=>Units.Contains(unit,StringComparer.Ordinal);
@@ -59,10 +60,29 @@ public sealed class ServiceLoadMonitor : BackgroundService
                         lastRuns[unit]=new(unit,at,null,null,null,load,active,sub,type,result,total??(prior?.LastFinishedAt==stamp?prior?.LastCpuMilliseconds:null),peak??(prior?.LastFinishedAt==stamp?prior?.LastPeakBytes:null),duration,stamp);
                 }
                 var last=lastRuns.GetValueOrDefault(unit);
-                rows.Add(new(unit,at,percentage,memory,tasks,load,active,sub,type,result,last?.LastCpuMilliseconds,last?.LastPeakBytes,last?.LastDurationMilliseconds,last?.LastFinishedAt,measurement));
+                var durable=ReadLastRun(unit,at);
+                if(durable is not null&&(last?.LastFinishedAt is null||durable.LastFinishedAt>=last.LastFinishedAt))last=durable;
+                rows.Add(new(unit,at,percentage,memory,tasks,load,active,sub,type,result,last?.LastCpuMilliseconds,last?.LastPeakBytes,last?.LastDurationMilliseconds,last?.LastFinishedAt,measurement,last?.LastResult??last?.Result));
             }
             Volatile.Write(ref latest,rows.ToArray());
         }while(await timer.WaitForNextTickAsync(ct));
+    }
+    private sealed record RunRecord(string Unit,DateTimeOffset FinishedAt,string Result,long? CpuMilliseconds,long? PeakBytes,long? DurationMilliseconds);
+    private static readonly JsonSerializerOptions Json=new(JsonSerializerDefaults.Web);
+    private static Sample? ReadLastRun(string unit,DateTimeOffset now)
+    {
+        if(unit is not ("mysticego-orchestra-updater.service" or "mysticego-infrastructure-reconcile.service"))return null;
+        try
+        {
+            var file=new FileInfo(Path.Combine("/var/lib/mysticego-infrastructure-status/oneshot",unit+".json"));
+            if(!file.Exists||file.Length>4096)return null;
+            var row=JsonSerializer.Deserialize<RunRecord>(File.ReadAllText(file.FullName),Json);
+            if(row is null||row.Unit!=unit||row.FinishedAt>now.AddSeconds(5)||row.FinishedAt==default)return null;
+            return new(unit,now,null,null,null,null,null,null,"oneshot",row.Result,
+                row.CpuMilliseconds is >=0?row.CpuMilliseconds:null,row.PeakBytes is >=0?row.PeakBytes:null,
+                row.DurationMilliseconds is >=0?row.DurationMilliseconds:null,row.FinishedAt,null,row.Result);
+        }
+        catch(Exception e) when(e is IOException or UnauthorizedAccessException or JsonException){return null;}
     }
     public static DateTimeOffset? ParseSystemdTime(string? raw)
     {
