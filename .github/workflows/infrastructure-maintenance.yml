@@ -1,0 +1,19 @@
+name: Infrastructure maintenance
+on:
+  pull_request:
+    paths:
+      - 'ops/infrastructure/**'
+      - '.github/workflows/infrastructure-maintenance.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'ops/infrastructure/**'
+      - '.github/workflows/infrastructure-maintenance.yml'
+permissions:
+  contents: read
+jobs:
+  maintenance:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m unittest discover -s ops/infrastructure -p 'test_*.py'
