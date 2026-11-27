@@ -14,10 +14,11 @@ public static class AuditRegistration
 {
     public sealed record Request(
         string Login, string Password, string Nickname,
-        string? TermsVersion = null, string? PrivacyVersion = null);
+        string? TermsVersion = null, string? PrivacyVersion = null, string? LicenseVersion = null,
+        string? PermissionPolicyVersion = null, string[]? EnabledScopes = null);
 
-    private sealed record Document(string Version, string Url);
-    private sealed record RegistrationDocuments(Document Terms, Document Privacy);
+    internal sealed record Document(string Version, string Url);
+    internal sealed record RegistrationDocuments(Document Terms, Document Privacy, Document License);
 
     private static Document? ReadDocument(IConfiguration config, string name)
     {
@@ -28,9 +29,9 @@ public static class AuditRegistration
             uri.UserInfo.Length == 0 ? new Document(version, uri.AbsoluteUri) : null;
     }
 
-    private static RegistrationDocuments? ReadDocuments(IConfiguration config) =>
+    internal static RegistrationDocuments? ReadDocuments(IConfiguration config) =>
         ReadDocument(config, "Terms") is { } terms && ReadDocument(config, "Privacy") is { } privacy
-            ? new RegistrationDocuments(terms, privacy)
+            ? new RegistrationDocuments(terms, privacy, new Document("polyform-noncommercial-1.0.0", "https://orchestra.isdarkline.ru/license"))
             : null;
 
     private static IResult DocumentsUnavailable() => Results.Json(
@@ -40,26 +41,20 @@ public static class AuditRegistration
         app.MapGet("/api/auth/audit/registration-documents", (HttpContext context, IConfiguration config) =>
         {
             context.Response.Headers.CacheControl = "no-store";
-            if (!config.GetValue<bool>("AuditRegistration:RequireDocuments"))
-                return Results.Ok(new { required = false });
-
             return ReadDocuments(config) is { } documents
-                ? Results.Ok(new { required = true, documents.Terms, documents.Privacy })
+                ? Results.Ok(new { required = true, documents.Terms, documents.Privacy, documents.License, permissionPolicyVersion = AccountConsentPolicy.Version, scopes = AccountConsentPolicy.Scopes })
                 : DocumentsUnavailable();
         }).AllowAnonymous();
 
         app.MapPost("/api/auth/audit/register", async (
             Request input, AuthDbContext db, IPasswordHasher hasher, IConfiguration config, CancellationToken ct) =>
         {
-            RegistrationDocuments? documents = null;
-            if (config.GetValue<bool>("AuditRegistration:RequireDocuments"))
-            {
-                documents = ReadDocuments(config);
-                if (documents is null)
-                    return DocumentsUnavailable();
-                if (input.TermsVersion != documents.Terms.Version || input.PrivacyVersion != documents.Privacy.Version)
-                    return Results.BadRequest(new { error = "Откройте актуальные условия и подтвердите ознакомление с документами." });
-            }
+            var documents = ReadDocuments(config);
+            if (documents is null) return DocumentsUnavailable();
+            if (input.TermsVersion != documents.Terms.Version || input.PrivacyVersion != documents.Privacy.Version ||
+                input.LicenseVersion != documents.License.Version || input.PermissionPolicyVersion != AccountConsentPolicy.Version ||
+                !AccountConsentPolicy.Valid(input.EnabledScopes))
+                return Results.BadRequest(new { error = "Accept the current terms, privacy notice, license and review feature permissions." });
 
             var login=(input.Login??"").Trim();var nickname=(input.Nickname??"").Trim();
             if(!System.Text.RegularExpressions.Regex.IsMatch(login,"^[a-zA-Z0-9_.-]{4,40}$") ||
@@ -81,6 +76,9 @@ public static class AuditRegistration
                     AcceptedUtc = DateTime.UtcNow
                 });
             }
+            db.AccountLicenseAcceptances.Add(new AccountLicenseAcceptance {UserId=user.Id,Version=documents.License.Version,AcceptedUtc=DateTime.UtcNow});
+            foreach(var scope in AccountConsentPolicy.Scopes)
+                db.AccountFeatureConsents.Add(new AccountFeatureConsent {UserId=user.Id,Scope=scope,PolicyVersion=AccountConsentPolicy.Version,Enabled=input.EnabledScopes!.Contains(scope),UpdatedUtc=DateTime.UtcNow});
             try{await db.SaveChangesAsync(ct);}
             catch(DbUpdateException){return Results.Conflict(new {error="Не удалось создать учётную запись. Проверьте логин."});}
             return Results.Created("/api/auth/login",new {registered=true,accountType="audit",login,
