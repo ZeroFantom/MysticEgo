@@ -11,7 +11,7 @@ const handoffInput = process.env.MYSTICEGO_AVATAR_HANDOFF === '1' ? new Promise(
   const data=chunk=>{input+=chunk.toString();if(input.length>12000)finish(null)};
   const end=()=>{try{
     const value=JSON.parse(input);
-    if(typeof value.token!=='string'||!value.token||value.token.length>8192||!['walk','perch'].includes(value.motion)||!Number.isFinite(value.horizontal)||value.horizontal<0||value.horizontal>1)throw Error();
+    if(typeof value.token!=='string'||!value.token||value.token.length>8192||!['walk','perch'].includes(value.motion)||!Number.isFinite(value.horizontal)||value.horizontal<0||value.horizontal>1||!Number.isFinite(value.phaseSeconds)||value.phaseSeconds<0||value.phaseSeconds>3600||!['neutral','happy','sad','angry','surprised'].includes(value.mood))throw Error();
     finish(value);
   }catch{finish(null)}};
   const timer=setTimeout(()=>finish(null),4000);
