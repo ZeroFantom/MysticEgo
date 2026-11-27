@@ -49,7 +49,7 @@ public sealed class UiAutomationBridge(IConfiguration configuration, IHttpClient
 
 [ApiController, Authorize]
 [Route("api/v1/managed/ui-automation")]
-public sealed class UiAutomationController(NodeOptions node, UiAutomationBridge bridge) : ControllerBase
+public sealed class UiAutomationController(NodeOptions node, UiAutomationBridge bridge, IAssistantAccessPolicy assistant) : ControllerBase
 {
     private static readonly HashSet<string> Operations = new(StringComparer.Ordinal)
     {
@@ -57,7 +57,7 @@ public sealed class UiAutomationController(NodeOptions node, UiAutomationBridge 
         "ui_click", "ui_fill", "ui_scroll", "ui_assert_visible", "ui_close",
         "ui_record_start", "ui_record_stop", "ui_replay",
         "native_targets", "native_attach", "native_snapshot", "native_click", "native_key",
-        "native_pointer_get", "native_pointer_set", "native_close"
+        "native_pointer_get", "native_pointer_set", "native_close", "native_vendor_launch", "native_replay_clicks"
     };
 
     private bool Allowed() =>
@@ -65,7 +65,7 @@ public sealed class UiAutomationController(NodeOptions node, UiAutomationBridge 
         bridge.IsEnabled && !string.IsNullOrWhiteSpace(bridge.Owner) &&
         User.Identity?.IsAuthenticated == true &&
         User.FindFirst("token_use")?.Value != "device" &&
-        string.Equals(User.Identity.Name, bridge.Owner, StringComparison.Ordinal) &&
+        string.Equals(assistant.ResolveOwner(User), bridge.Owner, StringComparison.Ordinal) &&
         HttpContext.Connection.RemoteIpAddress is { } ip && IPAddress.IsLoopback(ip) &&
         !Request.Headers.ContainsKey("Forwarded") &&
         !Request.Headers.ContainsKey("X-Forwarded-For") &&
