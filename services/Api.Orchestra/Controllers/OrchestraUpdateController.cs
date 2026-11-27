@@ -67,7 +67,7 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
         var maintenance=update?.Maintenance??ReadMaintenance();
         var updateFresh=now-System.IO.File.GetLastWriteTimeUtc(StateDirectory+"/status.json")<TimeSpan.FromMinutes(3);
         var pending=new[]{"pending.json","maintenance-rescue.json","maintenance-repair.json"}.Any(n=>System.IO.File.Exists(Path.Combine(Inbox,n)));
-        var busy=pending||update?.Phase is "switching" or "downloading"||
+        var busy=pending||serviceLoads.Read().Any(s=>s.Unit=="mysticego-infrastructure-reconcile.service"&&s.ActiveState=="activating")||update?.Phase is "switching" or "downloading"||
             recovery?.State=="repairing"&&now-recovery.CheckedAt<TimeSpan.FromMinutes(10)||
             report.Components.Any(c=>c.State=="repairing"&&now-c.CheckedAt<TimeSpan.FromMinutes(55));
         var failed=report.Components.Any(c=>c.Name is ("docker" or "lmstudio" or "voice" or "postgres-service" or "worker")&&c.State=="degraded"&&now-c.CheckedAt<TimeSpan.FromMinutes(55));
@@ -76,7 +76,7 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
         var available=updateFresh&&Directory.Exists(Inbox)&&update is {Phase:"ready" or "failed",Protocol:2,Candidate:{ } candidate}&&
             update.Targets?.Contains("orchestra")==true&&candidate.Tag!=update.Current;
         var healthy=updateFresh&&update?.Phase=="current"&&report.Installed&&report.SocketAvailable&&
-            report.Components.All(c=>c.State is "available" or "external" or "disabled"&&now-c.CheckedAt<TimeSpan.FromMinutes(3));
+            report.Components.All(c=>(c.State is "available" or "external" or "disabled")&&now-c.CheckedAt<TimeSpan.FromMinutes(3));
         var action=Decide(busy,available,repairNeeded,repairAvailable,healthy);
         var reason=action switch
         {
