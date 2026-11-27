@@ -195,7 +195,7 @@ function Workspace({logout}:{logout:()=>void}){
       <button ref={closeDrawer} className="icon-btn drawer-close" type="button" aria-label={t("Закрыть меню")} onClick={()=>setMobile(false)}><X size={20}/></button>
       <Link to="/" className="brand" aria-label="MysticEgo" onClick={()=>setMobile(false)}><div className="brand-mark"><img src={"/mystic-mark.png"} alt=""/></div><strong>MysticEgo</strong></Link>
       <div className="node-label"><span className="node-icon"><ModeIcon size={18}/></span><div><strong>{t(modes[mode].name)}</strong><small>{t(modes[mode].subtitle)}</small></div></div>
-      <nav aria-label={t("Главная навигация")}>{nav.map(section=><div className="nav-section" key={t(section.name)}>
+      <nav aria-label={t("Главная навигация")}>{nav.map(section=><div className="nav-section" key={section.name}>
         <div className="nav-title">{section.name}</div>
         {section.items.map(item=><NavLink key={item.to} to={item.to} aria-label={t(item.label)} title={t(item.label)} end={item.to==='/'} onClick={()=>setMobile(false)} className={({isActive})=>'nav-link '+(isActive?'active':'')}>
           <item.icon size={17}/><span>{t(item.label)}</span>
@@ -212,7 +212,7 @@ function Workspace({logout}:{logout:()=>void}){
       <header className="topbar orchestral-topbar">
         <span className="topbar-light" aria-hidden="true"><span className="topbar-sweep"/></span>
         <button ref={menuTrigger} type="button" className="icon-btn mobile-toggle" onClick={()=>setMobile(value=>!value)} aria-label={t("Открыть меню")} aria-controls="workspace-navigation" aria-expanded={drawerOpen}><Menu size={22}/></button>
-        <div className="breadcrumb"><span>{modes[mode].name}</span><ChevronRight size={14}/><strong>{t(current)}</strong></div>
+        <div className="breadcrumb"><span>{t(modes[mode].name)}</span><ChevronRight size={14}/><strong>{t(current)}</strong></div>
         <div className="top-actions"><MaintenanceNotices enabled={mode==='orchestra'&&developer.value?.owner===true}/><ThemeToggle scope={preferenceScope}/><AccountMenu logout={logout}/><NotificationsFloat/></div>
       </header>
       <main className="content"><AnimatedArea><Routes>
