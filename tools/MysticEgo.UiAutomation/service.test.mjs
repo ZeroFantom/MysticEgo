@@ -29,7 +29,12 @@ test('visible browser session, exact locator, ownership and close', async () => 
   const { sessionId } = await svc.run('ui_open', { kind: 'web', target: 'https://example.test/' });
   assert.equal(options.headless, false);
   await assert.rejects(svc.run('ui_open', { kind: 'web', target: 'https://example.test/' }), /Close active/);
+  await svc.run('ui_record_start', { sessionId });
   await svc.run('ui_click', { sessionId, role: 'button', name: 'Overview' });
+  const scenario = await svc.run('ui_record_stop', { sessionId });
+  assert.equal(scenario.steps.length, 1);
+  assert.equal(scenario.steps[0].name, 'ui_click');
+  assert.deepEqual(await svc.run('ui_replay', { sessionId, scenarioId: scenario.scenarioId }), { replayed: 1 });
   assert.deepEqual(clicked, ['button', { name: 'Overview', exact: true }]);
   await svc.run('ui_close', { sessionId });
   assert.equal(closed, 1);
