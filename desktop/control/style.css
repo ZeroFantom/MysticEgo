@@ -128,3 +128,15 @@ button.plain{color:var(--ink)}
  background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:7px 11px;
 }
 @media(max-width:650px){:root[data-interface][data-theme] .desktop-header{aspect-ratio:auto;padding-bottom:calc(12vw + 12px)}}
+
+/* Account typography presets. All fonts are local; OS fallback covers CJK. */
+:root[data-font="modern"]{font-family:"Inter","DM Sans","Noto Sans","Segoe UI",system-ui,sans-serif}
+:root[data-font="editorial"]{font-family:"Noto Serif","Source Serif 4",Georgia,serif}
+:root[data-font="system"]{font-family:system-ui,"Segoe UI",sans-serif}
+:root[data-font="mono"]{font-family:"JetBrains Mono","Cascadia Mono",Consolas,monospace}
+:root[lang="zh-CN"][data-font="modern"]{font-family:"Noto Sans CJK SC","Microsoft YaHei","PingFang SC",sans-serif}
+:root[lang="ko"][data-font="modern"]{font-family:"Noto Sans CJK KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif}
+:root[lang="zh-CN"][data-font="editorial"]{font-family:"Noto Serif CJK SC","SimSun",serif}
+:root[lang="ko"][data-font="editorial"]{font-family:"Noto Serif CJK KR","Batang",serif}
+:root[data-font] textarea{font-family:inherit}
+#presentation-controls{display:grid;gap:10px;margin-bottom:14px}
