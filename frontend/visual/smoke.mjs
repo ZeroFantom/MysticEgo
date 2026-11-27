@@ -157,16 +157,19 @@ try{
           const serverAppearance=await isolate(page,origin);
           await page.goto(origin+'/settings',{waitUntil:'domcontentloaded'});
           await visible(page.locator('.auth-form-card'));
-          const highlights=page.getByRole('complementary',{name:'Обновления MysticEgo'});
+          const privacy=page.getByRole('dialog',{name:'Настройки приватности'});
+          await visible(privacy);
+          await privacy.getByRole('button',{name:'Только необходимые'}).click();
+          const highlights=page.getByRole('dialog',{name:'Что нового'});
           await visible(highlights);
-          assert.match(await highlights.innerText(),/Что нового · v[0-9]/);
+          assert.match(await highlights.innerText(),/v[0-9]/);
+          const bounds=await highlights.boundingBox();
+          assert.ok(bounds&&Math.abs(bounds.x+bounds.width/2-viewport.width/2)<3&&Math.abs(bounds.y+bounds.height/2-viewport.height/2)<3,'release dialog must be centered');
           await highlights.getByRole('button',{name:'Ознакомился'}).click();
           await highlights.waitFor({state:'hidden'});
-          await visible(page.getByRole('region',{name:'Настройки приватности'}));
-          await page.getByRole('button',{name:'Только необходимые'}).click();
           await page.reload({waitUntil:'domcontentloaded'});
           await visible(page.locator('.auth-form-card'));
-          assert.equal(await page.getByRole('region',{name:'Настройки приватности'}).count(),0);
+          await privacy.waitFor({state:'hidden'});
           await highlights.waitFor({state:'hidden'});
           for(const [theme,style] of combinations)await check(page,prefix+'-login-'+theme+'-'+style,async()=>{
             await switchAppearance(page,theme,style);await checkArtwork(page,theme,style,'.auth-visual',viewport.width<=780?'hero':'entry');
