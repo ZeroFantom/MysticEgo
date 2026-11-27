@@ -6,9 +6,13 @@
 Запустите EXE, примите лицензию, дождитесь установки, откройте приложение через меню «Пуск». Версии устанавливаются раздельно в LocalAppData. Установщики не подписаны: SmartScreen может предупреждать. Удаление через список приложений не удаляет пользовательские профили.
 
 ## Linux x86_64
+Из папки загрузки (замените название на нужный продукт):
 ```bash
-bash MysticEgo-AuditDesktop-linux-x64.run
+cd ~/Downloads
+bash ./MysticEgo-CloudDesk-linux-x64.run --check
+bash ./MysticEgo-CloudDesk-linux-x64.run
 ```
+Браузеры обычно сохраняют файлы без executable-bit. Прямой запуск `./MysticEgo-CloudDesk-linux-x64.run` требует `chmod u+x` и файловой системы без `noexec`. `sudo` не исправляет отсутствие права выполнения; установщик запрещает запуск от root. Предпочтительный способ — `bash ./...run`. Если даже после распаковки приложение не запускается, проверьте `findmnt -T "${XDG_DATA_HOME:-$HOME/.local/share}" -o TARGET,FSTYPE,OPTIONS` и `ls -l` установленного Electron. Не отключайте sandbox или ограничения ОС. Проверяйте SHA256SUMS-desktop.txt из доверенного релиза; `--check` проверяет встроенный payload, но не удостоверяет автора установщика.
 Повторный запуск того же файла открывает установленное приложение. --install-only устанавливает без запуска; --check проверяет SHA-256 вложенного архива и извлекает его во временный каталог без запуска. Установка: ~/.local/share/mysticego/apps/<Product>/<Version> (или XDG_DATA_HOME). В установленном каталоге есть launch.sh. Это RUN, не AppImage; FUSE не нужен. Нужны системные библиотеки Electron и графическая сессия. Песочница не отключается; Ubuntu может потребовать настройку AppArmor. Не запускайте от root.
 
 .NET и Electron входят в комплект. Windows 10/11 x64: CloudDesk использует системный OpenSSH, если присутствуют все клиентские утилиты, иначе комплектный официальный portable OpenSSH (preview); GitHub CLI также входит в Windows-комплект. WSL не нужен. В Linux нужны GitHub CLI, OpenSSH, secret-tool и терминал Konsole, GNOME Terminal или x-terminal-emulator. Сам установщик не меняет hosts, SSH, DNS или серверы; приложение может запросить отдельную настройку при запуске. Функциональность на реальных VPS и физических Windows 10/11 требует отдельной проверки.
