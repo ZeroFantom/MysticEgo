@@ -5,8 +5,8 @@ import {Panel} from '../components/primitives';
 
 export type Maintenance={installed:boolean;components:{name:string;state:string;message:string;checkedAt:string}[]};
 const endpoint='/managed/infrastructure-maintenance';
-const names:Record<string,string>={orchestra:'Orchestra',docker:'Docker / Compose',lmstudio:'LM Studio',voice:'Распознавание речи','postgres-service':'Служба PostgreSQL',database:'Текущая база'};
-const labels:Record<string,string>={available:'Готово',repairing:'Восстановление',degraded:'Требует внимания',external:'Заданная конфигурация',disabled:'Отключено'};
+const names:Record<string,string>={worker:'Служба обслуживания',orchestra:'Orchestra',docker:'Docker / Compose',lmstudio:'LM Studio',voice:'Распознавание речи','postgres-service':'Служба PostgreSQL',database:'Текущая база'};
+const labels:Record<string,string>={checking:'Проверяется',available:'Готово',repairing:'Восстановление',degraded:'Требует внимания',external:'Заданная конфигурация',disabled:'Отключено'};
 export function MaintenanceStatus(){
   const {api}=useApp();
   const state=useRemote(()=>api.request<Maintenance>(endpoint),[api],10000);

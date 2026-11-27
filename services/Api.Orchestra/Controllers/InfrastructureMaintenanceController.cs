@@ -6,7 +6,7 @@ using MysticEgo.Distributed;
 namespace MysticEgo.Api.Orchestra.Controllers;
 
 [ApiController, Authorize(Policy = "operator"), Route("api/v1/managed/infrastructure-maintenance")]
-public sealed class InfrastructureMaintenanceController(DevelopmentTeam team, NodeState state) : ControllerBase
+public sealed class InfrastructureMaintenanceController(DevelopmentTeam team, DatabaseMaintenance database) : ControllerBase
 {
     private const string Report = "/var/lib/mysticego-infrastructure-status/status.json";
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -31,15 +31,10 @@ public sealed class InfrastructureMaintenanceController(DevelopmentTeam team, No
             }
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException) { }
-        var ok = false;
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        deadline.CancelAfter(TimeSpan.FromSeconds(5));
-        try { ok = await state.Data.CheckHealthAsync(deadline.Token); }
-        catch (Exception error) when (error is System.Data.Common.DbException or IOException or InvalidOperationException or OperationCanceledException) { }
-        components.Add(new("database", ok ? "available" : "degraded",
-            ok ? state.Data.Provider + ": подключение к текущему хранилищу доступно."
-               : state.Data.Provider + ": подключение не работает. Данные и провайдер сохранены; требуется проверка или явная миграция.",
-            DateTimeOffset.UtcNow));
+        var db = database.Snapshot;
+        components.Add(new(db.Name, db.State, db.Message, db.CheckedAt));
+        if (installed && components.Where(c => c.Name != "database").All(c => DateTimeOffset.UtcNow - c.CheckedAt > TimeSpan.FromMinutes(55)))
+            components.Add(new("worker", "degraded", "Worker не публикует свежие проверки. Проверьте systemd-таймер.", DateTimeOffset.UtcNow));
         return Ok(new { installed, components });
     }
 

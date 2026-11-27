@@ -36,6 +36,8 @@ builder.Services.AddAuthorizationBuilder().AddPolicy("orchestra-executor", polic
         request.RequestServices.GetRequiredService<ManagedNetwork>().Find(id) is { Kind: "agent", Enabled: true }));
 builder.Services.AddSingleton<ManagedDeployment>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<ManagedDeployment>());
+builder.Services.AddSingleton<DatabaseMaintenance>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<DatabaseMaintenance>());
 builder.Services.AddSingleton<ServerTelemetry>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<ServerTelemetry>());
 builder.Services.AddOrchestraProxy();
