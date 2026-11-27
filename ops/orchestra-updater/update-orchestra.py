@@ -478,6 +478,13 @@ def automatic_target(candidate, targets, last):
         return None
     if last.get("candidate") == candidate and last.get("phase") in ("downloading", "switching", "failed"):
         return None
+    # Persistent root-owned guard survives temporary GitHub outages and process restarts.
+    try:
+        prior = json.loads((STATE / "automatic-attempt.json").read_text())
+        if prior.get("tag") == candidate["tag"]:
+            return None
+    except (OSError, ValueError, AttributeError):
+        pass
     # No unattended retries of a failed release. Do not race active dependency provisioning.
     if system_ok("is-active", "--quiet", "mysticego-infrastructure-reconcile.service"):
         return None
@@ -510,6 +517,7 @@ def run_locked():
             status("failed", installed, candidate, targets, "Обновление остановилось. Проверьте журнал службы на VPS.", last.get("lastTarget"))
         elif (automatic := automatic_target(candidate, targets, last)):
             target = automatic
+            write("automatic-attempt.json", {"tag": candidate["tag"]})
             apply(candidate, installed, targets, target)
         else:
             status("ready", installed, candidate, targets)
