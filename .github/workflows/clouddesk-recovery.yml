@@ -26,5 +26,7 @@ jobs:
       - run: node ops/desktop-releases/clouddesk-recovery-smoke.mjs
       - run: node --check tools/MysticEgo.CloudDesk/desktop/main.cjs
       - run: bash -n ops/orchestra-updater/recover-maintenance.sh
-      - run: npm ci --prefix tools/MysticEgo.CloudDesk
+      - run: npm install --prefix tools/MysticEgo.CloudDesk --no-audit --no-fund
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       - run: npm run build --prefix tools/MysticEgo.CloudDesk
