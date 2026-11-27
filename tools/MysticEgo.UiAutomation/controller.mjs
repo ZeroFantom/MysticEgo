@@ -6,6 +6,16 @@ import { timingSafeEqual } from 'node:crypto';
 const session = { sessionId: z.string().uuid() };
 const element = { ...session, role: z.enum(['button','link','textbox','checkbox','radio','combobox','tab','menuitem','heading','switch','option']), name: z.string().min(1).max(300) };
 export const operations = {
+  desktop_capabilities: ['Report approved desktop settings capabilities', {}],
+  desktop_animations_get: ['Read desktop animation preference', {}],
+  desktop_animations_set: ['Enable or disable desktop animation preference', {enabled:z.boolean()}],
+  desktop_colors_list: ['List KDE installed color schemes', {}],
+  desktop_colors_set: ['Apply an owner-approved KDE color scheme; may affect system UI', {scheme:z.string().min(1).max(80)}],
+  desktop_theme_list: ['List KDE Plasma styles', {}],
+  desktop_theme_set: ['Apply an owner-approved KDE Plasma style including panel appearance', {theme:z.string().min(1).max(80)}],
+  desktop_count: ['Get KDE virtual desktop count', {}],
+  desktop_create: ['Create KDE virtual desktop, or send Windows shortcut only when desktop switching was locally approved', {name:z.string().min(1).max(80).optional()}],
+  desktop_colors_open: ['Open Windows personalization colors settings; may take focus', {}],
   native_targets: ['List owner-approved Windows process names and settings permission', {}],
   native_attach: ['Attach only to the currently foreground owner-approved Windows window', { process: z.string().regex(/^[A-Za-z0-9_. -]{1,80}$/) }],
   native_snapshot: ['Capture the foreground window client area', session],
