@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import type {Session} from './context';
 
-type StoredSession=Pick<Session,'url'|'authUrl'|'username'>&{refreshToken:string};
+type StoredSession=Pick<Session,'url'|'authUrl'|'username'>&{refreshToken?:string;browserSession?:boolean};
 
 function address(value:unknown){
  if(typeof value!=='string')return false;
@@ -14,19 +14,24 @@ function address(value:unknown){
 function read(key:string):StoredSession|null{
  try{
   const saved=JSON.parse(sessionStorage.getItem(key)??'null') as StoredSession|null;
-  return saved&&address(saved.authUrl)&&address(saved.url)&&typeof saved.refreshToken==='string'&&saved.refreshToken.length>0?saved:null;
+  return saved&&address(saved.authUrl)&&address(saved.url)&&(saved.browserSession===true&&saved.authUrl===location.origin&&location.protocol==='https:'||typeof saved.refreshToken==='string'&&saved.refreshToken.length>0)?saved:null;
  }catch{return null;}
 }
 
 function save(key:string,session:Session){
  try{
-  if(!session.refreshToken){sessionStorage.removeItem(key);return;}
-  const {url,authUrl,username,refreshToken}=session;
-  sessionStorage.setItem(key,JSON.stringify({url,authUrl,username,refreshToken}));
+  if(!session.refreshToken&&!session.browserSession){sessionStorage.removeItem(key);return;}
+  const {url,authUrl,username,refreshToken,browserSession}=session;
+  sessionStorage.setItem(key,JSON.stringify({url,authUrl,username,browserSession,refreshToken:browserSession?undefined:refreshToken}));
  }catch{/* Browsers may disable storage. */}
 }
 
+export async function browserAuthRequest(action:'login'|'refresh'|'logout',body:unknown={}){
+ const run=()=>fetch('/api/auth/browser/'+action,{method:'POST',credentials:'same-origin',redirect:'error',cache:'no-store',headers:{'Content-Type':'application/json','X-Mystic-Browser':'1'},body:JSON.stringify(body),signal:AbortSignal.timeout(15000)});
+ return navigator.locks?navigator.locks.request('mysticego-browser-auth',run):run();
+}
 async function revoke(session:Session){
+ if(session.browserSession){await browserAuthRequest('logout').catch(()=>{});return;}
  if(!session.refreshToken)return;
  await fetch(session.authUrl.replace(/\/$/,'')+'/api/auth/logout',{
   method:'POST',headers:{'Content-Type':'application/json'},
@@ -47,11 +52,11 @@ export function useBrowserSession(key:string,initial:Session){
  function logout(){
   const previous=current.current;
   setRestoreError('');
-  setSession({...previous,token:'',refreshToken:undefined,username:undefined});
+  setSession({...previous,token:'',refreshToken:undefined,browserSession:undefined,username:undefined});
   void revoke(previous);
  }
  useEffect(()=>{
-  if(!session.refreshToken)return;
+  if(!session.refreshToken&&!session.browserSession)return;
   let active=true;
   const restoreStarted=Date.now();
   let failures=0;
@@ -59,7 +64,7 @@ export function useBrowserSession(key:string,initial:Session){
   const schedule=(delay:number)=>{timer=window.setTimeout(refresh,delay);};
   async function refresh(){
    try{
-    const response=await fetch(session.authUrl.replace(/\/$/,'')+'/api/auth/refresh',{
+    const response=session.browserSession?await browserAuthRequest('refresh'):await fetch(session.authUrl.replace(/\/$/,'')+'/api/auth/refresh',{
      method:'POST',headers:{'Content-Type':'application/json'},
      body:JSON.stringify({refreshToken:session.refreshToken}),signal:AbortSignal.timeout(12000)
     });
@@ -69,10 +74,16 @@ export function useBrowserSession(key:string,initial:Session){
     }
     if(!response.ok)throw Error('Сервер входа временно недоступен.');
     const data=await response.json();
-    if(typeof data.accessToken!=='string'||!data.accessToken||typeof data.refreshToken!=='string'||!data.refreshToken)
+    if(typeof data.accessToken!=='string'||!data.accessToken||(!session.browserSession&&(typeof data.refreshToken!=='string'||!data.refreshToken)))
      throw Error('Сервер вернул неполную сессию.');
-    const next={...session,token:data.accessToken,refreshToken:data.refreshToken,username:data.user?.login??session.username};
-    if(!active||current.current!==session){void revoke(next);return;}
+    // A host-wide cookie can be replaced by an explicit sign-in in another tab.
+   // Do not silently transfer this workspace to that other account.
+   if(session.browserSession&&session.username&&data.user?.login!==session.username){
+    if(active&&current.current===session){setSession({...session,token:'',browserSession:undefined,refreshToken:undefined,username:undefined});setRestoreError('Account changed in another tab. Sign in again.');}
+    return;
+   }
+   const next={...session,token:data.accessToken,refreshToken:session.browserSession?undefined:data.refreshToken,username:data.user?.login??session.username};
+    if(!active||current.current!==session){if(!session.browserSession)void revoke(next);return;}
     setRestoreError('');
     setSession(next);
    }catch{
@@ -89,7 +100,7 @@ export function useBrowserSession(key:string,initial:Session){
   schedule(session.token?9*60*1000:0);
   return ()=>{active=false;window.clearTimeout(timer);};
  },[session,retry,key]);
- return {session,setSession,logout,restoring:!!session.refreshToken&&!session.token,restoreError,retryRestore:()=>setRetry(n=>n+1)};
+ return {session,setSession,logout,restoring:!!(session.refreshToken||session.browserSession)&&!session.token,restoreError,retryRestore:()=>setRetry(n=>n+1)};
 }
 
 export function accountScope(session:Session,mode:string,portal:boolean){

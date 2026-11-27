@@ -1,3 +1,4 @@
+import {browserAuthRequest} from '../app/browserSession';
 import {useState,type FormEvent} from 'react';
 import {browserKind,browserLabels} from '../app/browserPolicy';
 import {DesktopSignIn} from '../app/DesktopSignIn';
@@ -12,11 +13,17 @@ import {PanelLoginLinks} from './PanelDirectory';
 import {LicenseLink} from './Studio';
 import {readRegistrationDocuments} from './registration-documents';
 
-export type AuthLogin={accessToken:string;refreshToken:string;user?:{login?:string};expiresAt:string};
+export type AuthLogin={accessToken:string;refreshToken?:string;browserSession?:boolean;user?:{login?:string};expiresAt:string};
 export async function signIn(authUrl:string,login:string,password:string):Promise<AuthLogin>{
- const response=await fetch(authUrl.replace(/\/$/, '')+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({login,password})});
+ let protectedBrowser=false;
+ if(location.protocol==='https:'&&authUrl.replace(/\/$/,'')===location.origin){
+  const policy=await fetch('/api/auth/browser/status',{cache:'no-store',credentials:'same-origin',redirect:'error',signal:AbortSignal.timeout(8000)});
+  if(!policy.ok&&policy.status!==404)throw Error('Browser session policy unavailable');
+  protectedBrowser=policy.ok&&(await policy.json()).enabled===true;
+ }
+ const response=protectedBrowser?await browserAuthRequest('login',{login,password}):await fetch(authUrl.replace(/\/$/, '')+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({login,password})});
  if(!response.ok)throw new Error(response.status===401?'Проверьте логин и пароль.':'Вход недоступен, код '+response.status);
- return response.json();
+ return {...await response.json(),browserSession:protectedBrowser};
 }
 const labels:Record<string,[string,string]>={orchestra:['Оркестр','Управление экосистемой'],global:['Global','Панель организации'],local:['Local','Панель клуба'],agent:['Agent','Рабочая станция клуба'],audit:['Audit','Личный профиль MysticEgo']};
 export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;onLogin:(s:Session)=>void;mode?:string;onGuest?:(token:string)=>void}){
@@ -50,7 +57,7 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
     if(!response.ok){const result=await response.json().catch(()=>({}));throw Error(result.error||'Регистрация недоступна, код '+response.status)}
    }
    const result=await signIn(authUrl,login,password);
-   onLogin({...session,authUrl,token:result.accessToken,refreshToken:result.refreshToken,username:result.user?.login||login});
+   onLogin({...session,authUrl:result.browserSession?location.origin:authUrl,token:result.accessToken,refreshToken:result.browserSession?undefined:result.refreshToken,browserSession:result.browserSession,username:result.user?.login||login});
    setPassword('');
   }catch(error){setError(error instanceof Error?error.message:String(error))}
   finally{setBusy(false)}

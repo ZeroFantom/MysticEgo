@@ -20,4 +20,5 @@
   <ItemGroup>
     <Compile Include="../../shared/AgentRelease.cs" Link="Deployment/AgentRelease.cs"/>
   </ItemGroup>
+  <ItemGroup><ProjectReference Include="../MysticEgo.Capacity/MysticEgo.Capacity.csproj"/></ItemGroup>
 </Project>

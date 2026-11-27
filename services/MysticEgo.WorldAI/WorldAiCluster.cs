@@ -67,6 +67,21 @@ public sealed class WorldAiCluster
         }).ToArray();}
         finally{_mutex.Release();}
     }
+    /// <summary>Return physical model pool observations without URLs, credentials or prompts.</summary>
+    public async Task<MysticEgo.Capacity.ModelPool[]> CapacityPools(CancellationToken ct)
+    {
+        await _mutex.WaitAsync(ct);
+        try
+        {
+            var now=DateTimeOffset.UtcNow;
+            return Workers().GroupBy(w=>SlotKey(w.Id),StringComparer.Ordinal).Select(g=>
+                new MysticEgo.Capacity.ModelPool(g.Key,g.First().Model,
+                    g.Key=="local-model"?"local":"remote",
+                    g.Max(w=>w.Slots),_inflight.GetValueOrDefault(g.Key),
+                    g.Any(w=>w.Enabled&&(!_circuit.TryGetValue(w.Id,out var c)||c.RetryAt<=now)))).ToArray();
+        }
+        finally{_mutex.Release();}
+    }
     public SharedMemoryFact[] Memory(){lock(_memory)return _memory.TakeLast(200).ToArray();}
     async Task Save<T>(string name,T value,CancellationToken ct)
     {var path=Path.Combine(_dir,name);var tmp=path+".tmp";await File.WriteAllTextAsync(tmp,JsonSerializer.Serialize(value,_json),ct);File.Move(tmp,path,true);}

@@ -66,7 +66,9 @@ public sealed class AuthService : IAuthService
             return null;
 
         _db.RefreshTokens.Remove(stored);
-        var response = await BuildAuthResponseAsync(stored.User, ip, userAgent, ct);
+        AuthResponse response;
+        try { response = await BuildAuthResponseAsync(stored.User, ip, userAgent, ct); }
+        catch(DbUpdateConcurrencyException) { return null; } // A competing refresh already consumed this token.
 
         _log.LogInformation("Refresh OK: {Login}", stored.User.Login);
         return response;

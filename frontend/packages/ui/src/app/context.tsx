@@ -1,7 +1,7 @@
 import {createContext,useContext,useEffect,useRef,useState} from 'react';
 import {NodeApi,type NodeMode} from '@mysticego/sdk';
 
-export type Session={url:string;token:string;authUrl:string;refreshToken?:string;username?:string};
+export type Session={url:string;token:string;authUrl:string;refreshToken?:string;browserSession?:boolean;username?:string};
 export type AccountProfile={id:string;displayName:string;bio:string;statusText?:string;avatarUrl:string;backgroundUrl:string;coverUrl:string;accent:string;discoverable:boolean};
 export type Personality={version:string;resultVersion?:string;completed:boolean;completedAt?:string;questions?:{id:string;axis:string;text:string}[];axes:{id:string;label:string;question:string;value:number|null}[]};
 export type GameAttribute={id:string;label:string;group:'mind'|'social'|'body';value:number|null;locked:boolean;base:number|null;allocated:number;grade?:string;hint:string};

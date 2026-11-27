@@ -12,7 +12,7 @@ namespace MysticEgo.Api.Orchestra.Controllers;
 [ApiController, Authorize(Policy = "operator"), Route("api/v1/managed/nodes/{id:guid}/timeweb")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public sealed class GlobalTimewebController(ManagedNetwork network, DevelopmentTeam team, IConfiguration settings,
-    IHttpClientFactory clients, NodeState state) : ControllerBase
+    TimewebApiClient cloud, NodeState state) : ControllerBase
 {
     private static readonly ConcurrentDictionary<int, SemaphoreSlim> Operations = new();
 
@@ -43,8 +43,7 @@ public sealed class GlobalTimewebController(ManagedNetwork network, DevelopmentT
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
             timeout.CancelAfter(TimeSpan.FromSeconds(12));
-            using var client = clients.CreateClient("mysticego-timeweb");
-            var ips = await Get(client, $"servers/{server}/ips", token, timeout.Token);
+            var ips = await cloud.Get($"servers/{server}/ips", timeout.Token);
             if (ips?["server_ips"] is not JsonArray list ||
                 !list.OfType<JsonObject>().Any(x => Value(x,"type") == "ipv4" && Value(x,"ip") == ip.ToString()))
                 return Conflict(new { error = "IPv4 не принадлежит указанному VPS Timeweb." });
@@ -52,14 +51,14 @@ public sealed class GlobalTimewebController(ManagedNetwork network, DevelopmentT
                 !(await Dns.GetHostAddressesAsync(url.Host, timeout.Token)).Contains(ip))
                 return Conflict(new { error = "Адрес зарегистрированного Global не совпадает с привязкой." });
 
-            var reply = await Get(client, $"servers/{server}", token, timeout.Token);
+            var reply = await cloud.Get($"servers/{server}", timeout.Token);
             if (reply?["server"] is not JsonObject details || Value(details,"id") != server.ToString())
                 return StatusCode(502, new { error = "Timeweb вернул неожиданный идентификатор VPS." });
             var status = Value(details,"status");
             if (action is null) return Ok(new { serverId = server, ipv4 = ip.ToString(), status });
             if (action == "start" ? status != "off" : status != "on")
                 return Conflict(new { error = "Состояние VPS изменилось. Обновите статус перед повторной попыткой." });
-            using var result = await Send(client, HttpMethod.Post, $"servers/{server}/{action}", token, timeout.Token);
+            using var result = await cloud.Send(HttpMethod.Post, $"servers/{server}/{action}", timeout.Token);
             result.EnsureSuccessStatusCode();
             state.Log(User.Identity?.Name ?? "developer", "timeweb.global." + action, id.ToString(), true, server.ToString());
             return Accepted(new { serverId = server, action });
@@ -75,22 +74,7 @@ public sealed class GlobalTimewebController(ManagedNetwork network, DevelopmentT
         finally { gate.Release(); }
     }
 
-    private static string Value(JsonObject item, string key) =>
-        item[key] is JsonValue value ? value.ToString() : "";
-
-    private static async Task<JsonObject?> Get(HttpClient client, string path, string token, CancellationToken ct)
-    {
-        using var response = await Send(client, HttpMethod.Get, path, token, ct);
-        response.EnsureSuccessStatusCode();
-        return JsonNode.Parse(await response.Content.ReadAsStringAsync(ct)) as JsonObject;
-    }
-
-    private static async Task<HttpResponseMessage> Send(HttpClient client, HttpMethod method, string path, string token, CancellationToken ct)
-    {
-        using var request = new HttpRequestMessage(method, "https://api.timeweb.cloud/api/v1/" + path);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        return await client.SendAsync(request, ct);
-    }
+    private static string Value(JsonObject item,string key)=>TimewebApiClient.Value(item,key);
 
     public sealed record PowerRequest(string Action, bool Confirmed);
 }
