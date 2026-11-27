@@ -16,6 +16,7 @@ const view=pathToFileURL(path.join(here,'index.html')).href;
 mkdirSync(home,{recursive:true,mode:0o700});
 app.setName('LocalDesktop');
 app.setPath('userData',path.join(home,'electron'));
+const highlights=updater.createReleaseHighlights({app,root,product:'LocalDesktop'});
 
 const guid=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 let window,connection,profile,runner,closing=false,busy=false,online=false;
@@ -100,6 +101,7 @@ function handle(name,action,mutating=true){
   });
 }
 async function open(){
+  await highlights.load();
   try{profile=validate(JSON.parse(await fs.readFile(profileFile,'utf8')))}catch(error){if(error.code!=='ENOENT')log(error.message)}
   window=new BrowserWindow({title:'LocalDesktop · MysticEgo',icon:path.join(here,'local-icon.png'),width:900,height:700,autoHideMenuBar:true,
     webPreferences:{preload:path.join(here,'preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false}});
@@ -110,9 +112,10 @@ async function open(){
     approve:pairing.approveSession});
   handle('connect',connect);
   handle('provision',provision);
+  handle('release-highlights-dismiss',tag=>highlights.dismiss(tag),false);
   handle('status',async()=>{
     online=await health();
-    return {online,running:!!runner,name:profile?.name,global:profile?.endpoints.globalUrl,address:profile?.endpoints.publicUrl,logs};
+    return {releaseHighlights:highlights.get(),online,running:!!runner,name:profile?.name,global:profile?.endpoints.globalUrl,address:profile?.endpoints.publicUrl,logs};
   },false);
   handle('start',async()=>{if(!await health())start()});
   handle('stop',stop);
@@ -129,5 +132,5 @@ if(!app.requestSingleInstanceLock())app.quit();
 else{
   app.on('second-instance',()=>window?.focus());
   app.on('window-all-closed',()=>app.quit());
-  app.whenReady().then(async()=>{await open();updater.startDesktopUpdates({app,dialog,root,product:'LocalDesktop',window:()=>window})}).catch(error=>{console.error(error);app.quit()});
+  app.whenReady().then(async()=>{await open();updater.startDesktopUpdates({app,dialog,root,product:'LocalDesktop',window:()=>window,canRestart:()=>!closing&&!busy})}).catch(error=>{console.error(error);app.quit()});
 }

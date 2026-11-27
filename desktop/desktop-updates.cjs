@@ -10,6 +10,37 @@ const run=promisify(execFile);
 const repo='ZeroFantom/MysticEgo';
 const products=new Set(['CloudDesk','AgentDesktop','AuditDesktop','LocalDesktop']);
 const maxSize=2_000_000_000;
+const automaticProducts=new Set(['AgentDesktop','LocalDesktop']);
+const requiresConfirmation=product=>!automaticProducts.has(product);
+const releaseNotes=value=>typeof value==='string'?value.trim().slice(0,12000):'';
+const notesPath=app=>path.join(app.getPath('userData'),'release-highlights.json');
+const seenPath=app=>path.join(app.getPath('userData'),'release-highlights-seen.json');
+async function saveJson(file,value){
+ await fs.mkdir(path.dirname(file),{recursive:true,mode:0o700});
+ const temp=file+'.'+randomUUID()+'.tmp';
+ try{await fs.writeFile(temp,JSON.stringify(value),{mode:0o600,flag:'wx'});await fs.rename(temp,file)}
+ finally{await fs.rm(temp,{force:true}).catch(()=>{})}
+}
+async function readJson(file){
+ try{if((await fs.stat(file)).size>65000)return null;return JSON.parse(await fs.readFile(file,'utf8'))}catch{return null}
+}
+function createReleaseHighlights({app,root,product}){
+ let current=null;
+ async function load(){
+  const installed=installation(root,product,process.platform)?.installed;
+  if(!installed)return;
+  if((await readJson(seenPath(app)))?.tag===installed)return;
+  const staged=await readJson(notesPath(app));
+  const bundled=await readJson(path.join(root,'desktop','release-highlights.json'));
+  const source=[staged,bundled].find(value=>value?.tag===installed&&releaseNotes(value.notes));
+  if(source)current={tag:installed,notes:releaseNotes(source.notes)};
+ }
+ async function dismiss(tag){
+  if(!current||current.tag!==tag)return false;
+  await saveJson(seenPath(app),{tag});current=null;return true;
+ }
+ return {load,dismiss,get:()=>current};
+}
 const tagPattern=/^v(\d+)\.(\d+)\.(\d+)-beta\.(\d+)-r(\d+(?:\.\d+){0,7})$/;
 function version(tag){
  const m=tagPattern.exec(tag??'');
@@ -36,7 +67,7 @@ function select(releases,product,platform,installed){
   // Keep the beta train explicit: never silently switch to another channel.
   if(version(release.tag_name).slice(0,4).join('.')!==version(installed).slice(0,4).join('.'))continue;
   const asset=release.assets?.find(a=>a.name===filename&&a.state==='uploaded'&&Number.isSafeInteger(a.size)&&a.size>0&&a.size<=maxSize&&/^sha256:[a-f0-9]{64}$/.test(a.digest??''));
-  if(asset)found.push({tag:release.tag_name,filename,size:asset.size,digest:asset.digest.slice(7)});
+  if(asset)found.push({tag:release.tag_name,filename,size:asset.size,digest:asset.digest.slice(7),notes:releaseNotes(release.body)});
  }
  return found.sort((a,b)=>compare(b.tag,a.tag))[0]??null;
 }
@@ -109,7 +140,13 @@ function launchAfterExit(app,target){
   child.on('error',e=>console.warn('Update restart:',e.message));child.unref();
  });
 }
-function startDesktopUpdates({app,dialog,root,product,window}){
+async function confirmUpdate({product,dialog,win,candidate}){
+ if(!requiresConfirmation(product))return true;
+ const changes=releaseNotes(candidate.notes).slice(0,5000)||'Описание изменений не опубликовано.';
+ const result=await dialog.showMessageBox(win,{type:'info',title:'Обновление '+product,message:'Версия '+candidate.tag+' скачана и проверена.',detail:'Что нового:\n'+changes+'\n\nПрофили сохраняются. Для установки приложение будет перезапущено.',buttons:['Установить и перезапустить','Позже'],defaultId:1,cancelId:1,noLink:true});
+ return result.response===0;
+}
+function startDesktopUpdates({app,dialog,root,product,window,canRestart=()=>true}){
  if(process.arch!=='x64')return;
  const platform=process.platform,local=installation(root,product,platform);
  if(!local)return; // source checkout / legacy ZIP: no silent installation.
@@ -125,15 +162,17 @@ function startDesktopUpdates({app,dialog,root,product,window}){
    const file=await stage(candidate,folder);
    const win=window?.();
    if(!win||win.isDestroyed())return;
-   offered=candidate.tag;
-   const result=await dialog.showMessageBox(win,{type:'info',title:'Обновление '+product,message:'Версия '+candidate.tag+' скачана и проверена.',detail:'Установка в отдельный каталог. Для переключения приложение корректно завершит текущую работу. Профили и данные сохраняются. На Linux может потребоваться отдельное разрешение AppArmor.',buttons:['Установить и перезапустить','Позже'],defaultId:1,cancelId:1,noLink:true});
-   if(result.response!==0)return;
+   if(!canRestart())return;
+   if(requiresConfirmation(product))offered=candidate.tag;
+   if(!await confirmUpdate({product,dialog,win,candidate}))return;
    if(!await verified(file,candidate))throw Error('Installer verification failed');
    if(platform==='win32')await run(file,['/S'],{timeout:20*60_000,windowsHide:true});
    else await run('/bin/bash',[file,'--install-only'],{timeout:20*60_000});
    const target=path.join(local.parent,candidate.tag);
    const launcher=path.join(target,platform==='win32'?'launch.cmd':'launch.sh');
    if(!(await fs.lstat(launcher)).isFile())throw Error('New installation launcher missing');
+   await saveJson(notesPath(app),{tag:candidate.tag,notes:candidate.notes});
+   if(!canRestart()){offered=null;return;}
    await fs.rm(file,{force:true});
    launchAfterExit(app,target);
    app.quit();
@@ -144,4 +183,4 @@ function startDesktopUpdates({app,dialog,root,product,window}){
  const timer=setInterval(()=>void check(),30*60_000);
  app.once('before-quit',()=>{clearTimeout(first);clearInterval(timer)});
 }
-module.exports={version,compare,select,downloadResponse,verified,stage,installation,startDesktopUpdates};
+module.exports={version,compare,select,downloadResponse,verified,stage,installation,requiresConfirmation,releaseNotes,createReleaseHighlights,confirmUpdate,startDesktopUpdates};

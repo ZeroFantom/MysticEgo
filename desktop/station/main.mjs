@@ -23,6 +23,7 @@ const userData=path.join(home,'electron');
 mkdirSync(userData,{recursive:true,mode:0o700});
 app.setPath('userData',userData);
 app.setName(product);
+const highlights=updater.createReleaseHighlights({app,root,product});
 const runtime=path.join(root,'runtime','app','bin');
 const installer=path.join(runtime,'MysticEgo.Installer.dll');
 const layout=path.join(here,'index.html');
@@ -330,6 +331,7 @@ function handle(name,action){
 }
 async function open(){
   Menu.setApplicationMenu(null);
+  await highlights.load();
   await fs.mkdir(home,{recursive:true,mode:0o700});
   const local=path.join(home,'station.json');
   if(isAgent)for(const file of [local,path.join(legacyHome,'station.json')]){
@@ -356,11 +358,12 @@ async function open(){
     if(companion)companion.child.kill();
     await Promise.all([stop(),stopRunner(personalRunner)]);window.close();
   });
+  handle('release-highlights-dismiss',tag=>highlights.dismiss(tag));
   handle('snapshot',async()=>{
     void refreshTeam();
     if(actor&&Date.now()-lastTopology>18000){lastTopology=Date.now();void topology().catch(()=>{})}
     const [online,personalOnline]=await Promise.all([health(),personalProfile?health(current(personalProfile)):false]);
-    return {isAgent,node:current(),online,running:!!runner,personalOnline,personalRunning:!!personalRunner,recording:!!recording,features,beacon,clubAvailable,embedded:!!embedded,
+    return {releaseHighlights:highlights.get(),isAgent,node:current(),online,running:!!runner,personalOnline,personalRunning:!!personalRunner,recording:!!recording,features,beacon,clubAvailable,embedded:!!embedded,
       actor:actor?.login,team:actor?teamStatus:null,globals:playerGlobals.map(({id,name})=>({id,name})),central:current()?.central||assignment?.orchestraUrl||lastConnection.central,
       lan:profile?.endpoints.allowLanHttp===true||assignment?.allowLanHttp===true||lastConnection.lan,platform:process.platform,logs:[...logs]};
   });
@@ -474,7 +477,7 @@ async function open(){
 if(!app.requestSingleInstanceLock())app.quit();
 else{
   app.on('second-instance',()=>window?.focus());
-  app.whenReady().then(async()=>{await open();updater.startDesktopUpdates({app,dialog,root,product,window:()=>window})}).catch(error=>{dialog.showErrorBox(product,error.message);app.quit()});
+  app.whenReady().then(async()=>{await open();updater.startDesktopUpdates({app,dialog,root,product,window:()=>window,canRestart:()=>!closing&&!recording&&!savingInvitation&&!discovering&&!openingAudit})}).catch(error=>{dialog.showErrorBox(product,error.message);app.quit()});
   app.on('window-all-closed',()=>app.quit());
 }
 

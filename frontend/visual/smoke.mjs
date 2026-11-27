@@ -149,11 +149,17 @@ try{
           await isolate(page,origin);
           await page.goto(origin+'/settings',{waitUntil:'domcontentloaded'});
           await visible(page.locator('.auth-form-card'));
+          const highlights=page.getByRole('complementary',{name:'Обновления MysticEgo'});
+          await visible(highlights);
+          assert.match(await highlights.innerText(),/Что нового · v[0-9]/);
+          await highlights.getByRole('button',{name:'Ознакомился'}).click();
+          await highlights.waitFor({state:'hidden'});
           await visible(page.getByRole('region',{name:'Настройки приватности'}));
           await page.getByRole('button',{name:'Только необходимые'}).click();
           await page.reload({waitUntil:'domcontentloaded'});
           await visible(page.locator('.auth-form-card'));
           assert.equal(await page.getByRole('region',{name:'Настройки приватности'}).count(),0);
+          await highlights.waitFor({state:'hidden'});
           for(const [theme,style] of combinations)await check(page,prefix+'-login-'+theme+'-'+style,async()=>{
             await switchAppearance(page,theme,style);await checkArtwork(page,theme,style,'.auth-visual',viewport.width<=780?'hero':'entry');
             const typography=await page.locator('.auth-visual :is(.auth-brand,.auth-role)').evaluateAll(items=>items.map(el=>{const c=getComputedStyle(el);return {bg:c.backgroundColor,border:c.borderTopWidth,padding:c.paddingTop,color:c.color}}));
