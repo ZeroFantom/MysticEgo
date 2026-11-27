@@ -3,7 +3,7 @@ import {ThemeToggle} from './Settings';
 import {CinematicPreview} from '../app/CinematicPreview';
 import {
   ArrowDownRight, ArrowUpRight, Box, Building2, Compass, Github, Send, Users,
-  Server, ShieldCheck, Workflow,
+  Server, ShieldCheck, Workflow, Bot, Monitor,
 } from 'lucide-react';
 import {StudioEconomics} from './StudioEconomics';
 import editorialImage from './media/club-editorial.webp';
@@ -54,7 +54,11 @@ const roles = [
   },
   {
     title: 'Интерфейсы и тестирование',
-    description: 'Улучшать веб-панели и настольные приложения. Проверять сценарии на Windows и Linux.',
+    description: 'Улучшать веб-панели и настольные приложения. Проверять управление интерфейсом на Windows и KDE Plasma X11.',
+  },
+  {
+    title: 'ИИ, VRM и интерактивная автоматизация',
+    description: 'Развивать MCP, интеграцию локальных моделей, безопасную передачу задач на рабочий стол, липсинк, анимации и генерацию ресурсов персонажей.',
   },
   {
     title: 'Игровые системы и мир',
@@ -73,11 +77,11 @@ const partnerships = [
   },
   {
     title: 'Инвестиции',
-    description: 'Финансирование помогло бы расширить тестирование на реальных площадках, улучшить инструменты развёртывания и собрать игровой прототип Ether And Chaos.',
+    description: 'Финансирование помогло бы расширить тестирование на реальных площадках, улучшить инструменты развёртывания, проверить персонального ассистента и собрать игровой прототип Ether And Chaos.',
   },
 ];
 
-const stack = ['C#', '.NET 10', 'ASP.NET Core', 'SignalR', 'React', 'TypeScript', 'Electron', 'Linux / systemd', 'GitHub Actions', 'SSH', 'MCP', 'EF Core', 'PostgreSQL', 'MS SQL', 'Docker', 'WPF', 'Avalonia'];
+const stack = ['C#', '.NET 10', 'ASP.NET Core', 'SignalR', 'React', 'TypeScript', 'Electron', 'Linux / systemd', 'GitHub Actions', 'SSH', 'MCP', 'Playwright', 'Three.js / VRM', 'EF Core', 'PostgreSQL', 'MS SQL', 'Docker', 'WPF', 'Avalonia'];
 
 function discussion(topic: string) {
   return repository + '/issues/new?' + new URLSearchParams({title: topic});
@@ -123,7 +127,7 @@ export function StudioPage({scope=''}:{scope?:string}={}) {
         <div className="landing-hero-copy">
           <p className="landing-kicker">MysticEgo / Независимая студия</p>
           <h1 id="studio-title">Студия<br/>MysticEgo</h1>
-          <p>Инструменты для клубов, где десятки компьютеров должны работать как одна система. И отдельный игровой замысел о мире, который помнит решения своих жителей.</p>
+          <p>Независимая разработка программного обеспечения, персональных ИИ-ассистентов и игровых систем. От управления целыми компьютерными площадками до живого цифрового персонажа, который помогает человеку, и мира, который помнит решения своих жителей.</p>
           <div className="studio-actions">
             <a className="studio-button primary" href="#join">Присоединиться к проекту <ArrowDownRight size={17} aria-hidden="true"/></a>
             <a className="studio-button" href="#partners">Предложить партнёрство</a>
@@ -131,7 +135,7 @@ export function StudioPage({scope=''}:{scope?:string}={}) {
           </div>
           <a className="landing-scroll" href="#projects">Исследовать проекты <ArrowDownRight size={19} aria-hidden="true"/></a>
         </div>
-        <span className="landing-index" aria-hidden="true">01 / 02</span>
+        <span className="landing-index" aria-hidden="true">01 / 04</span>
       </section>
 
       <section id="projects" className="studio-section landing-projects" aria-labelledby="studio-direction">
@@ -143,14 +147,34 @@ export function StudioPage({scope=''}:{scope?:string}={}) {
             <span className="landing-kicker">01 / Инфраструктура</span>
             <Server size={24} aria-hidden="true"/>
             <h3>Инфраструктура MysticEgo</h3>
-            <p>Orchestra, организации Global, площадки Local и агенты на ПК. Ближайшая цель — сделать настройку, обновление и диагностику устойчивыми при развёртывании на нескольких площадках.</p>
+            <p>Orchestra, Global, Local и Agent связывают организации, площадки и рабочие станции. Audit предоставляет личное пространство и подключение к организациям. Приоритет — надёжность развёртывания, диагностики и обновлений.</p>
             <a href={repository}>Исходный код <ArrowUpRight size={16} aria-hidden="true"/></a>
+            </div>
+          </article>
+          <article className="studio-card landing-project">
+            <div className="landing-project-copy">
+              <span className="landing-kicker">02 / Инструменты разработки</span>
+              <Monitor size={24} aria-hidden="true"/>
+              <h3>MysticEgo CloudDesk</h3>
+              <p>Настольный центр развёртывания, обновления и диагностики серверов. Связывает локальные инструменты с удалённой инфраструктурой и GitHub Releases.</p>
+              <a href={repository+'/releases'}>Релизы <ArrowUpRight size={16} aria-hidden="true"/></a>
+            </div>
+          </article>
+          <article className="studio-card landing-project">
+            <div className="landing-project-copy">
+              <span className="landing-kicker">03 / ИИ · Экспериментальная разработка</span>
+              <Bot size={24} aria-hidden="true"/>
+              <h3>MysticEgo Assistant</h3>
+              <p>Персональный ассистент с VRM-аватаром, голосом, эмоциями, анимациями и локальными моделями. Цель — «вторые руки»: помощь в браузере и приложениях без перехвата физического ввода.</p>
+              <p>В разработке: локальный MCP, управление интерфейсами, переход аватара Web → Desktop, VRMA и процедурная генерация. Бесшовный переход, независимый курсор и нейросетевая генерация остаются целями.</p>
+              <p className="studio-note">Windows и KDE Plasma X11 — приоритетные среды. Прототип требует испытаний; не все функции входят в опубликованные релизы.</p>
+              <a href={repository+'/pull/72'}>Экспериментальная разработка <ArrowUpRight size={16} aria-hidden="true"/></a>
             </div>
           </article>
           <article className="studio-card landing-project">
             <div className="landing-world-image" aria-hidden="true"/>
             <div className="landing-project-copy">
-            <span className="landing-kicker">02 / Игровой замысел</span>
+            <span className="landing-kicker">04 / Игровой замысел</span>
             <Compass size={24} aria-hidden="true"/>
             <h3>Ether And Chaos</h3>
             <p>Концепция живого мира, где игроки и самостоятельные персонажи участвуют в общих событиях. Решения порождают локальные истории, а открытия развивают цивилизации в рамках законов мира.</p>
@@ -174,13 +198,14 @@ export function StudioPage({scope=''}:{scope?:string}={}) {
       <section id="architecture" className="studio-section landing-band" aria-labelledby="studio-workflow">
         <div className="studio-section-heading">
           <h2 id="studio-workflow">От оператора до станции</h2>
-          <p>Orchestra отвечает за установки и обновления. Global объединяет площадки, Local знает оборудование каждого клуба, Agent сообщает о состоянии конкретного ПК.</p>
+          <p>Orchestra отвечает за установки и обновления. Global объединяет площадки, Local знает оборудование каждого клуба, Agent сообщает о состоянии конкретного ПК, а Audit связывает личный профиль и компьютер пользователя.</p>
         </div>
         <ol className="studio-steps">
           <li><strong>Orchestra</strong><span>Реестр, версии и состояние развёртывания</span></li>
           <li><strong>Global</strong><span>Доступ и управление сетью площадок</span></li>
           <li><strong>Local</strong><span>Регистрация и работа внутри площадки</span></li>
           <li><strong>Agent</strong><span>Диагностика и разрешённые операции на ПК</span></li>
+          <li><strong>Audit</strong><span>Личный компьютер и ассистент</span></li>
         </ol>
         <p>Приоритет пилота — измерить время подключения станции, восстановления после сбоя и обновления нескольких площадок. Для Ether And Chaos ближайшая цель — небольшой игровой прототип, где событие возникает из действий участников, а его последствия сохраняются.</p>
       </section>
@@ -228,8 +253,8 @@ export function DeveloperPage({scope=''}:{scope?:string}={}) {
         <div className="landing-hero-copy">
           <p className="studio-role landing-kicker">Zero Fantom / C# · .NET</p>
           <h1 id="developer-title">Колыхалов<br/>Дмитрий<br/>Антонович</h1>
-          <p className="developer-meta">22 года · Разработка серверных и настольных приложений</p>
-          <p>Разработчик MysticEgo. Проектирую сервисы для управления парком компьютеров и связываю серверную архитектуру с интерфейсами для администраторов.</p>
+          <p className="developer-meta">C# / .NET · Серверные и настольные приложения</p>
+          <p>Автор и разработчик MysticEgo. Проектирую распределённые C#/.NET-сервисы, веб-панели, настольные приложения и автоматизацию рабочих станций. Развиваю интеграцию локальных ИИ-моделей и VRM-персонажей с программным обеспечением.</p>
           <div className="studio-actions">
             <a className="studio-button primary" href="https://github.com/ZeroFantom"><Github size={18} aria-hidden="true"/>Профиль GitHub</a>
             <a className="studio-button" href={repository}>Код MysticEgo <ArrowUpRight size={17} aria-hidden="true"/></a>
@@ -267,6 +292,11 @@ export function DeveloperPage({scope=''}:{scope?:string}={}) {
             <p>Настольный инструмент на C# и Electron для развёртывания, обновления и диагностики серверов. Работал с SSH, интеграцией GitHub Releases и журналами операций.</p>
           </article>
           <article className="studio-card">
+            <Bot size={24} aria-hidden="true"/>
+            <h3>Персональный ИИ и VRM</h3>
+            <p>Развиваю MCP-интеграцию, управление браузерным и настольным интерфейсом, передачу действий между Agent/Audit и интерактивным исполнителем. Работаю над общим VRM-рендерером, липсинком, анимациями и генерацией ресурсов. Экспериментальная ветка, испытания ещё предстоят.</p>
+          </article>
+          <article className="studio-card">
             <ShieldCheck size={24} aria-hidden="true"/>
             <h3>Диагностика рабочих станций</h3>
             <p>Работал с проверкой устройств, журналированием, интеграциями OpenRGB и Logitech G HUB и диагностическими командами MCP для Audit.</p>
@@ -275,7 +305,7 @@ export function DeveloperPage({scope=''}:{scope?:string}={}) {
       </section>
       <section className="studio-section studio-ideas">
         <h2>Идеи, которые хочу развивать</h2>
-        <p>Управление инфраструктурой с прозрачными правами доступа и понятными состояниями операций. В играх — живой мир с самостоятельными персонажами, местными событиями и последствиями, которые сохраняются после выхода игрока.</p>
+        <p>Инфраструктура с прозрачными правами доступа, персональный ИИ как параллельный помощник пользователя и живые цифровые персонажи. В играх — самостоятельные жители, локальные события и последствия, которые сохраняются после выхода игрока.</p>
         <a href="/studio">Подробнее о проектах студии <ArrowUpRight size={16} aria-hidden="true"/></a>
       </section>
     </main>
