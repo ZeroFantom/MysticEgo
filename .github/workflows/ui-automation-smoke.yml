@@ -1,0 +1,25 @@
+name: UI automation smoke
+on:
+  pull_request:
+    paths:
+      - 'tools/MysticEgo.UiAutomation/**'
+      - '.github/workflows/ui-automation-smoke.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: tools/MysticEgo.UiAutomation
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: xvfb-run -a node --test browser.integration.mjs
