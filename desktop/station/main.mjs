@@ -469,7 +469,15 @@ async function open(){
 if(!app.requestSingleInstanceLock())app.quit();
 else{
   app.on('second-instance',()=>window?.focus());
-  app.whenReady().then(open).catch(error=>{dialog.showErrorBox(product,error.message);app.quit()});
+  app.whenReady().then(()=>{
+    if(process.platform!=='win32' && (process.platform!=='linux' ||
+       process.env.WAYLAND_DISPLAY ||
+       String(process.env.XDG_SESSION_TYPE).toLowerCase()!=='x11' || !process.env.DISPLAY)){
+      dialog.showErrorBox(product,'Поддерживаются только Windows и Linux X11. Выйдите из системы и выберите Plasma (X11) на экране входа.');
+      app.quit();return;
+    }
+    return open();
+  }).catch(error=>{dialog.showErrorBox(product,error.message);app.quit()});
   app.on('window-all-closed',()=>app.quit());
 }
 
