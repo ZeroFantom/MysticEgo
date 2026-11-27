@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Root-owned worker. The web process can only approve the exact published candidate."""
+"""Root-owned Orchestra update service. Only exact published candidates can be approved."""
 import fcntl
 import hashlib
 import json
@@ -104,6 +104,120 @@ def status(phase, installed, candidate=None, targets=(), message=None, last_targ
     write("status.json", dict(phase=phase, current=installed[0], currentAudit=installed[1],
                              candidate=candidate, protocol=2, targets=list(targets),
                              message=message, lastTarget=last_target))
+
+
+MAINTENANCE_FILES = ("install.sh", "install.py", "local-runner.py", "reconcile.py", "install-voice.sh", "voice-server.py")
+MAINTENANCE_HOME = Path("/opt/mysticego-infrastructure/local")
+MAINTENANCE_SOCKET = INBOX.parent / "local-setup.sock"
+MAINTENANCE_STATUS = Path("/var/lib/mysticego-infrastructure-status/status.json")
+
+
+def trusted_file(path):
+    # Never execute scripts from a user-writable application tree or symlink.
+    try:
+        for part in (path, *path.parents):
+            info = part.lstat()
+            if info.st_uid != 0 or info.st_mode & 0o022 or stat.S_ISLNK(info.st_mode):
+                return False
+            if part == path and not stat.S_ISREG(info.st_mode):
+                return False
+        return True
+    except OSError:
+        return False
+
+
+def system_ok(*args):
+    try:
+        command("systemctl", *args, timeout=5)
+        return True
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def maintenance_ready(source):
+    try:
+        if not stat.S_ISSOCK(MAINTENANCE_SOCKET.lstat().st_mode):
+            return False
+        for name in MAINTENANCE_FILES:
+            if not trusted_file(MAINTENANCE_HOME / name) or (source / name).read_bytes() != (MAINTENANCE_HOME / name).read_bytes():
+                return False
+        return all(system_ok(operation, "--quiet", unit)
+                   for operation in ("is-active", "is-enabled")
+                   for unit in ("mysticego-local-setup.socket", "mysticego-infrastructure-reconcile.timer"))
+    except OSError:
+        return False
+
+
+def maintenance_state():
+    try:
+        return json.loads((STATE / "maintenance.json").read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def maintenance_record(state, release, reason="", retry_after=0):
+    write("maintenance.json", dict(state=state, release=release, reason=reason,
+                                   checkedAt=datetime.now().astimezone().isoformat(), retryAfter=retry_after))
+
+
+def ensure_maintenance(release, force=False):
+    source = APP / "ops/infrastructure"
+    script = source / "install-local.sh"
+    if not release or not all(trusted_file(source / name) for name in (*MAINTENANCE_FILES, "install-local.sh")):
+        maintenance_record("unavailable", release, "trusted-package-incomplete")
+        return False
+    if maintenance_ready(source) and not force:
+        # A running timer alone does not prove the reconciler is publishing.
+        try:
+            fresh = time.time() - MAINTENANCE_STATUS.stat().st_mtime < 3300
+        except OSError:
+            fresh = False
+        if fresh:
+            maintenance_record("ready", release)
+            return True
+        if system_ok("is-active", "--quiet", "mysticego-infrastructure-reconcile.service"):
+            maintenance_record("waiting", release)
+            return True
+        # Kick a timer which has not yet published, without reinstalling software.
+        prior = maintenance_state()
+        if prior.get("release") == release and prior.get("retryAfter", 0) > time.time():
+            return True
+        started = system_ok("start", "--no-block", "mysticego-infrastructure-reconcile.service")
+        maintenance_record("waiting" if started else "degraded", release,
+                           "" if started else "service-start-failed", time.time()+120)
+        return started
+    prior = maintenance_state()
+    if not force and prior.get("release") == release and prior.get("retryAfter", 0) > time.time():
+        return False
+    maintenance_record("repairing", release, retry_after=time.time()+120)
+    try:
+        # Fixed path, root-owned verified release only. Long installs run separately.
+        command("bash", str(script), timeout=90)
+        if not maintenance_ready(source):
+            raise RuntimeError("maintenance service validation failed")
+        maintenance_record("ready" if MAINTENANCE_STATUS.is_file() else "waiting", release)
+        return True
+    except (OSError, subprocess.SubprocessError, RuntimeError) as error:
+        print("Orchestra Maintenance Service setup: " + type(error).__name__, flush=True)
+        maintenance_record("degraded", release, type(error).__name__, time.time()+120)
+        return False
+
+
+def take_maintenance_request():
+    # Distinct fixed request, no user-supplied command, path or arguments.
+    try:
+        directory = os.open(INBOX, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            fd = os.open("maintenance-repair.json", os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
+            try:
+                return stat.S_ISREG(os.fstat(fd).st_mode) and os.read(fd, 64) == b'{"confirmed":true}'
+            finally:
+                os.close(fd)
+                os.unlink("maintenance-repair.json", dir_fd=directory)
+        finally:
+            os.close(directory)
+    except OSError:
+        return False
 
 
 def project_version(tag):
@@ -305,15 +419,13 @@ def apply(candidate, installed, targets, target):
                 time.sleep(2)
             else:
                 raise RuntimeError("new app did not pass health checks")
+        # Commit the verified app independently: infrastructure failure must not
+        # roll back a healthy app or touch its existing database.
+        if target != "audit":
+            maintenance_record("repairing", candidate["tag"], retry_after=time.time()+120)
         status("current", versions(), last_target=target)
         if target != "audit":
-            for relative in ("ops/infrastructure/install-local.sh", "ops/panel-assistant/install-default-model.sh"):
-                script = APP / relative
-                if script.is_file():
-                    try:
-                        print(command("bash", str(script), timeout=90), flush=True)
-                    except (OSError, subprocess.SubprocessError):
-                        print(f"Could not run {relative}; check journal and retry on the VPS.", flush=True)
+            ensure_maintenance(versions()[0], force=True)
         previous = PREVIOUS["audit" if target == "audit" else "orchestra"]
         shutil.rmtree(previous)
 
@@ -340,6 +452,8 @@ def run_locked():
                 else:
                     restore(component)
         installed = versions()
+        # Retry locally before contacting GitHub, even with no newer release or no network.
+        ensure_maintenance(installed[0], force=take_maintenance_request())
         candidate, targets = newest(installed)
         request = take_request()
         if not candidate:

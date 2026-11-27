@@ -4,12 +4,27 @@ set -euo pipefail
 . /etc/os-release
 [[ $ID == ubuntu && $VERSION_ID == 24.04 ]] || { echo 'Локальный установщик поддерживает Ubuntu 24.04 LTS.' >&2; exit 1; }
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# Upgrade the existing privileged updater BEFORE any systemd or dependency operation.
+# Legacy releases call this hook with a 20-second deadline; the new updater can
+# retry every timer cycle even if the rest of this invocation is interrupted.
+if [[ "$here" == /opt/mysticego/app/ops/infrastructure && -f /usr/local/libexec/mysticego/orchestra-updater.py ]]; then
+  source="$here/../orchestra-updater/update-orchestra.py"
+  [[ -f "$source" && ! -L "$source" && $(stat -c %u "$source") == 0 && $(( 8#$(stat -c %a "$source") & 8#022 )) == 0 ]]
+  stage=$(mktemp /usr/local/libexec/mysticego/.orchestra-updater.XXXXXXXX)
+  install -o root -g root -m 0644 "$source" "$stage"
+  mv -T "$stage" /usr/local/libexec/mysticego/orchestra-updater.py
+fi
 target=/opt/mysticego-infrastructure/local
 install -d -m 0700 "$target"
-install -m 0600 "$here/install.sh" "$here/install.py" "$here/local-runner.py" "$target/"
+# Copy the complete service before enabling its endpoints.
+for script in install.sh install.py local-runner.py reconcile.py install-voice.sh voice-server.py; do
+  stage=$(mktemp "$target/.$script.XXXXXXXX")
+  install -o root -g root -m 0600 "$here/$script" "$stage"
+  mv -T "$stage" "$target/$script"
+done
 cat > /etc/systemd/system/mysticego-local-setup.socket <<'UNIT'
 [Unit]
-Description=MysticEgo local infrastructure installation socket
+Description=Orchestra Maintenance Service socket
 [Socket]
 ListenStream=/var/lib/mysticego/local-setup.sock
 SocketUser=mysticego
@@ -23,7 +38,7 @@ WantedBy=sockets.target
 UNIT
 cat > /etc/systemd/system/mysticego-local-setup@.service <<'UNIT'
 [Unit]
-Description=MysticEgo local infrastructure installation
+Description=Orchestra Maintenance Service request
 [Service]
 Type=exec
 ExecStart=/usr/bin/python3 /opt/mysticego-infrastructure/local/local-runner.py
@@ -36,13 +51,17 @@ UNIT
 chmod 0644 /etc/systemd/system/mysticego-local-setup*
 systemctl daemon-reload
 systemctl enable --now mysticego-local-setup.socket
+# An active unit can retain a socket inode that was removed on disk.
+if [[ ! -S /var/lib/mysticego/local-setup.sock ]]; then
+  systemctl restart mysticego-local-setup.socket
+fi
+[[ -S /var/lib/mysticego/local-setup.sock ]]
 
 # Installed by the existing in-panel updater as well as CloudDesk.
-install -m 0600 "$here/reconcile.py" "$here/install-voice.sh" "$here/voice-server.py" "$target/"
 install -d -o root -g root -m 0755 /var/lib/mysticego-infrastructure-status
 cat > /etc/systemd/system/mysticego-infrastructure-reconcile.service <<'UNIT'
 [Unit]
-Description=Reconcile local MysticEgo infrastructure
+Description=Orchestra Maintenance Service
 After=network-online.target
 [Service]
 Type=oneshot
@@ -52,7 +71,7 @@ UMask=0077
 UNIT
 cat > /etc/systemd/system/mysticego-infrastructure-reconcile.timer <<'UNIT'
 [Unit]
-Description=Check local MysticEgo infrastructure
+Description=Orchestra Maintenance Service timer
 [Timer]
 OnBootSec=45s
 OnUnitInactiveSec=30s
@@ -66,11 +85,6 @@ systemctl daemon-reload
 systemctl enable --now mysticego-infrastructure-reconcile.timer
 systemctl start --no-block mysticego-infrastructure-reconcile.service
 systemctl is-enabled --quiet mysticego-infrastructure-reconcile.timer
-# Refresh the already installed updater for the next timer invocation. The
-# verified full release is root-owned; never load executable code from user data.
-if [[ "$here" == /opt/mysticego/app/ops/infrastructure && -f /usr/local/libexec/mysticego/orchestra-updater.py && -f "$here/../orchestra-updater/update-orchestra.py" ]]; then
-  stage=$(mktemp /usr/local/libexec/mysticego/.orchestra-updater.XXXXXXXX)
-  install -o root -g root -m 0644 "$here/../orchestra-updater/update-orchestra.py" "$stage"
-  mv -T "$stage" /usr/local/libexec/mysticego/orchestra-updater.py
-fi
+systemctl is-active --quiet mysticego-infrastructure-reconcile.timer
+systemctl is-active --quiet mysticego-local-setup.socket
 echo 'Локальная служба обслуживания установлена; первый цикл запущен.'

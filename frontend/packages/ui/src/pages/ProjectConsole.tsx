@@ -126,7 +126,7 @@ function ReleaseUpdate(){
 
   return <section className="panel github-update">
     <div className="github-section-head"><ArrowDownToLine size={21}/><div><h2>Обновление сервера</h2>
-      <p>Выбери, что обновить на VPS Orchestra.</p></div></div>
+      <p>Обновление Orchestra включает установку и восстановление службы обслуживания. Дополнительные команды на VPS не нужны при работающей службе обновления.</p></div></div>
     <div className="github-installed">
       <div><small>Orchestra</small><strong>{status?.current??'—'}</strong></div>
       <div><small>Audit на этом VPS</small><strong>{status?.currentAudit??'—'}</strong></div>
@@ -135,6 +135,7 @@ function ReleaseUpdate(){
     <p role="status">{update?.reloading?'Обновление проверено. Перезагружаем страницу…':waiting&&state.error?'Orchestra перезапускается. Проверяем связь…':waiting&&canApprove?'Подтверждено. Ожидаем службу обновления.':
       status?(phases[status.phase]??status.phase):state.loading?'Проверяем службу обновления…':''}</p>
     {status?.message&&(!failed||!waiting)&&<p>{status.message}</p>}
+    {status?.maintenance&&<p>Служба обслуживания Orchestra: {({ready:"установлена",waiting:"ожидается отчёт",repairing:"устанавливается",degraded:"повторная попытка запланирована",unavailable:"пакет недоступен"} as Record<string,string>)[status.maintenance.state]??"состояние уточняется"}.</p>}
     {status&&status.protocol!==2&&<p>Обновите службу на VPS через CloudDesk, чтобы включить отдельное обновление Audit.</p>}
     {canApprove&&candidate&&<div className="row-actions">{targets.map(target=><button key={target}
       className={'btn '+(target===targets.at(-1)?'':'secondary')} disabled={waiting||!!pendingConfirmation} onClick={()=>setConfirmation({tag:candidate.tag,digest:candidate.digest,target})}>

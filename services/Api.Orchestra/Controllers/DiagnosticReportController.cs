@@ -18,7 +18,7 @@ public sealed class DiagnosticReportController(DevelopmentTeam team, DatabaseMai
         or "checking" or "disabled" or "external" or "missing" or "waiting" or "unreachable" or "unreadable"
         or "reporting" or "current" or "ready" or "downloading" or "switching" or "failed" or "running" or "done"
         ? value : "unknown";
-    private static string SafeReason(string? value) => value is "invalid-upstream-url" or "upstream-http-error" or "timeout" or "connection-failed" or "CalledProcessError" or "TimeoutExpired" or "OSError" or "PermissionError" or "FileNotFoundError" or "ValueError" or "RuntimeError" or "OtherError" ? value : "";
+    private static string SafeReason(string? value) => value is "invalid-upstream-url" or "upstream-http-error" or "timeout" or "connection-failed" or "CalledProcessError" or "TimeoutExpired" or "OSError" or "PermissionError" or "FileNotFoundError" or "ValueError" or "RuntimeError" or "OtherError" or "trusted-package-incomplete" or "service-start-failed" ? value : "";
     private static string SafeTag(string? value) => value is not null && value.Length <= 90 &&
         System.Text.RegularExpressions.Regex.IsMatch(value, @"\Av[0-9][a-zA-Z0-9._-]*\z") ? value : "unknown";
     private static string SafeName(string value) => value is "auth" or "orchestra" or "global" or "local" or "audit" or "agent"
@@ -104,6 +104,10 @@ public sealed class DiagnosticReportController(DevelopmentTeam team, DatabaseMai
             metadata.Add(["installedRelease", SafeTag(update?.Current)]);
             metadata.Add(["candidateRelease", SafeTag(update?.Candidate?.Tag)]);
             metadata.Add(["updateState", SafeState(update?.Phase)]);
+            metadata.Add(["maintenanceServiceState", SafeState(update?.Maintenance?.State)]);
+            metadata.Add(["maintenanceServiceRelease", SafeTag(update?.Maintenance?.Release)]);
+            metadata.Add(["maintenanceServiceReason", SafeReason(update?.Maintenance?.Reason)]);
+            metadata.Add(["maintenanceServiceCheckedAt", update?.Maintenance?.CheckedAt]);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException)
         { metadata.Add(["updateState", "unreadable"]); }

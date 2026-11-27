@@ -240,7 +240,7 @@ try{
               '/api/v1/managed/development-team':{owner:true},
               '/api/v1/managed/infrastructure-setup':{localAvailable:true,targets:[]},
               '/api/v1/managed/infrastructure-maintenance':{installed:true,workerState:'reporting',source:'host-socket',socketAvailable:true,components:['orchestra','docker','lmstudio','voice','postgres-service','database'].map(name=>({name,state:'available',message:'Служба готова',checkedAt:now}))},
-              '/api/v1/orchestra/update':{phase:'current'}
+              '/api/v1/orchestra/update':{phase:'current',protocol:2,maintenance:{state:'ready',release:'v1.0.0-beta.7-r3.2.37',checkedAt:now}}
             };
             const handler=route=>route.fulfill({contentType:'application/json',body:JSON.stringify(fixture[new URL(route.request().url()).pathname])});
             for(const path of Object.keys(fixture))await page.route('**'+path,handler);
@@ -250,6 +250,17 @@ try{
                 await page.goto(origin+'/infrastructure/'+section,{waitUntil:'domcontentloaded'});
                 const workspace=page.locator('.infra-workspace');
                 await visible(workspace);
+                if(section==='services'){
+                  await visible(workspace.getByRole('button',{name:'Восстановить службу обслуживания'}));
+                  const route='**/api/v1/orchestra/update/maintenance';
+                  await page.route(route,r=>r.fulfill({contentType:'application/json',body:'{"accepted":true}'}));
+                  try{
+                    const sent=page.waitForRequest(r=>r.url().endsWith('/orchestra/update/maintenance')&&r.method()==='POST');
+                    await workspace.getByRole('button',{name:'Восстановить службу обслуживания'}).click();
+                    await sent;
+                    await visible(workspace.getByText('Запрос принят. Служба обновления автоматически проверит установку и восстановление.'));
+                  }finally{await page.unroute(route)}
+                }
                 const selector=workspace.getByLabel('Компонент',{exact:true});
                 await visible(selector);
                 assert.deepEqual(await selector.locator('option').evaluateAll(options=>options.map(o=>o.value)),actions);
