@@ -91,35 +91,16 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
         return new(action,reason,update,components,telemetry.History().LastOrDefault(),serviceLoads.Read(),now,AutoEnabled(),Directory.Exists(Inbox));
     }
 
-    private static bool AutoEnabled()
-    {
-        try
-        {
-            var f=new FileInfo(Path.Combine(Inbox,"auto-update.json"));
-            return f.Exists&&f.Length==16&&System.IO.File.ReadAllText(f.FullName)=="{\"enabled\":true}";
-        }
-        catch(IOException){return false;}
-        catch(UnauthorizedAccessException){return false;}
-    }
+    private static bool AutoEnabled()=>true;
 
     [HttpGet("automatic"),ResponseCache(NoStore=true,Location=ResponseCacheLocation.None)]
-    public IActionResult Automatic()=>!team.IsOwner(User)?Forbid():Ok(new{enabled=AutoEnabled(),available=Directory.Exists(Inbox)});
+    public IActionResult Automatic()=>!team.IsOwner(User)?Forbid():Ok(new{enabled=true,available=Directory.Exists(Inbox)});
     public sealed record AutoPolicy(bool Enabled,bool Confirmed);
     [HttpPost("automatic"),RequestSizeLimit(1024)]
     public IActionResult ConfigureAutomatic(AutoPolicy policy)
     {
         if(!team.IsOwner(User))return Forbid();
-        if(!policy.Confirmed||!Directory.Exists(Inbox))return Conflict(new{error="Подтвердите режим автоматического обновления."});
-        var target=Path.Combine(Inbox,"auto-update.json");
-        var temporary=Path.Combine(Inbox,Guid.NewGuid().ToString("N")+".tmp");
-        try
-        {
-            System.IO.File.WriteAllText(temporary,policy.Enabled?"{\"enabled\":true}":"{\"enabled\":false}");
-            System.IO.File.Move(temporary,target,true);
-            state.Log(User.Identity?.Name??"developer","orchestra.update.automatic",policy.Enabled.ToString(),true);
-            return Ok(new{enabled=policy.Enabled});
-        }
-        finally{System.IO.File.Delete(temporary);}
+        return Conflict(new{error="Автоматическое обновление является обязательной политикой Orchestra.",enabled=true});
     }
 
     [HttpGet("plan"), ResponseCache(NoStore=true,Location=ResponseCacheLocation.None)]
