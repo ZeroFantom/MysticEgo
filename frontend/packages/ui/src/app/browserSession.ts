@@ -89,6 +89,20 @@ export function useBrowserSession(key:string,initial:Session){
   schedule(session.token?9*60*1000:0);
   return ()=>{active=false;window.clearTimeout(timer);};
  },[session,retry,key]);
+ useEffect(()=>{
+  if(!session.token)return;
+  let alive=true,running=false;
+  async function check(){
+   if(running||!alive)return;running=true;
+   try{
+    const res=await fetch(session.authUrl.replace(/\/$/,'')+'/api/auth/sessions/current',{headers:{Authorization:'Bearer '+session.token},cache:'no-store',redirect:'error',signal:AbortSignal.timeout(8000)});
+    if(alive&&current.current===session&&(res.status===401||res.status===403))logout();
+   }catch{/* A connectivity outage is not proof of account revocation. */}finally{running=false;}
+  }
+  const timer=window.setInterval(()=>void check(),15000);
+  const focus=()=>void check();window.addEventListener('focus',focus);
+  return()=>{alive=false;window.clearInterval(timer);window.removeEventListener('focus',focus)};
+ },[session]);
  return {session,setSession,logout,restoring:!!session.refreshToken&&!session.token,restoreError,retryRestore:()=>setRetry(n=>n+1)};
 }
 
