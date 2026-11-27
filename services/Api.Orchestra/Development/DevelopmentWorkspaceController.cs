@@ -10,7 +10,7 @@ namespace MysticEgo.Api.Orchestra.Development;
 public sealed class DevelopmentWorkspaceController(DevelopmentWorkspace workspace,WorkspaceThreads threads,DevelopmentTeam team):ControllerBase
 {
     private async Task<Guid?> Actor(CancellationToken ct)=>
-        Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier),out var id)&&
+        !User.HasClaim("token_use","device")&&Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier),out var id)&&
         (team.IsOwner(User)||await team.IsMember(User,ct))?id:null;
     [HttpGet]
     public async Task<IActionResult> List(CancellationToken ct)=>await Actor(ct) is null?Forbid():Ok(await workspace.List(ct));
