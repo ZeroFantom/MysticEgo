@@ -15,6 +15,9 @@ export const operations = {
   ui_fill: ['Fill accessible editable element', { ...element, value: z.string().max(4000) }],
   ui_scroll: ['Scroll visible window vertically', { ...session, deltaY: z.number().int().min(-2000).max(2000) }],
   ui_assert_visible: ['Assert accessible element is visible', element],
+  ui_record_start: ['Start recording assistant click, scroll and assertion steps; no typed text', session],
+  ui_record_stop: ['Stop recording and return scenario', session],
+  ui_replay: ['Replay recorded steps in the same authorized session', { ...session, scenarioId: z.string().uuid() }],
   ui_close: ['Close controlled window and session', session]
 };
 export function makeMcp(service) {
