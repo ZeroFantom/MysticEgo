@@ -55,7 +55,9 @@ public sealed class UiAutomationController(NodeOptions node, UiAutomationBridge 
     {
         "ui_targets", "ui_open", "ui_snapshot", "ui_screenshot", "ui_navigate",
         "ui_click", "ui_fill", "ui_scroll", "ui_assert_visible", "ui_close",
-        "ui_record_start", "ui_record_stop", "ui_replay"
+        "ui_record_start", "ui_record_stop", "ui_replay",
+        "native_targets", "native_attach", "native_snapshot", "native_click", "native_key",
+        "native_pointer_get", "native_pointer_set", "native_close"
     };
 
     private bool Allowed() =>
