@@ -29,6 +29,39 @@ sealed partial class CloudDesk {
         return new {domain,host=S(args,"host"),serverId=Num(args,"serverId")};
     }
 
+    async Task<object> RecoverOrchestraMaintenance(JsonObject args, Action<string> progress)
+    {
+        if (S(args,"confirm")!="RECOVER_MAINTENANCE" || S(args,"user")!="root")
+            throw new Exception("Подтвердите восстановление службы обслуживания.");
+        var domain=await InstalledOrchestraDomain(args);
+        if(!domain.Equals(S(args,"domain"),StringComparison.OrdinalIgnoreCase))
+            throw new Exception("Домен установки изменился. Проверьте VPS повторно.");
+        var health=await SSH(args,"curl -fsS --max-time 5 http://127.0.0.1:5500/health/live",1);
+        var response=JsonNode.Parse(health);
+        if(response is not JsonObject info || S(info,"status")!="alive" || !S(info,"kind").Equals("orchestra",StringComparison.OrdinalIgnoreCase)
+            || !Guid.TryParse(S(info,"node"),out var node) || node==Guid.Empty)
+            throw new Exception("Не удалось подтвердить ID действующей Orchestra.");
+        var script=Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,"..","..","..","ops","orchestra-updater","recover-maintenance.sh"));
+        if(!File.Exists(script))throw new Exception("Распакуйте актуальный полный архив MysticEgo.");
+        var digest=Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(script))).ToLowerInvariant();
+        var remote="/root/.clouddesk-maintenance-"+Guid.NewGuid().ToString("N");
+        progress("Проверен сервер Orchestra. Приложение и данные не заменяются.");
+        await SSH(args,"umask 077; mkdir -m 700 "+remote,1);
+        try {
+            await Upload(args,script,remote+"/recover-maintenance.sh");
+            progress("Проверка SHA-256 и восстановление двух системных служб");
+            var command="cd "+remote+" && printf '%s  recover-maintenance.sh\\n' "+digest+
+                " | sha256sum -c - && bash recover-maintenance.sh "+node.ToString("D");
+            var output=await SSH(args,command,10);
+            if(!output.Split('\\n').Any(line=>line.Trim()=="MAINTENANCE_RECOVERY_OK"))
+                throw new Exception("Служба не подтвердила восстановление.");
+            progress("Сокет и таймеры активны. Orchestra отвечает с прежним ID.");
+            return new {domain,recovered=true,output="Службы обновления и обслуживания восстановлены; проверки компонентов выполняются автоматически."};
+        } finally {
+            try {await SSH(args,"rm -rf -- "+remote,1);}catch {}
+        }
+    }
+
     async Task<object> RestoreOrchestraUpdater(JsonObject args, Action<string> progress) {
         if(S(args,"confirm")!="RESTORE_ORCHESTRA")throw new Exception("Подтвердите обновление Orchestra.");
         if(S(args,"user")!="root")throw new Exception("Для установки обновлятора нужен доверенный SSH root.");
