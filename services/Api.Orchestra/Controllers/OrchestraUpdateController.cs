@@ -15,7 +15,7 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
     private const string Inbox = "/var/lib/mysticego/update-inbox";
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    private static UpdateStatus? ReadStatus() =>
+    internal static UpdateStatus? ReadStatus() =>
         System.IO.File.Exists(StateDirectory + "/status.json")
             ? JsonSerializer.Deserialize<UpdateStatus>(System.IO.File.ReadAllText(StateDirectory + "/status.json"), Json)
             : null;

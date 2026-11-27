@@ -18,8 +18,15 @@ public sealed record CapabilityHealth(string Name, string State, DateTimeOffset 
 public sealed class OptionalDependencyState
 {
     private readonly ConcurrentDictionary<string,CapabilityHealth> _health = new(StringComparer.OrdinalIgnoreCase);
-    public void Set(string name,string state,int? status=null,long? elapsed=null,string? reason=null) =>
-        _health[name]=new CapabilityHealth(name,state,DateTimeOffset.UtcNow,status,elapsed,reason);
+    private readonly ConcurrentQueue<CapabilityHealth> _history = new();
+    public void Set(string name,string state,int? status=null,long? elapsed=null,string? reason=null)
+    {
+        var item = new CapabilityHealth(name,state,DateTimeOffset.UtcNow,status,elapsed,reason);
+        _health[name]=item;
+        _history.Enqueue(item);
+        while (_history.Count > 720) _history.TryDequeue(out _);
+    }
+    public CapabilityHealth[] History() => _history.ToArray();
     public CapabilityHealth[] Snapshot() => _health.Values.OrderBy(x=>x.Name).ToArray();
 }
 

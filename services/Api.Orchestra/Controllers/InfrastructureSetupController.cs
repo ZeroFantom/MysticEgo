@@ -159,6 +159,7 @@ public sealed class InfrastructureSetupController(IConfiguration config, Develop
 
     public sealed record SetupInput(string Target, string Component, bool Confirmed,
         string? Url, string? Bind, string? Cidr, string? Role, string? Secret);
+    internal static (string Component, string Status)? DiagnosticRun() => Volatile.Read(ref current) is { } run ? (run.Component, run.Status) : null;
     private sealed record SetupRun(string Target, string Component, string Status, string Message);
 }
 

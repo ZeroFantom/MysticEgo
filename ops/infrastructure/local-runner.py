@@ -29,7 +29,7 @@ def main():
         # its existing Unix socket is mounted, but the host report directory is not.
         if request == b"maintenance-status\n":
             try:
-                if REPORT.stat().st_size > 32768:
+                if REPORT.stat().st_size > 131072:
                     raise ValueError("report too large")
                 report = json.loads(REPORT.read_text())
                 if not isinstance(report.get("components"), list):

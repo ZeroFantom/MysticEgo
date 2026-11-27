@@ -17,6 +17,12 @@ public sealed class InfrastructureMaintenanceController(DevelopmentTeam team, Da
     public async Task<IActionResult> Status(CancellationToken ct)
     {
         if (!team.IsOwner(User)) return Forbid();
+        var snapshot = await ReadAsync(database, ct);
+        return Ok(new { snapshot.Installed, snapshot.Components, snapshot.WorkerState, snapshot.Source, snapshot.SocketAvailable });
+    }
+
+    internal static async Task<MaintenanceReport> ReadAsync(DatabaseMaintenance database, CancellationToken ct)
+    {
         var components = new List<Component>();
         var installed = false;
         var socketAvailable = OperatingSystem.IsLinux() && System.IO.File.Exists("/var/lib/mysticego/local-setup.sock");
@@ -26,7 +32,7 @@ public sealed class InfrastructureMaintenanceController(DevelopmentTeam team, Da
         try
         {
             var info = new FileInfo(Report);
-            if (info.Exists && info.Length <= 32768)
+            if (info.Exists && info.Length <= 131072)
             {
                 snapshot = JsonSerializer.Deserialize<Snapshot>(await System.IO.File.ReadAllTextAsync(Report, ct), Json);
                 if (snapshot?.Components is { Length: > 0 }) source = "host-file";
@@ -63,10 +69,11 @@ public sealed class InfrastructureMaintenanceController(DevelopmentTeam team, Da
         components.Add(new(db.Name, db.State, db.Message, db.CheckedAt));
         if (installed && components.Where(c => c.Name != "database").All(c => DateTimeOffset.UtcNow - c.CheckedAt > TimeSpan.FromMinutes(55)))
             components.Add(new("worker", "degraded", "Worker не публикует свежие проверки. Проверьте systemd-таймер.", DateTimeOffset.UtcNow));
-        return Ok(new { installed, components, workerState, source, socketAvailable });
+        return new MaintenanceReport(installed, components.ToArray(), workerState, source, socketAvailable, snapshot?.History?.Where(c => c.Name is "orchestra" or "docker" or "lmstudio" or "voice" or "postgres-service").TakeLast(120).ToArray() ?? []);
     }
 
     public sealed record Component(string Name, string State, string Message, DateTimeOffset CheckedAt);
-    public sealed record Snapshot(Component[] Components);
+    public sealed record Snapshot(Component[] Components, Component[]? History = null);
+    internal sealed record MaintenanceReport(bool Installed, Component[] Components, string WorkerState, string Source, bool SocketAvailable, Component[] History);
     private sealed record SocketReport(bool Ok, Snapshot? Report);
 }
