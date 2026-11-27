@@ -31,6 +31,7 @@ import {Overview} from '../pages/Overview';
 import {AgentList,AgentDetails} from '../pages/Agents';
 import {Audit} from '../pages/Audit';
 import {AgentSystem} from '../pages/AgentSystem';
+import {AccountSecurity} from '../pages/AccountSecurity';
 import {Settings,initPalette,ThemeToggle,applyAccountAppearance} from '../pages/Settings';
 import {SignIn} from '../pages/SignIn';
 import {AgentDesktopEntry,PanelDirectory} from '../pages/PanelDirectory';
@@ -118,6 +119,7 @@ function AccountMenu({logout}:{logout:()=>void}){
     </button>
     <div id={menuId} className="account-popover motion-disclosure" data-motion-open={open} inert={!open} aria-hidden={!open}>
       <Link to="/profile" onClick={()=>setOpen(false)}><UserRound size={17}/>{t("Мой профиль")}</Link>
+      <Link to="/account-security" onClick={()=>setOpen(false)}>{t("Безопасность аккаунта")}</Link>
       <button type="button" onClick={logout}><LogOut size={17}/>{t("Выйти")}</button>
     </div>
   </div>;
@@ -225,6 +227,7 @@ function Workspace({logout}:{logout:()=>void}){
         {mode==='orchestra'&&<Route path="/project-branches" element={<ProjectBranches/>}/>}
         {mode==='orchestra'&&<Route path="/developer-assistant" element={<Navigate to="/assistant?tab=developer" replace/>}/>}
         <Route path="/profile" element={<ProfilePage/>}/>
+        <Route path="/account-security" element={<AccountSecurity/>}/>
         {mode==='orchestra'&&<Route path="/orchestra-update" element={<ProjectBranches/>}/>}
         <Route path="/collective" element={<Collective/>}/>
         {mode==='audit'&&<Route path="/organizations" element={<OrganizationRequests/>}/>}
