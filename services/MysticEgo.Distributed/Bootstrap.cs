@@ -20,6 +20,7 @@ public static class Bootstrap
         builder.Services.AddCommandMcpServer();
         builder.Services.AddLocalAssistant();
         builder.Services.AddScoped<DiagnosticMcpService>();
+        builder.Services.AddSingleton<InterfaceAutomation>();
         builder.Services.AddEther();
         builder.Services.AddSetup();
         builder.Services.AddControllers().AddApplicationPart(typeof(NodeController).Assembly);
