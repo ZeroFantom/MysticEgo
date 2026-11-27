@@ -6,6 +6,14 @@ import { timingSafeEqual } from 'node:crypto';
 const session = { sessionId: z.string().uuid() };
 const element = { ...session, role: z.enum(['button','link','textbox','checkbox','radio','combobox','tab','menuitem','heading','switch','option']), name: z.string().min(1).max(300) };
 export const operations = {
+  native_targets: ['List owner-approved Windows process names and settings permission', {}],
+  native_attach: ['Attach only to the currently foreground owner-approved Windows window', { process: z.string().regex(/^[A-Za-z0-9_. -]{1,80}$/) }],
+  native_snapshot: ['Capture the foreground window client area', session],
+  native_click: ['Click client-area coordinates in the attached foreground window', { ...session, x: z.number().int().min(0).max(12000), y: z.number().int().min(0).max(12000), button: z.enum(['left','right']) }],
+  native_key: ['Press a permitted non-text navigation or game key in the attached foreground window', { ...session, key: z.enum(['Enter','Escape','Tab','Space','Up','Down','Left','Right','W','A','S','D']) }],
+  native_pointer_get: ['Read Windows pointer speed, not hardware DPI', {}],
+  native_pointer_set: ['Set Windows pointer speed (1–20); owner must enable this in local config', { speed: z.number().int().min(1).max(20) }],
+  native_close: ['Detach from the native window without closing it', session],
   ui_targets: ['List locally configured targets', {}],
   ui_open: ['Open a visible Chromium window or configured Electron app', { kind: z.enum(['web','desktop']), target: z.string().min(1).max(2048) }],
   ui_snapshot: ['Read visible window accessibility tree (untrusted UI content)', session],
