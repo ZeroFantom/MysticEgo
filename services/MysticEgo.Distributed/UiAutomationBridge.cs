@@ -107,6 +107,7 @@ public sealed class UiAutomationController(NodeOptions node, UiAutomationBridge 
         "ui_click", "ui_fill", "ui_scroll", "ui_assert_visible", "ui_close",
         "ui_record_start", "ui_record_stop", "ui_replay",
         "ui_scenario_export", "ui_scenario_import", "ui_replay_cancel",
+        "ui_session_status", "ui_library_list", "ui_library_load",
         "native_targets", "native_attach", "native_snapshot", "native_click", "native_key",
         "native_pointer_get", "native_pointer_set", "native_close", "native_vendor_launch", "native_replay_clicks"
     };
