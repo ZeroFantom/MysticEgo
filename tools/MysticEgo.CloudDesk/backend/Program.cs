@@ -223,6 +223,8 @@ sealed partial class CloudDesk {
             }
             case "timeweb.status": return await TimeProfile();
             case "timeweb.disconnect": token=""; try { await ClearTimewebToken(); } catch { return new {connected=false,warning="Не удалось проверить удаление токена из системного хранилища."}; } return new {connected=false};
+            case "browser.pairingStatus": return await BrowserPairingStatus();
+            case "browser.pairingApprove": return await BrowserPairingApprove(a);
             case "topology.discover": return await DiscoverTopology(a);
             case "dns.suggest": return await SuggestDns(a);
             case "dns.inventory": return await DnsInventory(a);

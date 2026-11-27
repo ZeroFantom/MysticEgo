@@ -1,10 +1,11 @@
 import {useState} from 'react';
+import {useServerUpdate,type UpdateState} from '../app/serverUpdate';
 import './infrastructure-workspace.css';
 import {useApp,useRemote} from '../app/context';
 import {ErrorBanner,Panel} from '../components/primitives';
 type Format='xlsx'|'json'|'txt';
 type Service={unit:string;at:string;cpuPercent?:number;memoryBytes?:number;tasks?:number;loadState?:string;activeState?:string;subState?:string;type?:string;result?:string;lastCpuMilliseconds?:number;lastPeakBytes?:number;lastDurationMilliseconds?:number;lastFinishedAt?:string;measurement?:string;lastResult?:string};
-type Plan={action:string;reason:string;checkedAt:string;update?:{current?:string;candidate?:{tag:string;digest:string}};components:{name:string;state:string;checkedAt:string}[];services:Service[];host?:{hostCpuPercent?:number;hostMemoryUsedBytes?:number;hostMemoryTotalBytes?:number;rxBytesPerSecond:number;txBytesPerSecond:number}};
+type Plan={action:string;reason:string;checkedAt:string;update?:UpdateState;components:{name:string;state:string;checkedAt:string}[];services:Service[];host?:{hostCpuPercent?:number;hostMemoryUsedBytes?:number;hostMemoryTotalBytes?:number;rxBytesPerSecond:number;txBytesPerSecond:number}};
 export function ReportDownload({scope='all',label='Скачать отчёт',selfTests=false}:{scope?:string;label?:string;selfTests?:boolean}){
  const {api}=useApp();const [format,setFormat]=useState<Format>('xlsx'),[busy,setBusy]=useState(false),[error,setError]=useState('');
  async function download(){setBusy(true);setError('');try{const blob=selfTests?await api.selfTestReport(format):await api.diagnosticReport(format,scope);const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='MysticEgo-'+(selfTests?'self-tests':scope)+'-'+new Date().toISOString().replace(/[:.]/g,'-')+'.'+format;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}catch(e){setError(String(e))}finally{setBusy(false)}}
@@ -12,17 +13,17 @@ export function ReportDownload({scope='all',label='Скачать отчёт',se
 }
 const metric=(v:number|undefined|null,div=1)=>v==null?'—':(v/div).toLocaleString(undefined,{maximumFractionDigits:1});
 export function ServiceMaintenance(){
- const {api}=useApp();
+ const {api}=useApp();const tracker=useServerUpdate();
  const remote=useRemote(()=>api.request<Plan>('/orchestra/update/plan'),[api],5000,true);
  const [busy,setBusy]=useState(false),[message,setMessage]=useState('');
  const p=remote.value,action=p?.action;
  async function execute(){if(!p||!['update','repair'].includes(p.action)||!window.confirm(p.action==='update'?'Установить '+p.update?.candidate?.tag+'?':'Восстановить неисправные службы?'))return;
- setBusy(true);setMessage('');try{await api.request('/orchestra/update/plan',{method:'POST',body:JSON.stringify({action:p.action,confirmed:true,tag:p.update?.candidate?.tag,digest:p.update?.candidate?.digest})});setMessage('Запрос принят. Проверяем результат.');remote.reload()}catch(e){setMessage(String(e))}finally{setBusy(false)}}
+ setBusy(true);setMessage('');try{if(p.action==='update'&&p.update?.candidate&&tracker){await tracker.approve({...p.update.candidate,target:'orchestra'},p.update,true);remote.reload();return;}await api.request('/orchestra/update/plan',{method:'POST',body:JSON.stringify({action:p.action,confirmed:true,tag:p.update?.candidate?.tag,digest:p.update?.candidate?.digest})});setMessage('Запрос принят. Проверяем результат.');remote.reload()}catch(e){setMessage(String(e))}finally{setBusy(false)}}
  return <section className="infra-service-center" aria-label="Обновление и восстановление">
  <Panel title="Обновление и восстановление">
  <ErrorBanner text={remote.error||''}/>
  <p role="status">{p?.reason??'Ожидаем данные сервера'}</p><p>Версия: {p?.update?.current??'—'} · {p?.checkedAt?new Date(p.checkedAt).toLocaleTimeString():'—'}</p>
- <button className="btn" disabled={busy||!!remote.error||!['update','repair'].includes(action??'')} onClick={()=>void execute()}>Обновить / восстановить</button>
+ <button className="btn" disabled={busy||!!tracker?.pending||!!remote.error||!['update','repair'].includes(action??'')} onClick={()=>void execute()}>Обновить / восстановить</button>
  <p className="infra-auto-policy">Автоматическое обновление включено · штатная политика Orchestra</p>
  {message&&<p role="status">{message}</p>}
  <ReportDownload label="Сводный отчёт"/>

@@ -59,6 +59,7 @@ public static class ServiceCollectionExtensions
         // Сканер сам создаёт scope через IServiceScopeFactory — Singleton ок.
         services.AddSingleton<IToolDiscoveryService, ToolDiscoveryService>();
 
+        services.AddSingleton<DesktopPairing>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IRoleService, RoleService>();

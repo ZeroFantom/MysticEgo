@@ -141,6 +141,7 @@ try{
     try{
       for(const viewport of sizes){
         const context=await browser.newContext({viewport,locale:'ru-RU',timezoneId:'UTC',colorScheme:'dark',reducedMotion:'reduce'});
+        await context.addInitScript(()=>{Object.defineProperty(navigator,'userAgentData',{configurable:true,value:{brands:[{brand:'Google Chrome',version:'140'}]}})});
         const page=await context.newPage();page.setDefaultTimeout(8000);
         const errors=[];page.on('pageerror',e=>errors.push(String(e)));
         const prefix=role+'-'+viewport.width;
@@ -148,6 +149,11 @@ try{
           await isolate(page,origin);
           await page.goto(origin+'/settings',{waitUntil:'domcontentloaded'});
           await visible(page.locator('.auth-form-card'));
+          await visible(page.getByRole('region',{name:'Настройки приватности'}));
+          await page.getByRole('button',{name:'Только необходимые'}).click();
+          await page.reload({waitUntil:'domcontentloaded'});
+          await visible(page.locator('.auth-form-card'));
+          assert.equal(await page.getByRole('region',{name:'Настройки приватности'}).count(),0);
           for(const [theme,style] of combinations)await check(page,prefix+'-login-'+theme+'-'+style,async()=>{
             await switchAppearance(page,theme,style);await checkArtwork(page,theme,style,'.auth-visual',viewport.width<=780?'hero':'entry');
             const typography=await page.locator('.auth-visual :is(.auth-brand,.auth-role)').evaluateAll(items=>items.map(el=>{const c=getComputedStyle(el);return {bg:c.backgroundColor,border:c.borderTopWidth,padding:c.paddingTop,color:c.color}}));
