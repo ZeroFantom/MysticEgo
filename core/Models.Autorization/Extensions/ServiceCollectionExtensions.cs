@@ -46,7 +46,7 @@ public static class ServiceCollectionExtensions
         });
         services.AddMemoryCache();
 
-        services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
+        services.AddSingleton<IPasswordHasher, VersionedPasswordHasher>();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
 
         // ── AccessResolver ─────────────────────────────
