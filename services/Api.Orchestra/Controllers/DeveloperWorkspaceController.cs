@@ -45,6 +45,10 @@ public sealed class DeveloperWorkspaceController(DevelopmentTeam team,GitHubWork
     [HttpPost("internal/{id:guid}"),RequestSizeLimit(16384)]
     public Task<IActionResult> InternalChange(Guid id,WorkspaceChange input,CancellationToken ct)=>
         Run(async()=>await local.Change(id,input,Actor,Login,Owner,ct),ct);
+    public sealed record ReconcileRequest(int Number);
+    [HttpPost("internal/{id:guid}/reconcile"),RequestSizeLimit(1024)]
+    public Task<IActionResult> Reconcile(Guid id,ReconcileRequest input,CancellationToken ct)=>
+        Run(async()=>Owner?await local.Reconcile(id,input.Number,Login,ct):throw new WorkspaceProviderException(403,"owner_required"),ct);
     public sealed record PublishRequest(bool Confirmed,string? Category);
     [HttpPost("internal/{id:guid}/publish"),RequestSizeLimit(4096)]
     public Task<IActionResult> Publish(Guid id,PublishRequest input,CancellationToken ct)=>
