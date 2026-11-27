@@ -1,5 +1,6 @@
 import express from 'express';
 import { readFileSync } from 'node:fs';
+import { createInterface } from 'node:readline/promises';
 import { UiAutomationService } from './service.mjs';
 import { makeMcp, mapController } from './controller.mjs';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -19,6 +20,13 @@ if (process.argv.includes('--stdio')) {
 } else {
   const token = process.env.MYSTICEGO_UI_TOKEN;
   if (!token || token.length < 32) throw new Error('Set MYSTICEGO_UI_TOKEN to a random secret (minimum 32 characters)');
+  if (!process.stdin.isTTY || !process.stdout.isTTY) throw new Error('HTTP control requires a local interactive terminal');
+  const prompt = createInterface({ input: process.stdin, output: process.stdout });
+  const answer = await prompt.question('Allow local authenticated assistants to control configured UI targets for 30 minutes? Type ALLOW: ');
+  prompt.close();
+  if (answer !== 'ALLOW') throw new Error('Local consent denied');
+  console.log('UI control enabled for 30 minutes. Ctrl+C stops it. Supervise actions.');
+  setTimeout(() => void stop(), 30 * 60 * 1000).unref();
   const app = express();
   app.use(express.json({ limit: '64kb' }));
   mapController(app, service, token);
