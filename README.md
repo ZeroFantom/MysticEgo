@@ -36,7 +36,7 @@ MysticEgo развивается в рамках BETA7. [GitHub Releases](https:
 | Пространство разработчиков и GitHub | main: #77, #76; выбор категории обсуждения, восстановление публикации |
 | Нативная автоматизация, VRM handoff, локализация и разрешения аккаунта | main: [#72](https://github.com/ZeroFantom/MysticEgo/pull/72), 14/14 workflows и 264/264 браузерных проверок; требуется испытание на устройствах |
 
-[Дорожная карта и ограничения](docs/development-roadmap.md) · [Изменения R3.2.41](docs/releases/beta7-r3.2.41.md)
+[Дорожная карта и ограничения](docs/development-roadmap.md) · [Изменения R3.2.42](docs/releases/beta7-r3.2.42.md)
 
 ## Возможности
 
