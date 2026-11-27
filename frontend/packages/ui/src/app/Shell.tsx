@@ -2,6 +2,7 @@ import './panel-surface.css';
 import './cinematic.css';
 import {SharePage} from '../pages/SharePage';
 import {ServerUpdateProvider,useServerUpdate} from './serverUpdate';
+import {BrowserPreferences} from './BrowserPreferences';
 import {CloudDeskDownloads,PublicDesktopDownloads} from '../pages/DesktopDownloads';
 import {NoticeBell,NotificationProvider,useNotice} from './notifications';
 import {MaintenanceNotices} from '../pages/MaintenanceStatus';
@@ -251,7 +252,12 @@ function Workspace({logout}:{logout:()=>void}){
   </div>;
 }
 
-export function MysticApp({mode,defaultApi}:{mode:NodeMode;title:string;defaultApi:string}){
+export function MysticApp(props:{mode:NodeMode;title:string;defaultApi:string}){
+ const path=location.pathname.replace(/\/$/,'');
+ const publicPage=path==='/share'||path==='/audit-portal/share'||props.mode==='orchestra'&&['/studio','/developer','/desktop-downloads'].includes(path);
+ return <BrowserPreferences publicPage={publicPage}><MysticAppContent {...props}/></BrowserPreferences>;
+}
+function MysticAppContent({mode,defaultApi}:{mode:NodeMode;title:string;defaultApi:string}){
   const runtime=window.__MYSTIC_CONFIG__??{};
   const portal=location.pathname==='/audit-portal'||location.pathname.startsWith('/audit-portal/');
   const storageKey='mysticego.session.v1.'+mode+(portal?'.portal':'');
