@@ -93,7 +93,7 @@ public sealed class GitHubWorkspace(GitHubWorkspaceClient github,IConfiguration 
     }
     private async Task<JsonObject> GetDiscussion(int number,CancellationToken ct)
     {
-        var data=await github.Graph("query($number:Int!){"+RepositoryHead+"{discussion(number:$number){"+DiscussionFields+" comments(first:50){nodes{author{login} body createdAt} pageInfo{hasNextPage}}}}}",new{number},false,ct);
+        var data=await github.Graph("query($number:Int!){"+RepositoryHead+"{discussion(number:$number){"+DiscussionFields.Replace("comments{totalCount}","")+" comments(first:50){totalCount nodes{author{login} body createdAt} pageInfo{hasNextPage}}}}}",new{number},false,ct);
         return data["repository"]?["discussion"] as JsonObject??throw new WorkspaceProviderException(404,"discussion_not_found");
     }
     public async Task<WorkspaceDetail> Detail(string kind,int number,int page,CancellationToken ct)
