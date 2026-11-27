@@ -89,6 +89,9 @@ public static class Program
 
         app.MapControllers();
         app.MapAuditRegistration();
+        // Public metadata only. Never accepts or returns a password.
+        app.MapGet("/api/auth/credential-policy", (Models.Autorization.Configuration.AuthorizationOptions options) =>
+            Results.Ok(Models.Autorization.Security.CredentialPolicy.Describe(options.PasswordPolicy))).AllowAnonymous();
 
         app.MapGet("/health", () => Results.Json(new
         {
