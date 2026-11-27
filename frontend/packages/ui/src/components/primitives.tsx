@@ -9,6 +9,6 @@ export function ErrorBanner({text}:{text:string}){
 }
 export function Panel({title,aside,children}:{title:string;aside?:ReactNode;children:ReactNode}){const t=useLocale();return <section className="panel"><div className="panel-title"><h2>{t(title)}</h2>{aside}</div>{children}</section>}
 export function Header({title,description,action}:{title:string;description?:string;action?:ReactNode}){const t=useLocale();return <div className="page-header"><div><h1>{t(title)}</h1>{description&&<p>{t(description)}</p>}</div>{action}</div>}
-export function Empty({text}:{text:string}){return <div className="empty"><Box size={26}/><p>{text}</p></div>}
-export function Badge({ok,text}:{ok:boolean;text:string}){return <span className={'status '+(ok?'good':'bad')}><span className="dot"/>{text}</span>}
+export function Empty({text}:{text:string}){const t=useLocale();return <div className="empty"><Box size={26}/><p>{t(text)}</p></div>}
+export function Badge({ok,text}:{ok:boolean;text:string}){const t=useLocale();return <span className={'status '+(ok?'good':'bad')}><span className="dot"/>{t(text)}</span>}
 

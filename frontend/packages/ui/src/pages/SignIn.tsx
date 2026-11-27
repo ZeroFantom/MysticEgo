@@ -75,7 +75,7 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
    <div className="auth-top-actions"><ThemeToggle/><NoticeBell placement="header"/></div>
    <div className="auth-form-card">
     <p className="auth-eyeline"><Sparkles size={17}/> {title}</p>
-    <small>Браузер: {browserLabels[browserKind()]}</small>
+    <small>{t('Браузер')}: {browserLabels[browserKind()]}</small>
     <h2>{guest?t("Гостевой сеанс"):register?t("Создать аккаунт"):t("Войти в MysticEgo")}</h2>
     {mode==='orchestra'&&<PanelLoginLinks/>}
     <DesktopSignIn session={session} authUrl={authUrl} onLogin={onLogin} disabled={busy||register||guest} onBusy={setPairingBusy}/>

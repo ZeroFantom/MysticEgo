@@ -6,7 +6,7 @@ import './typography.css';
 import './cinematic.css';
 import {SharePage} from '../pages/SharePage';
 import {ServerUpdateProvider,useServerUpdate} from './serverUpdate';
-import {BrowserPreferences} from './BrowserPreferences';
+import {BrowserPreferences,PrivacyLink} from './BrowserPreferences';
 import {ReleaseHighlights} from './ReleaseHighlights';
 import {CloudDeskDownloads,PublicDesktopDownloads} from '../pages/DesktopDownloads';
 import {NoticeBell,NotificationProvider,useNotice} from './notifications';
@@ -119,9 +119,9 @@ function AccountMenu({logout}:{logout:()=>void}){
     document.addEventListener('keydown',escape);
     return()=>{document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',escape)};
   },[open]);
-  const name=personal?.profile.displayName||personal?.game.nickname||session.username||'Аккаунт';
+  const name=personal?.profile.displayName||personal?.game.nickname||session.username||t('Аккаунт');
   return <div className="account-menu" ref={box}>
-    <button className="account-trigger" type="button" aria-label={'Меню аккаунта: '+name} aria-expanded={open} aria-controls={menuId} onClick={()=>setOpen(value=>!value)}>
+    <button className="account-trigger" type="button" aria-label={t('Меню аккаунта')+': '+name} aria-expanded={open} aria-controls={menuId} onClick={()=>setOpen(value=>!value)}>
       <ProfileAvatar url={personal?.profile.avatarUrl} name={name}/><span>{name}</span><ChevronDown size={15}/>
     </button>
     <div id={menuId} className="account-popover motion-disclosure" data-motion-open={open} inert={!open} aria-hidden={!open}>
@@ -214,6 +214,7 @@ function Workspace({logout}:{logout:()=>void}){
       <footer className="workspace-project">
         {mode === 'orchestra' && <a href="/studio">{t("Студия и команда")}</a>}
         <LicenseLink/>
+        <PrivacyLink/>
       </footer>
       <ReleaseStatus/>
     </aside>
@@ -228,10 +229,10 @@ function Workspace({logout}:{logout:()=>void}){
       <main className="content"><AnimatedArea><Routes>
         <Route path="/" element={mode==='orchestra'||mode==='global'||mode==='local'?<OrchestraOverview/>:mode==='audit'?<OrganizationRequests overview/>:<Overview/>}/>
         {['audit','orchestra'].includes(mode)&&<Route path="/development-team" element={<DevelopmentTeam/>}/>}
-        {mode==='orchestra'&&<Route path="/development-workspace" element={cloudDownloads?<DevelopmentWorkspace/>:<p>Development team access required.</p>}/>}
+        {mode==='orchestra'&&<Route path="/development-workspace" element={cloudDownloads?<DevelopmentWorkspace/>:<p>{t('Development team access required.')}</p>}/>}
         {mode==='orchestra'&&<Route path="/model-workers" element={<Navigate to="/assistant?tab=models" replace/>}/>}
         {mode==='orchestra'&&<Route path="/clouddesk-downloads" element={cloudDownloads?<CloudDeskDownloads/>:
-          <p role="status">{developer.loading?'Проверяем доступ…':'Скачивание CloudDesk доступно команде разработки.'}</p>}/>}
+          <p role="status">{t(developer.loading?'Проверяем доступ…':'Скачивание CloudDesk доступно команде разработки.')}</p>}/>}
         {mode==='orchestra'&&<Route path="/panels" element={<PanelDirectory/>}/>}
         {mode==='orchestra'&&<Route path="/project-branches" element={<ProjectBranches/>}/>}
         {mode==='orchestra'&&<Route path="/developer-assistant" element={<Navigate to="/assistant?tab=developer" replace/>}/>}

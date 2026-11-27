@@ -1,3 +1,4 @@
+import {useLocale} from '../app/presentation';
 import {useState} from 'react';
 import {useServerUpdate,type UpdateState} from '../app/serverUpdate';
 import './infrastructure-workspace.css';
@@ -9,9 +10,9 @@ type RecoveryCandidate={tag:string;digest:string;asset:string;id:number;size:num
 type RecoveryMode='reinstall'|'cycle';
 type Plan={recovery?:{installed:string;options:Partial<Record<RecoveryMode,RecoveryCandidate[]>>};recoveryProgress?:{phase:string;mode:RecoveryMode;steps:string[];completed:number;message?:string};action:string;reason:string;checkedAt:string;update?:UpdateState;components:{name:string;state:string;checkedAt:string}[];services:Service[];host?:{hostCpuPercent?:number;hostMemoryUsedBytes?:number;hostMemoryTotalBytes?:number;rxBytesPerSecond:number;txBytesPerSecond:number}};
 export function ReportDownload({scope='all',label='Скачать отчёт',selfTests=false}:{scope?:string;label?:string;selfTests?:boolean}){
- const {api}=useApp();const [format,setFormat]=useState<Format>('xlsx'),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const t=useLocale();const {api}=useApp();const [format,setFormat]=useState<Format>('xlsx'),[busy,setBusy]=useState(false),[error,setError]=useState('');
  async function download(){setBusy(true);setError('');try{const blob=selfTests?await api.selfTestReport(format):await api.diagnosticReport(format,scope);const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='MysticEgo-'+(selfTests?'self-tests':scope)+'-'+new Date().toISOString().replace(/[:.]/g,'-')+'.'+format;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}catch(e){setError(String(e))}finally{setBusy(false)}}
- return <div className="infra-report-actions"><select aria-label="Формат отчёта" value={format} onChange={e=>setFormat(e.target.value as Format)}><option value="xlsx">XLSX</option><option value="json">JSON</option><option value="txt">TXT</option></select><button className="btn secondary" disabled={busy} onClick={()=>void download()}>{label}</button>{error&&<p role="alert">{error}</p>}</div>
+ return <div className="infra-report-actions"><select aria-label={t('Формат отчёта')} value={format} onChange={e=>setFormat(e.target.value as Format)}><option value="xlsx">XLSX</option><option value="json">JSON</option><option value="txt">TXT</option></select><button className="btn secondary" disabled={busy} onClick={()=>void download()}>{t(label)}</button>{error&&<p role="alert">{error}</p>}</div>
 }
 const metric=(v:number|undefined|null,div=1)=>v==null?'—':(v/div).toLocaleString(undefined,{maximumFractionDigits:1});
 export function ServiceMaintenance(){

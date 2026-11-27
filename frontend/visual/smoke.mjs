@@ -157,16 +157,19 @@ try{
           const serverAppearance=await isolate(page,origin);
           await page.goto(origin+'/settings',{waitUntil:'domcontentloaded'});
           await visible(page.locator('.auth-form-card'));
-          const highlights=page.getByRole('complementary',{name:'Обновления MysticEgo'});
+          const privacy=page.getByRole('dialog',{name:'Настройки приватности'});
+          await visible(privacy);
+          await privacy.getByRole('button',{name:'Только необходимые'}).click();
+          const highlights=page.getByRole('dialog',{name:'Что нового'});
           await visible(highlights);
-          assert.match(await highlights.innerText(),/Что нового · v[0-9]/);
+          assert.match(await highlights.innerText(),/v[0-9]/);
+          const bounds=await highlights.boundingBox();
+          assert.ok(bounds&&Math.abs(bounds.x+bounds.width/2-viewport.width/2)<3&&Math.abs(bounds.y+bounds.height/2-viewport.height/2)<3,'release dialog must be centered');
           await highlights.getByRole('button',{name:'Ознакомился'}).click();
           await highlights.waitFor({state:'hidden'});
-          await visible(page.getByRole('region',{name:'Настройки приватности'}));
-          await page.getByRole('button',{name:'Только необходимые'}).click();
           await page.reload({waitUntil:'domcontentloaded'});
           await visible(page.locator('.auth-form-card'));
-          assert.equal(await page.getByRole('region',{name:'Настройки приватности'}).count(),0);
+          await privacy.waitFor({state:'hidden'});
           await highlights.waitFor({state:'hidden'});
           for(const [theme,style] of combinations)await check(page,prefix+'-login-'+theme+'-'+style,async()=>{
             await switchAppearance(page,theme,style);await checkArtwork(page,theme,style,'.auth-visual',viewport.width<=780?'hero':'entry');
@@ -188,6 +191,23 @@ try{
             await visible(page.locator('.appearance-style-options'));
           });
           if(await page.locator('.appearance-style-options').isVisible()){
+            await check(page,prefix+'-privacy-and-language',async()=>{
+              const selector=page.locator('.presentation-settings-language select');
+              for(const [lang,heading] of [['en','Settings'],['zh-CN','设置'],['ko','설정'],['ru','Настройки']]){
+                await selector.selectOption(lang);
+                await page.waitForFunction(lang=>document.documentElement.lang===lang,lang);
+                await visible(page.getByRole('heading',{name:heading,exact:true}));
+                await noHorizontalOverflow(page);
+              }
+              assert.equal(await page.locator('.sidebar .browser-privacy-link').count(),1);
+              assert.equal(await page.locator('.sidebar .browser-privacy-link').evaluate(el=>getComputedStyle(el).position),'static');
+              if(viewport.width<=850)await page.getByRole('button',{name:'Открыть меню'}).click();
+              await page.locator('.sidebar .browser-privacy-link').click();
+              await visible(privacy);
+              await privacy.getByRole('button',{name:'Отмена',exact:true}).click();
+              await privacy.waitFor({state:'hidden'});
+              if(viewport.width<=850&&await page.getByRole('button',{name:'Закрыть меню'}).isVisible())await page.getByRole('button',{name:'Закрыть меню'}).click();
+            });
             for(const [theme,style] of combinations)await check(page,prefix+'-settings-'+theme+'-'+style,async()=>{
               await switchAppearance(page,theme,style);
               const previews=await page.locator('.appearance-art-preview').evaluateAll(items=>items.map(el=>{const r=el.getBoundingClientRect(),c=getComputedStyle(el);return {ratio:r.width/r.height,fit:c.backgroundSize,repeat:c.backgroundRepeat}}));

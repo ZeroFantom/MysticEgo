@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {Check,Moon,Palette,Sparkles,Sun} from 'lucide-react';
+import {Check,Globe2,Moon,Palette,Sparkles,Sun} from 'lucide-react';
 import {useApp} from '../app/context';
 import {preferenceKey} from '../app/panelPreferences';
 import {changePresentation,fonts,languages,syncAppearance,useLocale,usePresentation} from '../app/presentation';
@@ -58,7 +58,7 @@ export function ThemeToggle({scope=''}:{scope?:string}){
  return <span className="appearance-quick"><LanguageSelector/><button type="button" className="icon-btn" title={light?t("Тёмная тема"):t("Светлая тема")} aria-label={light?t("Тёмная тема"):t("Светлая тема")} onClick={()=>save(scope,{...current(scope),theme:light?'dark':'light'})}>{light?<Moon size={19}/>:<Sun size={19}/>}</button>
  <button type="button" className="icon-btn" title={t("Насыщенный стиль")} aria-label={t("Насыщенный стиль")} aria-pressed={style.interfaceStyle==='immersive'} onClick={()=>save(scope,{...current(scope),interfaceStyle:style.interfaceStyle==='immersive'?'simplified':'immersive'})}><Sparkles size={19} aria-hidden="true"/></button></span>;
 }
-export function LanguageSelector(){const t=useLocale();const {value,problem}=usePresentation();return <span className="presentation-quick"><select aria-label={t('Язык')} value={value.language} onChange={e=>changePresentation({language:e.target.value as typeof value.language})}>{languages.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select>{problem&&<small role="status">{t(problem)}</small>}</span>}
+export function LanguageSelector(){const t=useLocale();const {value,problem}=usePresentation();return <span className="presentation-quick"><span className="presentation-language"><Globe2 size={16} aria-hidden="true"/><select aria-label={t('Язык')} value={value.language} onChange={e=>changePresentation({language:e.target.value as typeof value.language})}>{languages.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></span>{problem&&<small role="status">{t(problem)}</small>}</span>}
 export function Settings(){
  const t=useLocale();
  const {preferenceScope:scope}=useApp();
@@ -66,7 +66,7 @@ export function Settings(){
  const {value:presentation,problem}=usePresentation();
  const update=<K extends keyof Style>(field:K,value:Style[K])=>{const next={...current(scope),[field]:value};save(scope,next);setStyle(next)};
  return <><Header title={t("Настройки")} description={t("Тема, палитра и эффекты оформления")} action={<button className="btn secondary" onClick={()=>{save(scope,{...defaults});setStyle({...defaults})}}>{t("Сбросить оформление")}</button>}/>
-  <Panel title={t('Язык')+' / '+t('Шрифт')}><div className="stack"><LanguageSelector/><label>{t('Шрифт')}<select value={presentation.font} onChange={e=>changePresentation({font:e.target.value as typeof presentation.font})}>{fonts.map(([id,name])=><option key={id} value={id}>{t(name)}</option>)}</select></label><p className="font-preview">{t("MysticEgo · 人工智能 · 인공지능 · Искусственный интеллект")}</p>{problem&&<p role="status">{t(problem)}</p>}</div></Panel>
+  <Panel title={t('Язык')+' / '+t('Шрифт')}><div className="stack"><div className="presentation-settings-language"><span>{t('Язык')}</span><LanguageSelector/></div><label>{t('Шрифт')}<select value={presentation.font} onChange={e=>changePresentation({font:e.target.value as typeof presentation.font})}>{fonts.map(([id,name])=><option key={id} value={id}>{t(name)}</option>)}</select></label><p className="font-preview">{t("MysticEgo · 人工智能 · 인공지능 · Искусственный интеллект")}</p>{problem&&<p role="status">{t(problem)}</p>}</div></Panel>
   <div className="two-col settings-layout">
    <Panel title={t("Тема и интерфейс")}><div className="stack">
     <label>{t("Тема")}<select aria-label={t("Тема")} value={style.theme} onChange={event=>update('theme',event.target.value as Style['theme'])}><option value="dark">{t("Тёмная")}</option><option value="light">{t("Светлая")}</option><option value="system">{t("Как в системе")}</option></select></label>

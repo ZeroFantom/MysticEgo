@@ -1,3 +1,4 @@
+import {useLocale} from '../app/presentation';
 import {useEffect,useState} from 'react';
 import {ArrowDownToLine, ArrowUpRight, Braces, CalendarDays, GitBranch, GitPullRequest, RefreshCw, Search, ShieldCheck, Tag, X} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -11,6 +12,7 @@ type Release={tag:string;publishedAt?:string;prerelease?:boolean};
 type PublishedRelease=Release&{name:string;publishedAt:string;url:string;notes:string;installable:boolean};
 type ReleaseInfo={installed?:string;releaseOrigin?:string};
 export function ReleaseStatus(){
+  const t=useLocale();
   const {session,mode,portal}=useApp();
   const [revision,setRevision]=useState(0);
   useEffect(()=>{const refresh=()=>setRevision(v=>v+1);window.addEventListener('project-github-changed',refresh);return()=>window.removeEventListener('project-github-changed',refresh);},[]);
@@ -57,11 +59,11 @@ export function ReleaseStatus(){
     window.addEventListener('focus',refresh);
     return ()=>{lifecycle.abort();window.clearTimeout(timer);document.removeEventListener('visibilitychange',refresh);window.removeEventListener('focus',refresh)};
   },[session.url,session.authUrl,mode,portal,revision]);
-  return <div className="release-status" aria-label="Версии MysticEgo"
-    title={`Установлено: ${installed||'—'} · GitHub: ${latest?.tag??'—'}`}>
+  return <div className="release-status" aria-label={t('Версии MysticEgo')}
+    title={`${t('Установлено')}: ${installed||'—'} · GitHub: ${latest?.tag??'—'}`}>
     <Tag className="release-status-icon" size={17} aria-hidden="true"/>
-    <small>Установлено <strong>{installed||'не указано'}</strong></small>
-    <small>GitHub <strong>{latest?.tag||(failed?'недоступен':'—')}</strong>{failed&&latest?' · данные устарели':latest?.prerelease?' · предварительный':''}</small>
+    <small>{t('Установлено')} <strong>{installed||t('не указано')}</strong></small>
+    <small>GitHub <strong>{latest?.tag||(failed?t('недоступен'):'—')}</strong>{failed&&latest?' · '+t('данные устарели'):latest?.prerelease?' · '+t('предварительный'):''}</small>
   </div>;
 }
 
