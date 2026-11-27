@@ -1,7 +1,7 @@
 import {useState} from 'react';
 import {useApp,useRemote} from '../app/context';
 import {Header,Panel,ErrorBanner} from '../components/primitives';
-type Item={id:string;kind:'issue'|'discussion';title:string;body:string;status:string;assignee?:string;creator:string;githubNumber?:number;syncState:string;updatedAt:string};
+type Item={id:string;kind:'issue'|'discussion';title:string;body:string;status:string;assignee?:string;remoteAssignees?:string[];creator:string;githubNumber?:number;syncState:string;updatedAt:string};
 type View={items:Item[];connected:boolean;writesEnabled:boolean;lastSync:string;syncError?:string};
 export function DevelopmentWorkspace(){
  const {api}=useApp();
@@ -33,11 +33,11 @@ export function DevelopmentWorkspace(){
    <div className="stack">{rows.map(item=><article className="panel" key={item.id}>
     <h3>{item.title}</h3><small>{item.status} · {item.syncState} · {new Date(item.updatedAt).toLocaleString()}</small>
     <p style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{item.body}</p>
-    {item.assignee&&<p>Assignee: {item.assignee}</p>}
+    {(item.assignee||item.remoteAssignees?.length)?<p>Assignee: {item.remoteAssignees?.join(', ')||item.assignee}</p>:null}
     {item.githubNumber&&<a href={'https://github.com/ZeroFantom/MysticEgo/'+(item.kind==='issue'?'issues':'discussions')+'/'+item.githubNumber} target="_blank" rel="noreferrer">GitHub #{item.githubNumber}</a>}
     <div className="actions">
-     {item.syncState==='local'&&item.kind==='issue'&&item.status==='open'&&<button className="btn secondary" disabled={busy} onClick={()=>void action('/'+item.id+'/take')}>Take task</button>}
-     {item.syncState==='local'&&item.status==='in-progress'&&<><button className="btn secondary" disabled={busy} onClick={()=>void action('/'+item.id+'/release')}>Release</button><button className="btn" disabled={busy} onClick={()=>void action('/'+item.id+'/complete')}>Complete</button></>}
+     {(item.syncState==='local'||item.syncState==='synced'&&remote.value?.writesEnabled)&&item.kind==='issue'&&item.status==='open'&&<button className="btn secondary" disabled={busy} onClick={()=>void action('/'+item.id+'/take')}>Take task</button>}
+     {(item.syncState==='local'||item.syncState==='synced'&&remote.value?.writesEnabled)&&item.status==='in-progress'&&<><button className="btn secondary" disabled={busy} onClick={()=>void action('/'+item.id+'/release')}>Release</button><button className="btn" disabled={busy} onClick={()=>void action('/'+item.id+'/complete')}>Complete</button></>}
      {item.syncState==='local'&&remote.value?.writesEnabled&&<button className="btn secondary" disabled={busy} onClick={()=>setPublish(item.id)}>Publish to GitHub</button>}
     </div>
     {publish===item.id&&<div role="alert"><p>Publish this title and description to the configured GitHub repository? Check for private information first.</p><button className="btn" disabled={busy} onClick={()=>void action('/'+item.id+'/publish')}>Confirm publication</button> <button className="btn secondary" onClick={()=>setPublish(null)}>Cancel</button></div>}
