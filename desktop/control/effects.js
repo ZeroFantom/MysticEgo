@@ -1,5 +1,5 @@
-const paletteList={iris:['Ирис','#b49bf7','#75d9c7'],jade:['Нефрит','#85dfcc','#aa8cf4'],amber:['Янтарь','#f1b47c','#bcb7fe'],arctic:['Арктика','#86c7ff','#75ebed'],rose:['Роза','#f2a9c7','#bc9df3'],lime:['Лайм','#bfed79','#6ee5b8'],indigo:['Индиго','#acaafa','#66dfff'],coral:['Коралл','#ffa99a','#f7d696']};
-export function initEffects(host){
+const paletteList={steel:['Сталь','#c6d5eb','#a5cccf'],iris:['Ирис','#b49bf7','#75d9c7'],jade:['Нефрит','#85dfcc','#aa8cf4'],amber:['Янтарь','#f1b47c','#bcb7fe'],arctic:['Арктика','#86c7ff','#75ebed'],rose:['Роза','#f2a9c7','#bc9df3'],lime:['Лайм','#bfed79','#6ee5b8'],indigo:['Индиго','#acaafa','#66dfff'],coral:['Коралл','#ffa99a','#f7d696']};
+export function initEffects(host,{onChange}={}){
   if(!host)return;
   const defaults={theme:'dark',interfaceStyle:'simplified',transition:'flow',uiMotion:'normal',palette:'iris',motion:'none',intensity:55,accent:'#b49bf7',alt:'#75d9c7'};
   let state={...defaults};
@@ -16,7 +16,7 @@ export function initEffects(host){
     for(const [key,button] of styleButtons)button.setAttribute('aria-pressed',String(state.interfaceStyle===key));
     intensity.value=String(state.intensity);
   }
-  function set(key,value){state[key]=value;apply();sync();try{localStorage.setItem('mysticego.desktop.style',JSON.stringify(state))}catch{}}
+  function set(key,value){state[key]=value;apply();sync();if(onChange){const patch=key==='accent'||key==='alt'?{palette:'custom',[key==='accent'?'primary':'secondary']:value}:key==='motion'?{wave:['wave','all'].includes(value),grid:['grid','all'].includes(value),border:['border','all'].includes(value)}:{[key]:value};onChange(patch)}else try{localStorage.setItem('mysticego.desktop.style',JSON.stringify(state))}catch{}}
   function apply(){
     const root=document.documentElement;
     root.dataset.theme=state.theme==='system'?(system.matches?'light':'dark'):state.theme==='light'?'light':'dark';
@@ -57,6 +57,7 @@ export function initEffects(host){
   select('Анимация','motion',[['none','Без эффектов'],['wave','Неоновая волна'],['grid','Затухающая сетка'],['border','Свет по контуру'],['all','Все эффекты']]);
   const intensity=document.createElement('input');intensity.type='range';intensity.min='10';intensity.max='100';intensity.value=state.intensity;
   intensity.oninput=()=>set('intensity',Number(intensity.value));field('Яркость',intensity);
-  const reset=document.createElement('button');reset.type='button';reset.className='secondary';reset.textContent='Сбросить оформление';reset.onclick=()=>{state={...defaults};set('theme',state.theme)};host.append(reset);
+  const reset=document.createElement('button');reset.type='button';reset.className='secondary';reset.textContent='Сбросить оформление';reset.onclick=()=>{state={...defaults};apply();sync();if(onChange)onChange({theme:state.theme,interfaceStyle:state.interfaceStyle,transition:state.transition,uiMotion:state.uiMotion,palette:state.palette,intensity:state.intensity,primary:state.accent,secondary:state.alt,wave:false,grid:false,border:false});else set('theme',state.theme)};host.append(reset);
   system.addEventListener('change',apply);apply();sync();
+  return {applyAccount(value){state={...defaults,...Object.fromEntries(Object.keys(defaults).filter(key=>Object.hasOwn(value,key)).map(key=>[key,value[key]])),accent:value.primary??defaults.accent,alt:value.secondary??defaults.alt,motion:value.wave&&value.grid&&value.border?'all':value.wave?'wave':value.grid?'grid':value.border?'border':'none'};apply();sync()}};
 }
