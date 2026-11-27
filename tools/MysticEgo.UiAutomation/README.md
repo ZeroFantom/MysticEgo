@@ -24,7 +24,7 @@
 
 ## HTTP / REST
 
-Установите MYSTICEGO_UI_CONFIG и MYSTICEGO_UI_TOKEN (случайный секрет длиной от 32 символов), запустите `npm start` в графическом сеансе и вручную введите ALLOW. Разрешение действует максимум 30 минут; Ctrl+C останавливает исполнитель. MCP: `http://127.0.0.1:1247/mcp` (Streamable HTTP); REST: `POST /api/v1/ui/{operation}`. Заголовок Authorization: Bearer <secret> обязателен для обоих. Сервис не слушает внешнюю сеть и не разрешает browser Origin. Не публикуйте его через reverse proxy. HTTP и stdio — альтернативные режимы запуска.
+Установите MYSTICEGO_UI_CONFIG и MYSTICEGO_UI_TOKEN (случайный секрет длиной от 32 символов), запустите `npm start` в графическом сеансе и вручную введите ALLOW. Разрешение действует максимум 30 минут; команды `status`, `stop` и Ctrl+C доступны в локальном терминале. Для нативного управления требуется отдельное подтверждение NATIVE, а для библиотеки — LIBRARY, если соответствующие возможности настроены. MCP: `http://127.0.0.1:1247/mcp` (Streamable HTTP); REST: `POST /api/v1/ui/{operation}`. Заголовок Authorization: Bearer <secret> обязателен для обоих. Сервис не слушает внешнюю сеть и не разрешает browser Origin. Не публикуйте его через reverse proxy. HTTP и stdio — альтернативные режимы запуска.
 
 | Tool | Purpose |
 | --- | --- |
@@ -67,7 +67,7 @@ Build `dotnet publish native/UiAutomation.Native.csproj -c Release -r win-x64 --
 ```
 Use HTTP mode; native operations are disabled in stdio. Select the window manually, then call native_attach, native_snapshot, native_click or native_key. Focus changes abort subsequent operations. Native screenshot is a capture of the visible client rectangle and may include overlays; never use it for sensitive windows. It is not a protected-window capture mechanism. No hidden or elevated input, lock screen/UAC access, anti-cheat bypass, or game memory access. Use games only where automation is permitted, e.g. an offline test environment. Exclusive fullscreen/raw-input titles may reject simulated input. Windows pointer speed (1–20) is separate from mouse hardware DPI and in-game sensitivity; native_pointer_get/set requires explicit local config permission.
 
-The existing AutomationRecorder records user clicks (not keystrokes) into a client-coordinate scenario. Native replay accepts that JSON via native_replay_clicks, with an attached window and a 20-click/30-second limit in this prototype. The existing recorder and automation.play also remain available. ui_record_start/stop/replay record assistant click, scroll and assertion steps in memory in the same Playwright session; no typed text is retained and the recording is cleared on close. Use ui_scenario_export to obtain versioned JSON and save it manually in a local scenario file; use ui_scenario_import in a new session opened with the same initial URL or configured Electron app ID. Import validates the exact target, schema, action types, timing and maximum of 20 steps; it does not execute the scenario. Review scenario data before saving or replay: accessible names and initial URLs can contain private data. Use only test targets and URLs without credentials or secret query parameters. ui_replay_cancel interrupts a running replay before the next action (an already-running Playwright operation can complete); cancellation is not rollback. Persistent scenario library UI and user-driven browser DOM recording are not yet implemented.
+The existing AutomationRecorder records user clicks (not keystrokes) into a client-coordinate scenario. Native replay accepts that JSON via native_replay_clicks, with an attached window and a 20-click/30-second limit in this prototype. The existing recorder and automation.play also remain available. ui_record_start/stop/replay record assistant click, scroll and assertion steps in memory in the same Playwright session; no typed text is retained and the recording is cleared on close. Use ui_scenario_export to obtain versioned JSON and save it manually in a local scenario file; use ui_scenario_import in a new session opened with the same initial URL or configured Electron app ID. Import validates the exact target, schema, action types, timing and maximum of 20 steps; it does not execute the scenario. Review scenario data before saving or replay: accessible names and initial URLs can contain private data. Use only test targets and URLs without credentials or secret query parameters. ui_replay_cancel interrupts a running replay before the next action (an already-running Playwright operation can complete); cancellation is not rollback. Persistent scenario library CLI is available (see below); graphical library UI and user-driven browser DOM recording are not yet implemented.
 
 ## Manufacturer applications
 
@@ -76,3 +76,16 @@ Configure exact installed executable paths in native.vendorApps using keys nvidi
 ## Verification
 
 Windows build and Linux Chromium smoke are defined in GitHub Actions; actual Windows interactive input, OEM application updates, local authentication and LM Studio interoperability must be verified on a test machine before release. Native pointer speed changes are global for the current user and can be restored via the same tool.
+
+## Local scenario library
+
+Set the optional `scenarioDirectory` field in the trusted local config to an absolute directory owned exclusively by the signed-in user. Do not use shared, synced or public directories. The library is disabled if not configured; in HTTP mode its use requires separate LIBRARY consent. Files may contain private accessible names and URLs; review every file before saving. On Windows restrict the directory ACL to the user; POSIX new files are created with owner-only modes. Local CLI:
+
+```sh
+node scenario-cli.mjs save scenario.json "Overview test"
+node scenario-cli.mjs list
+node scenario-cli.mjs show SCENARIO_UUID
+node scenario-cli.mjs remove SCENARIO_UUID
+```
+
+Save/remove require interactive confirmation. MCP clients have read-only access to the approved library through `ui_library_list` and `ui_library_load` for an already open, matching session; neither executes the scenario. Explicit `ui_replay` is still required. Maximum 100 files, 20 steps per scenario; the library is local, not synchronized. `ui_session_status` reports active Playwright session, recording/replay and configured native/library capabilities. It does not report native window attachment state. Local terminal stop requests shutdown; an in-flight operation may finish before cleanup. The graphical consent and launcher integration remain pending.
