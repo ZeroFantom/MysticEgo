@@ -51,7 +51,7 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
 
     public sealed record MaintenancePlan(string Action,string Reason,UpdateStatus? Update,
         InfrastructureMaintenanceController.Component[] Components,ServerSample? Host,
-        ServiceLoadMonitor.Sample[] Services,DateTimeOffset CheckedAt);
+        ServiceLoadMonitor.Sample[] Services,DateTimeOffset CheckedAt,bool AutomaticEnabled,bool AutomaticAvailable);
     public sealed record PlanApproval(string Action,bool Confirmed,string? Tag=null,string? Digest=null);
 
     /// <summary>Only authoritative fresh component failure or a newer published release permits a mutation.</summary>
@@ -88,7 +88,7 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
             _=>"Недостаточно актуальных данных. Ожидается проверка."
         };
         var components=report.Components.Concat(peers.Snapshot().Where(p=>p.Name!="orchestra").Select(p=>new InfrastructureMaintenanceController.Component(p.Name,p.State,"HTTP health observation",p.CheckedAt,p.Reason))).ToArray();
-        return new(action,reason,update,components,telemetry.History().LastOrDefault(),serviceLoads.Read(),now);
+        return new(action,reason,update,components,telemetry.History().LastOrDefault(),serviceLoads.Read(),now,AutoEnabled(),Directory.Exists(Inbox));
     }
 
     private static bool AutoEnabled()
