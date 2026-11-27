@@ -15,7 +15,7 @@ let current=guest(),problem='',revision=0;
 const listeners=new Set<()=>void>();
 const subscribe=(fn:()=>void)=>{listeners.add(fn);return()=>{listeners.delete(fn)}};
 function publish(){document.documentElement.lang=current.language;document.documentElement.dataset.font=current.font;revision++;listeners.forEach(fn=>fn())}
-export function t(source:string,language=current.language){const row=Object.hasOwn(catalog,source)?catalog[source]:undefined;return language==='ru'||!row?source:row[language==='en'?0:language==='zh-CN'?1:2]}
+export function t(source:string,language=current.language){const row=Object.hasOwn(catalog,source)?catalog[source]:undefined;return !row?source:language==='ru'?(row[3]??source):row[language==='en'?0:language==='zh-CN'?1:2]}
 export function useLocale(){useSyncExternalStore(subscribe,()=>revision,()=>0);return t}
 export function usePresentation(){useLocale();return {value:current,problem}}
 let active: {send:(patch:Record<string,unknown>)=>void}|undefined;
