@@ -1,3 +1,4 @@
+import {useLocale} from '../app/presentation';
 import {useState,type FormEvent} from 'react';
 import {ArrowRight,Boxes,Eye,EyeOff,KeyRound,Network,Shield,Sparkles,UserRound} from 'lucide-react';
 import type {Session} from '../app/context';
@@ -18,6 +19,7 @@ export async function signIn(authUrl:string,login:string,password:string):Promis
 }
 const labels:Record<string,[string,string]>={orchestra:['Оркестр','Управление экосистемой'],global:['Global','Панель организации'],local:['Local','Панель клуба'],agent:['Agent','Рабочая станция клуба'],audit:['Audit','Личный профиль MysticEgo']};
 export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;onLogin:(s:Session)=>void;mode?:string;onGuest?:(token:string)=>void}){
+ const t=useLocale();
  const [authUrl,setAuthUrl]=useState(session.authUrl);
  const [login,setLogin]=useState(''),[password,setPassword]=useState(''),[nickname,setNickname]=useState('');
  const [error,setError]=useState(''),[busy,setBusy]=useState(false),[register,setRegister]=useState(false),[reveal,setReveal]=useState(false);
@@ -56,53 +58,53 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
   <section className="auth-visual">
    <div className="auth-brand"><Boxes size={24}/> MysticEgo</div>
    <div className="auth-orbit" aria-hidden="true"><i/><i/><i/><span className="auth-emblem"><Shield size={48}/></span></div>
-   <div className="auth-role"><span><Network size={16}/>{title}</span><h1>{subtitle}</h1></div>
+   <div className="auth-role"><span><Network size={16}/>{t(title)}</span><h1>{t(subtitle)}</h1></div>
   </section>
   <section className="auth-form-side">
    <div className="auth-top-actions"><ThemeToggle/><NoticeBell placement="header"/></div>
    <div className="auth-form-card">
     <p className="auth-eyeline"><Sparkles size={17}/> {title}</p>
-    <h2>{guest?'Гостевой сеанс':register?'Создать аккаунт':'Войти в MysticEgo'}</h2>
+    <h2>{guest?t("Гостевой сеанс"):register?t("Создать аккаунт"):t("Войти в MysticEgo")}</h2>
     {mode==='orchestra'&&<PanelLoginLinks/>}
-    {mode==='audit'&&<div className="auth-tabs" role="group" aria-label="Режим авторизации" data-register={register}>
-      <button type="button" aria-pressed={!register} onClick={()=>selectMode(false)}>Вход</button>
-      <button type="button" aria-pressed={register} onClick={()=>selectMode(true)}>Регистрация</button>
+    {mode==='audit'&&<div className="auth-tabs" role="group" aria-label={t("Режим авторизации")} data-register={register}>
+      <button type="button" aria-pressed={!register} onClick={()=>selectMode(false)}>{t("Вход")}</button>
+      <button type="button" aria-pressed={register} onClick={()=>selectMode(true)}>{t("Регистрация")}</button>
     </div>}
     {guest&&onGuest&&available.value?<GuestEntry apiUrl={session.url} onLogin={onGuest}/>:<form className="stack auth-form" onSubmit={submit}>
      <div className="auth-field">
-      <label htmlFor="auth-login">Логин</label>
+      <label htmlFor="auth-login">{t("Логин")}</label>
       <div className="auth-control"><UserRound size={17} aria-hidden="true"/><input id="auth-login" name="login" value={login} onChange={e=>setLogin(e.target.value)} required autoComplete="username"/></div>
      </div>
      {register&&<div className="auth-field auth-field-new">
-      <label htmlFor="auth-nickname">Игровой никнейм</label>
+      <label htmlFor="auth-nickname">{t("Игровой никнейм")}</label>
       <div className="auth-control"><Sparkles size={17} aria-hidden="true"/><input id="auth-nickname" name="nickname" required minLength={2} maxLength={60} autoComplete="nickname" value={nickname} onChange={e=>setNickname(e.target.value)}/></div>
      </div>}
      <div className="auth-field">
-      <label htmlFor="auth-password">Пароль</label>
+      <label htmlFor="auth-password">{t("Пароль")}</label>
       <div className="auth-control auth-password"><KeyRound size={17} aria-hidden="true"/>
-       <input id="auth-password" name="password" type={reveal?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} required minLength={register?12:1} autoComplete={register?'new-password':'current-password'} aria-describedby={register?'auth-password-hint':undefined}/>
-       <button className="icon-btn" type="button" aria-label={reveal?'Скрыть пароль':'Показать пароль'} onClick={()=>setReveal(value=>!value)}>{reveal?<EyeOff size={17}/>:<Eye size={17}/>}</button>
+       <input id="auth-password" name="password" type={reveal?t("text"):'password'} value={password} onChange={e=>setPassword(e.target.value)} required minLength={register?12:1} autoComplete={register?t("new-password"):'current-password'} aria-describedby={register?t("auth-password-hint"):undefined}/>
+       <button className="icon-btn" type="button" aria-label={reveal?t("Скрыть пароль"):t("Показать пароль")} onClick={()=>setReveal(value=>!value)}>{reveal?<EyeOff size={17}/>:<Eye size={17}/>}</button>
       </div>
-      {register&&<small id="auth-password-hint">Минимум 12 символов</small>}
+      {register&&<small id="auth-password-hint">{t("Минимум 12 символов")}</small>}
      </div>
      {register&&policy&&<div className="registration-documents">
        <label><input type="checkbox" checked={acceptance===policyKey} required
           onChange={event=>setAcceptance(event.target.checked?policyKey:'')}/>
-        <span>Принимаю <a href={policy.terms.url} target="_blank" rel="noreferrer">условия использования</a>.</span>
+        <span>{t("Принимаю")}<a href={policy.terms.url} target="_blank" rel="noreferrer">{t("условия использования")}</a>.</span>
        </label>
-       <a href={policy.privacy.url} target="_blank" rel="noreferrer">Как обрабатываются данные</a>
+       <a href={policy.privacy.url} target="_blank" rel="noreferrer">{t("Как обрабатываются данные")}</a>
      </div>}
-     {register&&documents.loading&&<p className="footnote">Загружаем документы регистрации…</p>}
+     {register&&documents.loading&&<p className="footnote">{t("Загружаем документы регистрации…")}</p>}
      <ErrorBanner text={error||(register?documents.error:'')}/>
-     <button className="btn auth-submit" type="submit" disabled={busy||register&&(!documents.value||documents.loading||!!documents.error||!!policyKey&&acceptance!==policyKey)}>{busy?'Подождите…':register?'Создать аккаунт':'Войти'}<ArrowRight size={17}/></button>
-     <details className="auth-connection"><summary>Адрес авторизации</summary><div className="auth-field">
-      <label htmlFor="auth-url">API авторизации</label><div className="auth-control"><Network size={17} aria-hidden="true"/>
+     <button className="btn auth-submit" type="submit" disabled={busy||register&&(!documents.value||documents.loading||!!documents.error||!!policyKey&&acceptance!==policyKey)}>{busy?t("Подождите…"):register?t("Создать аккаунт"):t("Войти")}<ArrowRight size={17}/></button>
+     <details className="auth-connection"><summary>{t("Адрес авторизации")}</summary><div className="auth-field">
+      <label htmlFor="auth-url">{t("API авторизации")}</label><div className="auth-control"><Network size={17} aria-hidden="true"/>
        <input id="auth-url" type="url" value={authUrl} onChange={e=>setAuthUrl(e.target.value)} required/>
       </div></div></details>
     </form>}
-    {available.value&&onGuest&&<button className="btn secondary" onClick={()=>setGuest(value=>!value)}>{guest?'Войти в аккаунт':'Временный аккаунт гостя'}</button>}
+    {available.value&&onGuest&&<button className="btn secondary" onClick={()=>setGuest(value=>!value)}>{guest?t("Войти в аккаунт"):t("Временный аккаунт гостя")}</button>}
     <footer className="auth-project">
-      {mode === 'orchestra' && <a href="/studio">Студия и команда</a>}
+      {mode === 'orchestra' && <a href="/studio">{t("Студия и команда")}</a>}
       <LicenseLink/>
     </footer>
    </div>
