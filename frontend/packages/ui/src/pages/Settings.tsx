@@ -21,7 +21,7 @@ const volatileStyles=new Map<string,Style>();
 const defaults:Style={interfaceStyle:'simplified',transition:'flow',uiMotion:'normal',theme:'dark',palette:'iris',primary:'#b49bf7',secondary:'#75d9c7',ambient:true,wave:false,grid:false,border:false,intensity:55,density:'comfortable',size:'normal'};
 function current(scope:string):Style{
  if(volatileStyles.has(scope))return volatileStyles.get(scope)!;
- try{const saved={...defaults,...JSON.parse(localStorage.getItem(preferenceKey(scope,'appearance'))??localStorage.getItem(preferenceKey('','appearance'))??'{}')};return {...saved,theme:['dark','light','system'].includes(saved.theme)?saved.theme:defaults.theme,interfaceStyle:saved.interfaceStyle==='immersive'?'immersive':'simplified',transition:['flow','fade','slide','scale'].includes(saved.transition)?saved.transition:'flow',uiMotion:['off','low','normal'].includes(saved.uiMotion)?saved.uiMotion:'normal'}}
+ try{const saved={...defaults,...JSON.parse(localStorage.getItem(preferenceKey(scope,'appearance'))??'{}')};return {...saved,theme:['dark','light','system'].includes(saved.theme)?saved.theme:defaults.theme,interfaceStyle:saved.interfaceStyle==='immersive'?'immersive':'simplified',transition:['flow','fade','slide','scale'].includes(saved.transition)?saved.transition:'flow',uiMotion:['off','low','normal'].includes(saved.uiMotion)?saved.uiMotion:'normal'}}
  catch{return defaults}
 }
 export function applyStyle(style:Style){
@@ -55,11 +55,12 @@ export function ThemeToggle({scope=''}:{scope?:string}){
  const [style,setStyle]=useState(()=>current(scope));
  useEffect(()=>{const sync=()=>setStyle(current(scope));sync();window.addEventListener('mystic-appearance',sync);window.addEventListener('storage',sync);const media=matchMedia('(prefers-color-scheme:light)');media.addEventListener('change',sync);return()=>{window.removeEventListener('mystic-appearance',sync);window.removeEventListener('storage',sync);media.removeEventListener('change',sync)}},[scope]);
  const light=style.theme==='light'||style.theme==='system'&&matchMedia('(prefers-color-scheme:light)').matches;
- return <span className="appearance-quick"><LanguageSelector/><button type="button" className="icon-btn" title={light?t("Тёмная тема"):t("Светлая тема")} aria-label={light?t("Тёмная тема"):t("Светлая тема")} onClick={()=>save(scope,{...current(scope),theme:light?t("dark"):t("light")})}>{light?<Moon size={19}/>:<Sun size={19}/>}</button>
+ return <span className="appearance-quick"><LanguageSelector/><button type="button" className="icon-btn" title={light?t("Тёмная тема"):t("Светлая тема")} aria-label={light?t("Тёмная тема"):t("Светлая тема")} onClick={()=>save(scope,{...current(scope),theme:light?'dark':'light'})}>{light?<Moon size={19}/>:<Sun size={19}/>}</button>
  <button type="button" className="icon-btn" title={t("Насыщенный стиль")} aria-label={t("Насыщенный стиль")} aria-pressed={style.interfaceStyle==='immersive'} onClick={()=>save(scope,{...current(scope),interfaceStyle:style.interfaceStyle==='immersive'?'simplified':'immersive'})}><Sparkles size={19} aria-hidden="true"/></button></span>;
 }
 export function LanguageSelector(){const t=useLocale();const {value,problem}=usePresentation();return <span className="presentation-quick"><select aria-label={t('Язык')} value={value.language} onChange={e=>changePresentation({language:e.target.value as typeof value.language})}>{languages.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select>{problem&&<small role="status">{t(problem)}</small>}</span>}
 export function Settings(){
+ const t=useLocale();
  const {preferenceScope:scope}=useApp();
  const [style,setStyle]=useState(()=>current(scope));
  useEffect(()=>{const sync=()=>setStyle(current(scope));sync();window.addEventListener('mystic-appearance',sync);window.addEventListener('storage',sync);return()=>{window.removeEventListener('mystic-appearance',sync);window.removeEventListener('storage',sync)}},[scope]);
