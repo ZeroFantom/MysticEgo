@@ -9,7 +9,7 @@ namespace MysticEgo.Api.Orchestra.Controllers;
 /// Displays the update worker's state and queues the exact release confirmed by the managing developer.
 /// </summary>
 [ApiController, Authorize(Policy = "operator"), Route("api/v1/orchestra/update")]
-public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam team, DatabaseMaintenance database, ServerTelemetry telemetry, ServiceLoadMonitor serviceLoads) : ControllerBase
+public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam team, DatabaseMaintenance database, ServerTelemetry telemetry, ServiceLoadMonitor serviceLoads, OptionalDependencyState peers) : ControllerBase
 {
     private const string StateDirectory = "/var/lib/mysticego-orchestra-updater";
     private const string Inbox = "/var/lib/mysticego/update-inbox";
@@ -55,7 +55,7 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
     public sealed record PlanApproval(string Action,bool Confirmed,string? Tag=null,string? Digest=null);
 
     /// <summary>Only authoritative fresh component failure or a newer published release permits a mutation.</summary>
-    internal static string Decide(bool busy,bool updateAvailable,bool repairNeeded,bool repairAvailable,bool knownHealthy)
+    public static string Decide(bool busy,bool updateAvailable,bool repairNeeded,bool repairAvailable,bool knownHealthy)
         =>busy?"busy":updateAvailable?"update":repairNeeded?(repairAvailable?"repair":"unavailable"):knownHealthy?"healthy":"unknown";
 
     private async Task<MaintenancePlan> BuildPlan(CancellationToken ct)
@@ -71,12 +71,12 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
             recovery?.State=="repairing"&&now-recovery.CheckedAt<TimeSpan.FromMinutes(10)||
             report.Components.Any(c=>c.State=="repairing"&&now-c.CheckedAt<TimeSpan.FromMinutes(55));
         var failed=report.Components.Any(c=>c.Name is ("docker" or "lmstudio" or "voice" or "postgres-service" or "worker")&&c.State=="degraded"&&now-c.CheckedAt<TimeSpan.FromMinutes(55));
-        var repairNeeded=!report.SocketAvailable||failed||maintenance?.State is "degraded" or "unavailable";
+        var repairNeeded=OperatingSystem.IsLinux()&&(!report.SocketAvailable||failed||maintenance?.State is "degraded" or "unavailable");
         var repairAvailable=Directory.Exists(Inbox)&&(recovery is not null||maintenance is not null&&now-maintenance.CheckedAt<TimeSpan.FromMinutes(5));
         var available=updateFresh&&Directory.Exists(Inbox)&&update is {Phase:"ready" or "failed",Protocol:2,Candidate:{ } candidate}&&
             update.Targets?.Contains("orchestra")==true&&candidate.Tag!=update.Current;
         var healthy=updateFresh&&update?.Phase=="current"&&report.Installed&&report.SocketAvailable&&
-            report.Components.All(c=>(c.State is "available" or "external" or "disabled")&&now-c.CheckedAt<TimeSpan.FromMinutes(3));
+            new[]{"orchestra","docker","lmstudio","voice","postgres-service","database"}.All(name=>report.Components.Any(c=>c.Name==name&&(c.State is "available" or "external" or "disabled")&&now-c.CheckedAt<TimeSpan.FromMinutes(3)));
         var action=Decide(busy,available,repairNeeded,repairAvailable,healthy);
         var reason=action switch
         {
@@ -87,7 +87,8 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
             "unavailable"=>"Канал восстановления недоступен. Используйте доверенный CloudDesk.",
             _=>"Недостаточно актуальных данных. Ожидается проверка."
         };
-        return new(action,reason,update,report.Components,telemetry.History().LastOrDefault(),serviceLoads.Read(),now);
+        var components=report.Components.Concat(peers.Snapshot().Where(p=>p.Name!="orchestra").Select(p=>new InfrastructureMaintenanceController.Component(p.Name,p.State,"HTTP health observation",p.CheckedAt,p.Reason))).ToArray();
+        return new(action,reason,update,components,telemetry.History().LastOrDefault(),serviceLoads.Read(),now);
     }
 
     private static bool AutoEnabled()
