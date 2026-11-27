@@ -18,6 +18,7 @@ public static class Bootstrap
         builder.Services.AddSingleton<CommandCatalog>();
         builder.Services.AddSingleton<ApiMethodCatalog>();
         builder.Services.AddCommandMcpServer();
+        builder.Services.AddUiAutomationBridge();
         builder.Services.AddLocalAssistant();
         builder.Services.AddScoped<DiagnosticMcpService>();
         builder.Services.AddEther();
