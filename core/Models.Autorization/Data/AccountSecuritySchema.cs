@@ -37,6 +37,7 @@ public static class AccountSecuritySchema
         await db.Database.ExecuteSqlRawAsync("CREATE UNIQUE INDEX IF NOT EXISTS \"IX_refresh_tokens_SessionId\" ON refresh_tokens (\"SessionId\")",ct);
         var guid=db.Database.IsNpgsql()?"uuid":"TEXT";
         var timestamp=db.Database.IsNpgsql()?"timestamp with time zone":"TEXT";
+        var boolean=db.Database.IsNpgsql()?"boolean":"INTEGER";
         var sql=$"""
             CREATE TABLE IF NOT EXISTS account_license_acceptances (
                 "UserId" {guid} NOT NULL REFERENCES users("Id") ON DELETE CASCADE,
@@ -44,9 +45,18 @@ public static class AccountSecuritySchema
                 "AcceptedUtc" {timestamp} NOT NULL,
                 PRIMARY KEY ("UserId","Version")
             );
+            CREATE TABLE IF NOT EXISTS account_feature_consents (
+                "UserId" {guid} NOT NULL REFERENCES users("Id") ON DELETE CASCADE,
+                "Scope" varchar(40) NOT NULL,
+                "PolicyVersion" varchar(40) NOT NULL,
+                "Enabled" {boolean} NOT NULL,
+                "UpdatedUtc" {timestamp} NOT NULL,
+                PRIMARY KEY ("UserId","Scope")
+            );
             CREATE TABLE IF NOT EXISTS account_device_grants (
                 "UserId" {guid} NOT NULL REFERENCES users("Id") ON DELETE CASCADE,
                 "DeviceId" {guid} NOT NULL,
+                "GrantId" {guid} NOT NULL,
                 "Scope" varchar(40) NOT NULL,
                 "PolicyVersion" varchar(40) NOT NULL,
                 "GrantedUtc" {timestamp} NOT NULL,
