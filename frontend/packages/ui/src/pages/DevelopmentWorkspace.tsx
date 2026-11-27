@@ -46,7 +46,7 @@ export function DevelopmentWorkspace(){
  const rows=(remote.value?.items??[]).filter(x=>x.kind===kind&&(filter==='all'||x.status===filter)&&(x.title+' '+x.body).toLowerCase().includes(search.toLowerCase()));
  return <>
   <Header title="Development workspace" description="Team tasks, discussions and GitHub synchronization"/>
-  <ErrorBanner text={error||remote.error||remote.value?.syncError}/>
+  <ErrorBanner text={error||remote.error||remote.value?.syncError||''}/>
   <Panel title="Repository · ZeroFantom/MysticEgo">
    <p>{remote.value?.connected?'GitHub connected · synchronization every two minutes':'Local workspace · GitHub not configured'} · {remote.value?.writesEnabled?'Publishing enabled':'Publishing disabled'}</p>
    <a href="https://github.com/ZeroFantom/MysticEgo" target="_blank" rel="noreferrer">Open GitHub</a>
