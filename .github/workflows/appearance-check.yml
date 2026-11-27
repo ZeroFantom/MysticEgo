@@ -8,7 +8,10 @@ on:
       - 'services/**'
       - 'core/Models.Data/**'
       - 'ops/infrastructure/**'
+      - 'ops/orchestra-updater/**'
+      - 'tests/InfrastructureLocalSocketSmoke.py'
       - 'tests/BetaResilienceSmoke/**'
+      - 'tests/DiagnosticReportSmoke/**'
       - '.github/workflows/appearance-check.yml'
   workflow_dispatch:
 permissions:
@@ -42,11 +45,13 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - run: python3 -m unittest discover -s ops/infrastructure -p 'test_reconcile.py'
+      - run: python3 tests/InfrastructureLocalSocketSmoke.py
       - run: |
           python3 -m py_compile ops/infrastructure/{reconcile,voice-server,local-runner}.py
           bash -n ops/infrastructure/install-local.sh
           bash -n ops/infrastructure/install-voice.sh
       - run: dotnet run --project tests/BetaResilienceSmoke/BetaResilienceSmoke.csproj
+      - run: dotnet run --project tests/DiagnosticReportSmoke/DiagnosticReportSmoke.csproj
       - run: |
           for role in Orchestra Global Local Agent AuditOrchestra; do
             dotnet build "services/Api.$role/Api.$role.csproj" -c Release

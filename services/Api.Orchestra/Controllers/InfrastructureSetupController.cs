@@ -58,13 +58,14 @@ public sealed class InfrastructureSetupController(IConfiguration config, Develop
         {
             "docker" => "docker\n",
             "monitoring" when string.IsNullOrEmpty(input.Url) && string.IsNullOrEmpty(input.Secret) => "monitoring\n",
+            "metrics-source" when input.Secret is { } secret && Regex.IsMatch(secret, @"\A[a-f0-9]{64}\z") => "metrics-source " + secret + "\n",
             "postgres" when (input.Bind is null or "" or "127.0.0.1") && (input.Cidr is null or "" or "127.0.0.1/32") && string.IsNullOrEmpty(input.Secret) => "postgres\n",
             "postgres-native" when (input.Bind is null or "" or "127.0.0.1") && (input.Cidr is null or "" or "127.0.0.1/32") && string.IsNullOrEmpty(input.Secret) => "postgres-native\n",
             "lmstudio" when input.Role is "panel-data" or "world" => "lmstudio " + input.Role + "\n",
             _ => null
         };
         if (request is null)
-            return BadRequest(new { error = "На VPS Orchestra напрямую доступны Docker, LM Studio и PostgreSQL с loopback и автоматическими паролями. Подключение новой панели выполняется до её запуска." });
+            return BadRequest(new { error = "На VPS Orchestra напрямую доступны Docker, LM Studio, локальный мониторинг, источник метрик и PostgreSQL с loopback и автоматическими паролями. Подключение новой панели выполняется до её запуска." });
         if (!OperatingSystem.IsLinux() || !System.IO.File.Exists(LocalSocket))
             return Conflict(new { error = "Локальная служба установки не найдена. Проверьте обновление Orchestra и mysticego-local-setup.socket." });
         if (!Gate.Wait(0)) return Conflict(new { error = "Установка уже выполняется." });
@@ -158,6 +159,7 @@ public sealed class InfrastructureSetupController(IConfiguration config, Develop
 
     public sealed record SetupInput(string Target, string Component, bool Confirmed,
         string? Url, string? Bind, string? Cidr, string? Role, string? Secret);
+    internal static (string Component, string Status)? DiagnosticRun() => Volatile.Read(ref current) is { } run ? (run.Component, run.Status) : null;
     private sealed record SetupRun(string Target, string Component, string Status, string Message);
 }
 

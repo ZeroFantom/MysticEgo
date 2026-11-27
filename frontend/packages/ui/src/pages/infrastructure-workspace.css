@@ -1,0 +1,34 @@
+/* Component-scoped maintenance workspace, using the active MysticEgo palette. */
+.infra-workspace{display:grid;gap:clamp(16px,2.5vw,28px);min-width:0}
+.infra-hero{position:relative;display:flex;align-items:center;justify-content:space-between;gap:24px;min-height:180px;padding:clamp(22px,4vw,48px);overflow:hidden;border:1px solid var(--line);border-radius:18px;background:linear-gradient(100deg,var(--mystic-surface) 5%,var(--mystic-veil) 60%,transparent),var(--mystic-profile-art) right center/cover,var(--surface)}
+.infra-hero-copy{position:relative;z-index:1;min-width:0;max-width:64ch}
+.infra-eyebrow{font-size:.74rem;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--mystic-primary)}
+.infra-hero h1{font:400 clamp(32px,4.4vw,62px)/1.08 Georgia,serif;letter-spacing:-.04em;margin:12px 0}
+.infra-hero p{margin:0;line-height:1.6;color:var(--ink)}
+.infra-hero-icon{flex:none;color:var(--mystic-primary);opacity:.8}
+.infra-tabs{display:flex;flex-wrap:wrap;gap:8px;border-bottom:1px solid var(--line);padding-bottom:10px}
+.infra-tabs a{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid transparent;border-radius:10px;min-height:44px;color:var(--subtle)}
+.infra-tabs a.active{color:var(--ink);border-color:var(--line);background:var(--surface);box-shadow:inset 0 -2px var(--mystic-primary)}
+.infra-status-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:16px}
+.infra-status-card{display:flex;flex-direction:column;gap:12px;min-width:0;padding:clamp(18px,2.5vw,28px);border:1px solid var(--line);border-radius:16px;background:var(--surface);transition:transform .2s,border-color .2s}
+.infra-status-card:hover{transform:translateY(-2px);border-color:var(--mystic-primary)}
+.infra-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.infra-status-icon{display:grid;place-items:center;width:48px;height:48px;border-radius:14px;background:color-mix(in srgb,var(--mystic-primary) 14%,transparent);color:var(--mystic-primary)}
+.infra-state{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;font-weight:650;color:var(--subtle)}
+.infra-state i{width:7px;height:7px;border-radius:50%;background:currentColor}
+.infra-status-card[data-state=available] .infra-state{color:#218569}
+.infra-status-card[data-state=degraded] .infra-state{color:#bd6541}
+.infra-status-card[data-state=repairing] .infra-state{color:var(--mystic-primary)}
+.infra-status-card h3,.infra-status-card p{margin:0}
+.infra-status-card p{line-height:1.55;color:var(--subtle);overflow-wrap:anywhere}
+.infra-status-card small{margin-top:auto;color:var(--subtle);font-size:.75rem}
+.infra-worker-banner{display:flex;align-items:center;gap:14px;padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.infra-worker-banner>svg{flex:none;color:var(--mystic-primary)}
+.infra-worker-banner>div{flex:1;min-width:0}
+.infra-worker-banner p{margin:5px 0 0;line-height:1.5;color:var(--subtle)}
+.infra-actions-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:16px;align-items:start}
+.infra-actions-grid>*{min-width:0}.infra-actions-grid code{display:block;white-space:normal;overflow-wrap:anywhere}
+.infra-link{display:inline-flex;align-items:center;gap:8px;min-height:44px;color:var(--mystic-primary);font-weight:650}
+@media(max-width:1000px){.infra-actions-grid{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:600px){.infra-hero{min-height:140px}.infra-hero-icon{display:none}.infra-tabs a{flex:1 1 42%;justify-content:center;padding:9px}.infra-worker-banner{flex-wrap:wrap}.infra-worker-banner>div{flex:1 1 70%}.infra-worker-banner button{width:100%}}
+@media(prefers-reduced-motion:reduce){.infra-status-card{transition:none}.infra-status-card:hover{transform:none}}

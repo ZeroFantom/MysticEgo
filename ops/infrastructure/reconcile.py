@@ -12,6 +12,7 @@ STATUS = Path("/var/lib/mysticego-infrastructure-status")
 ENV = Path("/etc/mysticego/orchestra.env")
 rows = {}
 attempts = {}
+history = []
 
 def checked(*args):
     try:
@@ -35,10 +36,14 @@ def configured(*keys):
     except OSError:
         return False
 
-def publish(name, state, message):
+def publish(name, state, message, reason=None):
     rows[name] = dict(name=name, state=state, message=message,
                       checkedAt=datetime.now(timezone.utc).isoformat())
-    install.atomic(STATUS / "status.json", json.dumps({"components": list(rows.values())}), 0o644)
+    if reason is not None:
+        rows[name]["reason"] = reason
+    history.append(rows[name])
+    del history[:-120]
+    install.atomic(STATUS / "status.json", json.dumps({"components": list(rows.values()), "history": history}), 0o644)
     install.atomic(STATUS / "attempts.json", json.dumps(attempts))
 
 def repair(name, test, action, message):
@@ -59,7 +64,10 @@ def repair(name, test, action, message):
         publish(name, "available", message)
     except Exception as error:
         print(name + ": " + type(error).__name__, flush=True)
-        publish(name, "degraded", "Восстановление не завершилось. Проверьте журнал службы.")
+        reason = type(error).__name__
+        if reason not in ("CalledProcessError", "TimeoutExpired", "OSError", "PermissionError", "FileNotFoundError", "ValueError", "RuntimeError"):
+            reason = "OtherError"
+        publish(name, "degraded", "Восстановление не завершилось. Проверьте журнал службы.", reason)
 
 def lm_ready():
     # A compatibility catalog can list downloaded but unloaded models.
@@ -112,16 +120,20 @@ def voice_repair():
         time.sleep(2)
 
 def cycle():
-    global attempts, rows
+    global attempts, rows, history
     STATUS.mkdir(mode=0o755, parents=True, exist_ok=True)
+    STATUS.chmod(0o755) # systemd UMask=0077 must not hide the public status directory
     try:
         attempts = json.loads((STATUS / "attempts.json").read_text())
     except (OSError, ValueError):
         attempts = {}
     try:
-        rows = {item["name"]: item for item in json.loads((STATUS / "status.json").read_text())["components"]}
-    except (OSError, ValueError, KeyError):
+        previous = json.loads((STATUS / "status.json").read_text())
+        rows = {item["name"]: item for item in previous["components"]}
+        history = previous.get("history", [])[-120:]
+    except (OSError, ValueError, KeyError, TypeError):
         rows = {}
+        history = []
     publish("orchestra", "available" if active("mysticego-orchestra.service") else "degraded", "Этот VPS Orchestra.")
     if configured("MYSTICEGO_AUTO_DOCKER=off"):
         publish("docker", "disabled", "Автоматическая установка отключена.")

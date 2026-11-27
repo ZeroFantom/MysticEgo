@@ -31,6 +31,13 @@ export class NodeApi {
       return body.trim()?JSON.parse(body) as T:undefined as T;
     }catch(error){ if(error instanceof DOMException && (error.name==='AbortError'||error.name==='TimeoutError'))throw new Error(timeoutMessage);throw error; }finally{clearTimeout(timer)}
   }
+  async diagnosticReport(format:'json'|'txt'|'xlsx'):Promise<Blob>{
+    const response=await fetch(this.baseUrl.replace(/\/$/,'')+'/api/v1/orchestra/diagnostics/report?format='+format,{
+      headers:{Authorization:'Bearer '+this.getToken()},cache:'no-store',signal:AbortSignal.timeout(25000)
+    });
+    if(!response.ok)throw new ApiError(response.status,'Не удалось сформировать отчёт (HTTP '+response.status+').');
+    return response.blob();
+  }
   deployment=()=>this.request<{mode:string;label:string;description?:string;node:string;kind:string;auth:string;global?:string;local?:string}>('/deployment');
   ping=()=>this.request<{node:string;serverUtc:string;monotonicMs:number}>('/diagnostics/ping');
   links=()=>this.request<{name:string;url:string;status:number;ms:number;reachable:boolean}[]>('/diagnostics/links');

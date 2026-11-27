@@ -5,6 +5,7 @@ import {ServerUpdateProvider,useServerUpdate} from './serverUpdate';
 import {CloudDeskDownloads,PublicDesktopDownloads} from '../pages/DesktopDownloads';
 import {NoticeBell,NotificationProvider,useNotice} from './notifications';
 import {MaintenanceNotices} from '../pages/MaintenanceStatus';
+import {InfrastructureWorkspace,type InfrastructureSection} from '../pages/InfrastructureWorkspace';
 import './workspace-rail.css';
 import './workspace-polish.css';
 import './motion.css';
@@ -16,7 +17,7 @@ import {BrowserRouter,Link,NavLink,Navigate,Route,Routes,useLocation} from 'reac
 import {
   Activity,Bell,BookOpen,Boxes,ChevronDown,ChevronRight,Clapperboard,Cloud,Cog,
   HardDrive,House,LayoutDashboard,LogOut,Menu,Network,Rocket,ShieldCheck,Sparkles,UsersRound,
-  UserRound,Clock3,Bot,ServerCog,X,Building2
+  UserRound,Clock3,Bot,ServerCog,X,Building2,Container,BrainCircuit,Database,Radio
 } from 'lucide-react';
 import {NodeApi,type NodeMode} from '@mysticego/sdk';
 import {CTX,useApp,useRemote,type PersonalAccount} from './context';
@@ -143,6 +144,8 @@ function Workspace({logout}:{logout:()=>void}){
   const cloudDownloads=mode==='orchestra'&&(developer.value?.owner||developer.value?.membership?.status==='approved');
   const {pathname}=useLocation();
   const nav=navigation(mode,portal);
+  const infrastructureOwner=mode==='orchestra'&&developer.value?.owner===true;
+  if(infrastructureOwner)nav.splice(nav.length-1,0,{name:'Инфраструктура',items:[{to:'/infrastructure/services',label:'Сервисы',icon:Container},{to:'/infrastructure/ai',label:'AI и речь',icon:BrainCircuit},{to:'/infrastructure/database',label:'Базы данных',icon:Database},{to:'/infrastructure/metrics',label:'Мониторинг',icon:Radio}]});
   if(mode==='orchestra')nav[0].items.push({to:'/project-branches',label:'Ветки GitHub',icon:Network});
   if(cloudDownloads)nav[0].items.push({to:'/clouddesk-downloads',label:'Скачать CloudDesk',icon:Cloud});
   const current=nav.flatMap(section=>section.items).find(item=>item.to===pathname)?.label??(pathname==='/profile'?'Мой профиль':modes[mode].name);
@@ -227,6 +230,7 @@ function Workspace({logout}:{logout:()=>void}){
         <Route path="/faq" element={<Faq/>}/>
         <Route path="/audit" element={<Audit/>}/>
         <Route path="/diagnostics" element={<Diagnostics/>}/>
+        {mode==='orchestra'&&(['services','ai','database','metrics'] as InfrastructureSection[]).map(section=><Route key={section} path={'/infrastructure/'+section} element={infrastructureOwner?<InfrastructureWorkspace key={section} section={section}/>:<p role="status">{developer.loading?'Проверяем доступ…':'Управление инфраструктурой доступно владельцу Orchestra.'}</p>}/>)}
         <Route path="/settings" element={<Settings/>}/>
         <Route path="/notifications" element={<NotificationsPage/>}/>
         <Route path="/agents" element={<AgentList/>}/><Route path="/agents/:id" element={<AgentDetails/>}/>

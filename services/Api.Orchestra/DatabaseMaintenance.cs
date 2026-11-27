@@ -8,6 +8,8 @@ public sealed class DatabaseMaintenance(NodeState state, ILogger<DatabaseMainten
     public sealed record Result(string Name, string State, string Message, DateTimeOffset CheckedAt);
     private Result current = new("database", "checking", "Ожидается первый замер базы.", DateTimeOffset.UtcNow);
     public Result Snapshot => Volatile.Read(ref current);
+    private readonly System.Collections.Concurrent.ConcurrentQueue<Result> history = new();
+    public Result[] History() => history.ToArray();
 
     protected override async Task ExecuteAsync(CancellationToken stop)
     {
@@ -27,6 +29,8 @@ public sealed class DatabaseMaintenance(NodeState state, ILogger<DatabaseMainten
                 ok ? state.Data.Provider + ": подключение к текущему хранилищу доступно."
                    : state.Data.Provider + ": подключение не работает. Данные и провайдер сохранены; требуется проверка или явная миграция.",
                 DateTimeOffset.UtcNow));
+            history.Enqueue(Snapshot);
+            while (history.Count > 240) history.TryDequeue(out _);
             try { await Task.Delay(TimeSpan.FromSeconds(15), stop); }
             catch (OperationCanceledException) when (stop.IsCancellationRequested) { break; }
         }

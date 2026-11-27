@@ -1,7 +1,7 @@
 import {useState,type FormEvent} from 'react';
 import {useApp,useRemote} from '../app/context';
 import {Panel,ErrorBanner} from '../components/primitives';
-import {InfrastructureSetup} from './InfrastructureSetup';
+import {Link} from 'react-router-dom';
 import type {Maintenance} from './MaintenanceStatus';
 
 type Worker={id:string;role:string;model:string;slots:number;active:number;circuitOpen:boolean};
@@ -38,9 +38,9 @@ export function ModelWorkers(){
         <div><small>Назначение</small><span>{labels[w.role]??w.role}</span></div>
         <div><small>{w.circuitOpen?'Временно недоступна':'Вычисления'}</small><span>{w.active}/{w.slots}</span></div>
       </div>)}
-      {workers.value?.length===0&&<p>{lm?.state==='repairing'?'Локальная LM Studio разворачивается на VPS Orchestra.':lm?.state==='available'?'API LM Studio отвечает; ожидается доступная загруженная модель.':lm?.message??'Локальные модели пока недоступны. Проверьте автоматическое обслуживание в диагностике.'}</p>}
+      {workers.value?.length===0&&<p>{lm?.state==='repairing'?'Локальная LM Studio разворачивается на VPS Orchestra.':lm?.state==='available'?'API LM Studio отвечает; ожидается доступная загруженная модель.':lm?.message??'Локальные модели пока недоступны. Проверьте раздел «AI и речь».'}</p>}
     </Panel>
-    <details className="panel assistant-model-setup"><summary>Настроить или развернуть LM Studio</summary><InfrastructureSetup initial="lmstudio"/></details>
+    <Link className="btn secondary" to="/infrastructure/ai">Управление AI-инфраструктурой и речью</Link>
     <Panel title="Запрос к модели">
       <form className="stack" onSubmit={submit}>
         <label>Роль<select value={role} onChange={e=>setRole(e.target.value)}><option value="panel-data">Данные панелей</option><option value="world">Правила мира</option></select></label>

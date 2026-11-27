@@ -1,8 +1,7 @@
 import {useId,useState} from 'react';
-import {Activity,Cpu,HardDrive,MemoryStick,Network} from 'lucide-react';
+import {Activity,Cpu,HardDrive,MemoryStick,Network,FileDown} from 'lucide-react';
 import {useApp,useRemote} from '../app/context';
 import {Header,Panel,Badge,ErrorBanner} from '../components/primitives';
-import {InfrastructureSetup} from './InfrastructureSetup';
 import './monitoring.css';
 import {chartGeometry,smoothEdges,gapPath,isMeasurement as valid,type SamplePoint as Point} from './telemetryGeometry';
 
@@ -65,6 +64,20 @@ export function Diagnostics(){
   const data=useRemote(()=>mode==='orchestra'?api.request<Telemetry>('/orchestra/telemetry'):Promise.resolve(null),[api,mode],5000,true);
   const basic=useRemote(()=>mode!=='orchestra'?api.links():Promise.resolve([]),[api,mode],6000,true);
   const [range,setRange]=useState(5);
+  const owner=useRemote(()=>mode==='orchestra'?api.request<{owner:boolean}>('/managed/development-team'):Promise.resolve(null),[api,mode]);
+  const [reportFormat,setReportFormat]=useState<'json'|'txt'|'xlsx'>('json');
+  const [exporting,setExporting]=useState(false),[exportError,setExportError]=useState('');
+  async function exportReport(){
+    setExporting(true);setExportError('');
+    try{
+      const file=await api.diagnosticReport(reportFormat);
+      const url=URL.createObjectURL(file),link=document.createElement('a');
+      link.href=url;link.download='MysticEgo-diagnostics-'+new Date().toISOString().replace(/[:.]/g,'-')+'.'+reportFormat;
+      document.body.appendChild(link);link.click();link.remove();
+      window.setTimeout(()=>URL.revokeObjectURL(url),30000);
+    }catch(error){setExportError(error instanceof Error?error.message:String(error))}
+    finally{setExporting(false)}
+  }
   const ordered=(data.value?.samples??[]).filter(s=>Number.isFinite(Date.parse(s.at))).slice().sort((a,b)=>Date.parse(a.at)-Date.parse(b.at));
   const last=ordered.at(-1);
   const end=last?Date.parse(last.at):Date.now();
@@ -83,6 +96,11 @@ export function Diagnostics(){
   ]:[];
   return <>
     <Header title="Диагностика" description={mode==='orchestra'?'Состояние сервера и связь между узлами сети':'Доступность подключений этого узла'}/>
+    {mode==='orchestra'&&owner.value?.owner&&<section className="diagnostic-export panel">
+      <div className="diagnostic-export-copy"><span className="diagnostic-export-icon"><FileDown size={24}/></span><div><h2>Отчёт для анализа</h2><p>История серверных проверок, службы, телеметрия и связи. Без паролей, токенов и личных сообщений.</p></div></div>
+      <div className="diagnostic-export-actions"><label>Формат отчёта<select aria-label="Формат отчёта" value={reportFormat} disabled={exporting} onChange={e=>setReportFormat(e.target.value as typeof reportFormat)}><option value="json">JSON · для анализа AI</option><option value="txt">TXT · текстовый журнал</option><option value="xlsx">XLSX · Excel</option></select></label><button className="btn" disabled={exporting} onClick={()=>void exportReport()}><FileDown size={17}/>{exporting?'Формирование…':'Скачать отчёт'}</button></div>
+      <ErrorBanner text={exportError}/>
+    </section>}
     <ErrorBanner text={data.error||basic.error}/>
     {mode==='orchestra'&&<>
       <div className="diag-summary">
@@ -110,7 +128,6 @@ export function Diagnostics(){
         </tbody></table></div>
         {!data.value?.links.length&&<p className="footnote">{data.error?'Не удалось получить состояние связей.':data.loading?'Загружаем связи…':'Замеры появятся после подключения узлов.'}</p>}
       </Panel>
-      <InfrastructureSetup/>
     </>}
     {mode!=='orchestra'&&<Panel title="Подключения">{!basic.value?.length&&<p className="monitor-empty">{basic.error?'Данные недоступны':basic.loading?'Проверяем подключения…':'Нет зарегистрированных подключений'}</p>}{basic.value?.map(link=><div className="line" key={link.name}>
       <div className="grow"><strong>{link.name}</strong><small>{link.url}</small></div><Badge ok={link.reachable} text={link.reachable?format(link.ms)+' мс':'Недоступно'}/>
