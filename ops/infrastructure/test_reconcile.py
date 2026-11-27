@@ -73,5 +73,36 @@ class ModelDependencyTests(unittest.TestCase):
         packages.assert_called_once_with("libatomic1", "curl", "ca-certificates")
 
 
+class VoiceRecoveryTests(unittest.TestCase):
+    @patch.object(reconcile, "publish")
+    def test_cooldown_preserves_safe_reason(self, publish):
+        with patch.object(reconcile, "rows", {"voice": {"reason": "RuntimeError"}}), patch.object(reconcile, "attempts", {"voice": reconcile.time.time()}):
+            action = Mock()
+            reconcile.repair("voice", lambda: False, action, "ready")
+            action.assert_not_called()
+            self.assertEqual(publish.call_args.args[3], "RuntimeError")
+
+    @patch.object(reconcile, "voice_ready", return_value=True)
+    @patch.object(reconcile, "voice_dependencies_ready", return_value=False)
+    @patch.object(reconcile.Path, "is_file", return_value=True)
+    @patch.object(reconcile.install, "run")
+    def test_existing_voice_with_broken_import_repairs_dependencies(self, run, unit, dependencies, ready):
+        reconcile.voice_repair()
+        self.assertEqual(run.call_count, 1)
+        self.assertEqual(run.call_args.args[0], "/bin/bash")
+        self.assertTrue(run.call_args.args[1].endswith("install-voice.sh"))
+
+    @patch.object(reconcile, "voice_ready", return_value=True)
+    @patch.object(reconcile, "voice_dependencies_ready", return_value=True)
+    @patch.object(reconcile.Path, "is_file", return_value=True)
+    @patch.object(reconcile.install, "run")
+    def test_existing_voice_with_valid_import_restarts(self, run, unit, dependencies, ready):
+        reconcile.voice_repair()
+        self.assertEqual([call.args for call in run.call_args_list], [
+            ("systemctl", "reset-failed", "mysticego-voice.service"),
+            ("systemctl", "restart", "mysticego-voice.service"),
+        ])
+
+
 if __name__ == "__main__":
     unittest.main()
