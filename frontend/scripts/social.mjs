@@ -11,8 +11,8 @@ export const roles={
   audit:{title:'Audit',description:'Личное пространство, профиль и инструменты MysticEgo.',tone:[224,142,222]}
 };
 export const publicPages={
-  studio:{title:'Студия MysticEgo',description:'Разработка инфраструктуры MysticEgo и концепция мира Ether And Chaos.',image:'orchestra'},
-  developer:{title:'Разработчик MysticEgo',description:'Проектирование серверных и настольных приложений, разработка MysticEgo.',image:'orchestra'},
+  studio:{title:'Студия MysticEgo',description:'Независимая студия: инфраструктура MysticEgo, CloudDesk, персональный ИИ с VRM и игровой мир Ether And Chaos.',image:'orchestra'},
+  developer:{title:'Разработчик MysticEgo',description:'Автор MysticEgo: C#/.NET, распределённые системы, автоматизация, настольные приложения и интеграция ИИ.',image:'orchestra'},
   'desktop-downloads':{title:'Приложения MysticEgo',description:'Настольные приложения и инструменты подключения к экосистеме MysticEgo.',image:'agent'}
 };
 const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
