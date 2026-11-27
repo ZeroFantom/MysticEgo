@@ -11,6 +11,7 @@ const config = JSON.parse(readFileSync(path, 'utf8'));
 if (!Array.isArray(config.origins) || !config.origins.every(x => {
   try { const u = new URL(x); return ['http:', 'https:'].includes(u.protocol) && u.origin === x; } catch { return false; }
 }) || !config.apps || typeof config.apps !== 'object' || Array.isArray(config.apps)) throw new Error('Invalid target configuration');
+if (process.argv.includes('--stdio')) delete config.native; // Native control requires interactive HTTP consent.
 const service = new UiAutomationService(config);
 let http, mcp;
 if (process.argv.includes('--stdio')) {
@@ -22,7 +23,7 @@ if (process.argv.includes('--stdio')) {
   if (!token || token.length < 32) throw new Error('Set MYSTICEGO_UI_TOKEN to a random secret (minimum 32 characters)');
   if (!process.stdin.isTTY || !process.stdout.isTTY) throw new Error('HTTP control requires a local interactive terminal');
   const prompt = createInterface({ input: process.stdin, output: process.stdout });
-  const answer = await prompt.question('Allow local authenticated assistants to control configured UI targets for 30 minutes? Type ALLOW: ');
+  const answer = await prompt.question('Allow local authenticated assistants to control configured UI targets, approved foreground Windows apps and enabled settings for 30 minutes? Type ALLOW: ');
   prompt.close();
   if (answer !== 'ALLOW') throw new Error('Local consent denied');
   console.log('UI control enabled for 30 minutes. Ctrl+C stops it. Supervise actions.');
