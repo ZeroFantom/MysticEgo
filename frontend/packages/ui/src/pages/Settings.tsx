@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {Check,Globe2,Moon,Palette,Sparkles,Sun} from 'lucide-react';
+import {Check,ChevronDown,Globe2,Moon,Palette,Sparkles,Sun} from 'lucide-react';
 import {useApp} from '../app/context';
 import {preferenceKey} from '../app/panelPreferences';
 import {changePresentation,fonts,languages,syncAppearance,useLocale,usePresentation} from '../app/presentation';
@@ -55,10 +55,14 @@ export function ThemeToggle({scope=''}:{scope?:string}){
  const t=useLocale();
  const [style]=useAppearance(scope);
  const light=style.theme==='light'||style.theme==='system'&&matchMedia('(prefers-color-scheme:light)').matches;
- return <span className="appearance-quick"><LanguageSelector/><button type="button" className="icon-btn" title={light?t("Тёмная тема"):t("Светлая тема")} aria-label={light?t("Тёмная тема"):t("Светлая тема")} onClick={()=>save(scope,{...current(scope),theme:light?'dark':'light'})}>{light?<Moon size={19}/>:<Sun size={19}/>}</button>
+ return <span className="appearance-quick"><LanguageSelector compact/><button type="button" className="icon-btn" title={light?t("Тёмная тема"):t("Светлая тема")} aria-label={light?t("Тёмная тема"):t("Светлая тема")} onClick={()=>save(scope,{...current(scope),theme:light?'dark':'light'})}>{light?<Moon size={19}/>:<Sun size={19}/>}</button>
  <button type="button" className="icon-btn" title={t("Насыщенный стиль")} aria-label={t("Насыщенный стиль")} aria-pressed={style.interfaceStyle==='immersive'} onClick={()=>save(scope,{...current(scope),interfaceStyle:style.interfaceStyle==='immersive'?'simplified':'immersive'})}><Sparkles size={19} aria-hidden="true"/></button></span>;
 }
-export function LanguageSelector(){const t=useLocale();const {value,problem}=usePresentation();return <span className="presentation-quick"><span className="presentation-language"><Globe2 size={16} aria-hidden="true"/><select aria-label={t('Язык')} value={value.language} onChange={e=>changePresentation({language:e.target.value as typeof value.language})}>{languages.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></span>{problem&&<small role="status">{t(problem)}</small>}</span>}
+export function LanguageSelector({compact=false}:{compact?:boolean}){
+ const t=useLocale();const {value,problem}=usePresentation();
+ const label=languages.find(([id])=>id===value.language)?.[1]??'English';
+ return <span className={'presentation-quick'+(compact?' presentation-compact':'')}><span className="presentation-language" title={problem?t(problem):t('Язык')+': '+label}><Globe2 size={16} aria-hidden="true"/><select aria-label={t('Язык')} value={value.language} onChange={e=>changePresentation({language:e.target.value as typeof value.language})}>{languages.map(([id,name])=><option key={id} value={id} lang={id}>{name}</option>)}</select><ChevronDown className="presentation-chevron" size={14} aria-hidden="true"/></span>{problem&&<small className={compact?'presentation-sync-warning':undefined} role="status" title={t(problem)}>{compact?'!':t(problem)}</small>}</span>
+}
 export function Settings(){
  const t=useLocale();
  const {preferenceScope:scope}=useApp();

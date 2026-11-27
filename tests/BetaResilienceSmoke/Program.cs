@@ -159,3 +159,15 @@ if(actual.Last?.State!="done"||actual.Pending is not null)throw new Exception("A
 interfaceControl.Close("developer-a",uiSession.Id);
 RejectInterface(()=>interfaceControl.Inspect("developer-a",uiSession.Id),404);
 Console.WriteLine("PASS: owner isolation, safe routes, bounded queue, observed navigation, revocation");
+
+var assistantFrame = new InterfaceAutomation.Frame("/assistant",[new("/assistant?tab=persona","Характер"),new("/infrastructure/graphs/macro","Макро контроль")]);
+var assistantWindow = interfaceControl.Open("developer-a","Orchestra",assistantFrame);
+RejectInterface(()=>interfaceControl.Open("developer-a","Orchestra",new("/assistant?token=secret",[])),400);
+RejectInterface(()=>interfaceControl.Navigate("developer-a",assistantWindow.Id,"/assistant?tab=models"),400);
+var assistantQueued=interfaceControl.Navigate("developer-a",assistantWindow.Id,"/assistant?tab=persona");
+var assistantObserved=interfaceControl.Poll("developer-a",assistantWindow.Id,new("/assistant?tab=persona",assistantFrame.Targets),new(assistantQueued.Pending!.Id,"done","/assistant?tab=persona"));
+if(assistantObserved.Last?.State!="done")throw new Exception("Assistant tab navigation not observed");
+var graphQueued=interfaceControl.Navigate("developer-a",assistantWindow.Id,"/infrastructure/graphs/macro");
+if(graphQueued.Pending is null)throw new Exception("Nested infrastructure route rejected");
+interfaceControl.Close("developer-a",assistantWindow.Id);
+Console.WriteLine("PASS: allowlisted assistant tabs and three-segment infrastructure navigation");

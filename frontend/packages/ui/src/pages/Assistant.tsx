@@ -102,7 +102,7 @@ export function AssistantPage(){
     </header>
     <nav className="assistant-workspace-nav" aria-label={t('Разделы ассистента')}>
       {tabs.map(({id,label,icon:Icon})=><button key={id} className="assistant-workspace-tab" type="button"
-        aria-pressed={active===id} onClick={()=>setParams(id==='chat'?{}:{tab:id})}><Icon size={17} aria-hidden="true"/>{t(label)}</button>)}
+        aria-label={t(label)} data-interface-path={id==='chat'?'/assistant':'/assistant?tab='+id} aria-pressed={active===id} onClick={()=>setParams(id==='chat'?{}:{tab:id})}><Icon size={17} aria-hidden="true"/>{t(label)}</button>)}
     </nav>
     <ErrorBanner text={error||status.error||(mode==='orchestra'?access.error:'')}/>
     {mode==='orchestra'&&status.value&&!status.value.service.ready&&<p className="assistant-workspace-notice">
