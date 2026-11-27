@@ -49,6 +49,7 @@ export function AvatarStudio(){
  },[library?.assets,added]);
  const [selection,setSelection]=useState('bundled'),[mapping,setMapping]=useState<NonNullable<Selection['motions']>>({});
  const [appearance,setAppearance]=useState(defaultAppearance),[style,setStyle]=useState<MotionStyle>('calm');
+ const [palette,setPalette]=useState<'scout'|'violet'|'amber'>('scout');
  const [generated,setGenerated]=useState<GeneratedMotion>('wave'),[tempo,setTempo]=useState(1);
  const [motion,setMotion]=useState<AvatarMotion>('idle'),[message,setMessage]=useState('Привет! Чем могу помочь?'),[play,setPlay]=useState(0);
  const [error,setError]=useState(''),[status,setStatus]=useState(''),[busy,setBusy]=useState(false);
@@ -178,13 +179,14 @@ export function AvatarStudio(){
        </form>
        <details className="avatar-generator">
          <summary>Локальная модель «Скаут»</summary>
-         <p className="footnote">Базовый стилизованный робот с гуманоидными суставами. Собирается в браузере из шаблона.</p>
+         <p className="footnote">Стилизованный робот с гуманоидными суставами и пятью формами рта для липсинка. Собирается в браузере из шаблона.</p>
+         <label>Палитра<select value={palette} onChange={event=>setPalette(event.target.value as typeof palette)}><option value="scout">Бирюзовая</option><option value="violet">Фиолетовая</option><option value="amber">Янтарная</option></select></label><p className="footnote">Модель не отправляется внешнему генератору.</p>
          <div className="row-actions motion-actions">
            <button className="btn secondary" disabled={busy||!library}
-             onClick={()=>void upload(createStarterVrm,'model')}><Sparkles size={16}/> Создать VRM</button>
+             onClick={()=>void upload(()=>createStarterVrm(palette),'model')}><Sparkles size={16}/> Создать VRM</button>
            <button className="btn secondary" disabled={busy} onClick={async()=>{
              setBusy(true);setError('');setStatus('');
-             try{const file=await createStarterVrm();saveFile(file,file.name);}
+             try{const file=await createStarterVrm(palette);saveFile(file,file.name);}
              catch(problem){setError(String(problem))}
              finally{setBusy(false)}
            }}><Download size={16}/> Скачать VRM</button>
