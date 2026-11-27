@@ -3,6 +3,9 @@ import { readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
 import { UiAutomationService } from './service.mjs';
 import { ConsentLease } from './consent-lease.mjs';
+import { sessionPlatform } from './desktop-settings.mjs';
+
+if (sessionPlatform() === 'unsupported') throw new Error('MysticEgo Computer Use supports Windows and Linux X11 only. Sign in to an X11 desktop session.');
 import { makeMcp, mapController } from './controller.mjs';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
@@ -12,7 +15,7 @@ const config = JSON.parse(readFileSync(path, 'utf8'));
 if (!Array.isArray(config.origins) || !config.origins.every(x => {
   try { const u = new URL(x); return ['http:', 'https:'].includes(u.protocol) && u.origin === x; } catch { return false; }
 }) || !config.apps || typeof config.apps !== 'object' || Array.isArray(config.apps)) throw new Error('Invalid target configuration');
-if (process.argv.includes('--stdio')) delete config.native; // Native control requires interactive HTTP consent.
+if (process.argv.includes('--stdio')) { delete config.native; delete config.desktopSettings; } // Desktop settings require interactive HTTP consent.
 const service = new UiAutomationService(config);
 let http, mcp, localConsole;
 if (process.argv.includes('--stdio')) {
@@ -29,6 +32,14 @@ if (process.argv.includes('--stdio')) {
   if (config.native) {
     const native = await localConsole.question('Also allow native input and configured Windows settings? Type NATIVE to enable: ');
     if (native !== 'NATIVE') { delete config.native; service.config.native = undefined; service.native.config = undefined; }
+  }
+  if (config.desktopSettings?.enabled) {
+    const settings = await localConsole.question('Allow changes to desktop animation and appearance settings? Type DESKTOP: ');
+    if (settings !== 'DESKTOP') service.desktopSettings.config = undefined;
+    else if (config.desktopSettings.allowDesktopSwitch === true) {
+      const switching = await localConsole.question('Allow Windows virtual desktop creation, which can change focus? Type SWITCH: ');
+      if (switching !== 'SWITCH') service.desktopSettings.config.allowDesktopSwitch = false;
+    }
   }
   if (service.library) {
     const library = await localConsole.question('Allow access to locally approved scenarios for the active target? Type LIBRARY to enable: ');
