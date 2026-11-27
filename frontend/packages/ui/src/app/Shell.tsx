@@ -5,6 +5,7 @@ import {ServerUpdateProvider,useServerUpdate} from './serverUpdate';
 import {CloudDeskDownloads,PublicDesktopDownloads} from '../pages/DesktopDownloads';
 import {NoticeBell,NotificationProvider,useNotice} from './notifications';
 import {MaintenanceNotices} from '../pages/MaintenanceStatus';
+import {Capacity} from '../pages/Capacity';
 import {InfrastructureWorkspace,type InfrastructureSection} from '../pages/InfrastructureWorkspace';
 import './workspace-rail.css';
 import './workspace-polish.css';
@@ -145,7 +146,7 @@ function Workspace({logout}:{logout:()=>void}){
   const {pathname}=useLocation();
   const nav=navigation(mode,portal);
   const infrastructureOwner=mode==='orchestra'&&developer.value?.owner===true;
-  if(infrastructureOwner)nav.splice(nav.length-1,0,{name:'Инфраструктура',items:[{to:'/infrastructure/services',label:'Сервисы',icon:Container},{to:'/infrastructure/ai',label:'AI и речь',icon:BrainCircuit},{to:'/infrastructure/database',label:'Базы данных',icon:Database},{to:'/infrastructure/metrics',label:'Мониторинг',icon:Radio}]});
+  if(infrastructureOwner)nav.splice(nav.length-1,0,{name:'Инфраструктура',items:[{to:'/infrastructure/services',label:'Сервисы',icon:Container},{to:'/infrastructure/ai',label:'AI и речь',icon:BrainCircuit},{to:'/infrastructure/database',label:'Базы данных',icon:Database},{to:'/infrastructure/metrics',label:'Мониторинг',icon:Radio},{to:'/infrastructure/capacity',label:'Capacity & resilience',icon:Activity}]});
   if(mode==='orchestra')nav[0].items.push({to:'/project-branches',label:'Ветки GitHub',icon:Network});
   if(cloudDownloads)nav[0].items.push({to:'/clouddesk-downloads',label:'Скачать CloudDesk',icon:Cloud});
   const current=nav.flatMap(section=>section.items).find(item=>item.to===pathname)?.label??(pathname==='/profile'?'Мой профиль':modes[mode].name);
@@ -230,6 +231,7 @@ function Workspace({logout}:{logout:()=>void}){
         <Route path="/faq" element={<Faq/>}/>
         <Route path="/audit" element={<Audit/>}/>
         <Route path="/diagnostics" element={<Diagnostics/>}/>
+        {mode==='orchestra'&&<Route path="/infrastructure/capacity" element={infrastructureOwner?<Capacity/>:<p>Owner access required.</p>}/>}
         {mode==='orchestra'&&(['services','ai','database','metrics'] as InfrastructureSection[]).map(section=><Route key={section} path={'/infrastructure/'+section} element={infrastructureOwner?<InfrastructureWorkspace key={section} section={section}/>:<p role="status">{developer.loading?'Проверяем доступ…':'Управление инфраструктурой доступно владельцу Orchestra.'}</p>}/>)}
         <Route path="/settings" element={<Settings/>}/>
         <Route path="/notifications" element={<NotificationsPage/>}/>
