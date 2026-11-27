@@ -1,5 +1,5 @@
 [Unit]
-Description=Apply developer-approved MysticEgo Orchestra release
+Description=Apply verified MysticEgo Orchestra release
 After=network-online.target
 
 [Service]
@@ -12,5 +12,6 @@ EnvironmentFile=-/etc/mysticego/orchestra-updater.env
 StateDirectory=mysticego-orchestra-updater
 StateDirectoryMode=0755
 ExecStart=/usr/bin/python3 /usr/local/libexec/mysticego/orchestra-updater.py
+ExecStopPost=-/usr/bin/python3 /usr/local/libexec/mysticego/record-oneshot.py mysticego-orchestra-updater.service
 TimeoutStartSec=20min
 UMask=0022
