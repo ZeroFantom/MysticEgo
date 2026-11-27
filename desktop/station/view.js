@@ -1,3 +1,4 @@
+import {renderReleaseHighlights} from '../control/release-highlights.js';
 import {initEffects} from '../control/effects.js';
 const $=id=>document.getElementById(id);
 const api=window.station;
@@ -7,6 +8,7 @@ let documentRequest=0;
 initEffects($('design'));
 async function refresh(){
   const state=await api.snapshot();
+  renderReleaseHighlights(state.releaseHighlights,api['release-highlights-dismiss']);
   const node=state.node,authorized=Boolean(state.actor);
   document.body.dataset.product=state.isAgent?'agent':'audit';
   $('product-title').textContent=state.isAgent?'AgentDesktop':'AuditDesktop';
