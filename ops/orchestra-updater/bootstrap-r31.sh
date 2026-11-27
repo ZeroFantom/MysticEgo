@@ -2,6 +2,11 @@
 set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 [[ $EUID == 0 ]]
+# New packages require full dependency and Auth updates; never apply a partial DLL patch.
+if [[ -f payload/MysticEgo.Capacity.dll ]]; then
+  echo "Use the full Orchestra update/recovery package; legacy partial bootstrap is incompatible." >&2
+  exit 1
+fi
 root=/opt/mysticego/app/runtime/app
 api="$root/bin/Api.Orchestra.dll"
 distributed="$root/bin/MysticEgo.Distributed.dll"
