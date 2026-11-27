@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Drawing;
 using System.Drawing.Imaging;
 using System.Globalization;
 using System.Runtime.InteropServices;
@@ -7,6 +8,7 @@ using System.Text.Json;
 try
 {
     if (!OperatingSystem.IsWindows() || args.Length < 2) throw new InvalidOperationException();
+    Native.SetProcessDpiAwarenessContext(new IntPtr(-4));
     var op = args[0];
     var process = args[1];
     if (op == "pointer-get" || op == "pointer-set")
@@ -97,6 +99,7 @@ internal static class Native
     [StructLayout(LayoutKind.Explicit)] private struct InputUnion
     { [FieldOffset(0)] public Mouse mouse; [FieldOffset(0)] public Keyboard keyboard; }
     [StructLayout(LayoutKind.Sequential)] private struct Input { public uint type; public InputUnion value; }
+    [DllImport("user32.dll")] internal static extern bool SetProcessDpiAwarenessContext(IntPtr value);
     [DllImport("user32.dll")] internal static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] internal static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
     [DllImport("user32.dll")] internal static extern bool GetClientRect(IntPtr hwnd, out Rect rect);
