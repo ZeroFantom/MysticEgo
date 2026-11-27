@@ -36,8 +36,10 @@ var legacy = new System.Collections.Generic.Dictionary<string, string[]>
     ["services/Api.Orchestra/Program.cs"] = [
         "GET /metrics", "GET /api/v1/public/metrics-scrape", "GET /audit-portal/release-info.json", "GET /audit-portal/{**route}"],
     ["services/MysticEgo.Distributed/Bootstrap.cs"] = ["GET /api/v1/public/runtime"],
+    ["services/Api.Capacity/Program.cs"] = ["POST /api/v1/stations/capacity", "GET /api/v1/capacity", "GET /health"],
+    ["services/MysticEgo.Distributed/BrowserSessionGateway.cs"] = ["GET /api/auth/browser/status", "POST /api/auth/browser/ + action"],
     ["services/MysticEgo.Distributed/AuthGateway.cs"] = [
-        "POST /api/auth/ + action", "GET /api/auth/presentation", "POST /api/auth/presentation",
+        "POST /api/auth/ + action", "GET /api/auth/credential-policy", "GET /api/auth/presentation", "POST /api/auth/presentation",
         "GET /api/auth/ + action", "POST /api/auth/ + action", "POST /api/auth/sessions/{id:guid}/revoke",
         "POST /api/auth/audit/register", "GET /api/auth/audit/registration-documents"]
 };
@@ -55,6 +57,7 @@ foreach(var f in Directory.GetFiles(Path.Combine(root,"services"),"*.cs",SearchO
         var key=route.Groups[1].Value.ToUpperInvariant()+" "+literal.Groups[1].Value+(literal.Groups[2].Success?" + action":"");
         Check(literal.Success&&remaining.Remove(key),"Known bootstrap route: "+relative+" "+key);
     }
+    Check(remaining.Count==0,"All expected bootstrap routes retained: "+relative);
     Check(true,"Attribute MVC routes: "+relative);
 }
 
