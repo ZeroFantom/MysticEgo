@@ -40,6 +40,11 @@ function App(){
  const [tab,T]=useState(()=>readJob()?'monitor':'local'),[busy,B]=useState(''),[log,L]=useState([]),[token,K]=useState(''),[remember,R]=useState(true),[ready,Q]=useState(false),[authEpoch,E]=useState(0),[authChanging,AC]=useState(false),[operationError,OE]=useState(''),[now,N]=useState(Date.now());
  const [form,H]=useState({name:'mysticego-orchestra',role:'Orchestra',deploymentMethod:'native',databaseMode:'sqlite',network:'ipv4',zone:'',plan:'',os:'',host:'',port:'22',user:'root',domain:'',dnsZone:'',orchestra:'',script:'',command:'uptime'});
  const [installedTarget,setInstalledTarget]=useState(null);
+ const [maintenancePlan,setMaintenancePlan]=useState(null);
+ useEffect(()=>{setMaintenancePlan(null);if(tab!=='deploy'||!installedTarget||installedTarget.host!==form.host)return;let stop=false,timer;
+  async function tick(){try{const plan=await api.rpc('deploy.maintenancePlan',{domain:installedTarget.domain,node:installedTarget.node});if(!stop)setMaintenancePlan(plan)}catch(e){if(!stop)setMaintenancePlan({action:'unknown',reason:String(e.message||e)})}finally{if(!stop)timer=setTimeout(tick,5000)}}
+  void tick();return()=>{stop=true;clearTimeout(timer)};
+ },[tab,installedTarget,form.host]);
  const [deployment,setDeployment]=useState(null),[notice,setNotice]=useState(null);
  useEffect(()=>{if(!notice)return;const timer=setTimeout(()=>setNotice(null),6500);return()=>clearTimeout(timer);},[notice]);
  useEffect(()=>api.onDeployProgress?.(message=>{
@@ -58,7 +63,7 @@ function App(){
  const set=(k,v)=>{H(f=>({...f,[k]:v}));};
  const changeRole=v=>{if(!['Orchestra','Global'].includes(v))return;H(f=>({...f,role:v,orchestra:v==='Global'?monitor.origin:'',domain:f.dnsZone?'':f.domain,name:`mysticego-${v.toLowerCase()}`}));};
  const add=(level,action,message)=>L(s=>[{level,action,message,at:Date.now()},...s].slice(0,100));
- async function run(action,args={},after){if(busy)return;B(action);OE('');if(['deploy','deploy.restoreOrchestra','deploy.recoverMaintenance','deploy.auditPortal','deploy.infrastructure'].includes(action))setDeployment({status:'running',domain:args.domain,host:args.host,steps:[{at:Date.now(),message:'SSH подтверждён. Начинаем развёртывание.'}]});add('wait',action,'Выполняется');try{const r=await api.rpc(action,args);if(action==='server.create'&&r?.orderState==='not_sent'){const message=`Заказ VPS не отправлен. ${r.error||'Ошибка подготовки.'}`;OE(message);add('error',action,message);U(false);return;}if(action==='server.create'&&['capacity_rejected','preset_rejected','location_rejected'].includes(r?.orderState)){CB(old=>({...old,[r.blockKey]:r.until}));H(f=>({...f,zone:'',plan:'',os:''}));CE(n=>n+1);const reason=r.orderState==='preset_rejected'?`Timeweb не нашёл тариф ${r.blockKey.slice(7)}.`:r.orderState==='location_rejected'?`Timeweb не принимает заказы в ${r.blockKey}.`:`Нет свободных мощностей: ${r.blockKey.includes(':')?'конфигурация '+r.blockKey:'локация '+r.blockKey}.`;const message=`${reason} Заказ отклонён. Вариант исключён на 15 минут; каталог синхронизируется, затем будет выбран следующий подходящий тариф, если он есть. Подтверди новый заказ. ${r.error||''}`;OE(message);add('error',action,message);U(false);return;}after?.(r);if(action==='deploy.inspectOrchestra')setInstalledTarget(r);if(['deploy','deploy.restoreOrchestra','deploy.recoverMaintenance','deploy.auditPortal','deploy.infrastructure'].includes(action))setDeployment(current=>({...current,status:r?.queued?'queued':'done'}));if(action==='deploy'){monitor.registerDeploy(args,r);if(args.serverId)J(null);}if(action==='dns.reconcile'){DS(x=>({...x,duplicates:[],at:0}));}if(action==='deploy.reserve'){J(x=>x&&String(x.id)===String(args.serverId)&&x.phase==='reserve'?{...x,phase:x.f.dnsZone?'dns':'waiting',message:'Роль и DNS-имя закреплены за VPS.'}:x);}if(r?.storageWarning||r?.warning&&action==='timeweb.disconnect')OE(r.storageWarning||r.warning);add('ok',action,action.startsWith('timeweb.')||action.startsWith('github.')?'Готово':typeof r==='string'?r:JSON.stringify(r,null,2));return r;}catch(e){
+ async function run(action,args={},after){if(busy)return;B(action);OE('');if(['deploy','deploy.executeMaintenance','deploy.restoreOrchestra','deploy.recoverMaintenance','deploy.auditPortal','deploy.infrastructure'].includes(action))setDeployment({status:'running',domain:args.domain,host:args.host,steps:[{at:Date.now(),message:'SSH подтверждён. Начинаем развёртывание.'}]});add('wait',action,'Выполняется');try{const r=await api.rpc(action,args);if(action==='server.create'&&r?.orderState==='not_sent'){const message=`Заказ VPS не отправлен. ${r.error||'Ошибка подготовки.'}`;OE(message);add('error',action,message);U(false);return;}if(action==='server.create'&&['capacity_rejected','preset_rejected','location_rejected'].includes(r?.orderState)){CB(old=>({...old,[r.blockKey]:r.until}));H(f=>({...f,zone:'',plan:'',os:''}));CE(n=>n+1);const reason=r.orderState==='preset_rejected'?`Timeweb не нашёл тариф ${r.blockKey.slice(7)}.`:r.orderState==='location_rejected'?`Timeweb не принимает заказы в ${r.blockKey}.`:`Нет свободных мощностей: ${r.blockKey.includes(':')?'конфигурация '+r.blockKey:'локация '+r.blockKey}.`;const message=`${reason} Заказ отклонён. Вариант исключён на 15 минут; каталог синхронизируется, затем будет выбран следующий подходящий тариф, если он есть. Подтверди новый заказ. ${r.error||''}`;OE(message);add('error',action,message);U(false);return;}after?.(r);if(action==='deploy.inspectOrchestra')setInstalledTarget(r);if(['deploy','deploy.executeMaintenance','deploy.restoreOrchestra','deploy.recoverMaintenance','deploy.auditPortal','deploy.infrastructure'].includes(action))setDeployment(current=>({...current,status:r?.queued?'queued':'done'}));if(action==='deploy'){monitor.registerDeploy(args,r);if(args.serverId)J(null);}if(action==='dns.reconcile'){DS(x=>({...x,duplicates:[],at:0}));}if(action==='deploy.reserve'){J(x=>x&&String(x.id)===String(args.serverId)&&x.phase==='reserve'?{...x,phase:x.f.dnsZone?'dns':'waiting',message:'Роль и DNS-имя закреплены за VPS.'}:x);}if(r?.storageWarning||r?.warning&&action==='timeweb.disconnect')OE(r.storageWarning||r.warning);add('ok',action,action.startsWith('timeweb.')||action.startsWith('github.')?'Готово':typeof r==='string'?r:JSON.stringify(r,null,2));return r;}catch(e){
    const message=friendly(e);
    if(['deploy','deploy.reserve'].includes(action)&&message.includes('На VPS уже завершено развёртывание. Повторная установка запрещена.')){
      setDeployment(null);
@@ -68,7 +73,7 @@ function App(){
      if(args.role==='Orchestra'&&args.domain&&!monitor.origin)monitor.selectSource('https://'+args.domain);
      return;
    }
-   if(['deploy','deploy.restoreOrchestra','deploy.recoverMaintenance','deploy.auditPortal','deploy.infrastructure'].includes(action))setDeployment(current=>({...current,status:'failed',error:message}));OE(friendly(e));add('error',action,friendly(e));if(action==='server.create')U(true);if(action==='deploy.reserve')J(x=>x&&String(x.id)===String(args.serverId)?{...x,phase:'dns-error',message:friendly(e)}:x);}finally{B('');}}
+   if(['deploy','deploy.executeMaintenance','deploy.restoreOrchestra','deploy.recoverMaintenance','deploy.auditPortal','deploy.infrastructure'].includes(action))setDeployment(current=>({...current,status:'failed',error:message}));OE(friendly(e));add('error',action,friendly(e));if(action==='server.create')U(true);if(action==='deploy.reserve')J(x=>x&&String(x.id)===String(args.serverId)?{...x,phase:'dns-error',message:friendly(e)}:x);}finally{B('');}}
  useEffect(()=>{let active=true;api.rpc('timeweb.restore').catch(e=>active&&OE(e.message)).finally(()=>active&&Q(true));const i=setInterval(()=>N(Date.now()),1000);return()=>{active=false;clearInterval(i)}},[]);
  const gh=usePoll('github.status',ready&&!authChanging,15000,authEpoch),tw=usePoll('timeweb.status',ready&&!authChanging,15000,authEpoch);
  const connected=gh.data?.connected===true&&tw.data?.connected===true;
@@ -203,15 +208,14 @@ function App(){
    {installedTarget?.host===form.host&&String(installedTarget.serverId)===String(cloudId(form))&&<>
      <code>{installedTarget.domain}</code>
      <p>Установлена: {installedTarget.current||'не определена'} · {installedTarget.updatePhase||'нет сведений'}{installedTarget.candidateTag?` · Доступна ${installedTarget.candidateTag}`:''}</p>
-     {button('Восстановить службу обслуживания',()=>{
-       if(confirm('Восстановить службу обновлений и обслуживания '+installedTarget.domain+'? Приложение, база и конфигурация сохранятся.'))
-         runSSH('deploy.recoverMaintenance',{...form,user:'root',domain:installedTarget.domain,serverId:installedTarget.serverId,confirm:'RECOVER_MAINTENANCE'});
-     },'primary',wizBusy)}
-     {button('Обновить Orchestra',()=>{
-       if(installedTarget.candidateTag&&confirm('Установить '+installedTarget.candidateTag+' на '+installedTarget.domain+'? Сервис кратковременно перезапустится.'))
-         runSSH('deploy.restoreOrchestra',{...form,user:'root',domain:installedTarget.domain,serverId:installedTarget.serverId,candidateTag:installedTarget.candidateTag,candidateDigest:installedTarget.candidateDigest,confirm:'RESTORE_ORCHESTRA'});
-     },'primary',wizBusy||!installedTarget.candidateTag)}
-     {!installedTarget.candidateTag&&<p>Нет подтверждённого релиза. При необходимости восстановите службу обслуживания и повторите проверку.</p>}
+     <p role="status">{maintenancePlan?.reason??'Проверяем состояние служб…'}</p>
+     {button('Обновить / восстановить',()=>{
+       const action=maintenancePlan?.action,candidate=maintenancePlan?.update?.candidate;
+       if(!['update','repair','legacy-repair'].includes(action)||!confirm(action==='update'?'Установить '+candidate?.tag+'?':'Восстановить обслуживание? Данные сохранятся.'))return;
+       runSSH('deploy.executeMaintenance',{...form,user:'root',domain:installedTarget.domain,node:installedTarget.node,serverId:installedTarget.serverId,planAction:action,candidateTag:candidate?.tag??'',candidateDigest:candidate?.digest??'',confirm:'MAINTENANCE_PLAN'});
+     },'primary',wizBusy||!!busy||!['update','repair','legacy-repair'].includes(maintenancePlan?.action))}
+     <div className="fields">{maintenancePlan?.components?.map(c=><div key={c.name}><b>{c.name}</b><p>{c.state} · {new Date(c.checkedAt).toLocaleTimeString()}</p></div>)}</div>
+     <div className="fields">{maintenancePlan?.services?.map(s=><div key={s.unit}><b>{s.unit}</b><p>{s.activeState??'unknown'} · CPU {s.cpuPercent==null?'—':s.cpuPercent.toFixed(1)+'%'} · RAM {s.memoryBytes==null?'—':(s.memoryBytes/1048576).toFixed(1)+' MiB'}</p></div>)}</div>
    </>}
    </div>
    <h3>Global</h3>
