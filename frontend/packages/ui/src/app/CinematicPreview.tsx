@@ -28,6 +28,7 @@ function Scene({poster,immersive,light,allowed}:{poster:string;immersive:boolean
    if(!observer)setVisible(true);
    return()=>{observer?.disconnect();document.removeEventListener('visibilitychange',refresh)};
  },[]);
+ useEffect(()=>setState('idle'),[poster,allowed]);
  const active=allowed&&(state==='playing'||state==='paused');
  const running=active&&state==='playing'&&visible&&pageVisible;
  const status=!allowed?'Статический пейзаж · анимации ограничены':state==='finished'?'Сцена завершена':active?(running?'Воспроизведение':'Пауза'):'12 секунд · свет и движение частиц';
@@ -52,5 +53,5 @@ export function CinematicPreview(){
  const immersive=variant.style==='immersive',light=variant.theme==='light';
  const poster=immersive?(light?lightPoster:darkPoster):(light?simplePoster:simpleDarkPoster);
  const allowed=!variant.reduced&&variant.motion==='normal';
- return <Scene key={poster+':'+allowed} poster={poster} immersive={immersive} light={light} allowed={allowed}/>;
+ return <Scene poster={poster} immersive={immersive} light={light} allowed={allowed}/>;
 }

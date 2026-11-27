@@ -56,9 +56,15 @@ function apiResponse(path,origin){
   return routes[path];
 }
 async function isolate(page,origin){
+  // Model the real account API: GET returns stored fields, POST merges a patch.
+  const presentation={language:'ru',font:'modern'};
   await page.route('**/*',async route=>{
     const url=new URL(route.request().url());
     if(url.origin===origin&&url.pathname==='/mystic-config.js')return route.fulfill({contentType:'text/javascript',body:'window.__MYSTIC_CONFIG__='+JSON.stringify({apiUrl:origin,authUrl:origin})});
+    if(url.origin===origin&&url.pathname==='/api/auth/presentation'){
+      if(route.request().method()==='POST')Object.assign(presentation,route.request().postDataJSON());
+      return route.fulfill({json:presentation});
+    }
     if(url.pathname.startsWith('/api/')){
       const value=apiResponse(url.pathname,origin);
       return route.fulfill({status:value===undefined?404:200,contentType:'application/json',body:JSON.stringify(value??{error:'Fixture endpoint not implemented'})});
@@ -196,6 +202,11 @@ try{
               assert.equal(await trigger.getAttribute('aria-expanded'),'false');
             });
             await check(page,prefix+'-appearance-persistence',async()=>{
+              await page.waitForFunction(()=>!document.querySelector('.presentation-quick [role="status"]'));
+              await page.reload({waitUntil:'domcontentloaded'});
+              await visible(page.locator('.appearance-style-options'));
+              await rootState(page,'light','simplified');
+              // A second reload must retain the same saved account settings.
               await page.reload({waitUntil:'domcontentloaded'});
               await visible(page.locator('.appearance-style-options'));
               await rootState(page,'light','simplified');

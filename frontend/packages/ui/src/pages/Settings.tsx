@@ -19,10 +19,31 @@ const palettes=[
 export type Style={interfaceStyle:'immersive'|'simplified';transition:'flow'|'fade'|'slide'|'scale';uiMotion:'off'|'low'|'normal';theme:'dark'|'light'|'system';palette:string;primary:string;secondary:string;ambient:boolean;wave:boolean;grid:boolean;border:boolean;intensity:number;density:'compact'|'comfortable';size:'normal'|'large'};
 const volatileStyles=new Map<string,Style>();
 const defaults:Style={interfaceStyle:'simplified',transition:'flow',uiMotion:'normal',theme:'dark',palette:'iris',primary:'#b49bf7',secondary:'#75d9c7',ambient:true,wave:false,grid:false,border:false,intensity:55,density:'comfortable',size:'normal'};
+// Account responses are partial patches, not full replacements of local preferences.
+export function mergeAppearance(base:Style,patch:Record<string,unknown>):Style{
+ const next={...base};
+ const choices={theme:['dark','light','system'],interfaceStyle:['simplified','immersive'],transition:['flow','fade','slide','scale'],uiMotion:['off','low','normal'],density:['compact','comfortable'],size:['normal','large'],palette:[...palettes.map(p=>p.id),'custom']};
+ for(const [key,allowed] of Object.entries(choices))if(typeof patch[key]==='string'&&allowed.includes(patch[key] as string))Object.assign(next,{[key]:patch[key]});
+ for(const key of ['ambient','wave','grid','border'] as const)if(typeof patch[key]==='boolean')next[key]=patch[key];
+ for(const key of ['primary','secondary'] as const)if(typeof patch[key]==='string'&&/^#[0-9a-f]{6}$/i.test(patch[key]))next[key]=patch[key];
+ if(typeof patch.intensity==='number'&&Number.isInteger(patch.intensity)&&patch.intensity>=10&&patch.intensity<=100)next.intensity=patch.intensity;
+ return next;
+}
 function current(scope:string):Style{
  if(volatileStyles.has(scope))return volatileStyles.get(scope)!;
- try{const saved={...defaults,...JSON.parse(localStorage.getItem(preferenceKey(scope,'appearance'))??'{}')};return {...saved,theme:['dark','light','system'].includes(saved.theme)?saved.theme:defaults.theme,interfaceStyle:saved.interfaceStyle==='immersive'?'immersive':'simplified',transition:['flow','fade','slide','scale'].includes(saved.transition)?saved.transition:'flow',uiMotion:['off','low','normal'].includes(saved.uiMotion)?saved.uiMotion:'normal'}}
- catch{return defaults}
+ try{return mergeAppearance(defaults,JSON.parse(localStorage.getItem(preferenceKey(scope,'appearance'))??'{}')??{})}
+ catch{return {...defaults}}
+}
+function useAppearance(scope:string){
+ const [style,setStyle]=useState(()=>current(scope));
+ useEffect(()=>{
+  const refresh=()=>setStyle(current(scope));
+  refresh();
+  const media=matchMedia('(prefers-color-scheme:light)');
+  window.addEventListener('mystic-appearance',refresh);window.addEventListener('storage',refresh);media.addEventListener('change',refresh);
+  return()=>{window.removeEventListener('mystic-appearance',refresh);window.removeEventListener('storage',refresh);media.removeEventListener('change',refresh)};
+ },[scope]);
+ return [style,setStyle] as const;
 }
 export function applyStyle(style:Style){
  const root=document.documentElement;
@@ -43,7 +64,7 @@ export function applyStyle(style:Style){
  root.style.setProperty('--neon-strength',String(Math.max(.05,Math.min(1,style.intensity/100))));
 }
 function save(scope:string,style:Style,sync=true){const before=current(scope);applyStyle(style);try{localStorage.setItem(preferenceKey(scope,'appearance'),JSON.stringify(style));volatileStyles.delete(scope)}catch{volatileStyles.set(scope,style)}window.dispatchEvent(new Event('mystic-appearance'));if(sync&&scope){const patch=Object.fromEntries(Object.entries(style).filter(([key,value])=>before[key as keyof Style]!==value));if(Object.keys(patch).length)syncAppearance(patch)}}
-export function applyAccountAppearance(scope:string,value:Record<string,unknown>){const next={...defaults};for(const key of Object.keys(defaults) as (keyof Style)[]){if(Object.hasOwn(value,key))Object.assign(next,{[key]:value[key]})}save(scope,next,false)}
+export function applyAccountAppearance(scope:string,value:Record<string,unknown>){save(scope,mergeAppearance(current(scope),value),false)}
 export function initPalette(scope:string){
  const media=matchMedia('(prefers-color-scheme:light)');
  const update=()=>applyStyle(current(scope));
@@ -52,8 +73,7 @@ export function initPalette(scope:string){
 }
 export function ThemeToggle({scope=''}:{scope?:string}){
  const t=useLocale();
- const [style,setStyle]=useState(()=>current(scope));
- useEffect(()=>{const sync=()=>setStyle(current(scope));sync();window.addEventListener('mystic-appearance',sync);window.addEventListener('storage',sync);const media=matchMedia('(prefers-color-scheme:light)');media.addEventListener('change',sync);return()=>{window.removeEventListener('mystic-appearance',sync);window.removeEventListener('storage',sync);media.removeEventListener('change',sync)}},[scope]);
+ const [style]=useAppearance(scope);
  const light=style.theme==='light'||style.theme==='system'&&matchMedia('(prefers-color-scheme:light)').matches;
  return <span className="appearance-quick"><LanguageSelector/><button type="button" className="icon-btn" title={light?t("Тёмная тема"):t("Светлая тема")} aria-label={light?t("Тёмная тема"):t("Светлая тема")} onClick={()=>save(scope,{...current(scope),theme:light?'dark':'light'})}>{light?<Moon size={19}/>:<Sun size={19}/>}</button>
  <button type="button" className="icon-btn" title={t("Насыщенный стиль")} aria-label={t("Насыщенный стиль")} aria-pressed={style.interfaceStyle==='immersive'} onClick={()=>save(scope,{...current(scope),interfaceStyle:style.interfaceStyle==='immersive'?'simplified':'immersive'})}><Sparkles size={19} aria-hidden="true"/></button></span>;
@@ -62,8 +82,7 @@ export function LanguageSelector(){const t=useLocale();const {value,problem}=use
 export function Settings(){
  const t=useLocale();
  const {preferenceScope:scope}=useApp();
- const [style,setStyle]=useState(()=>current(scope));
- useEffect(()=>{const sync=()=>setStyle(current(scope));sync();window.addEventListener('mystic-appearance',sync);window.addEventListener('storage',sync);return()=>{window.removeEventListener('mystic-appearance',sync);window.removeEventListener('storage',sync)}},[scope]);
+ const [style,setStyle]=useAppearance(scope);
  const {value:presentation,problem}=usePresentation();
  const update=<K extends keyof Style>(field:K,value:Style[K])=>{const next={...current(scope),[field]:value};save(scope,next);setStyle(next)};
  return <><Header title={t("Настройки")} description={t("Тема, палитра и эффекты оформления")} action={<button className="btn secondary" onClick={()=>{save(scope,{...defaults});setStyle({...defaults})}}>{t("Сбросить оформление")}</button>}/>
