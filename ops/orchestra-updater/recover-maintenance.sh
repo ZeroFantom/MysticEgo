@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Only the existing, trusted Orchestra installation is used. No app replacement.
-set -euo pipefail
+set -Eeuo pipefail
+stage='preflight'
+trap 'printf "Maintenance recovery failed: stage=%s line=%s exit=%s\\n" "$stage" "$LINENO" "$?" >&2' ERR
 umask 077
 [[ $(id -u) == 0 ]]
 . /etc/os-release
@@ -15,9 +17,11 @@ health() {
 [[ $(health) == "$expected" ]] || { echo 'Wrong Orchestra node.' >&2; exit 1; }
 # Share the deployment lock with the privileged updater.
 exec 9>/run/lock/mysticego-clouddesk-deploy.lock
+stage='deployment-lock'
 flock -w 120 9
 [[ $(health) == "$expected" ]]
 systemctl is-active --quiet mysticego-orchestra.service
+stage='trusted-release-validation'
 tag=$(python3 - "$root" <<'PY'
 import json, pathlib, stat, sys, re
 root=pathlib.Path(sys.argv[1])
@@ -45,18 +49,22 @@ if not match or tuple(map(int,match.groups())) < (3,2,37):
 print(tag)
 PY
 )
+stage='updater-service'
 echo 'Installing privileged update service from the existing release.'
 command -v gh >/dev/null || { apt-get update; apt-get install -y gh; }
 # install-worker schedules the service; it may see the held deployment lock.
 bash "$root/ops/orchestra-updater/install-worker.sh" "$tag"
+stage='maintenance-service'
 echo 'Installing Orchestra Maintenance Service.'
 bash "$root/ops/infrastructure/install-local.sh"
+stage='service-verification'
 systemctl is-enabled --quiet mysticego-orchestra-updater.timer
 systemctl is-active --quiet mysticego-orchestra-updater.timer
 systemctl is-enabled --quiet mysticego-infrastructure-reconcile.timer
 systemctl is-active --quiet mysticego-infrastructure-reconcile.timer
 systemctl is-active --quiet mysticego-local-setup.socket
 [[ -S /var/lib/mysticego/local-setup.sock ]]
+stage='health-verification'
 [[ $(health) == "$expected" ]]
 # Release lock before triggering immediate status publication; the timer also retries.
 flock -u 9
