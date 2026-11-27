@@ -350,7 +350,7 @@ async function pollAvatarHandoff(){
       const onData=chunk=>{tail=(tail+chunk.toString()).slice(-4096);if(tail.includes('MYSTICEGO_AVATAR_HANDOFF_READY'))finish(true)};
       const timer=setTimeout(()=>finish(false),18000);
       child.child.stdout.on('data',onData);child.child.once('close',onClose);
-      child.child.stdin.end(JSON.stringify({token:auth.token,motion:request.motion,horizontal:request.horizontal})+'\n');
+      child.child.stdin.end(JSON.stringify({token:auth.token,motion:request.motion,horizontal:request.horizontal,phaseSeconds:request.phaseSeconds??0,mood:request.mood??'neutral'})+'\n');
     });
     if(!started||closing||generation!==accountGeneration){child.child.kill();await complete(false).catch(()=>{});return;}
     try{await complete(true)}catch(error){child.child.kill();throw error;}
