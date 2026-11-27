@@ -170,6 +170,8 @@ def ensure_rescue(release):
     try:
         installed=Path("/usr/local/libexec/mysticego/maintenance-rescue.py")
         if (trusted_file(installed) and installed.read_bytes()==(source/"rescue-request.py").read_bytes()
+                and trusted_file(Path("/usr/local/libexec/mysticego/orchestra-updater.py"))
+                and Path("/usr/local/libexec/mysticego/orchestra-updater.py").read_bytes()==(source/"update-orchestra.py").read_bytes()
                 and system_ok("is-active","--quiet","mysticego-maintenance-rescue.path")
                 and system_ok("is-enabled","--quiet","mysticego-maintenance-rescue.path")):
             return
@@ -256,8 +258,52 @@ def newer(tag, installed, publications):
     return installed in publications and publications[tag] > publications[installed]
 
 
+def published_releases():
+    return json.loads(github("api", f"repos/{REPO}/releases?per_page=30"))
+
+
+def verified_candidates(releases):
+    candidates = []
+    for release in releases:
+        tag = release.get("tag_name", "")
+        if release.get("draft") or not release.get("published_at") or not TAG.fullmatch(tag):
+            continue
+        for asset in release.get("assets", []):
+            digest = asset.get("digest") or ""
+            if (asset.get("name") == "MysticEgo-Orchestra-linux-x64.zip"
+                    and asset.get("state") == "uploaded" and 0 < asset.get("size", 0) <= LIMIT
+                    and re.fullmatch(r"sha256:[a-f0-9]{64}", digest)):
+                candidates.append(dict(tag=tag, digest=digest, asset=asset["name"],
+                                       id=asset["id"], size=asset["size"]))
+                break
+    return candidates
+
+
+def recovery_choices(installed, releases):
+    """Only exact published releases from the installed beta train. No arbitrary downgrade."""
+    version = project_version(installed[0])
+    if version is None:
+        return {}
+    candidates = [c for c in verified_candidates(releases)
+                  if project_version(c["tag"]) is not None
+                  and project_version(c["tag"])[:4] == version[:4]]
+    candidates.sort(key=lambda c: project_version(c["tag"]))
+    current = next((c for c in candidates if c["tag"] == installed[0]), None)
+    if current is None:
+        return {}
+    older = [c for c in candidates if project_version(c["tag"]) < version]
+    newer_candidates = [c for c in candidates if project_version(c["tag"]) > version]
+    result = {"reinstall": [current]}
+    if older:
+        # Return to the original build, then advance once more if possible;
+        # otherwise explicitly reinstall the original build a second time.
+        result["cycle"] = [older[-1], current, newer_candidates[0] if newer_candidates else current]
+    return result
+
+
 def newest(installed):
-    releases = json.loads(github("api", f"repos/{REPO}/releases?per_page=30"))
+    releases = published_releases()
+    write("release-options.json", {"installed": installed[0], "options": recovery_choices(installed, releases)})
     publications = {r["tag_name"]: datetime.fromisoformat(r["published_at"])
                     for r in releases if not r["draft"] and r.get("published_at") and TAG.fullmatch(r["tag_name"])}
     for release in sorted(releases, key=lambda item: item.get("published_at") or "", reverse=True):
@@ -388,7 +434,7 @@ def audit_health(expected):
         raise ValueError("Audit portal did not serve the expected build")
 
 
-def apply(candidate, installed, targets, target):
+def apply(candidate, installed, targets, target, recovery=False, intermediate=False):
     status("downloading", installed, candidate, last_target=target)
     expected_node = health()
     with tempfile.TemporaryDirectory(prefix=".mysticego-update-", dir=ROOT) as folder:
@@ -400,7 +446,7 @@ def apply(candidate, installed, targets, target):
             digest = hashlib.file_digest(stream, "sha256").hexdigest()
         if package.stat().st_size != candidate["size"] or "sha256:" + digest != candidate["digest"]:
             raise ValueError("digest or size mismatch")
-        if versions() != installed or newest(installed) != (candidate, targets):
+        if versions() != installed or (candidate not in verified_candidates(published_releases()) if recovery else newest(installed) != (candidate, targets)):
             raise ValueError("release or installed build changed")
         app = unpack(package, stage)
         orchestra = app / WEB / "orchestra"
@@ -439,10 +485,10 @@ def apply(candidate, installed, targets, target):
                 raise RuntimeError("new app did not pass health checks")
         # Commit the verified app independently: infrastructure failure must not
         # roll back a healthy app or touch its existing database.
-        if target != "audit":
+        if target != "audit" and not intermediate:
             maintenance_record("repairing", candidate["tag"], retry_after=time.time()+120)
         status("current", versions(), last_target=target)
-        if target != "audit":
+        if target != "audit" and not intermediate:
             ensure_maintenance(versions()[0], force=True)
             ensure_rescue(versions()[0])
         previous = PREVIOUS["audit" if target == "audit" else "orchestra"]
@@ -499,7 +545,25 @@ def run_locked():
         ensure_rescue(installed[0])
         candidate, targets = newest(installed)
         request = take_request()
-        if not candidate:
+        if isinstance(request, dict) and request.get("recovery") in ("reinstall", "cycle"):
+            mode = request["recovery"]
+            expected = recovery_choices(installed, published_releases()).get(mode)
+            if not expected or request.get("releases") != expected or request.get("installed") != installed[0]:
+                status("failed", installed, candidate, targets, "План восстановления изменился. Проверьте релизы повторно.")
+                return
+            if mode == "cycle" and request.get("backupConfirmed") is not True:
+                status("failed", installed, candidate, targets, "Не подтверждена совместимость схемы и резервная копия.")
+                return
+            if system_ok("is-active", "--quiet", "mysticego-infrastructure-reconcile.service"):
+                status("failed", installed, candidate, targets, "Дождитесь завершения обслуживания инфраструктуры.")
+                return
+            target = "orchestra"
+            for index, step in enumerate(expected):
+                candidate, targets = step, ["orchestra"]
+                # Persistent guard prevents unattended retries of a failed recovery step.
+                write("automatic-attempt.json", {"tag": step["tag"]})
+                apply(step, versions(), targets, target, recovery=True, intermediate=index < len(expected)-1)
+        elif not candidate:
             status("current", installed)
         elif isinstance(request, dict) and request.get("candidate") == candidate and request.get("target") in targets:
             target = request["target"]
