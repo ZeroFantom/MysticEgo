@@ -8,6 +8,8 @@ namespace Models.Autorization.Data
         public AuthDbContext(DbContextOptions<AuthDbContext> options) : base(options) { }
 
         public DbSet<AuditRegistrationAcceptance> AuditRegistrationAcceptances => Set<AuditRegistrationAcceptance>();
+        public DbSet<AccountLicenseAcceptance> AccountLicenseAcceptances => Set<AccountLicenseAcceptance>();
+        public DbSet<AccountDeviceGrant> AccountDeviceGrants => Set<AccountDeviceGrant>();
         public DbSet<User> Users => Set<User>();
         public DbSet<Role> Roles => Set<Role>();
         public DbSet<Permission> Permissions => Set<Permission>();
@@ -48,6 +50,19 @@ namespace Models.Autorization.Data
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
+            mb.Entity<AccountLicenseAcceptance>(e =>
+            {
+                e.ToTable("account_license_acceptances"); e.HasKey(x=>new{x.UserId,x.Version});
+                e.Property(x=>x.Version).HasMaxLength(80).IsRequired();
+                e.HasOne<User>().WithMany().HasForeignKey(x=>x.UserId).OnDelete(DeleteBehavior.Cascade);
+            });
+            mb.Entity<AccountDeviceGrant>(e =>
+            {
+                e.ToTable("account_device_grants"); e.HasKey(x=>new{x.UserId,x.DeviceId,x.Scope});
+                e.Property(x=>x.Scope).HasMaxLength(40).IsRequired();
+                e.Property(x=>x.PolicyVersion).HasMaxLength(40).IsRequired();
+                e.HasOne<User>().WithMany().HasForeignKey(x=>x.UserId).OnDelete(DeleteBehavior.Cascade);
+            });
             mb.Entity<Role>(e =>
             {
                 e.ToTable("roles");
