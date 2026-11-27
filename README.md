@@ -218,6 +218,7 @@ npm run test:social --prefix frontend
 | Чаты и профиль | [Коллектив: голосовые, ответы, редактирование, удаление и пересылка](docs/collective-chat.md) |
 | Аватары и стикеры | [Создание VRM / VRMA и стикеров](docs/avatar-creation.md) |
 | Ассистент | [Установка и настройка](ops/panel-assistant/README.md) |
+| Безопасность аккаунта | [Регистрация, сессии и разрешения устройств](docs/account-security.md) |
 | Computer Use / MCP | [Локальный исполнитель](tools/MysticEgo.UiAutomation/README.md) |
 | Системная автоматизация | [Agent / Audit](docs/agent-audit-computer-control.md) |
 | Переход VRM между средами | [Local Desktop Handoff](docs/local-desktop-handoff.md) |
