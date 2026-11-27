@@ -400,6 +400,15 @@ async function open(){
       actor:actor?.login,team:actor?teamStatus:null,globals:playerGlobals.map(({id,name})=>({id,name})),central:current()?.central||assignment?.orchestraUrl||lastConnection.central,
       lan:profile?.endpoints.allowLanHttp===true||assignment?.allowLanHttp===true||lastConnection.lan,platform:process.platform,logs:[...logs]};
   });
+  handle('presentation',async patch=>{
+    const generation=accountGeneration;
+    const session=await authorized();
+    const value=await json(session.central+'/api/auth/presentation',{
+      method:patch?'POST':'GET',headers:{Authorization:'Bearer '+session.token,...(patch?{'Content-Type':'application/json'}:{})},body:patch?JSON.stringify(patch):undefined
+    });
+    if(generation!==accountGeneration)throw Error('Account changed');
+    return value;
+  });
   handle('auth',userSession);
   handle('logout',async()=>{
     accountGeneration++;
