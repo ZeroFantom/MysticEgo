@@ -37,6 +37,54 @@ try
     Reject(()=>RelationalStorage.NodeConnection(Path.Combine(tmp,"new.db"),null,Path.Combine(tmp,"missing.connection")),"missing config must fail");
     var pg=Environment.GetEnvironmentVariable("MYSTICEGO_TEST_POSTGRES");
     if(string.IsNullOrEmpty(pg))throw new Exception("Integration PostgreSQL is required");
+    // A disposable database must be empty before staging. Use genuine records, non-ASCII text,
+    // nullable details and a deliberately failed copy to exercise transactional rollback.
+    var sourcePath=Path.Combine(tmp,"migration.db");
+    var sourceConnection=RelationalStorage.NodeConnection(sourcePath,null,null);
+    var sourceStore=new DynamicEntityStore(sourceConnection);
+    var identity=Guid.NewGuid();
+    var migrated=new RecordDocument{Id=identity,Collection="migration",Name="Мир MysticEgo",Data=JsonSerializer.SerializeToElement(new{value=42,note="Эфир"})};
+    await sourceStore.PutAsync(migrated);
+    var auditPath=sourcePath+".audit.db";
+    var sourceJournal=new AuditJournal(auditPath);
+    var eventId=Guid.NewGuid();
+    var entry=new AuditEntry(eventId,DateTimeOffset.UtcNow,"пользователь","migration.smoke",identity.ToString(),true,null);
+    sourceJournal.Append(entry);
+    sourceJournal.Append(entry with { Id=Guid.NewGuid(), Success=false, Detail="Проверка" });
+    var badEventId=Guid.NewGuid();
+    sourceJournal.Append(entry with { Id=badEventId, Detail="bad"+(char)0+"text" });
+    SqliteConnection.ClearAllPools();
+    Reject(()=>NodeDatabaseMigration.StageOffline(sourcePath,auditPath,pg,tmp),"bad text must roll back staged tables");
+    using(var conn=new NpgsqlConnection(pg))
+    {
+        conn.Open();
+        using var count=new NpgsqlCommand("SELECT count(*) FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public'",conn);
+        Check(Convert.ToInt64(count.ExecuteScalar())==0,"failed migration left partial destination");
+    }
+    using(var conn=new SqliteConnection(new SqliteConnectionStringBuilder{DataSource=auditPath}.ConnectionString))
+    {
+        conn.Open();
+        using var delete=conn.CreateCommand();
+        delete.CommandText="DELETE FROM action_journal WHERE event_id=@id";
+        delete.Parameters.AddWithValue("@id",badEventId.ToString());
+        Check(delete.ExecuteNonQuery()==1,"source row repair in fixture");
+    }
+    SqliteConnection.ClearAllPools();
+    var report=NodeDatabaseMigration.StageOffline(sourcePath,auditPath,pg,tmp);
+    Check(report.Tables.Count==3&&report.Tables.Sum(t=>t.Rows)==4,"verified migration counts");
+    Check(report.Tables.All(t=>t.Sha256.Length==64),"missing data digest");
+    Check(File.Exists(Path.Combine(report.BackupDirectory,"node.db"))&&File.Exists(Path.Combine(report.BackupDirectory,"node.db.audit.db")),"missing protected backup");
+    var migratedStore=new DynamicEntityStore(pg);
+    var transferred=await migratedStore.GetAsync<RecordDocument>(identity);
+    Check(transferred?.Name==migrated.Name&&transferred.Data.GetProperty("value").GetInt32()==42,"migrated entity data/identity");
+    var migratedJournal=new AuditJournal(auditPath,pg);
+    var journalPage=await migratedJournal.Read(1,10,"migration.smoke",null,identity.ToString(),CancellationToken.None);
+    Check(journalPage.Total==2&&journalPage.Items.Any(x=>x.Id==eventId&&x.Detail==null&&x.Success),"migrated audit data/identity");
+    var backupStore=new DynamicEntityStore(new SqliteConnectionStringBuilder{DataSource=Path.Combine(report.BackupDirectory,"node.db")}.ConnectionString);
+    Check((await backupStore.GetAsync<RecordDocument>(identity))?.Name==migrated.Name,"backup restore/read verification");
+    Check((await sourceStore.GetAsync<RecordDocument>(identity))?.Name==migrated.Name,"original source lost");
+    Reject(()=>NodeDatabaseMigration.StageOffline(sourcePath,auditPath,pg,tmp),"nonempty destination must not be overwritten");
+    Console.WriteLine("Verified offline migration: rollback, backups, hashes, IDs and audit passed");
     var remote=Path.Combine(tmp,"remote.db");
     var file=Path.Combine(tmp,"postgres.connection");
     File.WriteAllText(file,pg);
