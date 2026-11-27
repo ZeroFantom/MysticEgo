@@ -320,6 +320,43 @@ async function acceptInvitation(text){
   void followClub();
   return 'Приглашение принято. Получаем конфигурацию у Local.';
 }
+let handoffBusy=false;
+async function pollAvatarHandoff(){
+  if(handoffBusy||closing||!actor)return;
+  handoffBusy=true;
+  try{
+    const generation=accountGeneration;
+    const auth=await authorized();
+    const node=isAgent?current():personalProfile?current(personalProfile):null;
+    if(!node||!['agent','audit'].includes(node.kind)||!await health(node))return;
+    const base=node.url+'/api/v1/managed/avatar-handoff';
+    const post=(route,body)=>fetch(base+route,{method:'POST',headers:{Authorization:'Bearer '+auth.token,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(4000),redirect:'error'});
+    const response=await post('/claim');
+    if(response.status!==200)return;
+    const {request,proof}=await response.json();
+    const complete=async started=>{const r=await post('/'+request.id+'/complete',{proof,started});if(!r.ok)throw Error('Запрос перехода истёк.')};
+    if(companion||closing||generation!==accountGeneration){await complete(false);return;}
+    const answer=await dialog.showMessageBox(window,{type:'question',title:'MysticEgo · VRM',message:'Перенести аватар на рабочий стол?',detail:'Локальная веб-панель запрашивает '+(request.motion==='walk'?'прогулку':'переход на панель задач')+'. Ввод мыши и клавиатуры не будет перехвачен.',buttons:['Отмена','Разрешить'],defaultId:0,cancelId:0});
+    if(answer.response!==1||companion||closing||generation!==accountGeneration||Date.parse(request.expiresAt)<=Date.now()){await complete(false).catch(()=>{});return;}
+    const child=launch(process.execPath,[path.join(root,'desktop')],root,log,{
+      MYSTICEGO_DOTNET:dotnet,MYSTICEGO_DESKTOP_API_URL:node.url,MYSTICEGO_DESKTOP_AUTH_URL:node.url,MYSTICEGO_DESKTOP_SCOPE:node.kind,MYSTICEGO_AVATAR_HANDOFF:'1'
+    });
+    companion=child;
+    child.done.catch(error=>log(error.message)).finally(()=>{if(companion===child)companion=null});
+    const started=await new Promise(resolve=>{
+      let tail='';
+      const finish=value=>{clearTimeout(timer);child.child.stdout.off('data',onData);child.child.off('close',onClose);resolve(value)};
+      const onClose=()=>finish(false);
+      const onData=chunk=>{tail=(tail+chunk.toString()).slice(-4096);if(tail.includes('MYSTICEGO_AVATAR_HANDOFF_READY'))finish(true)};
+      const timer=setTimeout(()=>finish(false),18000);
+      child.child.stdout.on('data',onData);child.child.once('close',onClose);
+      child.child.stdin.end(JSON.stringify({token:auth.token,motion:request.motion,horizontal:request.horizontal})+'\n');
+    });
+    if(!started||closing||generation!==accountGeneration){child.child.kill();await complete(false).catch(()=>{});return;}
+    try{await complete(true)}catch(error){child.child.kill();throw error;}
+  }catch(error){log('VRM: '+error.message)}
+  finally{handoffBusy=false;}
+}
 function handle(name,action){
   ipcMain.handle('station:'+name,(event,...args)=>{
     if(event.sender!==window.webContents||event.senderFrame?.url!==launcher)throw Error('Недопустимый источник запроса.');
@@ -348,8 +385,9 @@ async function open(){
   window.webContents.setWindowOpenHandler(()=>({action:'deny'}));
   window.webContents.on('will-navigate',event=>event.preventDefault());
   const discovery=setInterval(()=>void followClub(),6000);
+  const handoffs=setInterval(()=>void pollAvatarHandoff(),2500);
   window.on('close',async event=>{
-    if(closing)return;event.preventDefault();closing=true;clearInterval(discovery);closePanel();
+    if(closing)return;event.preventDefault();closing=true;clearInterval(discovery);clearInterval(handoffs);closePanel();
     if(recording)recording.child.stdin.end('\n');
     if(companion)companion.child.kill();
     await Promise.all([stop(),stopRunner(personalRunner)]);window.close();
