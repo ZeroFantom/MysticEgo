@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { isAbsolute } from 'node:path';
 import { NativeWindowService } from './native.mjs';
 import { parseScenario, scenarioSchema, interruptibleDelay } from './scenario.mjs';
+import { ScenarioLibrary } from './scenario-library.mjs';
 
 export class UiAutomationService {
   #active = null;
@@ -15,9 +16,11 @@ export class UiAutomationService {
     this.config = config;
     this.engines = engines;
     this.native = new NativeWindowService(config.native);
+    this.library = config.scenarioDirectory ? new ScenarioLibrary(config.scenarioDirectory) : null;
   }
   run(name, args) {
     if (this.#stopping) return Promise.reject(new Error('Executor stopped'));
+    if (name === 'ui_session_status') return Promise.resolve({ active: Boolean(this.#active), recording: Boolean(this.#recording), replaying: Boolean(this.#replayAbort), libraryEnabled: Boolean(this.library), nativeEnabled: Boolean(this.config.native) });
     if (name === 'ui_replay_cancel') {
       if (!this.#active || this.#active.id !== args.sessionId) return Promise.reject(new Error('No matching active session'));
       const running = Boolean(this.#replayAbort);
@@ -42,6 +45,16 @@ export class UiAutomationService {
   async #execute(name, a) {
     if (name.startsWith('native_')) return this.native.run(name, a);
     const session = this.#active;
+    if (name === 'ui_library_list') {
+      if (!this.library) throw new Error('Library disabled');
+      if (!session || session.id !== a.sessionId) throw new Error('No matching active session');
+      return { items: (await this.library.list()).filter(item => item.target.kind === session.target.kind && item.target.id === session.target.id) };
+    }
+    if (name === 'ui_library_load') {
+      if (!this.library || !session || session.id !== a.sessionId) throw new Error('Library or session unavailable');
+      const scenario = await this.library.load(a.libraryId);
+      return this.#execute('ui_scenario_import', { sessionId: a.sessionId, scenarioJson: JSON.stringify(scenario) });
+    }
     if (['ui_record_start','ui_record_stop','ui_replay','ui_scenario_export','ui_scenario_import'].includes(name)) {
       if (!session || session.id !== a.sessionId) throw new Error('No matching active session');
       if (name === 'ui_scenario_export') {
