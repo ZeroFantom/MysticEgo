@@ -132,5 +132,5 @@ if(!app.requestSingleInstanceLock())app.quit();
 else{
   app.on('second-instance',()=>window?.focus());
   app.on('window-all-closed',()=>app.quit());
-  app.whenReady().then(async()=>{await open();updater.startDesktopUpdates({app,dialog,root,product:'LocalDesktop',window:()=>window,canRestart:()=>!closing&&!busy}}).catch(error=>{console.error(error);app.quit()});
+  app.whenReady().then(async()=>{await open();updater.startDesktopUpdates({app,dialog,root,product:'LocalDesktop',window:()=>window,canRestart:()=>!closing&&!busy})}).catch(error=>{console.error(error);app.quit()});
 }
