@@ -1,5 +1,8 @@
 import {Activity,ArrowUpRight,BrainCircuit,Container,Database,Mic,Radio,ServerCog,ShieldCheck,RefreshCw} from 'lucide-react';
 import {Link,NavLink} from 'react-router-dom';
+import {useState} from 'react';
+import {useApp,useRemote} from '../app/context';
+import type {UpdateState} from '../app/serverUpdate';
 import {ErrorBanner,Panel} from '../components/primitives';
 import {InfrastructureSetup} from './InfrastructureSetup';
 import {labels,names,useMaintenance,workerMessage,type Maintenance} from './MaintenanceStatus';
@@ -28,6 +31,16 @@ function StatusCard({component,name}:{component?:Component;name:string}){
 
 export function InfrastructureWorkspace({section}:{section:InfrastructureSection}){
   const page=sections[section];
+  const {api}=useApp();
+  const update=useRemote(()=>section==='services'?api.request<UpdateState>('/orchestra/update'):Promise.resolve(null),[api,section],4000);
+  const [repairing,setRepairing]=useState(false),[repairMessage,setRepairMessage]=useState('');
+  async function requestRepair(){
+    setRepairing(true);setRepairMessage('');
+    try{await api.request('/orchestra/update/maintenance',{method:'POST',body:'{}'});setRepairMessage('Запрос принят. Служба обновления автоматически проверит установку и восстановление.');update.reload()}
+    catch(error){setRepairMessage(error instanceof Error?error.message:String(error))}
+    finally{setRepairing(false)}
+  }
+  const maintenance=update.value?.maintenance;
   const state=useMaintenance();
   const data=state.value;
   const status=data?.components??[];
@@ -42,7 +55,7 @@ export function InfrastructureWorkspace({section}:{section:InfrastructureSection
     <ErrorBanner text={state.error}/>
     {section==='services'&&<div className="infra-worker-banner" data-state={data?.installed&&!worker?'available':'checking'}>
       <ShieldCheck size={24}/><div><strong>{data?.installed&&!worker?'Служба обслуживания передаёт данные':worker?'Служба требует внимания':'Состояние службы обслуживания'}</strong>
-        <p>{worker?.message??(data?.installed?'Отчёт получен '+(data.source==='host-socket'?'через локальный сокет':'из каталога VPS')+'.':data?workerMessage(data):'Проверяем доступность worker…')}</p>
+        <p>{worker?.message??(data?.installed?'Отчёт получен '+(data.source==='host-socket'?'через локальный сокет':'из каталога VPS')+'.':data?workerMessage(data):'Проверяем доступность службы обслуживания…')}</p>
       </div><button className="btn secondary" onClick={state.reload} disabled={state.loading}><RefreshCw size={15}/> Проверить</button>
     </div>}
     {!!page.components.length&&<div className="infra-status-grid">{page.components.filter(name=>name!=='worker'||!!worker).map(name=><StatusCard key={name} name={name} component={status.find(c=>c.name===name)}/>)}</div>}
@@ -50,7 +63,12 @@ export function InfrastructureWorkspace({section}:{section:InfrastructureSection
     <div className="infra-actions-grid">
       <InfrastructureSetup key={section} initial={page.initial} allowed={page.actions} title={page.actionTitle}/>
       <Panel title={section==='services'?'Автоматическое обслуживание':section==='ai'?'Вычислительный контур':section==='database'?'Безопасность данных':'Просмотр диагностики'}>
-        {section==='services'&&<><p>Сервер самостоятельно проверяет службы. CloudDesk не нужен для повторных проверок. Если worker не установлен, проверьте журнал службы на VPS.</p><code>sudo journalctl -u mysticego-infrastructure-reconcile -n 80 --no-pager</code><p className="footnote">Переустановка через локальный bootstrap (Ubuntu 24.04, при наличии файлов текущего релиза):</p><code>sudo bash /opt/mysticego/app/ops/infrastructure/install-local.sh</code></>}
+        {section==='services'&&<><p>Служба обновления устанавливает и восстанавливает обслуживание Orchestra из проверенного релиза. Повторные проверки происходят автоматически, без CloudDesk и SSH.</p>
+          <p><strong>{maintenance?({ready:'Установлена',waiting:'Ожидается отчёт',repairing:'Установка / восстановление',degraded:'Повторная попытка запланирована',unavailable:'Пакет обслуживания недоступен'} as Record<string,string>)[maintenance.state]??'Состояние уточняется':'Обновление службы обслуживания требуется'}</strong></p>
+          {maintenance?.release&&<p className="footnote">Версия: {maintenance.release} · {new Date(maintenance.checkedAt).toLocaleString('ru-RU')}</p>}
+          {maintenance?<button className="btn secondary" disabled={repairing||maintenance.state==='repairing'} onClick={()=>void requestRepair()}><RefreshCw size={16}/> Восстановить службу обслуживания</button>:<Link className="infra-link" to="/project-branches">Перейти к обновлению Orchestra <ArrowUpRight size={16}/></Link>}
+          {repairMessage&&<p role="status">{repairMessage}</p>}
+          <Link className="infra-link" to="/diagnostics">Скачать диагностический отчёт <ArrowUpRight size={16}/></Link></>}
         {section==='ai'&&<><p>Распознавание речи устанавливается автоматически при достаточных ресурсах VPS. Явно настроенный внешний сервис сохраняется.</p><Link className="infra-link" to="/assistant?tab=models">Вычислительные узлы и тест модели <ArrowUpRight size={16}/></Link></>}
         {section==='database'&&<><p>Существующая база и её учётные данные сохраняются. Перенос SQLite в PostgreSQL доступен только как автономная подготовка; переключение рабочей базы пока не автоматизировано.</p><p className="footnote">Не создавайте пустую замену действующей базе. Требуется проверяемая резервная копия и отдельное подтверждение.</p></>}
         {section==='metrics'&&<><p>Здесь настраиваются источники и системы сбора. Текущая нагрузка, графики ресурсов и состояние сетевых связей отображаются отдельно.</p><Link className="infra-link" to="/diagnostics">Открыть диагностику <ArrowUpRight size={16}/></Link></>}

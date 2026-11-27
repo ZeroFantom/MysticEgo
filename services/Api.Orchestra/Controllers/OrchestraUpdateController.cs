@@ -15,10 +15,42 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
     private const string Inbox = "/var/lib/mysticego/update-inbox";
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    internal static UpdateStatus? ReadStatus() =>
-        System.IO.File.Exists(StateDirectory + "/status.json")
-            ? JsonSerializer.Deserialize<UpdateStatus>(System.IO.File.ReadAllText(StateDirectory + "/status.json"), Json)
-            : null;
+    internal static UpdateStatus? ReadStatus()
+    {
+        if (!System.IO.File.Exists(StateDirectory + "/status.json")) return null;
+        var status = JsonSerializer.Deserialize<UpdateStatus>(System.IO.File.ReadAllText(StateDirectory + "/status.json"), Json);
+        if (status is null) return null;
+        return status with { Maintenance = ReadMaintenance() };
+    }
+
+    internal static MaintenanceStatus? ReadMaintenance()
+    {
+        try
+        {
+            var path = new FileInfo(StateDirectory + "/maintenance.json");
+            if (!path.Exists || path.Length > 8192) return null;
+            return JsonSerializer.Deserialize<MaintenanceStatus>(System.IO.File.ReadAllText(path.FullName), Json);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException) { return null; }
+    }
+
+    [HttpPost("maintenance"), RequestSizeLimit(1024)]
+    public IActionResult RepairMaintenance()
+    {
+        if (!team.IsOwner(User)) return Forbid();
+        if (!Directory.Exists(Inbox) || ReadMaintenance() is null)
+            return Conflict(new { error = "Сначала установите актуальную версию Orchestra через «Ветки GitHub»." });
+        var path = Path.Combine(Inbox, "maintenance-repair.json");
+        var temporary = Path.Combine(Inbox, Guid.NewGuid().ToString("N") + ".tmp");
+        try
+        {
+            System.IO.File.WriteAllText(temporary, "{\"confirmed\":true}");
+            try { System.IO.File.Move(temporary, path); }
+            catch (IOException) when (System.IO.File.Exists(path)) { return Accepted(new { accepted = true }); }
+            return Accepted(new { accepted = true });
+        }
+        finally { System.IO.File.Delete(temporary); }
+    }
 
     /// <summary>Reads the latest status published by the update worker.</summary>
     [HttpGet, ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
@@ -75,6 +107,7 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
     private sealed record UpdateRequest(string Target, Candidate Candidate);
     public sealed record Candidate(string Tag, string Digest, string Asset, long Id, long Size);
     public sealed record UpdateStatus(string Phase, string? Current, Candidate? Candidate, string? Message,
-        int Protocol = 0, string? CurrentAudit = null, string[]? Targets = null, string? LastTarget = null);
+        int Protocol = 0, string? CurrentAudit = null, string[]? Targets = null, string? LastTarget = null, MaintenanceStatus? Maintenance = null);
+    public sealed record MaintenanceStatus(string State, string? Release, string? Reason, DateTimeOffset CheckedAt, double RetryAfter);
 }
 

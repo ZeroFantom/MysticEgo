@@ -4,7 +4,8 @@ import {useApp} from './context';
 import {useNoticeFeed} from './notifications';
 
 export type UpdateTarget='orchestra'|'audit'|'both';
-export type UpdateState={phase:string;protocol:number;current?:string;currentAudit?:string;
+export type MaintenanceUpdate={state:string;release?:string;reason?:string;checkedAt:string;retryAfter?:number};
+export type UpdateState={phase:string;protocol:number;current?:string;currentAudit?:string;maintenance?:MaintenanceUpdate;
   candidate?:{tag:string;digest:string};targets?:UpdateTarget[];message?:string;lastTarget?:UpdateTarget};
 type Request={tag:string;digest:string;target:UpdateTarget};
 type Pending={tag:string;target:UpdateTarget;startedAt:number;previousFailure?:string};
@@ -72,9 +73,11 @@ export function ServerUpdateProvider({children}:{children:ReactNode}){
       try{
         const status=await api.request<UpdateState>(updatePath,{cache:'no-store'});
         if(canceled||active.current!==order)return;
-        if(status.phase!=='switching'&&status.phase!=='downloading'&&updateInstalled(status,order)){
+        if(status.phase!=='switching'&&status.phase!=='downloading'&&updateInstalled(status,order)&&
+          !(order.target!=='audit'&&status.maintenance?.release===order.tag&&status.maintenance.state==='repairing')){
           setReloading(true);
-          notify?.(`${targetLabel[order.target]} обновлён до ${order.tag}. Страница скоро перезагрузится.`,'success');
+          const maintenanceProblem=order.target!=='audit'&&status.maintenance&&['degraded','unavailable'].includes(status.maintenance.state);
+          notify?.(`${targetLabel[order.target]} обновлён до ${order.tag}.`+(maintenanceProblem?' Служба обслуживания будет проверена повторно.':' Страница скоро перезагрузится.'),maintenanceProblem?'warning':'success');
           timer=window.setTimeout(()=>{
             save(null);
             window.location.reload();

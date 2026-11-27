@@ -4,13 +4,13 @@ import {useNoticeFeed} from '../app/notifications';
 
 export type Maintenance={installed:boolean;workerState?:string;source?:string;socketAvailable?:boolean;components:{name:string;state:string;message:string;checkedAt:string}[]};
 const endpoint='/managed/infrastructure-maintenance';
-export const names:Record<string,string>={worker:'Служба обслуживания',orchestra:'Orchestra',docker:'Docker / Compose',lmstudio:'LM Studio',voice:'Распознавание речи','postgres-service':'Служба PostgreSQL',database:'Текущая база'};
+export const names:Record<string,string>={worker:'Служба обслуживания Orchestra',orchestra:'Orchestra',docker:'Docker / Compose',lmstudio:'LM Studio',voice:'Распознавание речи','postgres-service':'Служба PostgreSQL',database:'Текущая база'};
 export const labels:Record<string,string>={checking:'Проверяется',available:'Готово',repairing:'Восстановление',degraded:'Требует внимания',external:'Заданная конфигурация',disabled:'Отключено'};
 export const useMaintenance=()=>{const {api}=useApp();return useRemote(()=>api.request<Maintenance>(endpoint),[api],10000)};
 export function workerMessage(value:Maintenance){
-  if(value.workerState==='missing')return 'Локальный установщик не обнаружен. Проверьте службу mysticego-local-setup.socket на VPS.';
+  if(value.workerState==='missing')return 'Служба обслуживания не обнаружена. Обновление Orchestra устанавливает её автоматически.';
   if(value.workerState==='unreachable')return 'Локальный сокет занят или недоступен. Проверка будет повторена.';
-  if(value.workerState==='unreadable')return 'Отчёт worker не читается. Проверьте права доступа на VPS.';
+  if(value.workerState==='unreadable')return 'Отчёт службы обслуживания недоступен. Будет выполнена повторная проверка.';
   return 'Ожидается первый отчёт службы обслуживания на VPS.';
 }
 export function MaintenanceNotices({enabled}:{enabled:boolean}){

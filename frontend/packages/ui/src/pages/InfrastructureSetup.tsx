@@ -55,7 +55,7 @@ export function InfrastructureSetup({initial='monitoring',allowed,title='Раз�
         {!candidates.length&&<option value="">Нет доступного сервера</option>}
         {candidates.map(host=><option key={host} value={host}>{targetName(host)}</option>)}</select></label>
       {!candidates.length&&<p className="footnote">{['monitoring','metrics-source','docker','lmstudio','postgres','postgres-native'].includes(component)
-        ?'Установите актуальную версию Orchestra через встроенное обновление. Если привилегированный worker отсутствует, понадобится однократная настройка на VPS.'
+        ?'Установите актуальную версию Orchestra через встроенное обновление. Установка службы обслуживания выполняется автоматически. Состояние можно проверить в разделе «Сервисы».'
         :'Добавьте доверенный SSH-сервер для этого компонента.'}</p>}
       {['monitoring','model-connect'].includes(component)&&<label>{component==='monitoring'?'HTTPS-адрес Orchestra':'Локальный адрес или SSH-туннель к LM Studio'}
         <input type="url" placeholder={component==='monitoring'?'Пусто для Orchestra на том же сервере':'http://127.0.0.1:1234'} value={url} onChange={e=>setUrl(e.target.value)}/>

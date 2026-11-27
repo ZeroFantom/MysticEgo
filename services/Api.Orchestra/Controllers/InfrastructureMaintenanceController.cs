@@ -68,7 +68,7 @@ public sealed class InfrastructureMaintenanceController(DevelopmentTeam team, Da
         var db = database.Snapshot;
         components.Add(new(db.Name, db.State, db.Message, db.CheckedAt));
         if (installed && components.Where(c => c.Name != "database").All(c => DateTimeOffset.UtcNow - c.CheckedAt > TimeSpan.FromMinutes(55)))
-            components.Add(new("worker", "degraded", "Worker не публикует свежие проверки. Проверьте systemd-таймер.", DateTimeOffset.UtcNow));
+            components.Add(new("worker", "degraded", "Служба обслуживания Orchestra не публикует свежие проверки. Будет выполнена повторная проверка запуска.", DateTimeOffset.UtcNow));
         return new MaintenanceReport(installed, components.ToArray(), workerState, source, socketAvailable, snapshot?.History?.Where(c => c.Name is "orchestra" or "docker" or "lmstudio" or "voice" or "postgres-service").TakeLast(120).ToArray() ?? []);
     }
 

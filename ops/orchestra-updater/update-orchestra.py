@@ -167,9 +167,25 @@ def ensure_maintenance(release, force=False):
         maintenance_record("unavailable", release, "trusted-package-incomplete")
         return False
     if maintenance_ready(source) and not force:
-        # A running timer alone does not prove a first report has arrived.
-        maintenance_record("ready" if MAINTENANCE_STATUS.is_file() else "waiting", release)
-        return True
+        # A running timer alone does not prove the reconciler is publishing.
+        try:
+            fresh = time.time() - MAINTENANCE_STATUS.stat().st_mtime < 3300
+        except OSError:
+            fresh = False
+        if fresh:
+            maintenance_record("ready", release)
+            return True
+        if system_ok("is-active", "--quiet", "mysticego-infrastructure-reconcile.service"):
+            maintenance_record("waiting", release)
+            return True
+        # Kick a timer which has not yet published, without reinstalling software.
+        prior = maintenance_state()
+        if prior.get("release") == release and prior.get("retryAfter", 0) > time.time():
+            return True
+        started = system_ok("start", "--no-block", "mysticego-infrastructure-reconcile.service")
+        maintenance_record("waiting" if started else "degraded", release,
+                           "" if started else "service-start-failed", time.time()+120)
+        return started
     prior = maintenance_state()
     if not force and prior.get("release") == release and prior.get("retryAfter", 0) > time.time():
         return False
@@ -405,6 +421,8 @@ def apply(candidate, installed, targets, target):
                 raise RuntimeError("new app did not pass health checks")
         # Commit the verified app independently: infrastructure failure must not
         # roll back a healthy app or touch its existing database.
+        if target != "audit":
+            maintenance_record("repairing", candidate["tag"], retry_after=time.time()+120)
         status("current", versions(), last_target=target)
         if target != "audit":
             ensure_maintenance(versions()[0], force=True)
