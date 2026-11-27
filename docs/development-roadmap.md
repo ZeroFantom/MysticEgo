@@ -30,3 +30,11 @@ API and MCP controllers share application services; domain policies and persiste
 Build .NET and frontend, run smoke/integration tests, verify Windows/X11 desktop workflows, database migration and rollback, security isolation and realistic staging load. Merge independent verified increments, not unfinished draft functionality. See PRs #72–75 and current GitHub Actions for live results.
 
 Current integration: [PR #72](https://github.com/ZeroFantom/MysticEgo/pull/72) combines native automation, account permissions and presentation. Merged: 14/14 workflows and 264/264 browser checks passed. Presentation changes preserve account-scoped local settings when Auth returns a partial response; visual smoke uses persistent mocked account preferences. Production and physical-device verification remain separate.
+
+## R3.2.41: оставшиеся проверки
+
+- [ ] #102 — внешнее HTTPS-превью Telegram/VK после установки, включая /share и встроенный Audit.
+- [ ] #94, #40 — реальная расшифровка речи и причина отказа LM Studio.
+- [ ] #92 — специализированные и серверные переводы.
+- [ ] #99 — продолжение персонального ассистента, реальные виджеты и сценарии.
+- [ ] #100 — безопасная приёмка полного сброса только на одноразовом VPS.
