@@ -37,6 +37,7 @@ import {Users} from '../pages/Users';
 import {Diagnostics} from '../pages/Diagnostics';
 import {CommandCenter} from '../pages/CommandCenter';
 import {DevelopmentTeam} from '../pages/DevelopmentTeam';
+import {DeveloperWorkspace} from '../pages/DeveloperWorkspace';
 import {AgentUpdates} from '../pages/AgentUpdates';
 import {AssistantPage} from '../pages/Assistant';
 import {AutomationPage} from '../pages/Automation';
@@ -147,6 +148,7 @@ function Workspace({logout}:{logout:()=>void}){
   const infrastructureOwner=mode==='orchestra'&&developer.value?.owner===true;
   if(infrastructureOwner)nav.splice(nav.length-1,0,{name:'Инфраструктура',items:[{to:'/infrastructure/services',label:'Сервисы',icon:Container},{to:'/infrastructure/ai',label:'AI и речь',icon:BrainCircuit},{to:'/infrastructure/database',label:'Базы данных',icon:Database},{to:'/infrastructure/metrics',label:'Мониторинг',icon:Radio}]});
   if(mode==='orchestra')nav[0].items.push({to:'/project-branches',label:'Ветки GitHub',icon:Network});
+  if(cloudDownloads)nav[0].items.push({to:'/developer-workspace',label:'Development workspace',icon:UsersRound});
   if(cloudDownloads)nav[0].items.push({to:'/clouddesk-downloads',label:'Скачать CloudDesk',icon:Cloud});
   const current=nav.flatMap(section=>section.items).find(item=>item.to===pathname)?.label??(pathname==='/profile'?'Мой профиль':modes[mode].name);
   const [mobile,setMobile]=useState(false);
@@ -217,6 +219,7 @@ function Workspace({logout}:{logout:()=>void}){
         {mode==='orchestra'&&<Route path="/clouddesk-downloads" element={cloudDownloads?<CloudDeskDownloads/>:
           <p role="status">{developer.loading?'Проверяем доступ…':'Скачивание CloudDesk доступно команде разработки.'}</p>}/>}
         {mode==='orchestra'&&<Route path="/panels" element={<PanelDirectory/>}/>}
+        {mode==='orchestra'&&<Route path="/developer-workspace" element={cloudDownloads?<DeveloperWorkspace key={preferenceScope}/>:<p role="status">Developer team access required.</p>}/>}
         {mode==='orchestra'&&<Route path="/project-branches" element={<ProjectBranches/>}/>}
         {mode==='orchestra'&&<Route path="/developer-assistant" element={<Navigate to="/assistant?tab=developer" replace/>}/>}
         <Route path="/profile" element={<ProfilePage/>}/>
