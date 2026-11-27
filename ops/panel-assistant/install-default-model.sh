@@ -3,6 +3,13 @@ set -euo pipefail
 umask 077
 source_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 infra=${1:-"$source_dir/../infrastructure"}
+# Compatibility bridge for the updater generation that invokes only this hook.
+# Full releases are verified by the existing root updater before this is called.
+if [[ $EUID == 0 && "$source_dir" == /opt/mysticego/app/ops/panel-assistant && -f "$infra/install-local.sh" ]]; then
+  bash "$infra/install-local.sh"
+  # The maintenance service now owns default model provisioning.
+  exit 0
+fi
 config=/etc/mysticego/orchestra.env
 if [[ -r $config ]] && grep -Eq '^(MYSTICEGO_DEFAULT_MODEL=off|PanelAssistant__Model=.+|WorldAI__RemoteWorkers__[^=]+__Url=.+)$' "$config"; then
   echo 'Сохранена заданная конфигурация моделей MysticEgo.'
