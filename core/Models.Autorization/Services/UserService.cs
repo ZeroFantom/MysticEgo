@@ -62,10 +62,10 @@ public sealed class UserService : IUserService
         var caller = await _access.GetUserAccessAsync(callerId, ct);
 
         var login = (req.Login ?? "").Trim();
-        if (login.Length < 3)
-            throw new ValidationException("Логин должен быть не короче 3 символов.");
+        if (!CredentialPolicy.ValidLogin(login))
+            throw new ValidationException("login_format");
 
-        ValidatePassword(req.Password);
+        ValidatePassword(req.Password,login);
 
         if (await _db.Users.AnyAsync(u => u.Login == login, ct))
             throw new ValidationException($"Пользователь '{login}' уже существует.");
@@ -172,7 +172,7 @@ public sealed class UserService : IUserService
         if (user is null) return false;
 
         EnsureCanManageUser(caller, user);
-        ValidatePassword(newPassword);
+        ValidatePassword(newPassword,user.Login);
 
         user.PasswordHash = _hasher.Hash(newPassword);
         user.UpdatedAt = DateTime.UtcNow;
@@ -197,7 +197,7 @@ public sealed class UserService : IUserService
         if (!_hasher.Verify(currentPwd, user.PasswordHash))
             throw new AuthAuthException("Неверный текущий пароль.");
 
-        ValidatePassword(newPassword);
+        ValidatePassword(newPassword,user.Login);
 
         user.PasswordHash = _hasher.Hash(newPassword);
         user.UpdatedAt = DateTime.UtcNow;
@@ -235,28 +235,10 @@ public sealed class UserService : IUserService
                 "Нельзя назначать роль с приоритетом ≥ своего.");
     }
 
-    private void ValidatePassword(string password)
+    /// <summary>Apply the same policy as public signup and bootstrap provisioning.</summary>
+    private void ValidatePassword(string password,string login)
     {
-        if (string.IsNullOrWhiteSpace(password) ||
-            password.Length < _opt.PasswordPolicy.MinLength)
-            throw new ValidationException(
-                $"Пароль должен быть не короче {_opt.PasswordPolicy.MinLength} символов.");
-
-        if (password.Length > _opt.PasswordPolicy.MaxLength)
-            throw new ValidationException(
-                $"Пароль длиннее {_opt.PasswordPolicy.MaxLength} символов.");
-
-        if (_opt.PasswordPolicy.RequireDigit && !password.Any(char.IsDigit))
-            throw new ValidationException("Пароль должен содержать цифру.");
-
-        if (_opt.PasswordPolicy.RequireLowercase && !password.Any(char.IsLower))
-            throw new ValidationException("Пароль должен содержать строчную букву.");
-
-        if (_opt.PasswordPolicy.RequireUppercase && !password.Any(char.IsUpper))
-            throw new ValidationException("Пароль должен содержать заглавную букву.");
-
-        if (_opt.PasswordPolicy.RequireNonAlphanumeric &&
-            password.All(char.IsLetterOrDigit))
-            throw new ValidationException("Пароль должен содержать спецсимвол.");
+        var error=CredentialPolicy.PasswordError(password,login,_opt.PasswordPolicy);
+        if(error is not null)throw new ValidationException(error);
     }
 }
