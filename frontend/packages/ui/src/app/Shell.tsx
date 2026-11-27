@@ -125,10 +125,10 @@ function AccountMenu({logout}:{logout:()=>void}){
 type Notification={id:string;text:string;read:boolean;at:string};
 function NotificationsFloat(){
   const {api}=useApp();
-  const data=useRemote(()=>api.request<Notification[]>('/collective/notifications'),[api],10000);
+  const data=useRemote(()=>api.request<Notification[]>('/collective/notifications'),[api],10000,true);
   const [problem,setProblem]=useState('');
   const pending=useServerUpdate()?.pending;
-  useNotice(problem||(!pending?data.error:''));
+  useNotice(problem?('Уведомления: '+problem):(!pending&&data.error?'Уведомления: '+data.error:''));
   async function read(id:string){
     try{await api.request('/collective/notifications/'+id+'/read',{method:'POST'});setProblem('');data.reload()}
     catch(error){setProblem(String(error))}
