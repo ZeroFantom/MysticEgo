@@ -2,6 +2,7 @@ import express from 'express';
 import { readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
 import { UiAutomationService } from './service.mjs';
+import { ConsentLease } from './consent-lease.mjs';
 import { makeMcp, mapController } from './controller.mjs';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
@@ -33,6 +34,7 @@ if (process.argv.includes('--stdio')) {
     const library = await localConsole.question('Allow access to locally approved scenarios for the active target? Type LIBRARY to enable: ');
     if (library !== 'LIBRARY') service.library = null;
   }
+  service.lease = new ConsentLease(30 * 60 * 1000);
   console.log('UI control enabled for 30 minutes. Type status or stop, or press Ctrl+C. Supervise actions.');
   localConsole.on('line', line => {
     if (line.trim().toLowerCase() === 'stop') void stop();
@@ -50,9 +52,10 @@ let stopping = false;
 async function stop() {
   if (stopping) return;
   stopping = true;
+  const cleanup = service.stop(); // revoke before waiting for transports
   http?.close();
   localConsole?.close();
-  try { await mcp?.close(); await service.stop(); } finally { process.exit(0); }
+  try { await mcp?.close(); await cleanup; } finally { process.exit(0); }
 }
 process.on('SIGINT', () => void stop());
 process.on('SIGTERM', () => void stop());
