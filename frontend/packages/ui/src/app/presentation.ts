@@ -1,4 +1,4 @@
-import {useEffect,useSyncExternalStore} from 'react';
+import {useEffect,useRef,useSyncExternalStore} from 'react';
 import {catalog} from './localeCatalog';
 export type Language='en'|'zh-CN'|'ko'|'ru';
 export type Font='modern'|'editorial'|'system'|'mono';
@@ -6,9 +6,9 @@ export type Presentation={language:Language;font:Font};
 export const languages=[['en','English'],['zh-CN','简体中文'],['ko','한국어'],['ru','Русский']] as const;
 export const fonts=[['modern','Современный'],['editorial','Редакционный'],['system','Системный'],['mono','Моноширинный']] as const;
 const defaults:Presentation={language:'en',font:'modern'};
-function normalize(v:Partial<Presentation>):Presentation{return {
- language:languages.some(([id])=>id===v.language)?v.language!:defaults.language,
- font:fonts.some(([id])=>id===v.font)?v.font!:defaults.font
+function normalize(v:Record<string,unknown>):Presentation{return {
+ language:languages.some(([id])=>id===v.language)?v.language as Language:defaults.language,
+ font:fonts.some(([id])=>id===v.font)?v.font as Font:defaults.font
 }}
 function guest(){try{return normalize(JSON.parse(localStorage.getItem('mysticego.guest.presentation')||'{}'))}catch{return defaults}}
 let current=guest(),problem='',revision=0;
@@ -24,13 +24,14 @@ export function changePresentation(patch:Partial<Presentation>){current=normaliz
 }
 export function syncAppearance(patch:Record<string,unknown>){active?.send(patch)}
 export function useAccountPresentation(authUrl:string,token:string,scope:string,applyAppearance:(value:Record<string,unknown>)=>void){
+ const tokenRef=useRef(token);tokenRef.current=token;
  useEffect(()=>{
   let alive=true;let dirty:Record<string,unknown>={};let chain=Promise.resolve();
   problem='';current=token?defaults:guest();publish();
   if(!token||!scope){active=undefined;return}
   const endpoint=authUrl.replace(/\/$/,'')+'/api/auth/presentation';
   const request=async(patch?:Record<string,unknown>)=>{
-   const response=await fetch(endpoint,{method:patch?'POST':'GET',headers:{Authorization:'Bearer '+token,...(patch?{'Content-Type':'application/json'}:{})},body:patch?JSON.stringify(patch):undefined,signal:AbortSignal.timeout(10000),redirect:'error'});
+   const response=await fetch(endpoint,{method:patch?'POST':'GET',headers:{Authorization:'Bearer '+tokenRef.current,...(patch?{'Content-Type':'application/json'}:{})},body:patch?JSON.stringify(patch):undefined,signal:AbortSignal.timeout(10000),redirect:'error'});
    if(!response.ok)throw Error('HTTP '+response.status);return await response.json() as Record<string,unknown>
   };
   const binding={send(patch:Record<string,unknown>){Object.assign(dirty,patch);chain=chain.then(async()=>{
@@ -40,5 +41,5 @@ export function useAccountPresentation(authUrl:string,token:string,scope:string,
   active=binding;
   chain=request().then(data=>{if(!alive)return;const merged={...data,...dirty};current=normalize(merged);applyAppearance(merged);publish()}).catch(()=>{if(alive){problem='Настройки не синхронизированы';publish()}});
   return()=>{alive=false;if(active===binding)active=undefined}
- },[authUrl,token,scope]);
+ },[authUrl,scope,Boolean(token)]);
 }
