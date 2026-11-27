@@ -59,6 +59,7 @@ jobs:
       - run: npm ci --prefix frontend
       - run: node --test frontend/scripts/avatar-motion.test.mjs frontend/scripts/localization.test.mjs
       - run: dotnet build core/Api.Auth/Api.Auth.csproj
+      - run: dotnet run --project tests/AuthSmoke/AuthSmoke.csproj
       - run: node --check desktop/station/view.js
       - run: node --check desktop/control/presentation.js
       - run: node --check desktop/control/effects.js
