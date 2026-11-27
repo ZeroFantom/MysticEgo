@@ -4,16 +4,16 @@ All five panel roles share the frontend build and motion styles. The current dir
 
 ## Public previews
 
-- The root and /share of each panel carry role-only Open Graph and Twitter metadata in the initial HTML, before JavaScript.
+- The root, /share and known SPA routes of each panel carry role-only Open Graph and Twitter metadata in the initial HTML, before JavaScript. Private query parameters and identifiers never enter the preview.
 - Orchestra's /studio, /developer and /desktop-downloads have their own titles and descriptions. Embedded Audit uses /audit-portal/ and /audit-portal/share.
 - C# resolves absolute URLs using the trusted Node:PublicUrl configuration, not request Host or forwarded headers. Set this to the actual HTTPS public origin when deploying; local-only nodes remain private and won't be previewable by external crawlers.
-- The five 1200x630 PNG files are generated at build time, copied to each role's /og/ directory, and served without login. No account, live status, node ID, IP, token, telemetry or organization data appears in the metadata.
+- The five 1200x630 PNG files are checked at build time, copied to each role's /og/ directory, and served without login. No account, live status, node ID, IP, token, telemetry or organization data appears in the metadata.
 - Share pages link to the role's normal login/workspace. They do not change permissions or expose any protected API. Do not open private routes or a LAN-only Agent to the internet just to enable preview.
 - The Caddy Audit installer serves trusted generated HTML templates only for the exact public entry and share routes, with a fixed HTTPS origin derived from the validated site configuration. Embedded Audit uses its own image under /audit-portal/og/audit.png and keeps the updater's original local health response unchanged. Re-run the separate Audit site installer once to update its Caddy routes. On other static hosting, render the marker block with the real HTTPS origin; the static fallback uses root-relative paths.
 
 ## Verification
 
-Run npm ci and npm run build inside frontend; npm run test:social independently verifies generated role HTML and PNG dimensions/data. After deploy, check the actual HTML (not DevTools modified DOM) with curl, verify og:image returns 200 image/png without a cookie, and paste the link into Telegram and VK. Platforms choose their own crops/layout and cache previews. Telegram's @WebpageBot may refresh a cached preview.
+Run npm ci and npm run build inside frontend; npm run test:social independently verifies generated role HTML and PNG dimensions/data. The HTTP smoke test in BetaResilienceSmoke exercises GET, HEAD, absolute image URLs, MIME type, private API isolation and untrusted Host headers for all five panels, including embedded Audit. Set MYSTICEGO_SOCIAL_DIST to the absolute frontend/apps directory to test actual compiled files. After deploy, check the actual HTML (not DevTools modified DOM) with curl, verify og:image returns 200 image/png without a cookie, and paste the link into Telegram and VK. Platforms choose their own crops/layout and cache previews. Telegram's @WebpageBot may refresh a cached preview.
 
 ## Motion
 

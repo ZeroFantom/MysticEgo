@@ -1,4 +1,10 @@
 using MysticEgo.Distributed;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Models.Commands.Resilience;
 
 var store=new OptionalDependencyState();
@@ -48,6 +54,86 @@ SocialCheck(embeddedSocial.Contains("href=\"https://orchestra.example.test/audit
 SocialCheck(PanelSocialPreviews.Render(socialHtml, "https://user:password@example.test") == socialHtml, "unsafe origin ignored");
 SocialCheck(PanelSocialPreviews.Render(socialHtml, "javascript:alert(1)") == socialHtml, "non-HTTP origin ignored");
 SocialCheck(PanelSocialPreviews.Render("<html>old build</html>", "https://example.test") == "<html>old build</html>", "old panel untouched");
+
+
+SocialCheck(renderedSocial.Contains("property=\"og:image:secure_url\" content=\"https://orchestra.example.test/og/audit.png\""), "secure image URL");
+SocialCheck(!PanelSocialPreviews.Render(socialHtml,"http://localhost:5500").Contains("og:image:secure_url"), "HTTP origin has no misleading secure URL");
+
+// Exercise real HTTP GET and HEAD without cookies, JS, or a trusted request Host.
+var fixture = Path.Combine(Path.GetTempPath(), "mystic-social-" + Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(fixture);
+try
+{
+    var built = Environment.GetEnvironmentVariable("MYSTICEGO_SOCIAL_DIST");
+    foreach (var kind in new[]{NodeKind.Orchestra,NodeKind.Global,NodeKind.Local,NodeKind.Agent,NodeKind.Audit})
+    {
+        var role=kind.ToString().ToLowerInvariant();
+        var root=Path.Combine(fixture,role);
+        var auditRoot=Path.Combine(fixture,"embedded-"+role);
+        byte[] png=Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a1gAAAABJRU5ErkJggg==");
+        foreach(var (folder,panel) in new[]{(root,role),(auditRoot,"audit")})
+        {
+            Directory.CreateDirectory(Path.Combine(folder,"og"));
+            Directory.CreateDirectory(Path.Combine(folder,"social"));
+            if(!string.IsNullOrEmpty(built))
+            {
+                var source=Path.Combine(built,panel,"dist");
+                File.Copy(Path.Combine(source,"index.html"),Path.Combine(folder,"index.html"));
+                File.Copy(Path.Combine(source,"social","share.html"),Path.Combine(folder,"social","share.html"));
+                File.Copy(Path.Combine(source,"og",panel+".png"),Path.Combine(folder,"og",panel+".png"));
+            }
+            else
+            {
+                var html=socialHtml.Replace("/og/audit.png","/og/"+panel+".png")
+                    .Replace("<html>","<html data-role=\""+panel+"\">")
+                    .Replace("<head>","<head><meta property=\"og:title\" content=\"MysticEgo "+panel+"\"/>");
+                File.WriteAllText(Path.Combine(folder,"index.html"),html);
+                File.WriteAllText(Path.Combine(folder,"social","share.html"),html);
+                File.WriteAllBytes(Path.Combine(folder,"og",panel+".png"),png);
+            }
+        }
+        var builder=WebApplication.CreateBuilder(new WebApplicationOptions{ContentRootPath=fixture,WebRootPath=root});
+        builder.Logging.ClearProviders();
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.Configuration["Managed:AuditWebRoot"]=auditRoot;
+        builder.Services.AddSingleton(new NodeOptions{Kind=kind,PublicUrl="https://"+role+".example.test"});
+        await using var app=builder.Build();
+        app.UsePanelSocialPreviews();
+        app.UseStaticFiles();
+        app.MapGet("/api/private",()=>Results.StatusCode(401));
+        app.MapFallback(()=>Results.NotFound());
+        await app.StartAsync();
+        using var client=new HttpClient(new HttpClientHandler{AllowAutoRedirect=false,UseCookies=false}){BaseAddress=new Uri(app.Urls.Single())};
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("TelegramBot (like TwitterBot)");
+        client.DefaultRequestHeaders.Host="untrusted.example";
+        client.DefaultRequestHeaders.TryAddWithoutValidation("X-Forwarded-Host","untrusted.example");
+        foreach(var route in new[]{"/","/share","/assistant?token=must-not-appear","/settings"})
+        {
+            using var response=await client.GetAsync(route);
+            var html=await response.Content.ReadAsStringAsync();
+            SocialCheck(response.IsSuccessStatusCode&&response.Content.Headers.ContentType?.MediaType=="text/html"&&
+                html.Contains("https://"+role+".example.test/og/"+role+".png")&&
+                !html.Contains("must-not-appear")&&!html.Contains("untrusted.example"),role+" crawler GET "+route);
+        }
+        using(var head=await client.SendAsync(new HttpRequestMessage(HttpMethod.Head,"/")))
+            SocialCheck(head.IsSuccessStatusCode&&head.Content.Headers.ContentLength>0&&(await head.Content.ReadAsByteArrayAsync()).Length==0,role+" crawler HEAD");
+        using(var cover=await client.GetAsync("/og/"+role+".png"))
+            SocialCheck(cover.IsSuccessStatusCode&&cover.Content.Headers.ContentType?.MediaType=="image/png"&&
+                (await cover.Content.ReadAsByteArrayAsync()).SequenceEqual(File.ReadAllBytes(Path.Combine(root,"og",role+".png"))),role+" anonymous PNG");
+        using(var missing=await client.GetAsync("/og/not-a-cover.png"))SocialCheck((int)missing.StatusCode==404,role+" missing cover");
+        using(var api=await client.GetAsync("/api/private"))SocialCheck((int)api.StatusCode==401,role+" private API untouched");
+        if(kind==NodeKind.Orchestra)
+        {
+            using var audit=await client.GetAsync("/audit-portal/settings");
+            var html=await audit.Content.ReadAsStringAsync();
+            SocialCheck(audit.IsSuccessStatusCode&&html.Contains("https://orchestra.example.test/audit-portal/og/audit.png"),"embedded Audit nested route");
+            using var cover=await client.GetAsync("/audit-portal/og/audit.png");
+            SocialCheck(cover.IsSuccessStatusCode&&cover.Content.Headers.ContentType?.MediaType=="image/png","embedded Audit public image");
+        }
+        await app.StopAsync();
+    }
+}
+finally { Directory.Delete(fixture,true); }
 
 // Interface automation: no cross-owner actions or invented completion.
 var interfaceControl = new InterfaceAutomation();
