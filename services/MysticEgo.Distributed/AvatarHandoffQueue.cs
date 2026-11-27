@@ -2,8 +2,8 @@ using System.Security.Cryptography;
 
 namespace MysticEgo.Distributed;
 
-public sealed record AvatarHandoffRequest(string Motion, double Horizontal);
-public sealed record AvatarHandoff(Guid Id, string Motion, double Horizontal, string Status, DateTimeOffset ExpiresAt);
+public sealed record AvatarHandoffRequest(string Motion, double Horizontal, double PhaseSeconds = 0, string Mood = "neutral");
+public sealed record AvatarHandoff(Guid Id, string Motion, double Horizontal, string Status, DateTimeOffset ExpiresAt, double PhaseSeconds = 0, string Mood = "neutral");
 public sealed record AvatarHandoffClaim(AvatarHandoff Request, string Proof);
 public sealed record AvatarHandoffCompletion(string Proof, bool Started);
 
@@ -21,14 +21,15 @@ public sealed class AvatarHandoffQueue
     public AvatarHandoff? Request(string principal, AvatarHandoffRequest request)
     {
         if (request.Motion is not ("walk" or "perch") || !double.IsFinite(request.Horizontal) ||
-            request.Horizontal < 0 || request.Horizontal > 1) return null;
+            request.Horizontal < 0 || request.Horizontal > 1 || !double.IsFinite(request.PhaseSeconds) ||
+            request.PhaseSeconds < 0 || request.PhaseSeconds > 3600 || request.Mood is not ("neutral" or "happy" or "sad" or "angry" or "surprised")) return null;
         lock (gate)
         {
             Expire();
             if (current is { Status: "pending" or "claimed" }) return null;
             owner = principal;
             proof = null;
-            return current = new(Guid.NewGuid(), request.Motion, request.Horizontal, "pending", DateTimeOffset.UtcNow.AddSeconds(60));
+            return current = new(Guid.NewGuid(), request.Motion, request.Horizontal, "pending", DateTimeOffset.UtcNow.AddSeconds(60), request.PhaseSeconds, request.Mood);
         }
     }
     public AvatarHandoff? Status(string principal, Guid id)
