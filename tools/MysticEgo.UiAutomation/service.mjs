@@ -2,12 +2,14 @@ import { chromium, _electron as electron } from 'playwright';
 import { randomUUID } from 'node:crypto';
 import { isAbsolute } from 'node:path';
 import { NativeWindowService } from './native.mjs';
+import { parseScenario, scenarioSchema, interruptibleDelay } from './scenario.mjs';
 
 export class UiAutomationService {
   #active = null;
   #tail = Promise.resolve();
   #stopping = false;
   #recording = null;
+  #replayAbort = null;
   #scenarios = new Map();
   constructor(config, engines = { chromium, electron }) {
     this.config = config;
@@ -16,6 +18,12 @@ export class UiAutomationService {
   }
   run(name, args) {
     if (this.#stopping) return Promise.reject(new Error('Executor stopped'));
+    if (name === 'ui_replay_cancel') {
+      if (!this.#active || this.#active.id !== args.sessionId) return Promise.reject(new Error('No matching active session'));
+      const running = Boolean(this.#replayAbort);
+      this.#replayAbort?.abort();
+      return Promise.resolve({ cancelled: running });
+    }
     const job = this.#tail.then(() => {
       if (this.#stopping) throw new Error('Executor stopped');
       return this.#execute(name, args);
@@ -25,6 +33,7 @@ export class UiAutomationService {
   }
   async stop() {
     this.#stopping = true;
+    this.#replayAbort?.abort();
     this.native.close();
     await this.#tail;
     this.native.close();
@@ -33,8 +42,22 @@ export class UiAutomationService {
   async #execute(name, a) {
     if (name.startsWith('native_')) return this.native.run(name, a);
     const session = this.#active;
-    if (name === 'ui_record_start' || name === 'ui_record_stop' || name === 'ui_replay') {
+    if (['ui_record_start','ui_record_stop','ui_replay','ui_scenario_export','ui_scenario_import'].includes(name)) {
       if (!session || session.id !== a.sessionId) throw new Error('No matching active session');
+      if (name === 'ui_scenario_export') {
+        const saved = this.#scenarios.get(a.scenarioId);
+        if (!saved || saved.sessionId !== session.id) throw new Error('Unknown scenario for this session');
+        const portable = scenarioSchema.parse({ version: 1, target: session.target, steps: saved.steps });
+        return { scenarioJson: JSON.stringify(portable) };
+      }
+      if (name === 'ui_scenario_import') {
+        if (this.#recording) throw new Error('Stop recording before import');
+        const portable = parseScenario(a.scenarioJson, session.target);
+        const scenarioId = randomUUID();
+        this.#scenarios.set(scenarioId, { sessionId: session.id, steps: portable.steps });
+        while (this.#scenarios.size > 20) this.#scenarios.delete(this.#scenarios.keys().next().value);
+        return { scenarioId, steps: portable.steps.length };
+      }
       if (name === 'ui_record_start') {
         if (this.#recording) throw new Error('Recording already active');
         this.#recording = { sessionId: session.id, started: Date.now(), steps: [] };
@@ -52,13 +75,24 @@ export class UiAutomationService {
       if (this.#recording) throw new Error('Stop recording before replay');
       const scenario = this.#scenarios.get(a.scenarioId);
       if (!scenario || scenario.sessionId !== session.id) throw new Error('Unknown scenario for this session');
-      for (const step of scenario.steps) {
-        if (this.#stopping) throw new Error('Executor stopped');
-        await new Promise(resolve => setTimeout(resolve, step.delayMs));
-        if (this.#stopping) throw new Error('Executor stopped');
-        await this.#dispatch(step.name, { ...step.args, sessionId: session.id });
+      const controller = new AbortController();
+      this.#replayAbort = controller;
+      let completed = 0;
+      try {
+        for (const step of scenario.steps) {
+          await interruptibleDelay(step.delayMs, controller.signal);
+          if (this.#stopping || controller.signal.aborted) throw new Error('Replay cancelled');
+          await this.#dispatch(step.name, { ...step.args, sessionId: session.id });
+          completed++;
+          if (controller.signal.aborted) return { replayed: completed, cancelled: true };
+        }
+        return { replayed: completed };
+      } catch (err) {
+        if (controller.signal.aborted) return { replayed: completed, cancelled: true };
+        throw err;
+      } finally {
+        this.#replayAbort = null;
       }
-      return { replayed: scenario.steps.length };
     }
     const result = await this.#dispatch(name, a);
     if (this.#recording && ['ui_click', 'ui_scroll', 'ui_assert_visible'].includes(name)) {
@@ -114,7 +148,7 @@ export class UiAutomationService {
         } else throw new Error('Unknown target kind');
         page.setDefaultTimeout(8000);
         const id = randomUUID();
-        this.#active = { id, owner, page, kind: a.kind };
+        this.#active = { id, owner, page, kind: a.kind, target: { kind: a.kind, id: a.kind === 'web' ? this.#url(a.target) : a.target } };
         return { sessionId: id, title: await page.title(), url: page.url() };
       } catch (err) {
         this.#active = null;
