@@ -25,6 +25,7 @@ export class UiAutomationService {
   }
   async stop() {
     this.#stopping = true;
+    this.native.close();
     await this.#tail;
     this.native.close();
     await this.#close();
