@@ -34,7 +34,7 @@ async function bindOwner(next,expected){
  languageSelect.disabled=fontSelect.disabled=true;$('design').inert=true;
  try{const result=await api.presentation(expected);if(generation===preferenceGeneration){prefs={...prefs,...result};applyPrefs()}}
  catch{if(generation===preferenceGeneration)$('presentation-status').textContent=t('Настройки не синхронизированы')}
- finally{if(generation===preferenceGeneration){languageSelect.disabled=fontSelect.disabled=false}}
+ finally{if(generation===preferenceGeneration){languageSelect.disabled=fontSelect.disabled=false;$('design').inert=false}}
 }
 async function refresh(){
   const state=await api.snapshot();
