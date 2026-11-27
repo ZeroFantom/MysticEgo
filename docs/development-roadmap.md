@@ -14,11 +14,11 @@ Status snapshot: 2026-11-27. A merged change is not proof of deployment. Draft P
 | Timeweb rapid response | PR #75 merged; standby start code | Budget ledger, create VPS, verified readiness and fenced activation |
 | Orchestra HA | Design, not implemented | Shared transactional registries, durable queue, storage replication, SignalR backplane, fencing, load balancer and failover drills |
 | Independent analyzer | PR #75 merged | Independent primary metrics, durable history, self-cost measurements, separate failure domain |
-| Computer Use / MCP | PR #72 experimental; status in PR | Windows/X11 testing, native permission enforcement, independent cursor and focus isolation |
-| KDE Plasma / Windows settings | PR #72 experimental; status in PR | Native runtime validation, individual panel settings, safe desktop management |
-| VRM handoff / lipsync / generation | PR #72 experimental; current CI in PR | Runtime continuity, animation and generation integration |
-| Localization / typography | PR #72 experimental; partial coverage | English default, Chinese/Korean/Russian coverage, licensed bundled fonts, all desktop apps |
-| Account permissions / sessions | PR #72 experimental; status in PR | Versioned consent, device-local grants for all native operations, revocation across connections and legacy tokens |
+| Computer Use / MCP | PR #72 merged; experimental | Windows/X11 testing, native permission enforcement, independent cursor and focus isolation |
+| KDE Plasma / Windows settings | PR #72 merged; experimental | Native runtime validation, individual panel settings, safe desktop management |
+| VRM handoff / lipsync / generation | PR #72 merged; CI passed | Runtime continuity, animation and generation integration |
+| Localization / typography | PR #72 merged; partial coverage | English default, Chinese/Korean/Russian coverage, licensed bundled fonts, all desktop apps |
+| Account permissions / sessions | PR #72 merged; experimental | Versioned consent, device-local grants for all native operations, revocation across connections and legacy tokens |
 | License / studio / developer pages | Existing main pages and legal docs | Verify current document acceptance and all translations |
 | Collective chat / profile | Existing main documentation | Verify voice, transcription, edits, replies, forwarding and profile status across clients |
 | Development workspace | PR #77 and #76 merged; category selection and owner reconciliation | Real GitHub staging verification, notifications, per-user identity, distributed locks |
@@ -29,4 +29,4 @@ API and MCP controllers share application services; domain policies and persiste
 ## Release gates
 Build .NET and frontend, run smoke/integration tests, verify Windows/X11 desktop workflows, database migration and rollback, security isolation and realistic staging load. Merge independent verified increments, not unfinished draft functionality. See PRs #72–75 and current GitHub Actions for live results.
 
-Current integration: [PR #72](https://github.com/ZeroFantom/MysticEgo/pull/72) combines native automation, account permissions and presentation. Check the PR for final merge/CI status. Presentation changes preserve account-scoped local settings when Auth returns a partial response; visual smoke uses persistent mocked account preferences. Production and physical-device verification remain separate.
+Current integration: [PR #72](https://github.com/ZeroFantom/MysticEgo/pull/72) combines native automation, account permissions and presentation. Merged: 14/14 workflows and 264/264 browser checks passed. Presentation changes preserve account-scoped local settings when Auth returns a partial response; visual smoke uses persistent mocked account preferences. Production and physical-device verification remain separate.

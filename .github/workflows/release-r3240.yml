@@ -10,7 +10,7 @@ permissions:
 
 concurrency:
   group: mysticego-release-r3240
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   platform:
@@ -101,6 +101,7 @@ jobs:
           print(digest.split(":")[1])
           PY
           )
+          test "$digest" = a7bc70476a208c9df29ec8e0773a14f36a0e4b6198870e0d15cf87c682e10589
           gh release download "$previous" --pattern "$asset"
           printf '%s  %s\n' "$digest" "$asset" | sha256sum -c -
           unzip -q "$asset" -d bundle
