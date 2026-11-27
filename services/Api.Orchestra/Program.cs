@@ -38,8 +38,10 @@ builder.Services.AddSingleton<ManagedDeployment>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<ManagedDeployment>());
 builder.Services.AddSingleton<DatabaseMaintenance>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<DatabaseMaintenance>());
-builder.Services.AddSingleton<ServerTelemetry>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<ServerTelemetry>());
+builder.Services.AddSingleton<CapacityMonitor>();
+builder.Services.AddHostedService(sp=>sp.GetRequiredService<CapacityMonitor>());
+builder.Services.AddSingleton<TimewebApiClient>();
+builder.Services.AddSingleton<CapacityReserve>();
 builder.Services.AddOrchestraProxy();
 builder.Services.AddSingleton<GitHubPanel>();
 builder.Services.AddHttpClient("panel-github",client=>{
