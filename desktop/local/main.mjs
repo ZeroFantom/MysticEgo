@@ -1,3 +1,4 @@
+import interfaceMcp from '../interface-mcp.cjs';
 import {app,BrowserWindow,ipcMain,shell,dialog} from 'electron';
 import pairing from '../browser-pairing.cjs';
 import updater from '../desktop-updates.cjs';
@@ -126,6 +127,7 @@ async function open(){
     void stop().finally(()=>window.close());
   });
   await window.loadURL(view);
+  interfaceMcp.installInterfaceMcp(window,'LocalDesktop');
   if(!await health())start();
 }
 if(!app.requestSingleInstanceLock())app.quit();

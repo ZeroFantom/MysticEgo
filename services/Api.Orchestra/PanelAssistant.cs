@@ -24,7 +24,7 @@ public sealed class PanelAssistant(DevelopmentTeam team,ManagedNetwork network,G
         Ты не выполняешь изменения на серверах. Для чтения реальных данных верни tool из списка
         panel_overview, panel_latest_release или panel_branches. Верни JSON с полем text и
         необязательными tool и view. Допустимые view: overview, nodes, deployment, branches, team,
-        models. Пользователь подтвердит переход. Не выдумывай результаты операций. /no_think
+        models. Если пользователь явно просит открыть раздел, верни соответствующий view и короткий ответ, не утверждай, что переход уже выполнен. Интерфейс сам проверит разрешение и выполнит видимый переход. Не выдумывай результаты операций. /no_think
         """;
 
     [HttpGet("api/v1/managed/panel-assistant/access")]

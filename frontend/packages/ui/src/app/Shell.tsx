@@ -1,3 +1,4 @@
+import {InterfaceControl} from './InterfaceControl';
 import './panel-surface.css';
 import './cinematic.css';
 import {SharePage} from '../pages/SharePage';
@@ -198,7 +199,7 @@ function Workspace({logout}:{logout:()=>void}){
       <div className="node-label"><span className="node-icon"><ModeIcon size={18}/></span><div><strong>{modes[mode].name}</strong><small>{modes[mode].subtitle}</small></div></div>
       <nav aria-label="Главная навигация">{nav.map(section=><div className="nav-section" key={section.name}>
         <div className="nav-title">{section.name}</div>
-        {section.items.map(item=><NavLink key={item.to} to={item.to} aria-label={item.label} title={item.label} end={item.to==='/'} onClick={()=>setMobile(false)} className={({isActive})=>'nav-link '+(isActive?'active':'')}>
+        {section.items.map(item=><NavLink key={item.to} to={item.to} data-interface-path={item.to} aria-label={item.label} title={item.label} end={item.to==='/'} onClick={()=>setMobile(false)} className={({isActive})=>'nav-link '+(isActive?'active':'')}>
           <item.icon size={17}/><span>{item.label}</span>
         </NavLink>)}
       </div>)}</nav>
@@ -214,7 +215,7 @@ function Workspace({logout}:{logout:()=>void}){
         <span className="topbar-light" aria-hidden="true"><span className="topbar-sweep"/></span>
         <button ref={menuTrigger} type="button" className="icon-btn mobile-toggle" onClick={()=>setMobile(value=>!value)} aria-label="Открыть меню" aria-controls="workspace-navigation" aria-expanded={drawerOpen}><Menu size={22}/></button>
         <div className="breadcrumb"><span>{modes[mode].name}</span><ChevronRight size={14}/><strong>{current}</strong></div>
-        <div className="top-actions"><MaintenanceNotices enabled={mode==='orchestra'&&developer.value?.owner===true}/><ThemeToggle scope={preferenceScope}/><AccountMenu logout={logout}/><NotificationsFloat/></div>
+        <div className="top-actions"><InterfaceControl/><MaintenanceNotices enabled={mode==='orchestra'&&developer.value?.owner===true}/><ThemeToggle scope={preferenceScope}/><AccountMenu logout={logout}/><NotificationsFloat/></div>
       </header>
       <main className="content"><AnimatedArea><Routes>
         <Route path="/" element={mode==='orchestra'||mode==='global'||mode==='local'?<OrchestraOverview/>:mode==='audit'?<OrganizationRequests overview/>:<Overview/>}/>
