@@ -76,6 +76,8 @@ app.whenReady().then(()=>{
  }
  win.on('close',event=>{if(!quitReady){event.preventDefault();app.quit();}});
  win.webContents.setWindowOpenHandler(()=>({action:'deny'}));win.webContents.on('will-navigate',e=>e.preventDefault());win.loadFile(path.join(root,'dist','index.html'));
+ const updates=path.join(bundle,'desktop','desktop-updates.cjs');
+ if(fs.existsSync(updates))require(updates).startDesktopUpdates({app,dialog,root:bundle,product:'CloudDesk',window:()=>win});
 });app.on('window-all-closed',()=>app.quit());app.on('before-quit',event=>{
  if(quitReady)return;
  event.preventDefault();if(quitting)return;quitting=true;
