@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Http;
 using Models.Autorization.Data;
+using Models.Autorization.Configuration;
 using Models.Autorization.Domain.Entities;
 using Models.Autorization.Security;
 
@@ -49,7 +50,7 @@ public static class AuditRegistration
         }).AllowAnonymous();
 
         app.MapPost("/api/auth/audit/register", async (
-            Request input, AuthDbContext db, IPasswordHasher hasher, IConfiguration config, CancellationToken ct) =>
+            Request input, AuthDbContext db, IPasswordHasher hasher, IConfiguration config, AuthorizationOptions options, CancellationToken ct) =>
         {
             RegistrationDocuments? documents = null;
             if (config.GetValue<bool>("AuditRegistration:RequireDocuments"))
@@ -62,9 +63,10 @@ public static class AuditRegistration
             }
 
             var login=(input.Login??"").Trim();var nickname=(input.Nickname??"").Trim();
-            if(!System.Text.RegularExpressions.Regex.IsMatch(login,"^[a-zA-Z0-9_.-]{4,40}$") ||
-               (input.Password??"").Length is <12 or >128 || nickname.Length is <2 or >60)
-                return Results.BadRequest(new {error="Логин 4–40 символов; пароль минимум 12; никнейм 2–60."});
+            if(!CredentialPolicy.ValidLogin(login) || nickname.Length is <2 or >60)
+                return Results.BadRequest(new {error="login_or_nickname_format"});
+            if(CredentialPolicy.PasswordError(input.Password,login,options.PasswordPolicy) is { } error)
+                return Results.BadRequest(new {error});
             if(await db.Users.AnyAsync(x=>x.Login==login,ct))return Results.Conflict(new {error="Логин уже занят."});
             // Пользователь без административных ролей. Привилегии Auth/Global не выдаются автоматически.
             var user = new User{Id=Guid.NewGuid(),Login=login,Nickname=nickname,
