@@ -5,7 +5,7 @@ import './project-console.css';
 import {useApp,useRemote} from '../app/context';
 import {Header,Panel,ErrorBanner} from '../components/primitives';
 import {useNotice} from '../app/notifications';
-import {targetLabel,useServerUpdate,type UpdateState,type UpdateTarget as Target} from '../app/serverUpdate';
+import {ServiceMaintenance} from './ServiceMaintenance';
 
 type Release={tag:string;publishedAt?:string;prerelease?:boolean};
 type PublishedRelease=Release&{name:string;publishedAt:string;url:string;notes:string;installable:boolean};
