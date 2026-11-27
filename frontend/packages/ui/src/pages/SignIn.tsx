@@ -82,7 +82,7 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
      <div className="auth-field">
       <label htmlFor="auth-password">{t("Пароль")}</label>
       <div className="auth-control auth-password"><KeyRound size={17} aria-hidden="true"/>
-       <input id="auth-password" name="password" type={reveal?t("text"):'password'} value={password} onChange={e=>setPassword(e.target.value)} required minLength={register?12:1} autoComplete={register?t("new-password"):'current-password'} aria-describedby={register?t("auth-password-hint"):undefined}/>
+       <input id="auth-password" name="password" type={reveal?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} required minLength={register?12:1} autoComplete={register?'new-password':'current-password'} aria-describedby={register?'auth-password-hint':undefined}/>
        <button className="icon-btn" type="button" aria-label={reveal?t("Скрыть пароль"):t("Показать пароль")} onClick={()=>setReveal(value=>!value)}>{reveal?<EyeOff size={17}/>:<Eye size={17}/>}</button>
       </div>
       {register&&<small id="auth-password-hint">{t("Минимум 12 символов")}</small>}
@@ -90,7 +90,7 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
      {register&&policy&&<div className="registration-documents">
        <label><input type="checkbox" checked={acceptance===policyKey} required
           onChange={event=>setAcceptance(event.target.checked?policyKey:'')}/>
-        <span>{t("Принимаю")}<a href={policy.terms.url} target="_blank" rel="noreferrer">{t("условия использования")}</a>.</span>
+        <span>{t("Принимаю")} <a href={policy.terms.url} target="_blank" rel="noreferrer">{t("условия использования")}</a>.</span>
        </label>
        <a href={policy.privacy.url} target="_blank" rel="noreferrer">{t("Как обрабатываются данные")}</a>
      </div>}
