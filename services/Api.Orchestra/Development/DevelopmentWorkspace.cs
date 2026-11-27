@@ -35,10 +35,16 @@ public sealed class DevelopmentWorkspace(NodeState state,WorkspaceGitHubClient g
     public async Task<WorkspaceItem> Create(Guid actor,CreateInput input,CancellationToken ct)
     {
         if(input.Kind is not ("issue" or "discussion")||string.IsNullOrWhiteSpace(input.Title)||input.Title.Length>200||input.Body is null||input.Body.Length>16000)throw new ArgumentException("Invalid title, kind or body");
-        var item=new WorkspaceItem{Id=Guid.NewGuid(),Creator=actor,Kind=input.Kind,Title=input.Title.Trim(),Body=input.Body,UpdatedAt=DateTimeOffset.UtcNow};
-        await state.Data.PutAsync(item,ct);
-        state.Log(actor.ToString(),"workspace.create",item.Id.ToString(),true);
-        return item;
+        await gate.WaitAsync(ct);
+        try
+        {
+            if((await All(ct)).Length>=5000)throw new InvalidOperationException("Workspace capacity reached");
+            var item=new WorkspaceItem{Id=Guid.NewGuid(),Creator=actor,Kind=input.Kind,Title=input.Title.Trim(),Body=input.Body,UpdatedAt=DateTimeOffset.UtcNow};
+            await state.Data.PutAsync(item,ct);
+            state.Log(actor.ToString(),"workspace.create",item.Id.ToString(),true);
+            return item;
+        }
+        finally{gate.Release();}
     }
     public async Task<WorkspaceItem> Change(Guid id,Guid actor,bool owner,string action,CancellationToken ct)
     {
@@ -145,9 +151,9 @@ public sealed class DevelopmentWorkspace(NodeState state,WorkspaceGitHubClient g
     private async Task Import(List<WorkspaceItem> rows,string kind,int number,string? remoteId,string title,string body,bool closed,CancellationToken ct,string[]? assignees=null)
     {
         var item=rows.FirstOrDefault(x=>x.Kind==kind&&x.GitHubNumber==number);
-        // Reconcile an interrupted publish using its explicit local correlation marker.
-        if(item is null)item=rows.FirstOrDefault(x=>x.Kind==kind&&x.SyncState=="publishing"&&body.Contains("<!-- mysticego-workspace:"+x.Id.ToString("D")+" -->",StringComparison.Ordinal));
-        if(item is null){item=new WorkspaceItem{Id=Guid.NewGuid(),Kind=kind};rows.Add(item);}
+        // Correlation markers are untrusted GitHub content. Interrupted publications need manual reconciliation; never link an internal record based on a marker alone.
+        if(item is null){if(rows.Count>=5000)throw new InvalidOperationException("Workspace capacity reached");item=new WorkspaceItem{Id=Guid.NewGuid(),Kind=kind};rows.Add(item);}
+        title=title[..Math.Min(title.Length,200)];body=body[..Math.Min(body.Length,16000)];
         assignees??=[];
         var status=closed?"closed":assignees.Length>0?"in-progress":"open";
         if(item.SyncState=="synced"&&item.Title==title&&item.Body==body&&item.Status==status&&item.RemoteAssignees.SequenceEqual(assignees))return;
