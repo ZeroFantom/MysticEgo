@@ -1,3 +1,4 @@
+import interfaceMcp from '../interface-mcp.cjs';
 import {app,BrowserWindow,WebContentsView,dialog,ipcMain,Menu,shell} from 'electron';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {execFile} from 'node:child_process';
@@ -464,6 +465,7 @@ async function open(){
   handle('finish-record',async()=>{await authorized();if(recording){recording.child.stdin.end('\n');await recording.done;return 'Запись завершена.'}});
   handle('folder',async()=>{await authorized();const result=await shell.openPath(current()?path.join(home,current().id):home);if(result)throw Error(result)});
   await window.loadFile(layout);
+  interfaceMcp.installInterfaceMcp(window,product);
   void followClub();
 }
 if(!app.requestSingleInstanceLock())app.quit();

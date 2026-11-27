@@ -1,3 +1,4 @@
+import interfaceMcp from '../interface-mcp.cjs';
 import {app,BrowserWindow,ipcMain,shell} from 'electron';
 import {launch,json} from '../control/center.mjs';
 import {getDotnet} from '../launch-runtime.mjs';
@@ -118,6 +119,7 @@ async function open(){
     void stop().finally(()=>window.close());
   });
   await window.loadURL(view);
+  interfaceMcp.installInterfaceMcp(window,'LocalDesktop');
   if(!await health())start();
 }
 if(!app.requestSingleInstanceLock())app.quit();
