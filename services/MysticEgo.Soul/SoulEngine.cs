@@ -76,7 +76,19 @@ public sealed class SoulEngine(IConfiguration cfg) : ISoulService
     public async Task<SoulRecord?> Get(string user,CancellationToken ct)
     {
         var file=FileFor(user);if(!File.Exists(file))return null;
-        try{return JsonSerializer.Deserialize<SoulRecord>(await File.ReadAllTextAsync(file,ct),_json);}catch(JsonException){return null;}
+        var record=JsonSerializer.Deserialize<SoulRecord>(await File.ReadAllTextAsync(file,ct),_json)
+            ??throw new InvalidDataException("Existing soul record is empty.");
+        if(record.UserId!=user||string.IsNullOrWhiteSpace(record.SoulId)||record.Created==default)
+            throw new InvalidDataException("Existing soul record identity is invalid.");
+        // Older additive JSON schemas may omit collections. Preserve existing values and never
+        // interpret damaged/unreadable JSON as a new account.
+        return record with {
+            Stats=record.Stats??GameProgress.InitialAttributes(),
+            SelfReport=record.SelfReport??new(),
+            Memories=record.Memories??[],
+            Attempts=record.Attempts??new(),
+            Knowledge=record.Knowledge??[]
+        };
     }
     async Task Save(SoulRecord record,CancellationToken ct)
     {
