@@ -20,6 +20,21 @@
 
 ---
 
+## Состояние проекта
+
+MysticEgo развивается в рамках BETA7. [GitHub Releases](https://github.com/ZeroFantom/MysticEgo/releases) — источник опубликованных установщиков и контрольных сумм; [Actions](https://github.com/ZeroFantom/MysticEgo/actions) — результаты проверок исходного кода. Наличие кода в репозитории не означает, что он уже развёрнут на сервере или доступен в выпущенном установщике.
+
+| Направление | Состояние исходного кода |
+| :--- | :--- |
+| Профиль, уведомления, обслуживание Orchestra | Исправления в main: #84, #85 |
+| Автоматическое скачивание и установка Desktop, новости релизов | main: #86, #87; требуется новый релиз для использования на установленных клиентах |
+| Видимая навигация MCP | main: #71; ограниченное по времени локальное согласие |
+| Capacity, защищённые браузерные сессии и резервный сервер | main: #75; экспериментальные компоненты, HA не завершена |
+| Пространство разработчиков и GitHub | main: #77, #76; выбор категории обсуждения, восстановление публикации |
+| Нативная автоматизация, VRM handoff, локализация и разрешения аккаунта | Экспериментальная реализация: [#72](https://github.com/ZeroFantom/MysticEgo/pull/72); фактический статус слияния и CI — в PR |
+
+[Дорожная карта и ограничения](docs/development-roadmap.md) · [Подготовленные изменения R3.2.40](docs/releases/beta7-r3.2.40.md)
+
 ## Возможности
 
 MysticEgo — развиваемая платформа с доступным исходным кодом для распределённых рабочих станций и персональной автоматизации. Она связывает центральную панель, организации, площадки и компьютеры, позволяя наблюдать за их состоянием, обновлять компоненты и выполнять разрешённые операции. Следующее направление — единый персональный ИИ-ассистент, который работает в веб-панели и на рабочем столе, разговаривает через VRM-аватар и помогает пользователю выполнять задачи.
@@ -35,7 +50,7 @@ MysticEgo — развиваемая платформа с доступным и
 
 ## Интерактивный ассистент и Computer Use
 
-> Экспериментальная ветка: [PR #72](https://github.com/ZeroFantom/MysticEgo/pull/72). Описанные ниже новые компоненты находятся на этапе разработки и проверки, не являются обещанием возможностей опубликованных релизов.
+> Экспериментальная реализация: [PR #72](https://github.com/ZeroFantom/MysticEgo/pull/72). Состояние CI и слияния указано в PR. Нативные функции требуют испытаний на реальных устройствах и не являются обещанием возможностей опубликованных релизов.
 
 | Направление | Состояние |
 | :--- | :--- |
@@ -49,7 +64,7 @@ MysticEgo — развиваемая платформа с доступным и
 
 **Цель — «вторые руки» пользователя:** ассистент выполняет параллельные задачи в выделенном окне или через API, не перехватывая физический ввод. Независимый курсор, полноценная нативная маршрутизация, двусторонний бесшовный VRM-переход, фонемный липсинк, нейросетевая генерация произвольных моделей, автоматические обновления OEM-драйверов и изменение аппаратного DPI пока не завершены.
 
-Браузерные Agent/Audit и их настольные версии — два интерфейса одного локального узла. Нативные операции требуют локального исполнителя, авторизации и явного разрешения. Поддерживаемые графические сессии нового интерактивного режима — Windows и Linux X11, приоритет KDE Plasma. Wayland и XWayland не поддерживаются. Серверное развёртывание без графической среды этим ограничением не затрагивается.
+Браузерные Agent/Audit и их настольные версии — два интерфейса одного локального узла. Нативные операции требуют локального исполнителя, авторизации и явного разрешения. Поддерживаемые графические сессии нативного исполнителя — Windows и Linux X11, приоритет KDE Plasma. Wayland и XWayland не поддерживаются именно нативным исполнителем. Обычный запуск Desktop, проверка обновлений и headless-сервисы этим ограничением не затрагиваются.
 
 [UI Automation и MCP](tools/MysticEgo.UiAutomation/README.md) · [Контракт Agent/Audit](docs/agent-audit-computer-control.md) · [Передача VRM](docs/local-desktop-handoff.md)
 
@@ -123,6 +138,12 @@ flowchart TD
     G --> L["Local · площадка"]
     L --> A["Agent · рабочая станция"]
     O --> U["Audit · личное пространство"]
+    Auth["Auth · аккаунты и токены"] -.-> O
+    Auth -.-> G
+    Auth -.-> L
+    Auth -.-> A
+    Auth -.-> U
+    C["Capacity · независимый анализатор"] -.-> O
     classDef central fill:#332451,stroke:#ad91ff,color:#fff
     classDef node fill:#202139,stroke:#8f7ac9,color:#fff
     class O central
@@ -137,6 +158,8 @@ flowchart TD
 | **Agent** | Регистрация станции, диагностика и разрешённые действия |
 | **Audit** | Личный профиль и подключение к организациям |
 | **Auth** | Учётные записи, токены и управление доступом |
+| **Capacity** | Экспериментальный сбор и анализ ресурсов, без автоматических покупок серверов |
+| **CloudDesk** | Локальный центр развёртывания, диагностики и обслуживания инфраструктуры |
 
 Auth обеспечивает управление доступом; схема показывает логическую иерархию узлов, а не все сетевые соединения.
 
@@ -170,7 +193,24 @@ Auth обеспечивает управление доступом; схема 
 | LocalDesktop | Управление площадкой | EXE | RUN |
 | CloudDesk | Локальный центр Auth/Orchestra и управление облаком | EXE | RUN |
 
-[Установка и системные зависимости](ops/desktop-releases/README.md). Для новых AgentDesktop/AuditDesktop из экспериментальной ветки требуется Windows или полноценная X11-сессия Linux. На KDE выбирайте Plasma (X11) при входе.
+[Установка и системные зависимости](ops/desktop-releases/README.md). Для экспериментального нативного управления на Linux нужна полноценная X11-сессия; на KDE выбирайте Plasma (X11) при входе.
+
+### Обновления
+
+Новая система обновлений проверяет публичные релизы без входа в аккаунт, скачивает установщик точного продукта и платформы, проверяет размер и SHA-256. Для перехода со старых сборок потребуется один раз установить релиз с поддержкой updater.
+
+| Приложение | Установка обновления | Изменения |
+| :--- | :--- | :--- |
+| Agent Desktop | Автоматически, без диалога MysticEgo | Карточка после перезапуска |
+| Local Desktop | Автоматически, без диалога MysticEgo | Карточка после перезапуска |
+| Audit Desktop | С подтверждением | До установки и после перезапуска |
+| CloudDesk | С подтверждением | До установки |
+
+Обновление Agent/Local откладывает перезапуск во время отслеживаемых критических операций. Обязательные системные разрешения не обходятся. Все пять веб-панелей отображают изменения фактической сборки; открытая вкладка предлагает перезагрузку при смене версии. Orchestra поддерживает проверенную принудительную переустановку и цикл предыдущая → текущая → следующая версия; база данных автоматически не откатывается.
+
+### Хранение и безопасность
+
+SQLite по умолчанию. Для новых узлов доступен PostgreSQL: локальный, удалённый или Docker. [Настройка и ограничения миграции](ops/infrastructure/README.md#sqlite-и-postgresql). [Политика учётных данных](docs/credential-security.md) · [Защита от перегрузки](docs/traffic-protection.md) · [Capacity и отказоустойчивость](docs/capacity-resilience.md) · [План HA](ops/security/orchestra-ha.md).
 
 **Как подключить площадку:** создайте её в Global, получите конфигурацию через LocalDesktop, затем выпустите приглашение в панели Local. AgentDesktop получает профиль станции по сети площадки. Для личного использования можно начать с AuditDesktop.
 
@@ -202,7 +242,27 @@ Vite запускает интерфейс; для входа потребует
 ```bash
 npm run test:appearance --prefix frontend
 npm run test:social --prefix frontend
+npm run test:monitoring --prefix frontend
 ```
+
+Браузерные регрессии после сборки:
+
+```bash
+npm ci --prefix frontend/visual
+npx --prefix frontend/visual playwright install chromium
+npm test --prefix frontend/visual
+```
+
+Проверки UI executor и API:
+
+```bash
+npm install --prefix tools/MysticEgo.UiAutomation
+npm test --prefix tools/MysticEgo.UiAutomation
+dotnet run --project tests/ApiArchitectureSmoke/ApiArchitectureSmoke.csproj
+dotnet run --project tests/AuthSmoke/AuthSmoke.csproj
+```
+
+Тесты используют изолированные fixtures; реальные устройства, серверы и GitHub-операции требуют отдельного staging-тестирования.
 
 [GitHub Actions](https://github.com/ZeroFantom/MysticEgo/actions) · [Как внести изменения](CONTRIBUTING.md)
 
@@ -212,7 +272,7 @@ npm run test:social --prefix frontend
 
 [Состояние разработки и дорожная карта](docs/development-roadmap.md) · [Development Workspace и GitHub](docs/development-workspace.md) · [Безопасность учётных данных](docs/credential-security.md)
 
-Экспериментальные возможности отмечены отдельно от изменений, влитых в main.
+Экспериментальные возможности отмечены отдельно от опубликованных релизов; актуальное состояние слияния смотрите в PR и Actions.
 
 | Раздел | Руководство |
 | :--- | :--- |
@@ -227,7 +287,9 @@ npm run test:social --prefix frontend
 | Системная автоматизация | [Agent / Audit](docs/agent-audit-computer-control.md) |
 | Переход VRM между средами | [Local Desktop Handoff](docs/local-desktop-handoff.md) |
 | Развёртывание | [Инфраструктура](ops/infrastructure/README.md) |
-| Обновления | [Orchestra Updater](ops/orchestra-updater/README.md) |
+| Обновления | [Orchestra Updater](ops/orchestra-updater/README.md) · [Desktop installers](ops/desktop-releases/README.md) |
+| Capacity и HA | [Capacity resilience](docs/capacity-resilience.md) · [HA gates](ops/security/orchestra-ha.md) |
+| Developer Workspace | [GitHub и локальные задачи](docs/development-workspace.md) |
 | История эксплуатации | [Operations notes](docs/operations-notes.md) |
 
 ## О студии
@@ -262,16 +324,3 @@ MysticEgo — независимая студия программного об�
 [Сайт](https://orchestra.isdarkline.ru/studio) · [Релизы](https://github.com/ZeroFantom/MysticEgo/releases) · [Задачи и обсуждения](https://github.com/ZeroFantom/MysticEgo/issues)
 
 </div>
-
-
-### Хранение данных
-
-SQLite по умолчанию. Для новых узлов — PostgreSQL, локальный или удалённый, обычная установка или Docker. [Настройка и ограничения миграции](ops/infrastructure/README.md#sqlite-и-postgresql).
-
-### Traffic protection
-
-[Защита от перегрузки и DDoS: HTTP admission, прокси, ограничения и развёртывание](docs/traffic-protection.md).
-
-### Capacity & resilience (experimental)
-
-[Capacity analyzer, independent collector, browser sessions and safe standby activation](docs/capacity-resilience.md) · [Orchestra high availability rollout gates](ops/security/orchestra-ha.md).
