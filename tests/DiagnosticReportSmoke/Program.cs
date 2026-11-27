@@ -38,4 +38,6 @@ Check(RuntimeSelfTests.Evaluate("available",time,time.AddMinutes(5),TimeSpan.Fro
 Check(RuntimeSelfTests.Evaluate("disabled",time,time,TimeSpan.FromSeconds(30))=="skip","Disabled optional service not failure");
 Check(RuntimeSelfTests.Evaluate("degraded",time,time,TimeSpan.FromSeconds(30))=="fail","Fresh failure");
 Check(ServiceLoadMonitor.KnownUnit("mysticego-lmstudio.service")&&!ServiceLoadMonitor.KnownUnit("../../etc/passwd"),"Fixed unit allowlist");
+Check(ServiceLoadMonitor.ParseSystemdTime("Thu 2026-01-01 00:00:00 UTC")==time,"Systemd timestamp parsing");
+Check(ServiceLoadMonitor.ParseSystemdTime("n/a")==null,"Missing accounting time remains unknown");
 Console.WriteLine("PASS: JSON, TXT, XLSX, formula safety and bounded check history");
