@@ -2,7 +2,6 @@ import {useId,useState} from 'react';
 import {Activity,Cpu,HardDrive,MemoryStick,Network} from 'lucide-react';
 import {useApp,useRemote} from '../app/context';
 import {Header,Panel,Badge,ErrorBanner} from '../components/primitives';
-import {InfrastructureSetup} from './InfrastructureSetup';
 import './monitoring.css';
 import {chartGeometry,smoothEdges,gapPath,isMeasurement as valid,type SamplePoint as Point} from './telemetryGeometry';
 
@@ -110,7 +109,6 @@ export function Diagnostics(){
         </tbody></table></div>
         {!data.value?.links.length&&<p className="footnote">{data.error?'Не удалось получить состояние связей.':data.loading?'Загружаем связи…':'Замеры появятся после подключения узлов.'}</p>}
       </Panel>
-      <InfrastructureSetup/>
     </>}
     {mode!=='orchestra'&&<Panel title="Подключения">{!basic.value?.length&&<p className="monitor-empty">{basic.error?'Данные недоступны':basic.loading?'Проверяем подключения…':'Нет зарегистрированных подключений'}</p>}{basic.value?.map(link=><div className="line" key={link.name}>
       <div className="grow"><strong>{link.name}</strong><small>{link.url}</small></div><Badge ok={link.reachable} text={link.reachable?format(link.ms)+' мс':'Недоступно'}/>

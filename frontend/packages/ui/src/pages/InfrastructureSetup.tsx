@@ -1,7 +1,6 @@
 import {useState,type FormEvent} from 'react';
 import {useApp,useRemote} from '../app/context';
 import {Panel,ErrorBanner} from '../components/primitives';
-import {MaintenanceStatus} from './MaintenanceStatus';
 
 type Setup={
   targets:string[];
@@ -14,14 +13,15 @@ const items=[
   ['postgres','PostgreSQL · Docker'],['postgres-native','PostgreSQL · обычная установка'],['prepare-postgres','Подготовить подключение новой панели к PostgreSQL'],['auth-postgres','Подключить Auth к PostgreSQL'],
 ] as const;
 
-export function InfrastructureSetup({initial='monitoring'}:{initial?:string}){
+export function InfrastructureSetup({initial='monitoring',allowed,title='Развёртывание'}:{initial?:string;allowed?:readonly string[];title?:string}){
+  const options=items.filter(([id])=>!allowed||allowed.includes(id));
   const {api}=useApp();
   const endpoint='/managed/infrastructure-setup';
   const state=useRemote(()=>api.request<Setup>(endpoint),[api],4000);
   const [component,setComponent]=useState(initial),[target,setTarget]=useState('');
   const [url,setUrl]=useState(''),[secret,setSecret]=useState('');
   const [bind,setBind]=useState('127.0.0.1'),[cidr,setCidr]=useState('127.0.0.1/32');
-  const [role,setRole]=useState('panel-data'),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  const [role,setRole]=useState(initial==='prepare-postgres'?'orchestra':'panel-data'),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const needsSecret=component==='metrics-source'||component==='auth-postgres'||component==='monitoring'&&!!url.trim();
   const showSecret=needsSecret||['postgres','postgres-native','prepare-postgres'].includes(component);
   const candidates=[...(state.value?.localAvailable&&['monitoring','docker','lmstudio','postgres','postgres-native'].includes(component)?['@local']:[]),...(state.value?.targets??[])];
@@ -46,10 +46,10 @@ export function InfrastructureSetup({initial='monitoring'}:{initial?:string}){
     <p>Развёртывание доступно главному разработчику.</p><ErrorBanner text={state.error}/>
   </Panel>:null;
 
-  return <><MaintenanceStatus/><Panel title="Развёртывание инфраструктуры">
+  return <Panel title={title}>
     <form className="stack" onSubmit={install}>
       <label>Компонент<select value={component} onChange={e=>{setComponent(e.target.value);setSecret('');setUrl('');setRole(e.target.value==='prepare-postgres'?'orchestra':'panel-data')}}>
-        {items.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label>
+        {options.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label>
       <label>Сервер<select value={selected} onChange={e=>setTarget(e.target.value)} disabled={!candidates.length}>
         {!candidates.length&&<option value="">Нет доступного сервера</option>}
         {candidates.map(host=><option key={host} value={host}>{targetName(host)}</option>)}</select></label>
@@ -75,10 +75,10 @@ export function InfrastructureSetup({initial='monitoring'}:{initial?:string}){
       </label>}
       <button className="btn" disabled={!selected||busy||state.loading||state.value.run?.status==='running'}>Подтвердить установку</button>
     </form>
-    {state.value.run&&<div role="status"><p>{state.value.run.target} · {{
+    {state.value.run&&(!allowed||allowed.includes(state.value.run.component))&&<div role="status"><p>{state.value.run.target} · {{
       running:'Установка выполняется',done:'Установлено',failed:'Ошибка установки',
     }[state.value.run.status]}</p><pre className="output">{state.value.run.message}</pre></div>}
     <ErrorBanner text={error||state.error}/>
-  </Panel></>;
+  </Panel>;
 }
 
