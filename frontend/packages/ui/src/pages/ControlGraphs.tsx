@@ -11,8 +11,8 @@ type Plan={components:{name:string;state:string;checkedAt:string}[];services:{un
 type Graph={nodes:GraphNode[];edges:GraphEdge[]};
 const fresh=(at?:string,seconds=30)=>!!at&&Number.isFinite(Date.parse(at))&&Date.now()-Date.parse(at)<=seconds*1000&&Date.parse(at)<=Date.now()+5000;
 const remoteState=(row:NodeStatus)=>!row.node.enabled?'disabled':fresh(row.report?.seen)?online(row)?'online':'offline':'pending';
-function hostGraph(root:string,rootName:string,rows:NodeStatus[]):Graph{
- const nodes:GraphNode[]=[{id:root,title:rootName,subtitle:'Orchestra · центральный узел',state:'online',x:24,y:36}],edges:GraphEdge[]=[];
+function hostGraph(root:string,rootName:string,rows:NodeStatus[],reachable:boolean):Graph{
+ const nodes:GraphNode[]=[{id:root,title:rootName,subtitle:'Orchestra · зарегистрированный центр',state:reachable?'online':'pending',x:24,y:36}],edges:GraphEdge[]=[];
  // The station registry proves central reports; registered parent links are configured, not observed traffic.
  const unique=rows.filter(r=>r.node.id!==root).slice(0,100);
  const visible=new Set([root,...unique.map(r=>r.node.id)]);
@@ -69,7 +69,7 @@ export function ControlGraphs({kind}:{kind:'macro'|'micro'}){
  const plan=useRemote(()=>kind==='micro'?api.request<Plan>('/orchestra/update/plan'):Promise.resolve(null),[api,kind],5000,true);
  const [zoom,setZoom]=usePanelPreference('control.'+kind+'.zoom',100,(v):v is number=>typeof v==='number'&&v>=50&&v<=160);
  const [selected,setSelected]=useState('');
- const graph=useMemo(()=>context.value&&topology.value?kind==='macro'?hostGraph(context.value.rootId,context.value.rootName,topology.error?topology.value.map(r=>({...r,report:undefined})):topology.value):microGraph(context.value.rootId,topology.error?topology.value.map(r=>({...r,report:undefined})):topology.value,plan.error?null:plan.value):null,[kind,context.value,topology.value,topology.error,plan.value,plan.error]);
+ const graph=useMemo(()=>context.value&&topology.value?kind==='macro'?hostGraph(context.value.rootId,context.value.rootName,topology.error?topology.value.map(r=>({...r,report:undefined})):topology.value,!topology.error):microGraph(context.value.rootId,topology.error?topology.value.map(r=>({...r,report:undefined})):topology.value,plan.error?null:plan.value):null,[kind,context.value,topology.value,topology.error,plan.value,plan.error]);
  const node=graph?.nodes.find(n=>n.id===selected);
  return <div className="control-graph-page"><Header title={kind==='macro'?'Макро контрольный граф':'Микро контрольный граф'} description={kind==='macro'?'Связи зарегистрированных серверов и актуальные отчёты связи':'Службы Orchestra, веб-панели и подключённые удалённые API на одной схеме'}/>
  <nav className="control-graph-nav"><NavLink className="btn secondary" to="/infrastructure/graphs/macro">Макро</NavLink><NavLink className="btn secondary" to="/infrastructure/graphs/micro">Микро</NavLink><Link className="btn secondary" to="/nodes">Бизнес-логика</Link><Link className="btn secondary" to="/infrastructure/services">Службы и нагрузка</Link></nav>
