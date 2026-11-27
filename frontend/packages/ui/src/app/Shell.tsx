@@ -3,6 +3,7 @@ import './cinematic.css';
 import {SharePage} from '../pages/SharePage';
 import {ServerUpdateProvider,useServerUpdate} from './serverUpdate';
 import {BrowserPreferences} from './BrowserPreferences';
+import {ReleaseHighlights} from './ReleaseHighlights';
 import {CloudDeskDownloads,PublicDesktopDownloads} from '../pages/DesktopDownloads';
 import {NoticeBell,NotificationProvider,useNotice} from './notifications';
 import {MaintenanceNotices} from '../pages/MaintenanceStatus';
@@ -260,7 +261,7 @@ function Workspace({logout}:{logout:()=>void}){
 export function MysticApp(props:{mode:NodeMode;title:string;defaultApi:string}){
  const path=location.pathname.replace(/\/$/,'');
  const publicPage=path==='/share'||path==='/audit-portal/share'||props.mode==='orchestra'&&['/studio','/developer','/desktop-downloads'].includes(path);
- return <BrowserPreferences publicPage={publicPage}><MysticAppContent {...props}/></BrowserPreferences>;
+ return <BrowserPreferences publicPage={publicPage}><MysticAppContent {...props}/>{!publicPage&&<ReleaseHighlights mode={props.mode} portal={path==='/audit-portal'||path.startsWith('/audit-portal/')}/>}</BrowserPreferences>;
 }
 function MysticAppContent({mode,defaultApi}:{mode:NodeMode;title:string;defaultApi:string}){
   const runtime=window.__MYSTIC_CONFIG__??{};
