@@ -36,11 +36,12 @@ public static class TrafficProtection
     {
         if(path.StartsWithSegments("/hub")) return "hub";
         if(path.StartsWithSegments("/api/auth/desktop") ||
+           path.StartsWithSegments("/api/auth/browser") ||
            path.Equals("/api/auth/login",StringComparison.OrdinalIgnoreCase) ||
            path.Equals("/api/auth/audit/register",StringComparison.OrdinalIgnoreCase) ||
            path.StartsWithSegments("/api/users") && path.Value!.EndsWith("/password",StringComparison.OrdinalIgnoreCase))
             return "sensitive";
-        if(path.StartsWithSegments("/mcp") || path.StartsWithSegments("/api/v1/assistant") ||
+        if(path.StartsWithSegments("/mcp") || path.StartsWithSegments("/api/v1/orchestra/capacity/mcp") || path.StartsWithSegments("/api/v1/assistant") ||
            path.StartsWithSegments("/api/v1/managed/panel-assistant") ||
            path.StartsWithSegments("/api/v1/managed/ui-automation") ||
            path.StartsWithSegments("/api/v1/world-ai") || path.StartsWithSegments("/api/v1/avatars") ||

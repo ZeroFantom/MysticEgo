@@ -42,6 +42,7 @@ const token='fixture.'+Buffer.from(JSON.stringify({sub:'visual-user'})).toString
 function apiResponse(path,origin){
   if(path==='/api/auth/login'||path==='/api/auth/refresh')return {accessToken:token,refreshToken:'fixture-only',user:{login:'visual-user'},expiresAt:new Date(Date.now()+3600000).toISOString()};
   const routes={
+    '/api/auth/presentation':{language:'ru',font:'modern'},'/api/auth/sessions/current':{active:true},
     '/api/v1/collective/me':profile,'/api/v1/collective/notifications':[],'/api/v1/collective/shard/quests':[],
     '/api/v1/collective/contacts':[contact],'/api/v1/collective/messages/visual-peer':messages,
     '/api/v1/managed/context':{rootId:'root',rootName:'Оркестр',orchestraUrl:origin,authUrl:origin,developer:false,owner:false,actor:'visual-user',lan:false},
@@ -141,7 +142,7 @@ try{
     try{
       for(const viewport of sizes){
         const context=await browser.newContext({viewport,locale:'ru-RU',timezoneId:'UTC',colorScheme:'dark',reducedMotion:'reduce'});
-        await context.addInitScript(()=>{Object.defineProperty(navigator,'userAgentData',{configurable:true,value:{brands:[{brand:'Google Chrome',version:'140'}]}})});
+        await context.addInitScript(()=>{localStorage.setItem('mysticego.guest.presentation',JSON.stringify({language:'ru',font:'modern'}));Object.defineProperty(navigator,'userAgentData',{configurable:true,value:{brands:[{brand:'Google Chrome',version:'140'}]}})});
         const page=await context.newPage();page.setDefaultTimeout(8000);
         const errors=[];page.on('pageerror',e=>errors.push(String(e)));
         const prefix=role+'-'+viewport.width;

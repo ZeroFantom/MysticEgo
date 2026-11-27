@@ -11,4 +11,5 @@
     <Compile Include="../../shared/LocalModels.cs" Link="Deployment/LocalModels.cs"/>
     <Compile Include="../../shared/LocalModelChat.cs" Link="Deployment/LocalModelChat.cs"/>
   </ItemGroup>
+  <ItemGroup><ProjectReference Include="../MysticEgo.Capacity/MysticEgo.Capacity.csproj"/></ItemGroup>
 </Project>

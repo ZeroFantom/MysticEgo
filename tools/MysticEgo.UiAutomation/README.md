@@ -93,7 +93,7 @@ Save/remove require interactive confirmation. MCP clients have read-only access 
 
 ## Поддерживаемые графические среды / Desktop settings
 
-AgentDesktop, AuditDesktop and the UI executor accept Windows or an explicit Linux X11 session only. XWayland is not X11 for this purpose. On Linux the session must report XDG_SESSION_TYPE=x11 and DISPLAY. Select Plasma (X11) at login; no Wayland fallback. This restriction is for interactive desktop apps, not headless infrastructure services.
+The native UI executor accepts Windows or an explicit Linux X11 session only; AgentDesktop and AuditDesktop launchers retain their normal supported environments, including update access. XWayland is not X11 for this purpose. On Linux the session must report XDG_SESSION_TYPE=x11 and DISPLAY. Select Plasma (X11) at login; no Wayland fallback. This restriction is for interactive desktop apps, not headless infrastructure services.
 
 Optional local executor configuration (example):
 ```json

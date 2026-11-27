@@ -112,7 +112,7 @@ async function readAuth(){
       actor={...previous,token:data.accessToken,refreshToken:data.refreshToken,expiration:Date.parse(data.expiresAt)};
       return actor;
     };
-    refreshing=refreshing().catch(()=>{if(generation===accountGeneration)void clearRevokedAccount(generation);return actor}).finally(()=>{refreshing=null});
+    refreshing=refreshing().catch(async error=>{if(generation===accountGeneration&&[401,403].includes(error.status))await clearRevokedAccount(generation);return actor&&Date.now()<actor.expiration?actor:null}).finally(()=>{refreshing=null});
   }
   return refreshing;
 }
@@ -601,7 +601,7 @@ else{
   app.whenReady().then(async()=>{
     // Keep the launcher and updates available on all supported desktop environments.
     // The separate native executor enforces its own Windows/X11 restriction.
-    await open();updater.startDesktopUpdates({app,dialog,root,product,window:()=>window,canRestart:()=>!closing&&!recording&&!savingInvitation&&!discovering&&!openingAudit})}).catch(error=>{dialog.showErrorBox(product,error.message);app.quit()});
+    await open();updater.startDesktopUpdates({app,dialog,root,product,window:()=>window,canRestart:()=>!closing&&!recording&&!savingInvitation&&!discovering&&!openingAudit&&!handoffBusy&&!checkingAccount})}).catch(error=>{dialog.showErrorBox(product,error.message);app.quit()});
   app.on('window-all-closed',()=>app.quit());
 }
 

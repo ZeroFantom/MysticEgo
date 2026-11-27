@@ -91,7 +91,53 @@ public sealed class DevelopmentWorkspace(NodeState state,WorkspaceGitHubClient g
         item.RemoteAssignees=assigned;item.Assignee=null;item.UpdatedAt=DateTimeOffset.UtcNow;
         await state.Data.PutAsync(item,ct);state.Log(actor.ToString(),"workspace.remote."+action,item.Id.ToString(),true);return item;
     }
-    public async Task<WorkspaceItem> Publish(Guid id,Guid actor,bool owner,CancellationToken ct)
+    public sealed record DiscussionCategory(string Id,string Name);
+    private async Task<(string Repository,DiscussionCategory[] Categories)> CategoryData(CancellationToken ct)
+    {
+        var data=await github.Graph("query { repository(owner:\"ZeroFantom\",name:\"MysticEgo\"){ id discussionCategories(first:50){nodes{id name}} } }",new{},false,ct);
+        var repo=data["repository"]??throw new HttpRequestException("Repository unavailable");
+        var categories=(repo["discussionCategories"]?["nodes"]?.AsArray().OfType<JsonObject>()??[])
+            .Select(x=>new DiscussionCategory(x["id"]?.ToString()??"",x["name"]?.ToString()??""))
+            .Where(x=>x.Id.Length is >0 and <=200&&x.Name.Length is >0 and <=200).ToArray();
+        return (repo["id"]?.ToString()??throw new HttpRequestException("Missing repository ID"),categories);
+    }
+    public async Task<DiscussionCategory[]> Categories(CancellationToken ct)=>(await CategoryData(ct)).Categories;
+    private static string PublicationBody(WorkspaceItem item)=>item.Body+"\n\n<!-- mysticego-workspace:"+item.Id.ToString("D")+" -->";
+    public static bool MatchesPublication(WorkspaceItem item,string title,string body)=>item.SyncState=="publishing"&&
+        string.Equals(item.Title,title,StringComparison.Ordinal)&&string.Equals(PublicationBody(item),body,StringComparison.Ordinal);
+    /// <summary>Owner-only recovery of an exact remote publication; no automatic linking or repeated create.</summary>
+    public async Task<WorkspaceItem> Reconcile(Guid id,int number,Guid actor,bool owner,CancellationToken ct)
+    {
+        if(!owner)throw new UnauthorizedAccessException();
+        if(number<=0)throw new ArgumentException("Invalid remote number");
+        await gate.WaitAsync(ct);
+        try
+        {
+            var item=await state.Data.GetAsync<WorkspaceItem>(id,ct)??throw new KeyNotFoundException();
+            if(item.SyncState!="publishing"||item.GitHubNumber is not null)throw new InvalidOperationException("Not an unresolved publication");
+            var rows=await All(ct);
+            if(rows.Any(x=>x.Id!=id&&x.Kind==item.Kind&&x.GitHubNumber==number))throw new InvalidOperationException("Remote item already linked; preserve both records for manual review");
+            JsonNode remote;
+            if(item.Kind=="issue")
+            {
+                remote=await github.Rest(HttpMethod.Get,"issues/"+number,null,ct);
+                if(remote["pull_request"] is not null)throw new InvalidOperationException("Pull request is not an issue");
+            }
+            else
+            {
+                var data=await github.Graph("query($n:Int!){repository(owner:\"ZeroFantom\",name:\"MysticEgo\"){discussion(number:$n){id number title body closed}}}",new{n=number},false,ct);
+                remote=data["repository"]?["discussion"]??throw new KeyNotFoundException();
+            }
+            if(remote["number"]?.GetValue<int>()!=number||!MatchesPublication(item,remote["title"]?.ToString()??"",remote["body"]?.ToString()??""))
+                throw new InvalidOperationException("Remote title and body do not match the exact pending publication");
+            item.GitHubNumber=number;
+            if(item.Kind=="discussion")item.GitHubId=remote["id"]?.ToString()??throw new HttpRequestException("Missing discussion ID");
+            item.SyncState="synced";item.UpdatedAt=DateTimeOffset.UtcNow;
+            await state.Data.PutAsync(item,ct);state.Log(actor.ToString(),"workspace.reconcile",id.ToString(),true);return item;
+        }
+        finally{gate.Release();}
+    }
+    public async Task<WorkspaceItem> Publish(Guid id,Guid actor,bool owner,CancellationToken ct,string? categoryId=null)
     {
         await gate.WaitAsync(ct);
         try
@@ -99,9 +145,17 @@ public sealed class DevelopmentWorkspace(NodeState state,WorkspaceGitHubClient g
             var item=await state.Data.GetAsync<WorkspaceItem>(id,ct)??throw new KeyNotFoundException();
             if(!owner&&item.Creator!=actor)throw new UnauthorizedAccessException();
             if(!github.WritesEnabled||item.SyncState!="local")throw new InvalidOperationException("Publishing disabled or already attempted");
+            string? repositoryId=null,selectedCategory=null;
+            if(item.Kind=="discussion")
+            {
+                var metadata=await CategoryData(ct);
+                repositoryId=metadata.Repository;
+                selectedCategory=metadata.Categories.FirstOrDefault(c=>categoryId is null?c.Name=="General":c.Id==categoryId)?.Id
+                    ??throw new ArgumentException("Select a valid discussion category");
+            }
             // Persist ambiguous state before network request. Never automatically retry a create.
             item.SyncState="publishing";await state.Data.PutAsync(item,ct);
-            var body=item.Body+"\n\n<!-- mysticego-workspace:"+item.Id.ToString("D")+" -->";
+            var body=PublicationBody(item);
             if(item.Kind=="issue")
             {
                 var remote=await github.Rest(HttpMethod.Post,"issues",new{title=item.Title,body},ct);
@@ -109,11 +163,7 @@ public sealed class DevelopmentWorkspace(NodeState state,WorkspaceGitHubClient g
             }
             else
             {
-                var meta=await github.Graph("query { repository(owner:\"ZeroFantom\",name:\"MysticEgo\"){ id discussionCategories(first:50){nodes{id name}} } }",new{},false,ct);
-                var repository=meta["repository"]!;
-                var category=repository["discussionCategories"]?["nodes"]?.AsArray().FirstOrDefault(x=>x?["name"]?.ToString()=="General");
-                if(category is null)throw new InvalidOperationException("General discussion category required");
-                var result=await github.Graph("mutation($r:ID!,$c:ID!,$t:String!,$b:String!){createDiscussion(input:{repositoryId:$r,categoryId:$c,title:$t,body:$b}){discussion{id number}}}",new{r=repository["id"]!.ToString(),c=category["id"]!.ToString(),t=item.Title,b=body},true,ct);
+                var result=await github.Graph("mutation($r:ID!,$c:ID!,$t:String!,$b:String!){createDiscussion(input:{repositoryId:$r,categoryId:$c,title:$t,body:$b}){discussion{id number}}}",new{r=repositoryId,c=selectedCategory,t=item.Title,b=body},true,ct);
                 var remote=result["createDiscussion"]!["discussion"]!;
                 item.GitHubNumber=remote["number"]!.GetValue<int>();item.GitHubId=remote["id"]!.ToString();
             }
@@ -152,6 +202,8 @@ public sealed class DevelopmentWorkspace(NodeState state,WorkspaceGitHubClient g
     {
         var item=rows.FirstOrDefault(x=>x.Kind==kind&&x.GitHubNumber==number);
         // Correlation markers are untrusted GitHub content. Interrupted publications need manual reconciliation; never link an internal record based on a marker alone.
+        // Defer an exact pending publication until owner reconciliation; never automatically associate it.
+        if(item is null&&rows.Any(x=>x.Kind==kind&&MatchesPublication(x,title,body)))return;
         if(item is null){if(rows.Count>=5000)throw new InvalidOperationException("Workspace capacity reached");item=new WorkspaceItem{Id=Guid.NewGuid(),Kind=kind};rows.Add(item);}
         title=title[..Math.Min(title.Length,200)];body=body[..Math.Min(body.Length,16000)];
         assignees??=[];

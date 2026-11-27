@@ -271,3 +271,7 @@ SQLite по умолчанию. Для новых узлов — PostgreSQL, л�
 ### Traffic protection
 
 [Защита от перегрузки и DDoS: HTTP admission, прокси, ограничения и развёртывание](docs/traffic-protection.md).
+
+### Capacity & resilience (experimental)
+
+[Capacity analyzer, independent collector, browser sessions and safe standby activation](docs/capacity-resilience.md) · [Orchestra high availability rollout gates](ops/security/orchestra-ha.md).

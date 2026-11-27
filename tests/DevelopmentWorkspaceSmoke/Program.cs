@@ -27,7 +27,14 @@ Check(handler.Calls==1&&handler.LastUri=="https://api.github.com/repos/ZeroFanto
 try{await client.Rest(HttpMethod.Get,"../other",null,default);throw new Exception("Invalid route accepted");}catch(ArgumentException){}
 try{await client.Rest(HttpMethod.Post,"issues",new{title="test"},default);throw new Exception("Write accepted without consent");}catch(InvalidOperationException){}
 Check(handler.Calls==1,"Rejected request reached transport");
-Console.WriteLine("Workspace signature, coalescing and GitHub transport checks passed.");
+var pending=new WorkspaceItem{Id=Guid.NewGuid(),Title="Original title",Body="Original body",SyncState="publishing"};
+var exact=pending.Body+"\n\n<!-- mysticego-workspace:"+pending.Id.ToString("D")+" -->";
+Check(DevelopmentWorkspace.MatchesPublication(pending,pending.Title,exact),"Exact pending publication rejected");
+Check(!DevelopmentWorkspace.MatchesPublication(pending,"Other title",exact),"Marker alone accepted");
+Check(!DevelopmentWorkspace.MatchesPublication(pending,pending.Title,"Changed "+exact),"Changed body accepted");
+pending.SyncState="local";
+Check(!DevelopmentWorkspace.MatchesPublication(pending,pending.Title,exact),"Unpublished record matched");
+Console.WriteLine("Workspace signature, coalescing, reconciliation matching and GitHub transport checks passed.");
 
 sealed class FakeFactory(FakeHandler handler):IHttpClientFactory
 {

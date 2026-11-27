@@ -83,6 +83,7 @@ public static class Program
 
         // Only localhost reverse proxies may supply the original client address by default.
         app.UseForwardedHeaders(new ForwardedHeadersOptions { ForwardedHeaders = ForwardedHeaders.XForwardedFor });
+        app.UseMysticWebSecurity();
         app.UseMiddleware<ExceptionHandlingMiddleware>();
         app.UseRouting();
         app.UseCors();

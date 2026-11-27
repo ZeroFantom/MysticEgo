@@ -27,7 +27,7 @@ export function useAccountPresentation(authUrl:string,token:string,scope:string,
  const tokenRef=useRef({token,scope,authUrl});tokenRef.current={token,scope,authUrl};
  useEffect(()=>{
   let alive=true;let dirty:Record<string,unknown>={};let chain=Promise.resolve();
-  problem='';current=token?defaults:guest();publish();
+  problem='';current=guest();publish();
   if(!token||!scope){active=undefined;return}
   const endpoint=authUrl.replace(/\/$/,'')+'/api/auth/presentation';
   const request=async(patch?:Record<string,unknown>)=>{

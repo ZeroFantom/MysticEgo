@@ -18,4 +18,5 @@
   <ItemGroup>
     <Compile Include="../../shared/StationProfile.cs" Link="Deployment/StationProfile.cs"/>
   </ItemGroup>
+  <ItemGroup><ProjectReference Include="../MysticEgo.Capacity/MysticEgo.Capacity.csproj"/></ItemGroup>
 </Project>

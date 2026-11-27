@@ -570,6 +570,7 @@ export const catalog:Record<string,readonly [string,string,string,string?]>={
     "至少 12 个字符",
     "최소 12자"
   ],
+  "Минимум 15 символов": ["At least 15 characters","至少 15 个字符","최소 15자"],
   "Принимаю": [
     "I accept the",
     "我接受",

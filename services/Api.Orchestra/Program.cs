@@ -55,8 +55,10 @@ builder.Services.AddSingleton<RuntimeSelfTests>();
 builder.Services.AddHostedService(sp=>sp.GetRequiredService<RuntimeSelfTests>());
 builder.Services.AddSingleton<ServiceLoadMonitor>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<ServiceLoadMonitor>());
-builder.Services.AddSingleton<ServerTelemetry>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<ServerTelemetry>());
+builder.Services.AddSingleton<CapacityMonitor>();
+builder.Services.AddHostedService(sp=>sp.GetRequiredService<CapacityMonitor>());
+builder.Services.AddSingleton<TimewebApiClient>();
+builder.Services.AddSingleton<CapacityReserve>();
 builder.Services.AddOrchestraProxy();
 builder.Services.AddSingleton<GitHubPanel>();
 builder.Services.AddHttpClient("panel-github",client=>{
@@ -67,6 +69,7 @@ builder.Services.AddHttpClient("panel-github",client=>{
 builder.Services.AddHttpClient("panel-model",client=>client.Timeout=TimeSpan.FromSeconds(55))
     .ConfigurePrimaryHttpMessageHandler(()=>new HttpClientHandler{AllowAutoRedirect=false,UseProxy=false});
 var app=builder.Build();
+Models.Autorization.Security.WebSecurityHeaders.UseMysticWebSecurity(app);
 app.UsePanelSocialPreviews();
 app.UseDefaultFiles();
 app.UseStaticFiles();
@@ -98,6 +101,7 @@ app.Use(async (context,next)=>
        !context.Request.Path.Equals("/api/v1/ecosystem/capabilities", StringComparison.OrdinalIgnoreCase) &&
        !context.Request.Path.StartsWithSegments("/api/v1/managed") &&
        !context.Request.Path.Equals("/api/v1/stations/check-in",StringComparison.OrdinalIgnoreCase) &&
+       !context.Request.Path.Equals("/api/v1/stations/capacity",StringComparison.OrdinalIgnoreCase) &&
        !context.Request.Path.Equals("/api/v1/setup/enroll",StringComparison.OrdinalIgnoreCase) &&
        !context.Request.Path.Equals("/api/v1/nodes/announce",StringComparison.OrdinalIgnoreCase) &&
        !team.IsOwner(context.User) && !teamRead)
