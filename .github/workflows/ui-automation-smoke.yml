@@ -1,0 +1,72 @@
+name: UI automation smoke
+on:
+  pull_request:
+    paths:
+      - 'tools/MysticEgo.UiAutomation/**'
+      - '.github/workflows/ui-automation-smoke.yml'
+      - 'services/MysticEgo.Distributed/**'
+      - 'core/Models.Commands.Mcp/**'
+      - 'frontend/packages/ui/src/avatar/**'
+      - 'frontend/packages/ui/src/pages/AvatarStudio.tsx'
+      - 'frontend/scripts/avatar-motion.test.mjs'
+      - 'desktop/**'
+      - 'core/Api.Auth/**'
+      - 'frontend/packages/ui/src/app/**'
+      - 'frontend/scripts/localization.test.mjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: tools/MysticEgo.UiAutomation
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: xvfb-run -a node --test browser.integration.mjs
+
+  windows-build:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet build tools/MysticEgo.UiAutomation/native/UiAutomation.Native.csproj
+      - run: dotnet build services/Api.Agent/Api.Agent.csproj
+      - run: dotnet build services/Api.AuditOrchestra/Api.AuditOrchestra.csproj
+
+  avatar-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: npm ci --prefix frontend
+      - run: node --test frontend/scripts/avatar-motion.test.mjs frontend/scripts/localization.test.mjs
+      - run: dotnet build core/Api.Auth/Api.Auth.csproj
+      - run: dotnet run --project tests/AuthSmoke/AuthSmoke.csproj
+      - run: node --check desktop/station/main.mjs && node --check desktop/local/main.mjs
+      - run: node --check desktop/station/view.js
+      - run: node --check desktop/control/presentation.js
+      - run: node --check desktop/control/effects.js
+      - run: npm run build --prefix frontend
+      - run: npm install --prefix desktop --no-audit --no-fund
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: npm run build --prefix desktop
+      - run: dotnet run --project tests/ApiArchitectureSmoke/ApiArchitectureSmoke.csproj

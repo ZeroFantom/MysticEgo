@@ -12,7 +12,7 @@ const endpoint='/interface-control/sessions';
 const routePattern=/^\/(?:[a-z][a-z0-9-]*(?:\/[a-z][a-z0-9-]*)?)?$/;
 const delay=(ms:number)=>new Promise<void>(resolve=>window.setTimeout(resolve,ms));
 function navigationControls(){
-  return Array.from(document.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Главная навигация"] a[data-interface-path]'));
+  return Array.from(document.querySelectorAll<HTMLAnchorElement>('nav[data-interface-nav] a[data-interface-path]'));
 }
 function readFrame(path:string):Frame{
   return {path:routePattern.test(path)?path:'/unlisted',targets:navigationControls().flatMap(a=>{
@@ -32,7 +32,7 @@ export async function visibleNavigation(path:string,allowed:()=>boolean){
   const link=navigationControls().find(a=>a.dataset.interfacePath===path);
   if(!link)return false;
   if(!isVisible(link)){
-    const menu=document.querySelector<HTMLButtonElement>('button[aria-label="Открыть меню"]');
+    const menu=document.querySelector<HTMLButtonElement>('button[data-interface-menu]');
     if(!menu||!isVisible(menu))return false;
     menu.click();await delay(300);
   }

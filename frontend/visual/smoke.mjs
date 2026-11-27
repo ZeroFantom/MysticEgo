@@ -42,6 +42,7 @@ const token='fixture.'+Buffer.from(JSON.stringify({sub:'visual-user'})).toString
 function apiResponse(path,origin){
   if(path==='/api/auth/login'||path==='/api/auth/refresh')return {accessToken:token,refreshToken:'fixture-only',user:{login:'visual-user'},expiresAt:new Date(Date.now()+3600000).toISOString()};
   const routes={
+    '/api/auth/presentation':{language:'ru',font:'modern'},'/api/auth/sessions/current':{active:true},
     '/api/v1/collective/me':profile,'/api/v1/collective/notifications':[],'/api/v1/collective/shard/quests':[],
     '/api/v1/collective/contacts':[contact],'/api/v1/collective/messages/visual-peer':messages,
     '/api/v1/managed/context':{rootId:'root',rootName:'Оркестр',orchestraUrl:origin,authUrl:origin,developer:false,owner:false,actor:'visual-user',lan:false},
@@ -55,9 +56,15 @@ function apiResponse(path,origin){
   return routes[path];
 }
 async function isolate(page,origin){
+  // Model the real account API: GET returns stored fields, POST merges a patch.
+  const presentation={language:'ru',font:'modern'};
   await page.route('**/*',async route=>{
     const url=new URL(route.request().url());
     if(url.origin===origin&&url.pathname==='/mystic-config.js')return route.fulfill({contentType:'text/javascript',body:'window.__MYSTIC_CONFIG__='+JSON.stringify({apiUrl:origin,authUrl:origin})});
+    if(url.origin===origin&&url.pathname==='/api/auth/presentation'){
+      if(route.request().method()==='POST')Object.assign(presentation,route.request().postDataJSON());
+      return route.fulfill({json:presentation});
+    }
     if(url.pathname.startsWith('/api/')){
       const value=apiResponse(url.pathname,origin);
       return route.fulfill({status:value===undefined?404:200,contentType:'application/json',body:JSON.stringify(value??{error:'Fixture endpoint not implemented'})});
@@ -65,6 +72,7 @@ async function isolate(page,origin){
     if(url.origin!==origin)return route.abort();
     return route.continue();
   });
+  return presentation;
 }
 const results=[];
 async function check(page,label,fn){
@@ -141,12 +149,12 @@ try{
     try{
       for(const viewport of sizes){
         const context=await browser.newContext({viewport,locale:'ru-RU',timezoneId:'UTC',colorScheme:'dark',reducedMotion:'reduce'});
-        await context.addInitScript(()=>{Object.defineProperty(navigator,'userAgentData',{configurable:true,value:{brands:[{brand:'Google Chrome',version:'140'}]}})});
+        await context.addInitScript(()=>{localStorage.setItem('mysticego.guest.presentation',JSON.stringify({language:'ru',font:'modern'}));Object.defineProperty(navigator,'userAgentData',{configurable:true,value:{brands:[{brand:'Google Chrome',version:'140'}]}})});
         const page=await context.newPage();page.setDefaultTimeout(8000);
         const errors=[];page.on('pageerror',e=>errors.push(String(e)));
         const prefix=role+'-'+viewport.width;
         try{
-          await isolate(page,origin);
+          const serverAppearance=await isolate(page,origin);
           await page.goto(origin+'/settings',{waitUntil:'domcontentloaded'});
           await visible(page.locator('.auth-form-card'));
           const highlights=page.getByRole('complementary',{name:'Обновления MysticEgo'});
@@ -195,6 +203,16 @@ try{
               assert.equal(await trigger.getAttribute('aria-expanded'),'false');
             });
             await check(page,prefix+'-appearance-persistence',async()=>{
+              // Observe the server patch, not only the optimistic browser state.
+              for(let n=0;n<50&&(serverAppearance.theme!=='light'||serverAppearance.interfaceStyle!=='simplified');n++)await page.waitForTimeout(100);
+              assert.equal(serverAppearance.theme,'light');
+              assert.equal(serverAppearance.interfaceStyle,'simplified');
+              await page.reload({waitUntil:'domcontentloaded'});
+              await visible(page.locator('.appearance-style-options'));
+              await rootState(page,'light','simplified');
+              // Empty/partial server responses must not erase the per-account local cache.
+              delete serverAppearance.theme;delete serverAppearance.interfaceStyle;
+              // A second reload must retain the same saved account settings.
               await page.reload({waitUntil:'domcontentloaded'});
               await visible(page.locator('.appearance-style-options'));
               await rootState(page,'light','simplified');
@@ -432,12 +450,14 @@ try{
             const scene=page.locator('.cinematic-live');
             await visible(scene);
             await scene.scrollIntoViewIfNeeded();
+            const mediaIdentity=await scene.evaluate(el=>{el.dataset.testIdentity='stable';return el.dataset.testIdentity});
             assert.equal(await scene.getAttribute('data-playing'),'false');
             assert.equal(await page.locator('.cinematic-effects').count(),0);
             await page.emulateMedia({reducedMotion:'no-preference'});
             for(const [theme,style] of combinations){
               await switchAppearance(page,theme,style);
               await scene.scrollIntoViewIfNeeded();
+              assert.equal(await scene.getAttribute('data-test-identity'),mediaIdentity,'Theme changes must not detach the media DOM node');
               await checkArtwork(page,theme,style,'.studio-hero-cover','overview');
               const image=await scene.locator('img').evaluate(async img=>{await img.decode();const rect=img.getBoundingClientRect();return {src:img.currentSrc,ratio:rect.width/rect.height,fit:getComputedStyle(img).objectFit}});
               assert(image.src.includes(style+'-'+theme+'-hero'));

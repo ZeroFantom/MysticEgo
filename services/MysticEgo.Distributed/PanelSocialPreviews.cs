@@ -88,6 +88,7 @@ public static class PanelSocialPreviews
             {
                 "" or "/index.html" or "/audit-portal" or "/audit-portal/index.html" => "index.html",
                 "/share" or "/audit-portal/share" => "social/share.html",
+                "/license" when node.Kind == NodeKind.Orchestra => "social/license.html",
                 "/studio" when node.Kind == NodeKind.Orchestra => "social/studio.html",
                 "/developer" when node.Kind == NodeKind.Orchestra => "social/developer.html",
                 "/desktop-downloads" when node.Kind == NodeKind.Orchestra => "social/desktop-downloads.html",

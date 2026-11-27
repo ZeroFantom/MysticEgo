@@ -15,6 +15,18 @@ internal static class AuthGateway
                 Forward(context, clients, node.AuthUrl, action)).AllowAnonymous();
         app.MapGet("/api/auth/credential-policy", (HttpContext context, IHttpClientFactory clients) =>
             Forward(context, clients, node.AuthUrl, "credential-policy")).AllowAnonymous();
+        app.MapGet("/api/auth/presentation", (HttpContext context, IHttpClientFactory clients) =>
+            Forward(context, clients, node.AuthUrl, "presentation")).RequireAuthorization();
+        app.MapPost("/api/auth/presentation", (HttpContext context, IHttpClientFactory clients) =>
+            Forward(context, clients, node.AuthUrl, "presentation")).RequireAuthorization();
+        foreach (var action in new[] { "sessions", "sessions/current", "consents" })
+            app.MapGet("/api/auth/" + action, (HttpContext context, IHttpClientFactory clients) =>
+                Forward(context, clients, node.AuthUrl, action)).RequireAuthorization();
+        foreach (var action in new[] { "sessions/revoke-others", "consents", "device-grants/revoke", "device-grants/approve" })
+            app.MapPost("/api/auth/" + action, (HttpContext context, IHttpClientFactory clients) =>
+                Forward(context, clients, node.AuthUrl, action)).RequireAuthorization();
+        app.MapPost("/api/auth/sessions/{id:guid}/revoke", (Guid id, HttpContext context, IHttpClientFactory clients) =>
+            Forward(context, clients, node.AuthUrl, "sessions/" + id.ToString("D") + "/revoke")).RequireAuthorization();
         if (node.Kind is NodeKind.AuditOrchestra or NodeKind.Orchestra)
         {
             app.MapPost("/api/auth/audit/register", (HttpContext context, IHttpClientFactory clients) =>
@@ -30,8 +42,12 @@ internal static class AuthGateway
             limit.MaxRequestBodySize = 16_384;
         using var client = factory.CreateClient("mysticego-logged-api");
         using var request = new HttpRequestMessage(new HttpMethod(context.Request.Method), auth.TrimEnd('/') + "/api/auth/" + action);
+        if ((action == "login" || action == "refresh") && context.Request.Headers.UserAgent.ToString() is { Length: >0 } agent)
+            request.Headers.TryAddWithoutValidation("User-Agent", agent.Length > 500 ? agent[..500] : agent);
         if (context.Connection.RemoteIpAddress is { } caller)
             request.Headers.TryAddWithoutValidation("X-Forwarded-For", caller.ToString());
+        if ((action == "presentation" || action.StartsWith("sessions",StringComparison.Ordinal) || action == "consents" || action.StartsWith("device-grants/",StringComparison.Ordinal)) && AuthenticationHeaderValue.TryParse(context.Request.Headers.Authorization.ToString(),out var authorization) && authorization.Scheme == "Bearer")
+            request.Headers.Authorization = authorization;
         if (HttpMethods.IsPost(context.Request.Method))
         {
             request.Content = new StreamContent(context.Request.Body);

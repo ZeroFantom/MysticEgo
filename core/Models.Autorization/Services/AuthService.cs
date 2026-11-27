@@ -65,10 +65,9 @@ public sealed class AuthService : IAuthService
             || !stored.User.IsActive)
             return null;
 
-        _db.RefreshTokens.Remove(stored);
         AuthResponse response;
-        try { response = await BuildAuthResponseAsync(stored.User, ip, userAgent, ct); }
-        catch(DbUpdateConcurrencyException) { return null; } // A competing refresh already consumed this token.
+        try { response = await BuildAuthResponseAsync(stored.User, ip, userAgent, ct, stored); }
+        catch (DbUpdateConcurrencyException) { return null; }
 
         _log.LogInformation("Refresh OK: {Login}", stored.User.Login);
         return response;
@@ -118,28 +117,28 @@ public sealed class AuthService : IAuthService
     }
 
     private async Task<AuthResponse> BuildAuthResponseAsync(
-        User user, string? ip, string? userAgent, CancellationToken ct)
+        User user, string? ip, string? userAgent, CancellationToken ct, RefreshToken? existing = null)
     {
         var roleCodes = user.UserRoles.Select(ur => ur.Role.Code).ToList();
 
         var roleIds = user.UserRoles.Select(x=>x.RoleId).ToArray();
         var permissions = await _db.RolePermissions.AsNoTracking().Where(rp=>roleIds.Contains(rp.RoleId))
             .Select(rp=>rp.Permission.Code).Distinct().ToListAsync(ct);
-        var (access, expires) = _jwt.GenerateAccessToken(user, roleCodes, permissions);
         var refresh = _jwt.GenerateRefreshToken();
 
-        _db.RefreshTokens.Add(new RefreshToken
-        {
-            UserId = user.Id,
-            Token = HashRefreshToken(refresh),
-            ExpiresAt = DateTime.UtcNow.AddDays(_opt.Jwt.RefreshTokenDays),
-            CreatedAt = DateTime.UtcNow,
-            CreatedByIp = ip,
-            UserAgent = userAgent,
-        });
+        var now = DateTime.UtcNow;
+        var session = existing ?? new RefreshToken { UserId = user.Id, CreatedAt = now };
+        session.SessionId ??= Guid.NewGuid();
+        session.Token = HashRefreshToken(refresh);
+        session.ExpiresAt = now.AddDays(_opt.Jwt.RefreshTokenDays);
+        session.LastSeenUtc = now;
+        session.CreatedByIp = ip is { Length: >64 } ? ip[..64] : ip;
+        session.UserAgent = userAgent is { Length: >500 } ? userAgent[..500] : userAgent;
+        if (existing is null) _db.RefreshTokens.Add(session);
 
         await _db.SaveChangesAsync(ct);
 
+        var (access, expires) = _jwt.GenerateAccessToken(user, roleCodes, permissions, session.SessionId);
         return new AuthResponse
         {
             AccessToken = access,

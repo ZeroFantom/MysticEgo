@@ -4,6 +4,19 @@ import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 const home=path.dirname(fileURLToPath(import.meta.url));
 let window,walkTimer;
+let handoff = null, handoffShown = false;
+const handoffInput = process.env.MYSTICEGO_AVATAR_HANDOFF === '1' ? new Promise(resolve=>{
+  let input='';
+  const finish=value=>{clearTimeout(timer);process.stdin.removeListener('data',data);process.stdin.removeListener('end',end);resolve(value)};
+  const data=chunk=>{input+=chunk.toString();if(input.length>12000)finish(null)};
+  const end=()=>{try{
+    const value=JSON.parse(input);
+    if(typeof value.token!=='string'||!value.token||value.token.length>8192||!['walk','perch'].includes(value.motion)||!Number.isFinite(value.horizontal)||value.horizontal<0||value.horizontal>1||!Number.isFinite(value.phaseSeconds)||value.phaseSeconds<0||value.phaseSeconds>3600||!['neutral','happy','sad','angry','surprised'].includes(value.mood))throw Error();
+    finish(value);
+  }catch{finish(null)}};
+  const timer=setTimeout(()=>finish(null),4000);
+  process.stdin.on('data',data);process.stdin.once('end',end);process.stdin.resume();
+}) : Promise.resolve(null);
 const allowedHosts=['127.0.0.1','localhost'];
 const configuredApi = process.env.MYSTICEGO_DESKTOP_API_URL || '';
 function isLocal(value){try{const u=new URL(value);return ['http:','https:'].includes(u.protocol)&&allowedHosts.includes(u.hostname)}catch{return false}}
@@ -12,10 +25,10 @@ function create(){
   webPreferences:{preload:path.join(home,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true,webSecurity:true}});
  window.setVisibleOnAllWorkspaces(true,{visibleOnFullScreen:false});
  window.webContents.setWindowOpenHandler(({url})=>{if(isLocal(url))shell.openExternal(url);return {action:'deny'}});
- window.webContents.on('will-navigate',(event,url)=>{if(!url.startsWith('file:')&&!isLocal(url))event.preventDefault()});
- const url=process.env.MYSTICEGO_DESKTOP_DEV_URL;
+ window.webContents.on('will-navigate',(event,url)=>{if(process.env.MYSTICEGO_AVATAR_HANDOFF==='1'||(!url.startsWith('file:')&&!isLocal(url)))event.preventDefault()});
+ const url=process.env.MYSTICEGO_AVATAR_HANDOFF==='1'?'':process.env.MYSTICEGO_DESKTOP_DEV_URL;
  if(url&&isLocal(url))window.loadURL(url);else window.loadFile(path.join(home,'dist','index.html'));
- window.once('ready-to-show',()=>{dockTaskbar();window.show()});
+ window.once('ready-to-show',()=>{if(!handoffShown){dockTaskbar();if(process.env.MYSTICEGO_AVATAR_HANDOFF!=='1')window.show()}});
 }
 function stopWalk(){if(walkTimer){clearInterval(walkTimer);walkTimer=null}}
 function dockTaskbar(){stopWalk();const display=screen.getDisplayMatching(window.getBounds());const w=window.getBounds().width,h=window.getBounds().height;window.setPosition(display.workArea.x+display.workArea.width-w-10,display.workArea.y+display.workArea.height-h)}
@@ -69,7 +82,21 @@ ipcMain.handle('avatar:approved-link',(event,raw)=>{
  if(url.protocol!=='https:'||!['www.google.com','www.youtube.com'].includes(url.host)||url.username||url.password)throw new Error('Адрес не разрешён');
  return shell.openExternal(url.href);
 });
-ipcMain.handle('avatar:context',()=>({api:configuredApi,scope:process.env.MYSTICEGO_DESKTOP_SCOPE||'audit'}));
+ipcMain.handle('avatar:context',async event=>{
+ if(event.sender!==window.webContents)throw Error('Недопустимый источник');
+ if(!handoffShown)handoff=await handoffInput;
+ return {api:configuredApi,scope:process.env.MYSTICEGO_DESKTOP_SCOPE||'audit',handoff};
+});
+ipcMain.handle('avatar:handoff-ready',event=>{
+ if(event.sender!==window.webContents||!handoff||handoffShown) return false;
+ const bounds=window.getBounds(), area=screen.getDisplayMatching(bounds).workArea;
+ window.setPosition(area.x+Math.round(Math.max(0,area.width-bounds.width)*handoff.horizontal),area.y+Math.max(0,area.height-bounds.height));
+ window.showInactive();
+ handoffShown=true;
+ handoff=null;
+ console.log('MYSTICEGO_AVATAR_HANDOFF_READY');
+ return true;
+});
 ipcMain.handle('avatar:dock-taskbar',()=>{dockTaskbar();return true});
 ipcMain.handle('avatar:windows',async()=>{try{return await geometry()}catch{return []}});
 ipcMain.handle('avatar:anchor',async(_event,title)=>{

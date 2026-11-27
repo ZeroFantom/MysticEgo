@@ -31,7 +31,8 @@ for(const [css,assets,settings] of groups){
 }
 assert(read('desktop/local/index.html').includes('type="module" src="view.js"'));
 assert(read('desktop/local/view.js').includes("initEffects($('design'))"));
-assert(read('desktop/station/view.js').includes("initEffects($('design'))"));
+const station=read('desktop/station/view.js');
+assert(station.includes("initEffects($('design'),{onChange:")&&station.includes('effects?.applyAccount(prefs)')&&station.includes('api.presentation(expected,patch)'));
 assert(read('desktop/control/view.js').includes("initEffects($('design'))"));
 assert(read('desktop/renderer/src/main.tsx').includes('overlay-appearance'));
 assert(read('tools/MysticEgo.CloudDesk/update.sh').includes('src/appearance-art/simplified-light.webp'));
@@ -107,7 +108,8 @@ for(const css of [web,desktopCss,cloudCss])assert(css.includes('var(--mystic-hea
 for(const css of [web,cloudCss])assert(css.includes('var(--mystic-sidebar-art) center bottom/contain no-repeat'));
 assert(cinematic.includes('Смотреть сцену')&&cinematic.includes('Остановить')&&cinematic.includes('mystic-scene-haze'));
 assert(motion.includes('.cinematic-live[data-running=false]')&&motion.includes('animation-play-state:paused')&&motion.includes('aspect-ratio:21/9;max-height:none'));
-assert(!cinematic.includes('.webm')&&cinematic.includes('key={poster+\':\'+allowed}'));
+// Reset playback on theme/motion changes without remounting the media element.
+assert(!cinematic.includes('.webm')&&!cinematic.includes('<Scene key=')&&cinematic.includes("useEffect(()=>setState('idle'),[poster,allowed])"));
 
 const dashboardCss=read('frontend/packages/ui/src/components/dashboard.css');
 const dashboardHero=read('frontend/packages/ui/src/components/DashboardHero.tsx');

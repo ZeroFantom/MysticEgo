@@ -25,6 +25,27 @@ public static class NodeSecurity
         builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(jwt=>
         {
             jwt.MapInboundClaims=true;
+            jwt.Events=new JwtBearerEvents { OnTokenValidated=async context=>
+            {
+                if(context.Principal?.FindFirst("mystic_session") is null)return;
+                var auth=context.Request.Headers.Authorization.ToString();
+                // Only the configured Auth origin receives the bearer. No redirect or proxy.
+                if(!System.Net.Http.Headers.AuthenticationHeaderValue.TryParse(auth,out var header)||header.Scheme!="Bearer")
+                {context.Fail("Missing account bearer");return;}
+                try
+                {
+                    var factory=context.HttpContext.RequestServices.GetRequiredService<IHttpClientFactory>();
+                    using var client=factory.CreateClient("mysticego-logged-api");
+                    using var request=new HttpRequestMessage(HttpMethod.Get,options.AuthUrl.TrimEnd('/')+"/api/auth/sessions/current");
+                    request.Headers.Authorization=header;
+                    using var timeout=CancellationTokenSource.CreateLinkedTokenSource(context.HttpContext.RequestAborted);
+                    timeout.CancelAfter(TimeSpan.FromSeconds(5));
+                    using var response=await client.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,timeout.Token);
+                    if(!response.IsSuccessStatusCode)context.Fail("Account session revoked or unavailable");
+                }
+                catch(Exception error) when(error is HttpRequestException or OperationCanceledException or InvalidOperationException)
+                {context.Fail("Central session validation unavailable");}
+            }};
             jwt.TokenValidationParameters=new TokenValidationParameters
             {
                 ValidateIssuer=true,ValidIssuer=issuer,ValidateAudience=true,ValidAudience=audience,

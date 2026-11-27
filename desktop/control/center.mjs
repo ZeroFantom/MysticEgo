@@ -2,7 +2,7 @@ import {spawn} from 'node:child_process';
 
 export async function json(url, options={}) {
   const response = await fetch(url, {signal:AbortSignal.timeout(10000),redirect:'error',...options});
-  if (!response.ok) throw new Error('HTTP '+response.status+' · '+(await response.text()).slice(0,250));
+  if (!response.ok) {const error=new Error('HTTP '+response.status+' · '+(await response.text()).slice(0,250));error.status=response.status;throw error;}
   return response.json();
 }
 export function launch(exe,args,root,log,env={}) {

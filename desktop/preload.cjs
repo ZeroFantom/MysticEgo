@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('mysticDesktop',Object.freeze({
  walk:value=>ipcRenderer.invoke('avatar:walk',value),
  openLink:value=>ipcRenderer.invoke('avatar:approved-link',value),
  context:()=>ipcRenderer.invoke('avatar:context'),
+ handoffReady:()=>ipcRenderer.invoke('avatar:handoff-ready'),
  login:(login,password)=>ipcRenderer.invoke('avatar:login',login,password),
  request:(options)=>ipcRenderer.invoke('avatar:request',options),
  taskbar:()=>ipcRenderer.invoke('avatar:dock-taskbar'),

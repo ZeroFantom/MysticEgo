@@ -1,6 +1,6 @@
 import React,{useEffect,useState} from 'react';
 import {createRoot} from 'react-dom/client';
-import {AvatarStage,type AvatarMotion} from '../../../frontend/packages/ui/src/avatar/AvatarStage';
+import {AvatarStage,type AvatarMotion,type AvatarMood} from '../../../frontend/packages/ui/src/avatar/AvatarStage';
 import type {ClipAsset} from '../../../frontend/packages/ui/src/avatar/AvatarClips';
 import type {AvatarAppearance} from '../../../frontend/packages/ui/src/avatar/PersonalAvatar';
 import {useFaceTracking} from '../../../frontend/packages/ui/src/avatar/faceTracking';
@@ -17,7 +17,8 @@ type Persona={voice?:boolean;moveDesktop?:boolean;music?:'auto'|'dance'|'listen'
 type Reply={ok:boolean;status:number;data:Uint8Array};
 declare global {
  interface Window{mysticDesktop?:{
-  context:()=>Promise<{api:string;scope:Service}>;
+  context:()=>Promise<{api:string;scope:Service;handoff?:{token:string;motion:'walk'|'perch';horizontal:number;phaseSeconds:number;mood:AvatarMood}|null}>;
+  handoffReady:()=>Promise<boolean>;
   login:(login:string,password:string)=>Promise<string>;
   request:(options:{api:string;path:string;token?:string;guest?:string;method?:string;body?:string})=>Promise<Reply>;
   taskbar:()=>Promise<boolean>;windows:()=>Promise<SystemWindow[]>;anchor:(title:string)=>Promise<boolean>;
@@ -34,6 +35,9 @@ function readOverlayLook():OverlayLook{try{return {...overlayDefaults,...JSON.pa
 function Overlay(){
  const [look,setLook]=useState<OverlayLook>(readOverlayLook);
  useEffect(()=>{const media=matchMedia('(prefers-color-scheme:light)');const apply=()=>{const root=document.documentElement;root.dataset.theme=look.theme==='system'?(media.matches?'light':'dark'):look.theme;root.dataset.interface=look.interfaceStyle;root.dataset.uiMotion=look.uiMotion;root.dataset.transition=look.transition;};apply();media.addEventListener('change',apply);try{localStorage.setItem('mysticego.overlay.appearance',JSON.stringify(look))}catch{}return()=>media.removeEventListener('change',apply)},[look]);
+ const [handoff,setHandoff]=useState<{motion:'walk'|'perch';phaseSeconds:number;mood:AvatarMood}|null>(null);
+ const [handoffMood,setHandoffMood]=useState<AvatarMood>('neutral');
+ const [profileToken,setProfileToken]=useState('');
  const [scope,setScope]=useState<Service>('audit'),[api,setApi]=useState('http://127.0.0.1:5350');
  const [login,setLogin]=useState(''),[password,setPassword]=useState(''),[token,setToken]=useState(''),[guest,setGuest]=useState('');
  const [model,setModel]=useState<{url?:string;mime:string}>({mime:'.vrm'});
@@ -46,11 +50,18 @@ function Overlay(){
  const [settings,setSettings]=useState(true),[walking,setWalking]=useState(false),[busy,setBusy]=useState(false),[proposals,setProposals]=useState<Proposal[]>([]);
  const voice=useAvatarVoice(),music=useMusicBeat(),face=useFaceTracking();
 
- useEffect(()=>{void service?.context().then(value=>{if(value.api){setApi(value.api);setScope(value.scope)}})},[]);
+ useEffect(()=>{void service?.context().then(value=>{if(value.api){setApi(value.api);setScope(value.scope)}if(value.handoff){setModel({mime:'.vrm'});setToken(value.handoff.token);setHandoff({motion:value.handoff.motion,phaseSeconds:value.handoff.phaseSeconds,mood:value.handoff.mood});setHandoffMood(value.handoff.mood);setMotion(value.handoff.motion);setSettings(false)}})},[]);
  useEffect(()=>{
   const dispose=service?.onEdge(()=>{setMotion('bump');window.setTimeout(()=>setMotion(current=>current==='bump'?'walk':current),780)});
   return()=>dispose?.();
  },[]);
+ function stageReady(){
+  if(!handoff||!token||profileToken!==token||!service)return;
+  if(persona.moveDesktop===false){setError('Движение на рабочем столе отключено.');return;}
+  const next=handoff.motion;
+  setHandoff(null);setMotion(next);setWalking(next==='walk');setAnchor('');
+  void service.handoffReady().then(ok=>{if(ok&&next==='walk')return service.walk(true);return undefined}).catch(error=>setError(String(error)));
+ }
  useEffect(()=>{
   if(!anchor)return;
   const interval=window.setInterval(()=>void service?.anchor(anchor),1400);
@@ -91,15 +102,14 @@ function Overlay(){
    const route=organization?'/api/v1/avatars/theme/assets/':library+'/asset/';
    const url=id&&id!=='bundled'?await media(route+id):await media('/bundled/mysticego.vrm');
    if(cancelled)return;
-   setModel({url,mime:assets.find(item=>item.id===id)?.extension||'.vrm'});
    setMotionStyle(meta?.motionStyle??'calm');
-   setAppearance(meta?.appearance);setMotion(meta?.appearance?.idleMotion??'idle');
+   setAppearance(meta?.appearance);if(!handoff)setMotion(meta?.appearance?.idleMotion??'idle');
    const tracks=await Promise.all(Object.entries(meta?.motions??{}).map(async ([slot,asset])=>{
     const file=await media(library+'/asset/'+asset);
     const item=assets.find(candidate=>candidate.id===asset);
     return file&&item?[[slot,{url:file,extension:item.extension}]]:[];
    }));
-   if(!cancelled)setAnimations(Object.fromEntries(tracks.flat()));
+   if(!cancelled){setAnimations(Object.fromEntries(tracks.flat()));setModel({url,mime:assets.find(item=>item.id===id)?.extension||'.vrm'});setProfileToken(token);}
   })().catch(error=>{if(!cancelled)setError(String(error))});
   return()=>{cancelled=true;objects.forEach(URL.revokeObjectURL)};
  },[api,token,guest,scope]);
@@ -162,7 +172,7 @@ function Overlay(){
    <button title="Стоп" onClick={stop}>■</button>
    <button title="Закрыть" onClick={()=>void service?.close()}>×</button>
   </div>
-  <AvatarStage url={model.url} mime={model.mime} motion={motion==='talk'&&!voice.speaking?appearance?.idleMotion??'idle':motion} mood={inferVisualMood(answer)} speech={voice.speech} viseme={voice.viseme}
+  <AvatarStage url={handoff&&profileToken!==token?undefined:model.url} mime={model.mime} motion={handoff?.motion??(motion==='talk'&&!voice.speaking?appearance?.idleMotion??'idle':motion)} mood={answer?inferVisualMood(answer):handoffMood} initialPhase={handoff?.phaseSeconds??0} onReady={stageReady} speech={voice.speech} viseme={voice.viseme}
    beat={music.beat} gaze={face.motion} animations={animations} appearance={appearance} intensity={motionStyle==='lively'?1.1:motionStyle==='calm'?.5:.75}/>
   {settings&&<section className="settings">
    <details className="overlay-appearance"><summary>Оформление</summary><label>Тема<select value={look.theme} onChange={e=>setLook(v=>({...v,theme:e.target.value as OverlayLook['theme']}))}><option value="dark">Тёмная</option><option value="light">Светлая</option><option value="system">Системная</option></select></label><label>Стиль<select value={look.interfaceStyle} onChange={e=>setLook(v=>({...v,interfaceStyle:e.target.value as OverlayLook['interfaceStyle']}))}><option value="simplified">Упрощённый</option><option value="immersive">Насыщенный</option></select></label><label>Анимации<select value={look.uiMotion} onChange={e=>setLook(v=>({...v,uiMotion:e.target.value as OverlayLook['uiMotion']}))}><option value="normal">Обычные</option><option value="low">Минимальные</option><option value="off">Выкл.</option></select></label><label>Переход<select value={look.transition} onChange={e=>setLook(v=>({...v,transition:e.target.value as OverlayLook['transition']}))}><option value="flow">Мягкий</option><option value="fade">Растворение</option><option value="slide">Скольжение</option><option value="scale">Масштаб</option></select></label></details>

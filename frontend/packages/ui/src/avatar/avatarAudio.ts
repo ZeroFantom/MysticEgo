@@ -19,18 +19,22 @@ export function useAvatarVoice(){
   stop();const text=input.slice(0,3000);if(!text)return false;
   const request=generation.current;
   let position=0,wordPosition=0,tick=0;
+  let paused=false;
   const animate=()=>{
-   if(request!==generation.current)return;
+   if(request!==generation.current||paused)return;
+   if(position>=text.length){setSpeech(0);if(!audible)clear();return;}
    const char=(text[position]??' ').toLowerCase();tick++;
-   setViseme(/[оёo]/.test(char)?'oh':/[уюuw]/.test(char)?'ou':/[иеée]/.test(char)?'ee':/[ыийi]/.test(char)?'ih':'aa');
-   setSpeech(/[ .,!?:;]/.test(char)?0.035:/[аеёиоуыэюяaeiou]/.test(char)?.69+Math.sin(tick*.98)*.16:.21);
+   setViseme(/[оёo]/.test(char)?'oh':/[уюuw]/.test(char)?'ou':/[еэée]/.test(char)?'ee':/[ыийi]/.test(char)?'ih':'aa');
+   setSpeech(/\s|[.,!?:;—-]/.test(char)?0:/[мбпmbp]/.test(char)?.025:/[аеёиоуыэюяaeiou]/.test(char)?.69+Math.sin(tick*.98)*.16:.21);
    if(++position>=text.length&&!audible)clear();
   };
   const start=()=>{if(request!==generation.current)return;window.clearInterval(timer.current);setSpeaking(true);timer.current=window.setInterval(animate,68)};
   if(!audible||!('speechSynthesis'in window)){audible=false;start();return true}
   const utterance=new SpeechSynthesisUtterance(text);utterance.lang='ru-RU';utterance.rate=1;
   utterance.onstart=start;
-  utterance.onboundary=event=>{if(event.charIndex>=wordPosition){wordPosition=event.charIndex;position=event.charIndex}};
+  utterance.onboundary=event=>{if(event.charIndex>=wordPosition&&event.charIndex<text.length&&request===generation.current){wordPosition=event.charIndex;position=event.charIndex}};
+  utterance.onpause=()=>{if(request===generation.current){paused=true;setSpeech(0)}};
+  utterance.onresume=()=>{if(request===generation.current)paused=false};
   utterance.onend=()=>{if(request===generation.current)clear()};
   utterance.onerror=()=>{if(request===generation.current){audible=false;start()}};
   window.speechSynthesis.speak(utterance);return true;

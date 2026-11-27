@@ -15,7 +15,7 @@ public sealed class JwtTokenService : IJwtTokenService
     public JwtTokenService(JwtOptions opt) => _opt = opt;
 
     public (string Token, DateTime ExpiresAt) GenerateAccessToken(
-        User user, IEnumerable<string> roleCodes, IEnumerable<string>? permissions = null)
+        User user, IEnumerable<string> roleCodes, IEnumerable<string>? permissions = null, Guid? sessionId = null)
     {
 
         var expires = DateTime.UtcNow.AddMinutes(_opt.AccessTokenMinutes);
@@ -29,6 +29,7 @@ public sealed class JwtTokenService : IJwtTokenService
             new("account_created", DateTime.SpecifyKind(user.CreatedAt, DateTimeKind.Utc).ToString("O")),
         };
 
+        if (sessionId is Guid sid) claims.Add(new Claim("mystic_session", sid.ToString("D")));
         if (!string.IsNullOrWhiteSpace(user.Nickname))
             claims.Add(new Claim("nickname", user.Nickname));
 

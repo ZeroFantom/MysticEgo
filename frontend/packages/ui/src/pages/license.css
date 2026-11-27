@@ -1,0 +1,25 @@
+/* The legal page uses the public studio palette, with a quiet reading surface. */
+.license-site .license-content{max-width:1160px}
+.license-hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(180px,.32fr);gap:clamp(24px,5vw,56px);align-items:center;padding:clamp(22px,5vw,60px);border:1px solid var(--studio-line);border-radius:20px;background:radial-gradient(ellipse at top right,color-mix(in srgb,var(--studio-accent) 12%,transparent),transparent 65%),var(--studio-panel)}
+.license-hero h1{font:400 clamp(44px,8vw,78px)/1 Georgia,serif;letter-spacing:-.04em;margin:0 0 12px;color:var(--studio-text)}
+.license-hero h2{font-size:clamp(18px,3vw,25px);line-height:1.25;margin:0;color:var(--studio-accent);overflow-wrap:anywhere}
+.license-hero-copy{min-width:0}
+.license-emblem{display:grid;justify-items:center;align-content:center;gap:10px;min-height:185px;padding:16px;border:1px solid var(--studio-line);border-radius:50% 50% 12px 12px;color:var(--studio-accent);text-align:center}
+.license-emblem span{font-size:.9rem;letter-spacing:.16em}
+.license-emblem small{font-size:.64rem;letter-spacing:.09em;color:var(--studio-muted)}
+.license-commercial{padding:clamp(20px,4vw,36px);border:1px solid var(--studio-line);border-radius:14px;background:var(--studio-panel)}
+.license-commercial p,.license-previous p{max-width:78ch}
+.license-document-layout{display:grid;grid-template-columns:minmax(185px,.32fr) minmax(0,1fr);align-items:start;gap:clamp(16px,4vw,34px);margin-top:24px}
+.license-toc{display:grid;gap:8px;padding:18px;border:1px solid var(--studio-line);border-radius:12px;background:var(--studio-panel);position:sticky;top:16px;max-height:calc(100vh - 32px);overflow:auto}
+.license-toc strong{margin-bottom:5px;color:var(--studio-text)}
+.license-toc a{font-size:.84rem;color:var(--studio-muted);line-height:1.35}
+.license-document{min-width:0;padding:clamp(18px,4vw,40px);border:1px solid var(--studio-line);border-radius:14px;background:var(--studio-panel);font-size:1rem;line-height:1.7;overflow-wrap:anywhere}
+.license-document-title{font:400 clamp(23px,4vw,34px)/1.2 Georgia,serif;margin:0 0 20px}
+.license-document h4{font-size:1.08rem;margin:28px 0 8px;color:var(--studio-text);scroll-margin-top:20px}
+.license-document p{margin:0 0 14px;line-height:1.75;color:var(--studio-text)}
+.license-document a,.license-previous a,.license-content>section>p>a{display:inline;color:var(--studio-accent);text-decoration:underline;text-underline-offset:3px}
+.license-document blockquote{margin:14px 0;padding:8px 16px;border-inline-start:2px solid var(--studio-accent)}
+.license-document blockquote p{margin:0}
+.license-document code{font-size:.86em;overflow-wrap:anywhere}
+.license-document strong{color:inherit}
+@media(max-width:760px){.license-hero,.license-document-layout{grid-template-columns:minmax(0,1fr)}.license-emblem{display:none}.license-toc{position:static;max-height:none}.license-document{font-size:.94rem}.license-site .studio-actions{gap:10px}}

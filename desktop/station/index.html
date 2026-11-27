@@ -1,4 +1,4 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; script-src 'self'">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>AuditDesktop</title>
 <link rel="stylesheet" href="../control/style.css"><link rel="stylesheet" href="./station.css"></head>
@@ -32,8 +32,10 @@
   <div class="actions">
     <button type="button" class="secondary" id="terms-document">Условия</button>
     <button type="button" class="secondary" id="privacy-document">Обработка данных</button>
+    <button type="button" class="secondary" id="license-document">License</button>
   </div>
-  <label><input id="accept-terms" type="checkbox"> Принимаю условия использования</label>
+  <label><input id="accept-terms" type="checkbox"> I accept the terms, privacy notice and license</label>
+  <fieldset><legend>Assistant permissions</legend><p>Choose optional features; each device requires separate local approval.</p><div id="registration-scopes"></div></fieldset>
 </fieldset>
 <div class="actions"><button id="login-button">Войти</button><button class="plain" type="button" id="register">Создать аккаунт</button></div>
 </form>
@@ -60,7 +62,7 @@
 <div class="actions"><button id="record" class="secondary">Начать запись</button><button id="finish" class="secondary" disabled>Сохранить сценарий</button></div>
 </section>
 <section class="desktop-card"><div class="row"><h2>Журнал запуска</h2><button id="folder" class="plain">Открыть папку</button></div><pre id="logs"></pre></section>
-<details class="desktop-card"><summary data-interface-id="appearance">Оформление</summary><div id="design"></div></details>
+<details class="desktop-card"><summary data-interface-id="appearance">Оформление</summary><div id="presentation-controls"></div><p id="presentation-status" role="status"></p><div id="design"></div></details>
 <p id="message" class="message" role="status"></p>
 </main></div><script type="module" src="view.js"></script></body></html>
 

@@ -10,15 +10,15 @@ import type {AvatarAppearance} from './PersonalAvatar';
 export type AvatarMood='neutral'|'happy'|'sad'|'angry'|'surprised';
 export type AvatarMotion='idle'|'wave'|'nod'|'dance'|'talk'|'sit'|'walk'|'lean'|'perch'|'bump'|'listen';
 export type Viseme='aa'|'ih'|'ou'|'ee'|'oh';
-export function AvatarStage({url,mime,motion='idle',mood='neutral',speech=0,viseme='aa',beat=0,gaze,animations,intensity=1,appearance,play=0}: 
+export function AvatarStage({url,mime,motion='idle',mood='neutral',speech=0,viseme='aa',beat=0,gaze,animations,intensity=1,appearance,play=0,initialPhase=0,onPlayback,onReady}: 
   {url?:string;mime?:string;motion?:AvatarMotion;mood?:AvatarMood;speech?:number;viseme?:Viseme;beat?:number;gaze?:FaceMotion;
-    animations?:Partial<Record<AvatarMotion,ClipAsset>>;intensity?:number;appearance?:AvatarAppearance;play?:number}){
+    animations?:Partial<Record<AvatarMotion,ClipAsset>>;intensity?:number;appearance?:AvatarAppearance;play?:number;initialPhase?:number;onPlayback?:(motion:AvatarMotion,seconds:number)=>void;onReady?:()=>void}){
  const mount=useRef<HTMLDivElement>(null);
  const [notice,setNotice]=useState('');
  const [phase,setPhase]=useState('waiting');
  const [imported,setImported]=useState(false);
- const state=useRef({motion,mood,speech,viseme,beat,gaze,intensity,appearance,play});
- useEffect(()=>{state.current={motion,mood,speech,viseme,beat,gaze,intensity,appearance,play}},[motion,mood,speech,viseme,beat,gaze,intensity,appearance,play]);
+ const state=useRef({motion,mood,speech,viseme,beat,gaze,intensity,appearance,play,initialPhase,onPlayback,onReady});
+ useEffect(()=>{state.current={motion,mood,speech,viseme,beat,gaze,intensity,appearance,play,initialPhase,onPlayback,onReady}},[motion,mood,speech,viseme,beat,gaze,intensity,appearance,play,initialPhase,onPlayback,onReady]);
  useEffect(()=>{
   const host=mount.current;if(!host)return;
   setNotice('');
@@ -43,6 +43,7 @@ export function AvatarStage({url,mime,motion='idle',mood='neutral',speech=0,vise
   const bones=new Map<string,{node:THREE.Object3D,rest:THREE.Quaternion}>();
   const movement=new THREE.Quaternion();const pose=new THREE.Euler();
   let leftArm=-1.04,rightArm=1.04;
+  const mouth={aa:0,ih:0,ou:0,ee:0,oh:0};
   function loadBones(model:VRM){
    for(const name of ['leftUpperArm','rightUpperArm','leftUpperLeg','rightUpperLeg','leftLowerLeg','rightLowerLeg','head','spine'] as const){
     const node=model.humanoid.getNormalizedBoneNode(name);if(node)bones.set(name,{node,rest:node.quaternion.clone()});
@@ -76,6 +77,7 @@ export function AvatarStage({url,mime,motion='idle',mood='neutral',speech=0,vise
       const model=vrm;
       for(const [name,clip] of Object.entries(animations??{})){
        if(!clip)continue;
+       loadingClips++;
        void avatarClip(clip,model).then(animation=>{
         if(dead||!mixer)return;
         if(animation){
@@ -83,7 +85,7 @@ export function AvatarStage({url,mime,motion='idle',mood='neutral',speech=0,vise
          trackedBones.set(action,new Set(animation.tracks.map(track=>THREE.PropertyBinding.parseTrackName(track.name).nodeName)));
         }
         else setNotice('Для одного из клипов используется встроенное движение. Проверьте кости и формат анимации.');
-       }).catch(()=>{if(!dead)setNotice('Для одного из клипов используется встроенное движение. Проверьте кости и формат анимации.')});
+       }).catch(()=>{if(!dead)setNotice('Для одного из клипов используется встроенное движение. Проверьте кости и формат анимации.')}).finally(()=>{loadingClips--});
       }
      }else if(Object.keys(animations??{}).length){
       setNotice('Назначенные движения требуют модели VRM с гуманоидным скелетом.');
@@ -97,9 +99,12 @@ export function AvatarStage({url,mime,motion='idle',mood='neutral',speech=0,vise
    if(size.lengthSq()>0){const scale=1.6/Math.max(size.y,size.x*.68,.01);root.scale.multiplyScalar(scale);root.position.set(-center.x*scale,-bounds.min.y*scale,-center.z*scale)}
   }
   let frame=0,t=0,previous=performance.now(),lastPlay=-1,lastMotion:AvatarMotion|undefined;
+  let readyReported=false;
+  let loadingClips=0;
   const tick=(now=performance.now())=>{if(dead)return;const s=state.current;
    const dt=Math.min((now-previous)/1000,.05);previous=now;
-   if(s.motion!==lastMotion||s.play!==lastPlay)t=0;
+   if(!subject||loadingClips>0){frame=requestAnimationFrame(tick);return;}
+   if(s.motion!==lastMotion||s.play!==lastPlay)t=lastMotion===undefined?Math.max(0,s.initialPhase):0;
    t+=dt*(s.appearance?.speed??1);
    const center=.84+(s.appearance?.vertical??0);
    camera.position.set(0,center,3.45*Math.max(1,.72/camera.aspect)/(s.appearance?.zoom??1));camera.lookAt(0,center,0);
@@ -118,6 +123,8 @@ export function AvatarStage({url,mime,motion='idle',mood='neutral',speech=0,vise
      if(s.motion==='wave'||s.motion==='bump'){currentClip.setLoop(THREE.LoopOnce,1);currentClip.clampWhenFinished=true}
      else currentClip.setLoop(THREE.LoopRepeat,Infinity);
      currentClip.play();
+     const duration=currentClip.getClip().duration;
+     if(duration>0)currentClip.time=s.motion==='wave'||s.motion==='bump'?Math.min(t,duration):t%duration;
     }
    }
    if(subject){
@@ -142,12 +149,19 @@ export function AvatarStage({url,mime,motion='idle',mood='neutral',speech=0,vise
     const face=vrm.expressionManager;
     if(face){
      for(const key of ['happy','sad','angry','surprised'])face.setValue(key,key===s.mood?0.75:0);
-     for(const vowel of ['aa','ih','ou','ee','oh'] as const)face.setValue(vowel,vowel===s.viseme?Math.max(0,Math.min(1,s.speech)):0);
+     for(const vowel of ['aa','ih','ou','ee','oh'] as const){
+      const target=vowel===s.viseme?Math.max(0,Math.min(1,s.speech)):0;
+      const response=1-Math.exp(-dt*(target>mouth[vowel]?23:15));
+      mouth[vowel]+=(target-mouth[vowel])*response;
+      face.setValue(vowel,mouth[vowel]);
+     }
      face.setValue('blink',Math.sin(t*1.7)>0.985?1:0);
     }
     vrm.update(dt);
    }
-   renderer.render(scene,camera);frame=requestAnimationFrame(tick);
+   renderer.render(scene,camera);
+   if(subject){s.onPlayback?.(s.motion,t);if(!readyReported){readyReported=true;s.onReady?.()}}
+   frame=requestAnimationFrame(tick);
   };tick();
   return ()=>{dead=true;cancelAnimationFrame(frame);ro.disconnect();mixer?.stopAllAction();VRMUtils.deepDispose(pivot);renderer.dispose();renderer.domElement.remove();};
  },[url,mime,animations]);
