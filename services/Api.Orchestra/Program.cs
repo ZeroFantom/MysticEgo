@@ -32,6 +32,7 @@ builder.Services.AddSingleton<DevelopmentTeam>();
 builder.Services.AddSingleton<WorkspaceGitHubClient>();
 builder.Services.AddSingleton<DevelopmentWorkspace>();
 builder.Services.AddSingleton<WorkspaceThreads>();
+builder.Services.AddScoped<WorkspaceMcpService>();
 builder.Services.AddHostedService<WorkspaceSyncWorker>();
 builder.Services.AddHttpClient("development-github",client=>{
     client.Timeout=TimeSpan.FromSeconds(12);
