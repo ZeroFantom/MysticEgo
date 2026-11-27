@@ -14,6 +14,7 @@ public sealed class WorkspaceItem
     public string Status {get;set;}="open";
     public Guid Creator {get;set;}
     public Guid? Assignee {get;set;}
+    public string[] RemoteAssignees {get;set;}=[];
     public int? GitHubNumber {get;set;}
     public string? GitHubId {get;set;}
     public string SyncState {get;set;}="local";
@@ -45,7 +46,8 @@ public sealed class DevelopmentWorkspace(NodeState state,WorkspaceGitHubClient g
         try
         {
             var item=await state.Data.GetAsync<WorkspaceItem>(id,ct)??throw new KeyNotFoundException();
-            if(item.SyncState!="local")throw new InvalidOperationException("Published tasks are managed on GitHub or via explicit synchronized actions");
+            if(item.SyncState=="synced")return await ChangeRemote(item,actor,owner,action,ct);
+            if(item.SyncState!="local")throw new InvalidOperationException("Publication outcome unresolved");
             if(item.Kind!="issue")throw new InvalidOperationException("Only issues have work status");
             switch(action)
             {
@@ -57,6 +59,31 @@ public sealed class DevelopmentWorkspace(NodeState state,WorkspaceGitHubClient g
             item.UpdatedAt=DateTimeOffset.UtcNow;await state.Data.PutAsync(item,ct);state.Log(actor.ToString(),"workspace."+action,id.ToString(),true);return item;
         }
         finally{gate.Release();}
+    }
+    /// <summary>Update remote issue through the configured member mapping, never an arbitrary supplied GitHub login.</summary>
+    private async Task<WorkspaceItem> ChangeRemote(WorkspaceItem item,Guid actor,bool owner,string action,CancellationToken ct)
+    {
+        if(item.Kind!="issue"||item.GitHubNumber is not int number||!github.WritesEnabled)throw new InvalidOperationException("Remote task unavailable");
+        var login=github.LinkedLogin(actor);
+        if(string.IsNullOrWhiteSpace(login)||!System.Text.RegularExpressions.Regex.IsMatch(login,@"\A[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?\z"))throw new InvalidOperationException("GitHub member mapping required");
+        var route="issues/"+number;
+        var current=await github.Rest(HttpMethod.Get,route,null,ct);
+        if(current["pull_request"] is not null||current["state"]?.ToString()!="open")throw new InvalidOperationException("Remote issue is not open");
+        var assignees=current["assignees"]?.AsArray().Select(x=>x?["login"]?.ToString()).ToArray()??[];
+        var mine=assignees.Contains(login,StringComparer.OrdinalIgnoreCase);
+        object patch=action switch
+        {
+            "take" when assignees.Length==0=>new{assignees=new[]{login}},
+            "release" when mine&&assignees.Length==1=>new{assignees=Array.Empty<string>()},
+            "complete" when mine||owner=>new{state="closed"},
+            _=>throw new InvalidOperationException("Remote issue action not allowed")
+        };
+        var updated=await github.Rest(HttpMethod.Patch,route,patch,ct);
+        var assigned=updated["assignees"]?.AsArray().Select(x=>x?["login"]?.ToString()).OfType<string>().ToArray()??[];
+        if(action=="take"&&!assigned.Contains(login,StringComparer.OrdinalIgnoreCase))throw new InvalidOperationException("GitHub did not assign the mapped member");
+        item.Status=updated["state"]?.ToString()=="closed"?"closed":assigned.Length>0?"in-progress":"open";
+        item.RemoteAssignees=assigned;item.Assignee=null;item.UpdatedAt=DateTimeOffset.UtcNow;
+        await state.Data.PutAsync(item,ct);state.Log(actor.ToString(),"workspace.remote."+action,item.Id.ToString(),true);return item;
     }
     public async Task<WorkspaceItem> Publish(Guid id,Guid actor,bool owner,CancellationToken ct)
     {
@@ -98,7 +125,7 @@ public sealed class DevelopmentWorkspace(NodeState state,WorkspaceGitHubClient g
             for(var page=1;page<=5;page++)
             {
                 var data=(await github.Rest(HttpMethod.Get,"issues?state=all&per_page=100&page="+page,null,ct)).AsArray();
-                foreach(var n in data.OfType<JsonObject>().Where(n=>n["pull_request"] is null))await Import(rows,"issue",n["number"]!.GetValue<int>(),null,n["title"]!.ToString(),n["body"]?.ToString()??"",n["state"]?.ToString()=="closed",ct);
+                foreach(var n in data.OfType<JsonObject>().Where(n=>n["pull_request"] is null))await Import(rows,"issue",n["number"]!.GetValue<int>(),null,n["title"]!.ToString(),n["body"]?.ToString()??"",n["state"]?.ToString()=="closed",ct,n["assignees"]?.AsArray().Select(x=>x?["login"]?.ToString()).OfType<string>().ToArray());
                 if(data.Count<100)break;
             }
             string? cursor=null;
@@ -115,15 +142,16 @@ public sealed class DevelopmentWorkspace(NodeState state,WorkspaceGitHubClient g
         catch(Exception e) when(e is not OperationCanceledException||!ct.IsCancellationRequested){syncError="GitHub synchronization incomplete";}
         finally{gate.Release();}
     }
-    private async Task Import(List<WorkspaceItem> rows,string kind,int number,string? remoteId,string title,string body,bool closed,CancellationToken ct)
+    private async Task Import(List<WorkspaceItem> rows,string kind,int number,string? remoteId,string title,string body,bool closed,CancellationToken ct,string[]? assignees=null)
     {
         var item=rows.FirstOrDefault(x=>x.Kind==kind&&x.GitHubNumber==number);
         // Reconcile an interrupted publish using its explicit local correlation marker.
         if(item is null)item=rows.FirstOrDefault(x=>x.Kind==kind&&x.SyncState=="publishing"&&body.Contains("<!-- mysticego-workspace:"+x.Id.ToString("D")+" -->",StringComparison.Ordinal));
         if(item is null){item=new WorkspaceItem{Id=Guid.NewGuid(),Kind=kind};rows.Add(item);}
-        var status=closed?"closed":"open";
-        if(item.SyncState=="synced"&&item.Title==title&&item.Body==body&&item.Status==status)return;
-        item.GitHubNumber=number;item.GitHubId=remoteId;item.Title=title;item.Body=body;item.Status=status;item.SyncState="synced";item.UpdatedAt=DateTimeOffset.UtcNow;
+        assignees??=[];
+        var status=closed?"closed":assignees.Length>0?"in-progress":"open";
+        if(item.SyncState=="synced"&&item.Title==title&&item.Body==body&&item.Status==status&&item.RemoteAssignees.SequenceEqual(assignees))return;
+        item.GitHubNumber=number;item.GitHubId=remoteId;item.Title=title;item.Body=body;item.Status=status;item.RemoteAssignees=assignees;item.Assignee=null;item.SyncState="synced";item.UpdatedAt=DateTimeOffset.UtcNow;
         await state.Data.PutAsync(item,ct);
     }
 }
