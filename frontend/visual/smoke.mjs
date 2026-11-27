@@ -45,6 +45,7 @@ function apiResponse(path,origin){
     '/api/v1/collective/me':profile,'/api/v1/collective/notifications':[],'/api/v1/collective/shard/quests':[],
     '/api/v1/collective/contacts':[contact],'/api/v1/collective/messages/visual-peer':messages,
     '/api/v1/managed/context':{rootId:'root',rootName:'Оркестр',orchestraUrl:origin,authUrl:origin,developer:false,owner:false,actor:'visual-user',lan:false},
+    '/api/v1/public/desktop-downloads':Object.fromEntries(['audit','agent','local'].flatMap(app=>['windows','linux'].map(os=>[app+'-'+os,{tag:'v1.0.0-test',url:'https://github.com/ZeroFantom/MysticEgo/releases/download/test/'+app+(os==='windows'?'.exe':'.run'),format:os==='windows'?'exe':'run',fileName:app+(os==='windows'?'.exe':'.run')}]))),
     '/api/v1/managed/topology':topology,'/api/v1/managed/development-team':{owner:false},
     '/api/v1/managed/applications':[],'/api/v1/public/project-release':{latest:null},'/api/v1/guest/availability':{available:false},
     '/api/v1/orchestra/telemetry':{os:'Fixture Linux',processors:8,observabilityAvailable:false,samples:[sample(-65,20,40),sample(-60,32,46),sample(-55,12,null),sample(-25,72,55),sample(-20,55,60),sample(-15,34,48),sample(-10,64,55),sample(-5,40,42),sample(0,55,50)],links:[]},
@@ -234,6 +235,29 @@ try{
               await capture(page,prefix+'-'+route);
             });
           }
+          if(role==='orchestra')await check(page,prefix+'-public-downloads-fullscreen',async()=>{
+            await page.goto(origin+'/desktop-downloads',{waitUntil:'domcontentloaded'});
+            const screen=page.locator('.desktop-downloads-public');
+            await visible(screen);
+            await visible(screen.getByRole('link',{name:'Скачать AuditDesktop для Windows x64 на GitHub'}));
+            for(const [theme,style] of combinations){
+              await switchAppearance(page,theme,style);
+              const layout=await screen.evaluate(el=>{
+                const r=el.getBoundingClientRect(),hero=el.querySelector('.desktop-download-hero').getBoundingClientRect(),footer=el.querySelector('footer').getBoundingClientRect();
+                return {width:r.width,left:r.left,heroWidth:hero.width,height:r.height,footerBottom:footer.bottom,viewportWidth:document.documentElement.clientWidth,viewportHeight:innerHeight};
+              });
+              assert(Math.abs(layout.width-layout.viewportWidth)<=1&&Math.abs(layout.left)<=1,'Public downloads must fill viewport width '+JSON.stringify(layout));
+              assert(Math.abs(layout.heroWidth-layout.viewportWidth)<=1,'Download hero must be full bleed');
+              assert(layout.height>=layout.viewportHeight-1&&layout.footerBottom>=layout.viewportHeight-1,'Download page must fill viewport height');
+              await checkArtwork(page,theme,style,'.desktop-downloads-public .desktop-download-hero','profile');
+              await noHorizontalOverflow(page);
+              await capture(page,prefix+'-public-downloads-'+theme+'-'+style);
+            }
+            assert.equal(await screen.locator('.desktop-download-card').count(),3);
+            assert.equal(await screen.locator('.desktop-download-platforms a').count(),6);
+            await screen.locator('a[href="#applications"]').click();
+            assert.equal(new URL(page.url()).hash,'#applications');
+          });
           if(role==='orchestra')for(const route of ['studio','developer'])await check(page,prefix+'-landing-'+route,async()=>{
             await page.goto(origin+'/'+route,{waitUntil:'domcontentloaded'});
             const hero=page.locator('.landing-hero'),nav=page.locator('.studio-nav');

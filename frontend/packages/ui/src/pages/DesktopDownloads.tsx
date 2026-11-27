@@ -62,14 +62,25 @@ export function PublicDesktopDownloads({scope=''}:{scope?:string}={}){
     return ()=>controller.abort();
   },[revision]);
   return <main className="desktop-downloads desktop-downloads-public">
-    <div className="appearance-public-bar"><ThemeToggle scope={scope}/></div>
-    <a className="desktop-download-back" href="/"><ArrowLeft size={17} aria-hidden="true"/> К авторизации</a>
-    <header className="desktop-download-hero"><Laptop size={29} aria-hidden="true"/><h1>Приложения MysticEgo</h1>
-      <p>Выберите нужное приложение и ОС. Windows: запустите EXE. Linux x64: запустите скачанный RUN-файл через bash. Среды выполнения включены. Если установщика пока нет, доступен прежний ZIP.</p>
+    <nav className="desktop-download-nav" aria-label="Скачивание приложений">
+      <a className="desktop-download-back" href="/"><ArrowLeft size={17} aria-hidden="true"/> К авторизации</a>
+      <span className="desktop-download-brand">MysticEgo</span>
+      <div className="appearance-public-bar"><ThemeToggle scope={scope}/></div>
+    </nav>
+    <header className="desktop-download-hero">
+      <div className="desktop-download-hero-copy">
+        <p className="desktop-download-kicker"><Laptop size={22} aria-hidden="true"/> MysticEgo / Desktop</p>
+        <h1>Приложения MysticEgo</h1>
+        <p>Выберите нужное приложение и ОС. Windows: запустите EXE. Linux x64: запустите скачанный RUN-файл через bash. Среды выполнения включены. Если установщика пока нет, доступен прежний ZIP.</p>
+        <a className="desktop-download-jump" href="#applications"><Download size={18} aria-hidden="true"/> Выбрать приложение</a>
+      </div>
     </header>
-    {error&&<p role="status">Не удалось получить актуальные ссылки GitHub. <button className="btn secondary" onClick={()=>retry(value=>value+1)}>Повторить</button></p>}
-    <div className="desktop-download-grid">{publicApps.map(app=><AppCard key={app.name} app={app} downloads={downloads} loading={!downloads&&!error}/>)}</div>
-    <p className="desktop-download-footnote">Лицензия исходного кода <LicenseLink/>.</p>
+    <section id="applications" className="desktop-download-content" aria-labelledby="desktop-applications-title">
+      <h2 id="desktop-applications-title">Скачивание приложений</h2>
+      {error&&<p role="status">Не удалось получить актуальные ссылки GitHub. <button className="btn secondary" onClick={()=>retry(value=>value+1)}>Повторить</button></p>}
+      <div className="desktop-download-grid">{publicApps.map(app=><AppCard key={app.name} app={app} downloads={downloads} loading={!downloads&&!error}/>)}</div>
+    </section>
+    <footer className="desktop-download-footnote">Лицензия исходного кода <LicenseLink/>.</footer>
   </main>;
 }
 
