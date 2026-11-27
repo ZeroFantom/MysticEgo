@@ -6,7 +6,7 @@ let initialized=false,centralEdited=false,register=false;
 let documents=null;
 let documentRequest=0;
 const effects=initEffects($('design'),{onChange:patch=>void savePref(patch)});
-let prefs={language:'en',font:'modern'},owner=null,preferenceGeneration=0,saveChain=Promise.resolve();
+let prefs={language:'en',font:'modern'},owner=null,serverGeneration=0,preferenceGeneration=0,saveChain=Promise.resolve();
 try{prefs={...prefs,...JSON.parse(localStorage.getItem('mysticego.desktop.guest.presentation')||'{}')}}catch{}
 const host=$('presentation-controls');
 const languageSelect=document.createElement('select'),fontSelect=document.createElement('select');
@@ -19,27 +19,27 @@ captureStatic(document.body);
 function applyPrefs(){effects?.applyAccount(prefs);applyPresentation(prefs);languageSelect.value=prefs.language;fontSelect.value=prefs.font;$('global-panel').dataset.options='';$('login-title').textContent=t(register?'Создайте аккаунт Audit':'Войдите в MysticEgo');$('login-button').textContent=t(register?'Создать аккаунт':'Войти');$('register').textContent=t(register?'У меня есть аккаунт':'Создать аккаунт');}
 applyPrefs();
 async function savePref(patch){
- const generation=preferenceGeneration;prefs={...prefs,...patch};applyPrefs();
+ const generation=preferenceGeneration,expected=serverGeneration;prefs={...prefs,...patch};applyPrefs();
  if(!owner){try{localStorage.setItem('mysticego.desktop.guest.presentation',JSON.stringify(prefs))}catch{};return}
- saveChain=saveChain.then(async()=>{if(generation!==preferenceGeneration)return;try{await api.presentation(patch);if(generation===preferenceGeneration)$('presentation-status').textContent=''}catch{if(generation===preferenceGeneration)$('presentation-status').textContent=t('Настройки не синхронизированы')}});
+ saveChain=saveChain.then(async()=>{if(generation!==preferenceGeneration)return;try{await api.presentation(expected,patch);if(generation===preferenceGeneration)$('presentation-status').textContent=''}catch{if(generation===preferenceGeneration)$('presentation-status').textContent=t('Настройки не синхронизированы')}});
  await saveChain;
 }
 languageSelect.onchange=()=>void savePref({language:languageSelect.value});
 fontSelect.onchange=()=>void savePref({font:fontSelect.value});
-async function bindOwner(next){
- if(next===owner)return;
- owner=next;const generation=++preferenceGeneration;
+async function bindOwner(next,expected){
+ if(next===owner&&expected===serverGeneration)return;
+ owner=next;serverGeneration=expected;const generation=++preferenceGeneration;
  prefs={language:'en',font:'modern'};applyPrefs();$('presentation-status').textContent='';
  if(!next){languageSelect.disabled=fontSelect.disabled=false;$('design').inert=false;try{prefs={...prefs,...JSON.parse(localStorage.getItem('mysticego.desktop.guest.presentation')||'{}')}}catch{}applyPrefs();return}
  languageSelect.disabled=fontSelect.disabled=true;$('design').inert=true;
- try{const result=await api.presentation();if(generation===preferenceGeneration){prefs={...prefs,...result};applyPrefs()}}
+ try{const result=await api.presentation(expected);if(generation===preferenceGeneration){prefs={...prefs,...result};applyPrefs()}}
  catch{if(generation===preferenceGeneration)$('presentation-status').textContent=t('Настройки не синхронизированы')}
  finally{if(generation===preferenceGeneration){languageSelect.disabled=fontSelect.disabled=false}}
 }
 async function refresh(){
   const state=await api.snapshot();
   const node=state.node,authorized=Boolean(state.actor);
-  await bindOwner(state.actor?JSON.stringify([state.central,state.actor]):null);
+  await bindOwner(state.actor?JSON.stringify([state.central,state.actor]):null,state.accountGeneration);
   document.body.dataset.product=state.isAgent?'agent':'audit';
   $('product-title').textContent=state.isAgent?'AgentDesktop':'AuditDesktop';
   $('product-subtitle').textContent=state.isAgent?t("Клубная рабочая станция"):t("Личный профиль MysticEgo");
