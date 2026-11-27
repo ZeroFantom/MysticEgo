@@ -11,6 +11,7 @@ on:
       - 'ops/orchestra-updater/**'
       - 'tests/InfrastructureLocalSocketSmoke.py'
       - 'tests/BetaResilienceSmoke/**'
+      - 'tests/DiagnosticReportSmoke/**'
       - '.github/workflows/appearance-check.yml'
   workflow_dispatch:
 permissions:
@@ -50,6 +51,7 @@ jobs:
           bash -n ops/infrastructure/install-local.sh
           bash -n ops/infrastructure/install-voice.sh
       - run: dotnet run --project tests/BetaResilienceSmoke/BetaResilienceSmoke.csproj
+      - run: dotnet run --project tests/DiagnosticReportSmoke/DiagnosticReportSmoke.csproj
       - run: |
           for role in Orchestra Global Local Agent AuditOrchestra; do
             dotnet build "services/Api.$role/Api.$role.csproj" -c Release

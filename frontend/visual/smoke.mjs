@@ -265,6 +265,17 @@ try{
               await visible(page.locator('.chart-line').first());
               assert.equal(await page.getByLabel('Компонент',{exact:true}).count(),0);
               assert.equal(await page.locator('.infra-workspace').count(),0);
+              const reportRoute='**/api/v1/orchestra/diagnostics/report?format=*';
+              await page.route(reportRoute,route=>route.fulfill({contentType:'application/octet-stream',body:'fixture-diagnostic-report'}));
+              try{
+                for(const format of ['json','txt','xlsx']){
+                  await page.getByLabel('Формат отчёта',{exact:true}).selectOption(format);
+                  const download=page.waitForEvent('download');
+                  await page.getByRole('button',{name:'Скачать отчёт',exact:true}).click();
+                  assert((await download).suggestedFilename().endsWith('.'+format));
+                }
+              }finally{await page.unroute(reportRoute)}
+              await noHorizontalOverflow(page);
             }finally{for(const path of Object.keys(fixture))await page.unroute('**'+path,handler)}
           });
           if(role==='orchestra')await check(page,prefix+'-public-downloads-fullscreen',async()=>{
