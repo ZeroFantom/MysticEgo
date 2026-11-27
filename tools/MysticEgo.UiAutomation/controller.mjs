@@ -13,6 +13,8 @@ export const operations = {
   native_key: ['Press a permitted non-text navigation or game key in the attached foreground window', { ...session, key: z.enum(['Enter','Escape','Tab','Space','Up','Down','Left','Right','W','A','S','D']) }],
   native_pointer_get: ['Read Windows pointer speed, not hardware DPI', {}],
   native_pointer_set: ['Set Windows pointer speed (1–20); owner must enable this in local config', { speed: z.number().int().min(1).max(20) }],
+  native_vendor_launch: ['Open locally configured NVIDIA App, G HUB or MSI Center; update through official UI with owner confirmation', { vendor: z.enum(['nvidia','logitech','msicenter']) }],
+  native_replay_clicks: ['Replay a locally recorded MysticEgo client-coordinate click scenario in the attached foreground window', { ...session, scenarioJson: z.string().max(16000) }],
   native_close: ['Detach from the native window without closing it', session],
   ui_targets: ['List locally configured targets', {}],
   ui_open: ['Open a visible Chromium window or configured Electron app', { kind: z.enum(['web','desktop']), target: z.string().min(1).max(2048) }],
