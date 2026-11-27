@@ -11,7 +11,7 @@ using Models.Commands.SignalR.Hub;
 namespace MysticEgo.Distributed;
 
 public sealed class DiagnosticMcpService(IMcpDispatcher dispatcher, ICapabilityStore capabilities, INodeCommandService commands,
-    IAssistantProposalStore proposals, NodeOptions node, IConfiguration config)
+    IAssistantProposalStore proposals, NodeOptions node, IConfiguration config, UiAutomationBridge ui)
 {
     private static readonly HashSet<string> ReadOnlyTools = ["system.info", "system.health", "system.drives", "rgb.status", "integrations.status"];
     private bool Desktop => node.Kind is NodeKind.Agent or NodeKind.AuditOrchestra;
@@ -47,6 +47,9 @@ public sealed class DiagnosticMcpService(IMcpDispatcher dispatcher, ICapabilityS
                 dynamic.Add(BuiltIn("desktop.windows", "Заголовки видимых окон текущего сеанса", true));
                 dynamic.Add(BuiltIn("desktop.launch.propose", "Создать предложение запустить ранее разрешённое приложение", false, "alias"));
             }
+            if (Desktop && localConsole && ui.IsEnabled && string.Equals(ui.Owner, actor, StringComparison.Ordinal) &&
+                await ui.ToolsAsync(ct) is { } uiTools)
+                dynamic.AddRange(uiTools.Tools.Where(t => UiAutomationController.IsOperation(t.Name)));
             list.Tools = dynamic;
         }
         return response;
@@ -66,6 +69,9 @@ public sealed class DiagnosticMcpService(IMcpDispatcher dispatcher, ICapabilityS
 
     private async Task<McpCallToolResult> Call(string tool, JsonElement args, string actor, bool localConsole, CancellationToken ct)
     {
+        if (UiAutomationController.IsOperation(tool))
+            return Desktop && localConsole && ui.IsEnabled && string.Equals(ui.Owner, actor, StringComparison.Ordinal)
+                ? await ui.CallAsync(tool, args, ct) : McpCallToolResult.Fail("Local owner consent required.");
         if (tool == "node.status")
         {
             using var process = Process.GetCurrentProcess();
@@ -132,7 +138,9 @@ public sealed class DiagnosticsMcpController(NodeOptions node, INodeAccessPolicy
         if (request.Method.StartsWith("notifications/", StringComparison.Ordinal) && request.Id is null) return Accepted();
         // Window titles and app proposals are confined to the device owner and a local client.
         var owner = Environment.GetEnvironmentVariable("MYSTICEGO_AGENT_OWNER_USER");
-        var localConsole = owner == actor && HttpContext.Connection.RemoteIpAddress is { } address && IPAddress.IsLoopback(address);
+        var localConsole = owner == actor && HttpContext.Connection.RemoteIpAddress is { } address && IPAddress.IsLoopback(address) && !Request.Headers.ContainsKey("Forwarded") &&
+            !Request.Headers.ContainsKey("X-Forwarded-For") && !Request.Headers.ContainsKey("Origin") &&
+            User.FindFirst("token_use")?.Value != "device";
         return Ok(await service.Dispatch(request, actor, localConsole, ct));
     }
 }
