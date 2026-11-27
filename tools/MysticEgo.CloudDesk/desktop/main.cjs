@@ -1,5 +1,6 @@
 const {app,BrowserWindow,ipcMain,shell,dialog,clipboard}=require('electron');
 const {createLocalCenter}=require('./local-center.cjs');
+const {installInterfaceMcp}=require('./interface-mcp.cjs');
 const {spawn}=require('node:child_process'); const fs=require('node:fs'); const path=require('node:path');const readline=require('node:readline');const crypto=require('node:crypto');
 const windows=process.platform==='win32';
 const root=path.join(__dirname,'..');
@@ -75,7 +76,7 @@ app.whenReady().then(()=>{
      approve:async(session,challenge)=>(await request('browser.pairingApprove',{origin:session.origin,identity:session.identity,challenge})).code});
  }
  win.on('close',event=>{if(!quitReady){event.preventDefault();app.quit();}});
- win.webContents.setWindowOpenHandler(()=>({action:'deny'}));win.webContents.on('will-navigate',e=>e.preventDefault());win.loadFile(path.join(root,'dist','index.html'));
+ win.webContents.setWindowOpenHandler(()=>({action:'deny'}));win.webContents.on('will-navigate',e=>e.preventDefault());win.loadFile(path.join(root,'dist','index.html'));installInterfaceMcp(win,'CloudDesk');
  const updates=path.join(bundle,'desktop','desktop-updates.cjs');
  if(fs.existsSync(updates))require(updates).startDesktopUpdates({app,dialog,root:bundle,product:'CloudDesk',window:()=>win});
 });app.on('window-all-closed',()=>app.quit());app.on('before-quit',event=>{

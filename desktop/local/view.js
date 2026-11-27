@@ -1,3 +1,4 @@
+import {renderReleaseHighlights} from '../control/release-highlights.js';
 import {initEffects} from '../control/effects.js';
 const $=id=>document.getElementById(id);
 const api=window.local;
@@ -5,6 +6,7 @@ initEffects($('design'));
 let dirty=false,busy=false;
 async function refresh(){
   const state=await api.status();
+  renderReleaseHighlights(state.releaseHighlights,api['release-highlights-dismiss']);
   const input=$('connect').elements.global;
   if(!dirty&&state.global)input.value=state.global;
   $('state').textContent=state.online?'В сети':state.running?'Запускается':state.name?'Остановлен':'Ожидает настройки';

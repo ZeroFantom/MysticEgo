@@ -2,6 +2,7 @@ import {useState,type FormEvent} from 'react';
 import {ArrowUpRight,Bot,Braces,MessageSquare,Send,Server,Sparkles} from 'lucide-react';
 import {Link,useSearchParams} from 'react-router-dom';
 import {useApp,useRemote} from '../app/context';
+import {assistantNavigate} from '../app/InterfaceControl';
 import {Panel,ErrorBanner} from '../components/primitives';
 import {ModelWorkers} from './ModelWorkers';
 import './assistant-workspace.css';
@@ -28,6 +29,11 @@ function DeveloperChat(){
       const reply=await api.request<DeveloperReply>('/managed/panel-assistant',{method:'POST',
         body:JSON.stringify({text:question}),signal:AbortSignal.timeout(150000)});
       setTurns(items=>[...items,{question,reply}]);setPrompt(current=>current===prompt?'':current);
+      const action=reply.view&&Object.hasOwn(actions,reply.view)?actions[reply.view]:null;
+      // A model response alone is not authorization. The user must explicitly
+      // ask to open/navigate and grant the visible-window session.
+      if(action&&/^(?:пожалуйста[, ]+)?(?:открой|открыть|перейди|перейти|покажи страницу|open|navigate to|go to)(?:\s|$)/iu.test(question))
+        await assistantNavigate(action.path);
     }catch(e){setError(e instanceof Error?e.message:String(e));}
     finally{setBusy(false);}
   }
