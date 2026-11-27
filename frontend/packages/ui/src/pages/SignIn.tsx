@@ -1,4 +1,5 @@
 import {useState,type FormEvent} from 'react';
+import {browserKind,browserLabels} from '../app/browserPolicy';
 import {ArrowRight,Boxes,Eye,EyeOff,KeyRound,Network,Shield,Sparkles,UserRound} from 'lucide-react';
 import type {Session} from '../app/context';
 import {useRemote} from '../app/context';
@@ -38,7 +39,7 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
   setError('');
  }
  async function submit(event:FormEvent){
-  event.preventDefault();setBusy(true);setError('');
+  event.preventDefault();if(browserKind()==='unsupported'){setError('Браузер не поддерживается.');return;}setBusy(true);setError('');
   try{
    if(register){
     if(!documents.value||documents.loading||documents.error||policyKey&&acceptance!==policyKey)
@@ -62,6 +63,7 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
    <div className="auth-top-actions"><ThemeToggle/><NoticeBell placement="header"/></div>
    <div className="auth-form-card">
     <p className="auth-eyeline"><Sparkles size={17}/> {title}</p>
+    <small>Браузер: {browserLabels[browserKind()]}</small>
     <h2>{guest?'Гостевой сеанс':register?'Создать аккаунт':'Войти в MysticEgo'}</h2>
     {mode==='orchestra'&&<PanelLoginLinks/>}
     {mode==='audit'&&<div className="auth-tabs" role="group" aria-label="Режим авторизации" data-register={register}>
@@ -80,10 +82,10 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
      <div className="auth-field">
       <label htmlFor="auth-password">Пароль</label>
       <div className="auth-control auth-password"><KeyRound size={17} aria-hidden="true"/>
-       <input id="auth-password" name="password" type={reveal?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} required minLength={register?12:1} autoComplete={register?'new-password':'current-password'} aria-describedby={register?'auth-password-hint':undefined}/>
+       <input id="auth-password" name="password" type={reveal?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} required minLength={register?15:1} autoComplete={register?'new-password':'current-password'} aria-describedby={register?'auth-password-hint':undefined}/>
        <button className="icon-btn" type="button" aria-label={reveal?'Скрыть пароль':'Показать пароль'} onClick={()=>setReveal(value=>!value)}>{reveal?<EyeOff size={17}/>:<Eye size={17}/>}</button>
       </div>
-      {register&&<small id="auth-password-hint">Минимум 12 символов</small>}
+      {register&&<small id="auth-password-hint">Минимум 15 символов</small>}
      </div>
      {register&&policy&&<div className="registration-documents">
        <label><input type="checkbox" checked={acceptance===policyKey} required
