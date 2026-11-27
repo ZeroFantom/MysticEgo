@@ -4,6 +4,7 @@ import {SharePage} from '../pages/SharePage';
 import {ServerUpdateProvider,useServerUpdate} from './serverUpdate';
 import {CloudDeskDownloads,PublicDesktopDownloads} from '../pages/DesktopDownloads';
 import {NoticeBell,NotificationProvider,useNotice} from './notifications';
+import {MaintenanceNotices} from '../pages/MaintenanceStatus';
 import './workspace-rail.css';
 import './workspace-polish.css';
 import './motion.css';
@@ -204,7 +205,7 @@ function Workspace({logout}:{logout:()=>void}){
         <span className="topbar-light" aria-hidden="true"><span className="topbar-sweep"/></span>
         <button ref={menuTrigger} type="button" className="icon-btn mobile-toggle" onClick={()=>setMobile(value=>!value)} aria-label="Открыть меню" aria-controls="workspace-navigation" aria-expanded={drawerOpen}><Menu size={22}/></button>
         <div className="breadcrumb"><span>{modes[mode].name}</span><ChevronRight size={14}/><strong>{current}</strong></div>
-        <div className="top-actions"><ThemeToggle scope={preferenceScope}/><AccountMenu logout={logout}/><NotificationsFloat/></div>
+        <div className="top-actions"><MaintenanceNotices enabled={mode==='orchestra'&&developer.value?.owner===true}/><ThemeToggle scope={preferenceScope}/><AccountMenu logout={logout}/><NotificationsFloat/></div>
       </header>
       <main className="content"><AnimatedArea><Routes>
         <Route path="/" element={mode==='orchestra'||mode==='global'||mode==='local'?<OrchestraOverview/>:mode==='audit'?<OrganizationRequests overview/>:<Overview/>}/>

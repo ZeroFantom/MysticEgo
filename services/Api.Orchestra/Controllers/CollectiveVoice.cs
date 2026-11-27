@@ -60,7 +60,7 @@ public sealed class CollectiveVoice(NodeState state, IHttpClientFactory clients,
 
     public async Task<string> Transcribe(SocialMessage message, CancellationToken ct)
     {
-        if (!Uri.TryCreate(configuration["VoiceTranscription:Endpoint"], UriKind.Absolute, out var endpoint) ||
+        if (!Uri.TryCreate(configuration["VoiceTranscription:Endpoint"] ?? "http://127.0.0.1:1237/v1/audio/transcriptions", UriKind.Absolute, out var endpoint) ||
             (endpoint.Scheme != Uri.UriSchemeHttps && !(endpoint.Scheme == Uri.UriSchemeHttp && endpoint.IsLoopback)) ||
             endpoint.UserInfo.Length > 0)
             throw new NodeApiException(503, "Распознавание речи ещё не настроено администратором.");

@@ -24,6 +24,7 @@ def main():
         except OSError:
             return
         jobs = {
+            b"monitoring\n": {"component": "monitoring"},
             b"docker\n": {"component": "docker"},
             b"postgres\n": {"component": "postgres"},
             b"postgres-native\n": {"component": "postgres-native"},
@@ -40,6 +41,8 @@ def main():
             (directory / "request.json").write_text(json.dumps(data))
             for name in ("install.sh", "install.py"):
                 (directory / name).symlink_to(DIRECTORY / name)
+            if (DIRECTORY / "monitoring").is_dir():
+                (directory / "monitoring").symlink_to(DIRECTORY / "monitoring", target_is_directory=True)
             try:
                 result = subprocess.run(("/bin/bash", str(directory / "install.sh")), stdin=subprocess.DEVNULL,
                                         stdout=output, stderr=output, timeout=45 * 60)
