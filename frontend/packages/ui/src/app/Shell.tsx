@@ -1,4 +1,6 @@
 import './panel-surface.css';
+import {useAccountPresentation,useLocale} from './presentation';
+import './typography.css';
 import './cinematic.css';
 import {SharePage} from '../pages/SharePage';
 import {ServerUpdateProvider,useServerUpdate} from './serverUpdate';
@@ -29,7 +31,7 @@ import {Overview} from '../pages/Overview';
 import {AgentList,AgentDetails} from '../pages/Agents';
 import {Audit} from '../pages/Audit';
 import {AgentSystem} from '../pages/AgentSystem';
-import {Settings,initPalette,ThemeToggle} from '../pages/Settings';
+import {Settings,initPalette,ThemeToggle,applyAccountAppearance} from '../pages/Settings';
 import {SignIn} from '../pages/SignIn';
 import {AgentDesktopEntry,PanelDirectory} from '../pages/PanelDirectory';
 import {Identities} from '../pages/Identities';
@@ -94,6 +96,7 @@ function navigation(mode:NodeMode,portal:boolean):Section[]{
 }
 
 function AccountMenu({logout}:{logout:()=>void}){
+  const t=useLocale();
   const {personal,session}=useApp();
   const {pathname}=useLocation();
   const [open,setOpen]=useState(false);
@@ -114,8 +117,8 @@ function AccountMenu({logout}:{logout:()=>void}){
       <ProfileAvatar url={personal?.profile.avatarUrl} name={name}/><span>{name}</span><ChevronDown size={15}/>
     </button>
     <div id={menuId} className="account-popover motion-disclosure" data-motion-open={open} inert={!open} aria-hidden={!open}>
-      <Link to="/profile" onClick={()=>setOpen(false)}><UserRound size={17}/> Мой профиль</Link>
-      <button type="button" onClick={logout}><LogOut size={17}/> Выйти</button>
+      <Link to="/profile" onClick={()=>setOpen(false)}><UserRound size={17}/>{t("Мой профиль")}</Link>
+      <button type="button" onClick={logout}><LogOut size={17}/>{t("Выйти")}</button>
     </div>
   </div>;
 }
@@ -140,6 +143,7 @@ function AnimatedArea({children}:{children:ReactNode}){
 }
 
 function Workspace({logout}:{logout:()=>void}){
+  const t=useLocale();
   const {mode,portal,preferenceScope,api}=useApp();
   const developer=useRemote(()=>mode==='orchestra'?api.request<{owner:boolean;membership?:{status:string}}>('/managed/development-team'):Promise.resolve(null),[api,mode]);
   const cloudDownloads=mode==='orchestra'&&(developer.value?.owner||developer.value?.membership?.status==='approved');
@@ -187,18 +191,18 @@ function Workspace({logout}:{logout:()=>void}){
   const emblem=modes[mode].icon;
   const ModeIcon=emblem;
   return <div className="app-shell mystic-workspace" data-workspace={mode} data-drawer-open={drawerOpen}>
-    <aside id="workspace-navigation" ref={drawer} className={'sidebar '+(drawerOpen?'open':'')} inert={narrow&&!drawerOpen} role={drawerOpen?'dialog':undefined} aria-modal={drawerOpen?true:undefined} aria-label="Навигация MysticEgo">
-      <button ref={closeDrawer} className="icon-btn drawer-close" type="button" aria-label="Закрыть меню" onClick={()=>setMobile(false)}><X size={20}/></button>
+    <aside id="workspace-navigation" ref={drawer} className={'sidebar '+(drawerOpen?'open':'')} inert={narrow&&!drawerOpen} role={drawerOpen?'dialog':undefined} aria-modal={drawerOpen?true:undefined} aria-label={t("Навигация MysticEgo")}>
+      <button ref={closeDrawer} className="icon-btn drawer-close" type="button" aria-label={t("Закрыть меню")} onClick={()=>setMobile(false)}><X size={20}/></button>
       <Link to="/" className="brand" aria-label="MysticEgo" onClick={()=>setMobile(false)}><div className="brand-mark"><img src={"/mystic-mark.png"} alt=""/></div><strong>MysticEgo</strong></Link>
-      <div className="node-label"><span className="node-icon"><ModeIcon size={18}/></span><div><strong>{modes[mode].name}</strong><small>{modes[mode].subtitle}</small></div></div>
-      <nav aria-label="Главная навигация">{nav.map(section=><div className="nav-section" key={section.name}>
+      <div className="node-label"><span className="node-icon"><ModeIcon size={18}/></span><div><strong>{t(modes[mode].name)}</strong><small>{t(modes[mode].subtitle)}</small></div></div>
+      <nav aria-label={t("Главная навигация")}>{nav.map(section=><div className="nav-section" key={t(section.name)}>
         <div className="nav-title">{section.name}</div>
-        {section.items.map(item=><NavLink key={item.to} to={item.to} aria-label={item.label} title={item.label} end={item.to==='/'} onClick={()=>setMobile(false)} className={({isActive})=>'nav-link '+(isActive?'active':'')}>
-          <item.icon size={17}/><span>{item.label}</span>
+        {section.items.map(item=><NavLink key={item.to} to={item.to} aria-label={t(item.label)} title={t(item.label)} end={item.to==='/'} onClick={()=>setMobile(false)} className={({isActive})=>'nav-link '+(isActive?'active':'')}>
+          <item.icon size={17}/><span>{t(item.label)}</span>
         </NavLink>)}
       </div>)}</nav>
       <footer className="workspace-project">
-        {mode === 'orchestra' && <a href="/studio">Студия и команда</a>}
+        {mode === 'orchestra' && <a href="/studio">{t("Студия и команда")}</a>}
         <LicenseLink/>
       </footer>
       <ReleaseStatus/>
@@ -207,8 +211,8 @@ function Workspace({logout}:{logout:()=>void}){
     <div className="main" inert={drawerOpen}>
       <header className="topbar orchestral-topbar">
         <span className="topbar-light" aria-hidden="true"><span className="topbar-sweep"/></span>
-        <button ref={menuTrigger} type="button" className="icon-btn mobile-toggle" onClick={()=>setMobile(value=>!value)} aria-label="Открыть меню" aria-controls="workspace-navigation" aria-expanded={drawerOpen}><Menu size={22}/></button>
-        <div className="breadcrumb"><span>{modes[mode].name}</span><ChevronRight size={14}/><strong>{current}</strong></div>
+        <button ref={menuTrigger} type="button" className="icon-btn mobile-toggle" onClick={()=>setMobile(value=>!value)} aria-label={t("Открыть меню")} aria-controls="workspace-navigation" aria-expanded={drawerOpen}><Menu size={22}/></button>
+        <div className="breadcrumb"><span>{modes[mode].name}</span><ChevronRight size={14}/><strong>{t(current)}</strong></div>
         <div className="top-actions"><MaintenanceNotices enabled={mode==='orchestra'&&developer.value?.owner===true}/><ThemeToggle scope={preferenceScope}/><AccountMenu logout={logout}/><NotificationsFloat/></div>
       </header>
       <main className="content"><AnimatedArea><Routes>
@@ -243,7 +247,7 @@ function Workspace({logout}:{logout:()=>void}){
         {['/social','/directory'].map(path=><Route key={path} path={path} element={<Navigate to="/collective" replace/>}/>)}
         <Route path="/presets" element={<Navigate to="/commands" replace/>}/>
         <Route path="/deploy-native" element={<Navigate to="/setup" replace/>}/>
-        <Route path="*" element={<div className="empty"><p>Страница не найдена</p><Link className="btn secondary" to="/">К обзору</Link></div>}/>
+        <Route path="*" element={<div className="empty"><p>{t("Страница не найдена")}</p><Link className="btn secondary" to="/">{t("К обзору")}</Link></div>}/>
       </Routes></AnimatedArea></main>
       {(mode==='agent'||mode==='audit')&&pathname!=='/assistant'&&<AssistantCompanion/>}
     </div>
@@ -251,6 +255,7 @@ function Workspace({logout}:{logout:()=>void}){
 }
 
 export function MysticApp({mode,defaultApi}:{mode:NodeMode;title:string;defaultApi:string}){
+  const t=useLocale();
   const runtime=window.__MYSTIC_CONFIG__??{};
   const portal=location.pathname==='/audit-portal'||location.pathname.startsWith('/audit-portal/');
   const storageKey='mysticego.session.v1.'+mode+(portal?'.portal':'');
@@ -263,6 +268,7 @@ export function MysticApp({mode,defaultApi}:{mode:NodeMode;title:string;defaultA
   const scope=accountScope(session,mode,portal);
   const profile=useRemote(async()=>session.token?{scope,account:await api.request<PersonalAccount>('/collective/me')}:null,[api,scope]);
   useLayoutEffect(()=>initPalette(scope),[scope]);
+  useAccountPresentation(session.authUrl,session.token,scope,value=>applyAccountAppearance(scope,value));
   // Public pages work with or without a session, including during service recovery.
   const publicPath = location.pathname.replace(/\/$/, '');
   if (publicPath === '/share' || (portal && publicPath === '/audit-portal/share')) return <SharePage mode={portal?'audit':mode} portal={portal} scope={scope}/>;
@@ -275,10 +281,10 @@ export function MysticApp({mode,defaultApi}:{mode:NodeMode;title:string;defaultA
   if(mode==='orchestra'&&location.pathname==='/agent-desktop')return <AgentDesktopEntry scope={scope}/>;
   if(restoring)return <NotificationProvider><main className="auth-experience auth-recovery"><section className="auth-form-side">
     <div className="auth-form-card">
-      <h2>Восстановление входа</h2>
-      <p role="status">Проверяем сохранённую сессию. Если сервер ещё запускается, вход восстановится автоматически.</p><ErrorBanner text={restoreError}/>
-      {restoreError&&<button className="btn" onClick={retryRestore}>Повторить</button>}
-      <button className="btn secondary" onClick={logout}>Войти заново</button>
+      <h2>{t("Восстановление входа")}</h2>
+      <p role="status">{t("Проверяем сохранённую сессию. Если сервер ещё запускается, вход восстановится автоматически.")}</p><ErrorBanner text={restoreError}/>
+      {restoreError&&<button className="btn" onClick={retryRestore}>{t("Повторить")}</button>}
+      <button className="btn secondary" onClick={logout}>{t("Войти заново")}</button>
     </div>
   </section></main><NoticeBell/></NotificationProvider>;
   if(!session.token){
