@@ -1,0 +1,32 @@
+name: CloudDesk recovery
+on:
+  pull_request:
+    paths:
+      - 'tools/MysticEgo.CloudDesk/**'
+      - 'ops/orchestra-updater/**'
+      - 'ops/desktop-releases/clouddesk*'
+      - '.github/workflows/clouddesk-recovery.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  recovery:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: dotnet publish tools/MysticEgo.CloudDesk/backend/CloudDesk.csproj -c Release -o "${{ runner.temp }}/clouddesk"
+      - run: node ops/desktop-releases/clouddesk-smoke.mjs dotnet "${{ runner.temp }}/clouddesk/CloudDesk.dll"
+      - run: node ops/desktop-releases/clouddesk-recovery-smoke.mjs
+      - run: node --check tools/MysticEgo.CloudDesk/desktop/main.cjs
+      - run: bash -n ops/orchestra-updater/recover-maintenance.sh
+      - run: npm install --prefix tools/MysticEgo.CloudDesk --no-audit --no-fund
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: npm run build --prefix tools/MysticEgo.CloudDesk
