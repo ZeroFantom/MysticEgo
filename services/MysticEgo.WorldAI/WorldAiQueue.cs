@@ -98,6 +98,13 @@ public sealed class WorldAiJobQueue
         try{return _jobs.FirstOrDefault(j=>j.Id==id);}
         finally{_gate.Release();}
     }
+    /// <summary>Return queue backlog only; do not export prompts or results to monitoring.</summary>
+    public async Task<int?> PendingCount(CancellationToken ct)
+    {
+        await _gate.WaitAsync(ct);
+        try{return _recoveryError is null?_jobs.Count(j=>j.State=="pending"):null;}
+        finally{_gate.Release();}
+    }
     public async Task<object> Status(CancellationToken ct)
     {
         await _gate.WaitAsync(ct);
