@@ -2,7 +2,7 @@
 set -euo pipefail
 [[ $EUID == 0 ]]
 . /etc/os-release
-[[ $ID == ubuntu && $VERSION_ID == 24.04 ]] || { echo 'Локальный установщик поддерживает Ubuntu 24.04 LTS.' >&2; exit 1; }
+[[ $ID == ubuntu && ${VERSION_ID:-} =~ ^[0-9]+\.[0-9]+$ ]] && dpkg --compare-versions "$VERSION_ID" ge 24.04 || { echo 'Требуется Ubuntu 24.04 или новее.' >&2; exit 1; }
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 # Upgrade the existing privileged updater BEFORE any systemd or dependency operation.
 # Legacy releases call this hook with a 20-second deadline; the new updater can
