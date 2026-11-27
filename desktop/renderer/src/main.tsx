@@ -17,7 +17,8 @@ type Persona={voice?:boolean;moveDesktop?:boolean;music?:'auto'|'dance'|'listen'
 type Reply={ok:boolean;status:number;data:Uint8Array};
 declare global {
  interface Window{mysticDesktop?:{
-  context:()=>Promise<{api:string;scope:Service}>;
+  context:()=>Promise<{api:string;scope:Service;handoff?:{token:string;motion:'walk'|'perch';horizontal:number}|null}>;
+  handoffReady:()=>Promise<boolean>;
   login:(login:string,password:string)=>Promise<string>;
   request:(options:{api:string;path:string;token?:string;guest?:string;method?:string;body?:string})=>Promise<Reply>;
   taskbar:()=>Promise<boolean>;windows:()=>Promise<SystemWindow[]>;anchor:(title:string)=>Promise<boolean>;
@@ -34,6 +35,7 @@ function readOverlayLook():OverlayLook{try{return {...overlayDefaults,...JSON.pa
 function Overlay(){
  const [look,setLook]=useState<OverlayLook>(readOverlayLook);
  useEffect(()=>{const media=matchMedia('(prefers-color-scheme:light)');const apply=()=>{const root=document.documentElement;root.dataset.theme=look.theme==='system'?(media.matches?'light':'dark'):look.theme;root.dataset.interface=look.interfaceStyle;root.dataset.uiMotion=look.uiMotion;root.dataset.transition=look.transition;};apply();media.addEventListener('change',apply);try{localStorage.setItem('mysticego.overlay.appearance',JSON.stringify(look))}catch{}return()=>media.removeEventListener('change',apply)},[look]);
+ const [handoff,setHandoff]=useState<'walk'|'perch'|null>(null);
  const [scope,setScope]=useState<Service>('audit'),[api,setApi]=useState('http://127.0.0.1:5350');
  const [login,setLogin]=useState(''),[password,setPassword]=useState(''),[token,setToken]=useState(''),[guest,setGuest]=useState('');
  const [model,setModel]=useState<{url?:string;mime:string}>({mime:'.vrm'});
@@ -46,11 +48,18 @@ function Overlay(){
  const [settings,setSettings]=useState(true),[walking,setWalking]=useState(false),[busy,setBusy]=useState(false),[proposals,setProposals]=useState<Proposal[]>([]);
  const voice=useAvatarVoice(),music=useMusicBeat(),face=useFaceTracking();
 
- useEffect(()=>{void service?.context().then(value=>{if(value.api){setApi(value.api);setScope(value.scope)}})},[]);
+ useEffect(()=>{void service?.context().then(value=>{if(value.api){setApi(value.api);setScope(value.scope)}if(value.handoff){setModel({mime:'.vrm'});setToken(value.handoff.token);setHandoff(value.handoff.motion);setSettings(false)}})},[]);
  useEffect(()=>{
   const dispose=service?.onEdge(()=>{setMotion('bump');window.setTimeout(()=>setMotion(current=>current==='bump'?'walk':current),780)});
   return()=>dispose?.();
  },[]);
+ useEffect(()=>{
+  if(!handoff||!model.url||!token||!service)return;
+  if(persona.moveDesktop===false){setError('Движение на рабочем столе отключено.');return;}
+  const next=handoff;
+  setHandoff(null);setMotion(next);setWalking(next==='walk');setAnchor('');
+  void service.handoffReady().then(ok=>{if(ok&&next==='walk')return service.walk(true);return undefined}).catch(error=>setError(String(error)));
+ },[handoff,model.url,token,persona.moveDesktop]);
  useEffect(()=>{
   if(!anchor)return;
   const interval=window.setInterval(()=>void service?.anchor(anchor),1400);
