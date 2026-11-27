@@ -450,12 +450,14 @@ try{
             const scene=page.locator('.cinematic-live');
             await visible(scene);
             await scene.scrollIntoViewIfNeeded();
+            const mediaIdentity=await scene.evaluate(el=>{el.dataset.testIdentity='stable';return el.dataset.testIdentity});
             assert.equal(await scene.getAttribute('data-playing'),'false');
             assert.equal(await page.locator('.cinematic-effects').count(),0);
             await page.emulateMedia({reducedMotion:'no-preference'});
             for(const [theme,style] of combinations){
               await switchAppearance(page,theme,style);
               await scene.scrollIntoViewIfNeeded();
+              assert.equal(await scene.getAttribute('data-test-identity'),mediaIdentity,'Theme changes must not detach the media DOM node');
               await checkArtwork(page,theme,style,'.studio-hero-cover','overview');
               const image=await scene.locator('img').evaluate(async img=>{await img.decode();const rect=img.getBoundingClientRect();return {src:img.currentSrc,ratio:rect.width/rect.height,fit:getComputedStyle(img).objectFit}});
               assert(image.src.includes(style+'-'+theme+'-hero'));
