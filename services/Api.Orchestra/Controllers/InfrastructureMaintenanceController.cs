@@ -72,7 +72,7 @@ public sealed class InfrastructureMaintenanceController(DevelopmentTeam team, Da
         return new MaintenanceReport(installed, components.ToArray(), workerState, source, socketAvailable, snapshot?.History?.Where(c => c.Name is "orchestra" or "docker" or "lmstudio" or "voice" or "postgres-service").TakeLast(120).ToArray() ?? []);
     }
 
-    public sealed record Component(string Name, string State, string Message, DateTimeOffset CheckedAt);
+    public sealed record Component(string Name, string State, string Message, DateTimeOffset CheckedAt, string? Reason = null);
     public sealed record Snapshot(Component[] Components, Component[]? History = null);
     internal sealed record MaintenanceReport(bool Installed, Component[] Components, string WorkerState, string Source, bool SocketAvailable, Component[] History);
     private sealed record SocketReport(bool Ok, Snapshot? Report);

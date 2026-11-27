@@ -1,4 +1,7 @@
 using System.Globalization;
+using System.Net.Sockets;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
@@ -15,20 +18,59 @@ public sealed class DiagnosticReportController(DevelopmentTeam team, DatabaseMai
         or "checking" or "disabled" or "external" or "missing" or "waiting" or "unreachable" or "unreadable"
         or "reporting" or "current" or "ready" or "downloading" or "switching" or "failed" or "running" or "done"
         ? value : "unknown";
-    private static string SafeReason(string? value) => value is "invalid-upstream-url" or "upstream-http-error" or "timeout" or "connection-failed" ? value : "";
+    private static string SafeReason(string? value) => value is "invalid-upstream-url" or "upstream-http-error" or "timeout" or "connection-failed" or "CalledProcessError" or "TimeoutExpired" or "OSError" or "PermissionError" or "FileNotFoundError" or "ValueError" or "RuntimeError" or "OtherError" ? value : "";
     private static string SafeTag(string? value) => value is not null && value.Length <= 90 &&
         System.Text.RegularExpressions.Regex.IsMatch(value, @"\Av[0-9][a-zA-Z0-9._-]*\z") ? value : "unknown";
     private static string SafeName(string value) => value is "auth" or "orchestra" or "global" or "local" or "audit" or "agent"
         or "database" or "docker" or "lmstudio" or "voice" or "postgres-service" or "worker" or "metrics-source" or "monitoring"
         or "postgres" or "postgres-native" or "prepare-postgres" or "auth-postgres" or "model-connect" ? value : "other";
     private static object?[] Component(string origin, InfrastructureMaintenanceController.Component c) =>
-        [origin, SafeName(c.Name), SafeState(c.State), c.CheckedAt, null, null, ""];
+        [origin, SafeName(c.Name), SafeState(c.State), c.CheckedAt, null, null, SafeReason(c.Reason)];
     private static object?[] Database(DatabaseMaintenance.Result c) =>
         ["database-history", "database", SafeState(c.State), c.CheckedAt, null, null,
             c.Message.StartsWith("PostgreSQL:", StringComparison.Ordinal) ? "PostgreSQL" :
             c.Message.StartsWith("SQLite:", StringComparison.Ordinal) ? "SQLite" : "unknown"];
     private static object?[] Peer(string origin, CapabilityHealth c) =>
         [origin, SafeName(c.Name), SafeState(c.State), c.CheckedAt, c.HttpStatus, c.LatencyMs, SafeReason(c.Reason)];
+
+    private static readonly HashSet<string> UnitNames = new(StringComparer.Ordinal)
+    {
+        "mysticego-orchestra.service","mysticego-orchestra-updater.service","mysticego-orchestra-updater.timer",
+        "mysticego-infrastructure-reconcile.service","mysticego-infrastructure-reconcile.timer","mysticego-local-setup.socket",
+        "mysticego-default-model.service","mysticego-lmstudio.service","mysticego-voice.service","docker.service",
+        "postgresql.service","postgresql@16-mysticego.service","caddy.service"
+    };
+    private static async Task<object?[][]> HostUnits(CancellationToken ct)
+    {
+        if (!OperatingSystem.IsLinux()) return [];
+        try
+        {
+            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            deadline.CancelAfter(TimeSpan.FromSeconds(6));
+            using var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+            await socket.ConnectAsync(new UnixDomainSocketEndPoint("/var/lib/mysticego/local-setup.sock"),deadline.Token);
+            using var stream = new NetworkStream(socket);
+            await stream.WriteAsync(Encoding.UTF8.GetBytes("diagnostic-host\n"),deadline.Token);
+            using var reader = new StreamReader(stream);
+            var line = await reader.ReadLineAsync(deadline.Token);
+            if (line is null || line.Length > 32768) return [];
+            using var doc=JsonDocument.Parse(line);
+            if (!doc.RootElement.TryGetProperty("units",out var units) || units.ValueKind!=JsonValueKind.Array) return [];
+            var rows=new List<object?[]>();
+            foreach(var unit in units.EnumerateArray().Take(20))
+            {
+                string? Read(string key) => unit.ValueKind==JsonValueKind.Object && unit.TryGetProperty(key,out var value)
+                    && value.ValueKind==JsonValueKind.String && value.GetString() is {Length:<=80} text
+                    && Regex.IsMatch(text,@"\A[a-zA-Z0-9@_.-]+\z") ? text : null;
+                if(Read("Id") is not { } id || !UnitNames.Contains(id)) continue;
+                rows.Add([id,Read("LoadState"),Read("ActiveState"),Read("SubState"),Read("Result"),
+                    int.TryParse(Read("ExecMainStatus"),out var exit)?exit:null,
+                    int.TryParse(Read("NRestarts"),out var restarts)?restarts:null]);
+            }
+            return rows.ToArray();
+        }
+        catch(Exception error) when(error is SocketException or IOException or OperationCanceledException or JsonException) { return []; }
+    }
 
     [HttpGet, ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public async Task<IActionResult> Download([FromQuery] string format = "json", CancellationToken ct = default)
@@ -83,13 +125,16 @@ public sealed class DiagnosticReportController(DevelopmentTeam team, DatabaseMai
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException)
         { metadata.Add(["linksState", "unreadable"]); }
+        var units = await HostUnits(ct);
+        metadata.Add(["hostUnitsState", units.Length == 0 ? "unavailable" : "received"]);
         var tables = new DiagnosticReport.Table[]
         {
             new("Summary", ["field","value"], metadata.ToArray()),
             new("Checks", ["source","component","state","checkedUtc","httpStatus","latencyMs","reasonOrProvider"], checks.ToArray()),
             new("Telemetry", ["atUtc","cpuPercent","memoryBytes","managedBytes","memoryLimitBytes","rxBytesPerSecond","txBytesPerSecond","diskFreeBytes","diskTotalBytes","uptimeSeconds","hostCpuPercent","hostMemoryUsedBytes","hostMemoryTotalBytes"],
                 samples.Select(s => new object?[] {s.At,s.CpuPercent,s.MemoryBytes,s.ManagedBytes,s.MemoryLimitBytes,s.RxBytesPerSecond,s.TxBytesPerSecond,s.DiskFreeBytes,s.DiskTotalBytes,s.UptimeSeconds,s.HostCpuPercent,s.HostMemoryUsedBytes,s.HostMemoryTotalBytes}).ToArray()),
-            new("Links", ["alias","kind","enabled","online","latencyMs","mbps","measuredUtc"], links.ToArray())
+            new("Links", ["alias","kind","enabled","online","latencyMs","mbps","measuredUtc"], links.ToArray()),
+            new("HostServices", ["unit","load","active","subState","result","exitStatus","restarts"], units)
         };
         var content = DiagnosticReport.Encode(tables, format);
         var mime = format == "xlsx" ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : format == "json" ? "application/json; charset=utf-8" : "text/plain; charset=utf-8";

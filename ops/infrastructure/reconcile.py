@@ -36,9 +36,11 @@ def configured(*keys):
     except OSError:
         return False
 
-def publish(name, state, message):
+def publish(name, state, message, reason=None):
     rows[name] = dict(name=name, state=state, message=message,
                       checkedAt=datetime.now(timezone.utc).isoformat())
+    if reason is not None:
+        rows[name]["reason"] = reason
     history.append(rows[name])
     del history[:-120]
     install.atomic(STATUS / "status.json", json.dumps({"components": list(rows.values()), "history": history}), 0o644)
@@ -62,7 +64,10 @@ def repair(name, test, action, message):
         publish(name, "available", message)
     except Exception as error:
         print(name + ": " + type(error).__name__, flush=True)
-        publish(name, "degraded", "Восстановление не завершилось. Проверьте журнал службы.")
+        reason = type(error).__name__
+        if reason not in ("CalledProcessError", "TimeoutExpired", "OSError", "PermissionError", "FileNotFoundError", "ValueError", "RuntimeError"):
+            reason = "OtherError"
+        publish(name, "degraded", "Восстановление не завершилось. Проверьте журнал службы.", reason)
 
 def lm_ready():
     # A compatibility catalog can list downloaded but unloaded models.

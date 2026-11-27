@@ -13,6 +13,29 @@ DIRECTORY = Path(__file__).resolve().parent
 REPORT = Path('/var/lib/mysticego-infrastructure-status/status.json')
 
 
+UNITS = ("mysticego-orchestra.service", "mysticego-orchestra-updater.service",
+         "mysticego-orchestra-updater.timer", "mysticego-infrastructure-reconcile.service",
+         "mysticego-infrastructure-reconcile.timer", "mysticego-local-setup.socket",
+         "mysticego-default-model.service", "mysticego-lmstudio.service",
+         "mysticego-voice.service", "docker.service", "postgresql.service",
+         "postgresql@16-mysticego.service", "caddy.service")
+PROPERTIES = ("Id", "LoadState", "ActiveState", "SubState", "Result", "ExecMainStatus", "NRestarts")
+
+def host_units():
+    # No journal text, command line, credentials, paths or arbitrary unit names.
+    try:
+        result = subprocess.run(("systemctl", "show", "--no-pager", "--property=" + ",".join(PROPERTIES), *UNITS),
+                                capture_output=True, text=True, timeout=4)
+        units = []
+        for block in result.stdout.split("\n\n"):
+            data = dict(line.split("=", 1) for line in block.splitlines() if "=" in line)
+            if data.get("Id") not in UNITS:
+                continue
+            units.append({key: data[key] for key in PROPERTIES if key in data and re.fullmatch(r"[a-zA-Z0-9@_.-]{1,80}", data[key])})
+        return units
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+
 def main():
     with socket.socket(fileno=sys.stdin.fileno()) as connection:
         _, uid, _ = struct.unpack("3i", connection.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
@@ -27,6 +50,9 @@ def main():
             return
         # Read-only host report also works for Orchestra inside a container:
         # its existing Unix socket is mounted, but the host report directory is not.
+        if request == b"diagnostic-host\n":
+            connection.sendall((json.dumps({"ok": True, "units": host_units()}) + "\n").encode())
+            return
         if request == b"maintenance-status\n":
             try:
                 if REPORT.stat().st_size > 131072:

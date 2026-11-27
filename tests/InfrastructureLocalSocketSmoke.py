@@ -19,6 +19,7 @@ def serve(directory):
     spec.loader.exec_module(runner)
     runner.DIRECTORY = Path(directory)
     runner.REPORT = Path(directory) / "report.json"
+    runner.host_units = lambda: [{"Id": "docker.service", "ActiveState": "active"}]
     import pwd
     pwd.getpwnam = lambda _: SimpleNamespace(pw_uid=os.getuid())
     runner.main()
@@ -37,6 +38,7 @@ def smoke():
             listener.listen()
             for line, expected in [
                 (b"maintenance-status\n", report),
+                (b"diagnostic-host\n", [{"Id": "docker.service", "ActiveState": "active"}]),
                 (b"metrics-source "+b"a"*64+b"\n", {"component":"metrics-source","secret":"a"*64}),
                 (b"metrics-source "+b"!"*64+b"\n", None),
                 (b"docker\n", {"component": "docker"}),
@@ -60,6 +62,8 @@ def smoke():
                         assert reply["ok"] is (expected is not None)
                         if line == b"maintenance-status\n":
                             assert reply["report"] == expected
+                        elif line == b"diagnostic-host\n":
+                            assert reply["units"] == expected
                         elif expected:
                             assert json.loads(reply["message"]) == expected
                     finally:
