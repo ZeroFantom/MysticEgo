@@ -27,7 +27,7 @@ export DEBIAN_FRONTEND=noninteractive
 echo 'CLOUDDESK_STEP:apt-update'
 apt-get update
 echo 'CLOUDDESK_STEP:apt-install'
-apt-get install -y ca-certificates caddy curl libicu74 libssl3t64 unzip
+apt-get install -y ca-certificates caddy curl libicu74 libssl3t64 unzip gh
 echo 'CLOUDDESK_STEP:unpack'
 install -d -m 0755 /opt/mysticego /etc/mysticego
 stage=$(mktemp -d /opt/mysticego/.stage.XXXXXXXX)
@@ -134,6 +134,13 @@ for ((i=0;i<60;i++)); do
     systemctl enable caddy.service
     systemctl restart caddy.service
     curl -fsS --retry 10 --retry-delay 5 --retry-all-errors --max-time 10 "https://$domain/health/live" >/dev/null
+    recovery=/opt/mysticego/app/ops/orchestra-updater/recover-maintenance.sh
+    if [[ -f $recovery ]]; then
+      node=$(curl -fsS --max-time 5 http://127.0.0.1:5500/health/live | python3 -c 'import json,sys;print(json.load(sys.stdin)["node"])')
+      bash "$recovery" "$node" || { echo 'Orchestra работает, но установка службы обслуживания не завершена. Используйте восстановление в CloudDesk.' >&2; exit 1; }
+      echo "Orchestra ready: https://$domain/ (Audit: /audit-portal/)"
+      exit 0
+    fi
     local_setup=/opt/mysticego/app/ops/infrastructure/install-local.sh
     if [[ -f $local_setup ]]; then
       bash "$local_setup" || echo 'Не удалось запустить локальный установщик.'

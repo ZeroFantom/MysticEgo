@@ -107,6 +107,8 @@ def status(phase, installed, candidate=None, targets=(), message=None, last_targ
 
 
 MAINTENANCE_FILES = ("install.sh", "install.py", "local-runner.py", "reconcile.py", "install-voice.sh", "voice-server.py")
+RESCUE_FILES = ("install-worker.sh","update-orchestra.py","mysticego-orchestra-updater.service","mysticego-orchestra-updater.timer",
+                "recover-maintenance.sh","rescue-request.py","mysticego-maintenance-rescue.path","mysticego-maintenance-rescue.service")
 MAINTENANCE_HOME = Path("/opt/mysticego-infrastructure/local")
 MAINTENANCE_SOCKET = INBOX.parent / "local-setup.sock"
 MAINTENANCE_STATUS = Path("/var/lib/mysticego-infrastructure-status/status.json")
@@ -158,6 +160,22 @@ def maintenance_state():
 def maintenance_record(state, release, reason="", retry_after=0):
     write("maintenance.json", dict(state=state, release=release, reason=reason,
                                    checkedAt=datetime.now().astimezone().isoformat(), retryAfter=retry_after))
+
+
+def ensure_rescue(release):
+    source=APP/"ops/orchestra-updater"
+    # A legacy package may not contain this channel. Do not execute partial trees.
+    if not all(trusted_file(source/name) for name in RESCUE_FILES):
+        return
+    try:
+        installed=Path("/usr/local/libexec/mysticego/maintenance-rescue.py")
+        if (trusted_file(installed) and installed.read_bytes()==(source/"rescue-request.py").read_bytes()
+                and system_ok("is-active","--quiet","mysticego-maintenance-rescue.path")
+                and system_ok("is-enabled","--quiet","mysticego-maintenance-rescue.path")):
+            return
+        command("bash",str(source/"install-worker.sh"),release,timeout=90)
+    except (OSError, subprocess.SubprocessError):
+        print("Independent maintenance recovery channel is not ready.",flush=True)
 
 
 def ensure_maintenance(release, force=False):
@@ -426,6 +444,7 @@ def apply(candidate, installed, targets, target):
         status("current", versions(), last_target=target)
         if target != "audit":
             ensure_maintenance(versions()[0], force=True)
+            ensure_rescue(versions()[0])
         previous = PREVIOUS["audit" if target == "audit" else "orchestra"]
         shutil.rmtree(previous)
 
@@ -454,6 +473,7 @@ def run_locked():
         installed = versions()
         # Retry locally before contacting GitHub, even with no newer release or no network.
         ensure_maintenance(installed[0], force=take_maintenance_request())
+        ensure_rescue(installed[0])
         candidate, targets = newest(installed)
         request = take_request()
         if not candidate:

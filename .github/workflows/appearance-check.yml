@@ -47,7 +47,9 @@ jobs:
           dotnet-version: '10.0.x'
       - run: python3 -m unittest discover -s ops/infrastructure -p 'test_reconcile.py'
       - run: python3 tests/InfrastructureLocalSocketSmoke.py
-      - run: python3 -m unittest discover -s ops/orchestra-updater -p 'test_maintenance.py'
+      - run: python3 -m unittest discover -s ops/orchestra-updater -p 'test_*.py'
+      - run: bash -n ops/orchestra-updater/recover-maintenance.sh && bash -n ops/orchestra-updater/install-worker.sh && bash -n tools/MysticEgo.CloudDesk/profiles/orchestra-r3.sh
+      - run: dotnet build tools/MysticEgo.CloudDesk/backend/CloudDesk.csproj -c Release
       - run: bash -n ops/panel-assistant/install-default-model.sh
       - run: |
           python3 -m py_compile ops/infrastructure/{reconcile,voice-server,local-runner}.py

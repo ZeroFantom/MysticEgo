@@ -34,13 +34,37 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException) { return null; }
     }
 
+    internal static RecoveryStatus? ReadRecovery()
+    {
+        try
+        {
+            var path = new FileInfo(StateDirectory + "/rescue.json");
+            if (!path.Exists || path.Length > 8192) return null;
+            return JsonSerializer.Deserialize<RecoveryStatus>(System.IO.File.ReadAllText(path.FullName), Json);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException) { return null; }
+    }
+
+    [HttpGet("maintenance"), ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public IActionResult Recovery()
+    {
+        if (!team.IsOwner(User)) return Forbid();
+        var independent = ReadRecovery();
+        var maintenance = ReadMaintenance();
+        var automatic = maintenance is not null && DateTimeOffset.UtcNow - maintenance.CheckedAt < TimeSpan.FromMinutes(5);
+        return Ok(new { independent, automatic, queued = System.IO.File.Exists(Path.Combine(Inbox, "maintenance-rescue.json")) || System.IO.File.Exists(Path.Combine(Inbox, "maintenance-repair.json")), available = Directory.Exists(Inbox) && (independent is not null || automatic) });
+    }
+
     [HttpPost("maintenance"), RequestSizeLimit(1024)]
     public IActionResult RepairMaintenance()
     {
         if (!team.IsOwner(User)) return Forbid();
-        if (!Directory.Exists(Inbox) || ReadMaintenance() is null)
-            return Conflict(new { error = "Сначала установите актуальную версию Orchestra через «Ветки GitHub»." });
-        var path = Path.Combine(Inbox, "maintenance-repair.json");
+        var independent = ReadRecovery();
+        var maintenance = ReadMaintenance();
+        var automatic = maintenance is not null && DateTimeOffset.UtcNow - maintenance.CheckedAt < TimeSpan.FromMinutes(5);
+        if (!Directory.Exists(Inbox) || (independent is null && !automatic))
+            return Conflict(new { error = "Привилегированный канал восстановления не подтверждён. Откройте CloudDesk → Обновление узлов → Восстановить службу обслуживания (без переустановки)." });
+        var path = Path.Combine(Inbox, independent is not null ? "maintenance-rescue.json" : "maintenance-repair.json");
         var temporary = Path.Combine(Inbox, Guid.NewGuid().ToString("N") + ".tmp");
         try
         {
@@ -109,5 +133,6 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
     public sealed record UpdateStatus(string Phase, string? Current, Candidate? Candidate, string? Message,
         int Protocol = 0, string? CurrentAudit = null, string[]? Targets = null, string? LastTarget = null, MaintenanceStatus? Maintenance = null);
     public sealed record MaintenanceStatus(string State, string? Release, string? Reason, DateTimeOffset CheckedAt, double RetryAfter);
+    public sealed record RecoveryStatus(string State, string? Reason, DateTimeOffset CheckedAt);
 }
 

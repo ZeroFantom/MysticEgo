@@ -288,6 +288,7 @@ sealed partial class CloudDesk {
             case "topology.developerPassword": return await RevealDeveloperPassword(a);
             case "deploy.inspectOrchestra": return await InspectOrchestra(a);
             case "deploy.restoreOrchestra": return await RestoreOrchestraUpdater(a,progress ?? (_ => {}));
+            case "deploy.recoverMaintenance": return await RecoverOrchestraMaintenance(a,progress ?? (_ => {}));
             case "deploy.infrastructure": return await ProvisionInfrastructure(a,progress ?? (_ => {}));
             case "deploy.auditPortal": return await DeployAuditPortal(a,progress ?? (_ => {}));
             case "deploy.reuploadGlobal": return await QueueGlobalReupload(a);

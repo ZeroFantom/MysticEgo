@@ -33,10 +33,11 @@ export function InfrastructureWorkspace({section}:{section:InfrastructureSection
   const page=sections[section];
   const {api}=useApp();
   const update=useRemote(()=>section==='services'?api.request<UpdateState>('/orchestra/update'):Promise.resolve(null),[api,section],4000);
+  const recovery=useRemote(()=>section==='services'?api.request<{available:boolean;automatic:boolean;queued?:boolean;independent?:{state:string;checkedAt:string}}>('/orchestra/update/maintenance'):Promise.resolve(null),[api,section],4000);
   const [repairing,setRepairing]=useState(false),[repairMessage,setRepairMessage]=useState('');
   async function requestRepair(){
     setRepairing(true);setRepairMessage('');
-    try{await api.request('/orchestra/update/maintenance',{method:'POST',body:'{}'});setRepairMessage('Запрос принят. Служба обновления автоматически проверит установку и восстановление.');update.reload()}
+    try{await api.request('/orchestra/update/maintenance',{method:'POST',body:'{}'});setRepairMessage('Запрос принят. Служба обновления автоматически проверит установку и восстановление.');update.reload();recovery.reload()}
     catch(error){setRepairMessage(error instanceof Error?error.message:String(error))}
     finally{setRepairing(false)}
   }
@@ -66,7 +67,10 @@ export function InfrastructureWorkspace({section}:{section:InfrastructureSection
         {section==='services'&&<><p>Служба обновления устанавливает и восстанавливает обслуживание Orchestra из проверенного релиза. Повторные проверки происходят автоматически, без CloudDesk и SSH.</p>
           <p><strong>{maintenance?({ready:'Установлена',waiting:'Ожидается отчёт',repairing:'Установка / восстановление',degraded:'Повторная попытка запланирована',unavailable:'Пакет обслуживания недоступен'} as Record<string,string>)[maintenance.state]??'Состояние уточняется':'Обновление службы обслуживания требуется'}</strong></p>
           {maintenance?.release&&<p className="footnote">Версия: {maintenance.release} · {new Date(maintenance.checkedAt).toLocaleString('ru-RU')}</p>}
-          {maintenance?<button className="btn secondary" disabled={repairing||maintenance.state==='repairing'} onClick={()=>void requestRepair()}><RefreshCw size={16}/> Восстановить службу обслуживания</button>:<Link className="infra-link" to="/project-branches">Перейти к обновлению Orchestra <ArrowUpRight size={16}/></Link>}
+          <button className="btn secondary" disabled={repairing||maintenance?.state==='repairing'||recovery.value?.queued||recovery.value?.independent?.state==='repairing'} onClick={()=>void requestRepair()}><RefreshCw size={16}/> Восстановить службу обслуживания</button>
+          {recovery.value?.queued&&<p role="status">Запрос ожидает запуска системной службы.</p>}
+          {recovery.value?.independent&&<p className="footnote">Независимый канал: {recovery.value.independent.state==='ready'?'готов':recovery.value.independent.state==='repairing'?'восстановление':'требует внимания'}.</p>}
+          {recovery.value&&!recovery.value.available&&<p>Если привилегированная служба не установлена, откройте CloudDesk → Обновление узлов → Восстановить службу обслуживания. Переустановка Orchestra не требуется.</p>}
           {repairMessage&&<p role="status">{repairMessage}</p>}
           <Link className="infra-link" to="/diagnostics">Скачать диагностический отчёт <ArrowUpRight size={16}/></Link></>}
         {section==='ai'&&<><p>Распознавание речи устанавливается автоматически при достаточных ресурсах VPS. Явно настроенный внешний сервис сохраняется.</p><Link className="infra-link" to="/assistant?tab=models">Вычислительные узлы и тест модели <ArrowUpRight size={16}/></Link></>}

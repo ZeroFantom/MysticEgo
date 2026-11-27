@@ -240,7 +240,8 @@ try{
               '/api/v1/managed/development-team':{owner:true},
               '/api/v1/managed/infrastructure-setup':{localAvailable:true,targets:[]},
               '/api/v1/managed/infrastructure-maintenance':{installed:true,workerState:'reporting',source:'host-socket',socketAvailable:true,components:['orchestra','docker','lmstudio','voice','postgres-service','database'].map(name=>({name,state:'available',message:'Служба готова',checkedAt:now}))},
-              '/api/v1/orchestra/update':{phase:'current',protocol:2,maintenance:{state:'ready',release:'v1.0.0-beta.7-r3.2.37',checkedAt:now}}
+              '/api/v1/orchestra/update':{phase:'current',protocol:2,maintenance:{state:'ready',release:'v1.0.0-beta.7-r3.2.37',checkedAt:now}},
+              '/api/v1/orchestra/update/maintenance':{available:true,automatic:true,independent:{state:'ready',checkedAt:now}}
             };
             const handler=route=>route.fulfill({contentType:'application/json',body:JSON.stringify(fixture[new URL(route.request().url()).pathname])});
             for(const path of Object.keys(fixture))await page.route('**'+path,handler);
@@ -253,7 +254,7 @@ try{
                 if(section==='services'){
                   await visible(workspace.getByRole('button',{name:'Восстановить службу обслуживания'}));
                   const route='**/api/v1/orchestra/update/maintenance';
-                  await page.route(route,r=>r.fulfill({contentType:'application/json',body:'{"accepted":true}'}));
+                  await page.route(route,r=>r.request().method()==='POST'?r.fulfill({contentType:'application/json',body:'{"accepted":true}'}):r.fallback());
                   try{
                     const sent=page.waitForRequest(r=>r.url().endsWith('/orchestra/update/maintenance')&&r.method()==='POST');
                     await workspace.getByRole('button',{name:'Восстановить службу обслуживания'}).click();
