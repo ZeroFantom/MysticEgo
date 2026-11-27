@@ -25,6 +25,8 @@ public static class BrowserSessionGateway
     public static void MapBrowserSessions(this WebApplication app,NodeOptions node)
     {
         var origin=app.Configuration["BrowserSession:Origin"];
+        if(!string.IsNullOrWhiteSpace(origin)&&(!Uri.TryCreate(origin,UriKind.Absolute,out var parsed)||!OriginAllowed(origin,parsed.GetLeftPart(UriPartial.Authority),parsed.Authority)))
+            throw new InvalidOperationException("BrowserSession:Origin must be an HTTPS origin without path, query or credentials.");
         app.MapGet("/api/auth/browser/status",()=>Results.Ok(new{enabled=!string.IsNullOrWhiteSpace(origin)})).AllowAnonymous();
         foreach(var action in new[]{"login","refresh","logout"})
             app.MapPost("/api/auth/browser/"+action,(HttpContext context,IHttpClientFactory clients)=>
@@ -39,6 +41,9 @@ public static class BrowserSessionGateway
         {context.Response.StatusCode=403;return;}
         if(context.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>() is {IsReadOnly:false} size)
             size.MaxRequestBodySize=16384;
+        // Reject ambiguous duplicate refresh cookie names instead of picking one by ordering.
+        if(context.Request.Headers.Cookie.ToString().Split(';',StringSplitOptions.TrimEntries).Count(c=>c.StartsWith(CookieName+"=",StringComparison.Ordinal))>1)
+        {context.Response.StatusCode=400;return;}
         var cookie=context.Request.Cookies[CookieName];
         if(action!="login"&&(string.IsNullOrEmpty(cookie)||cookie.Length>500))
         {
