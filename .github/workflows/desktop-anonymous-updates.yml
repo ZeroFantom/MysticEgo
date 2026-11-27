@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: node --test desktop/desktop-updates.test.cjs
+      - run: node --test desktop/desktop-updates.test.cjs desktop/interface-mcp.test.cjs
       - run: node --check desktop/station/main.mjs
       - run: node --check desktop/local/main.mjs
       - run: node --check tools/MysticEgo.CloudDesk/desktop/main.cjs

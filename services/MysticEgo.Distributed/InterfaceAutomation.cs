@@ -13,7 +13,7 @@ public sealed class InterfaceAutomation
     private readonly object gate = new();
     private readonly Dictionary<Guid,Session> sessions = new();
     private static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(10), Heartbeat = TimeSpan.FromSeconds(15);
-    private static readonly Regex Route = new(@"\A/(?:[a-z][a-z0-9-]*(?:/[a-z][a-z0-9-]*)?)?\z");
+    private static readonly Regex Route = new(@"\A(?:/(?:[a-z][a-z0-9-]*(?:/[a-z][a-z0-9-]*){0,2})?|/assistant\?tab=(?:chat|persona|models|developer))\z");
     public sealed record Target(string Path,string Label);
     public sealed record Frame(string Path,Target[] Targets);
     public sealed record Action(Guid Id,string Path,DateTimeOffset ExpiresAt);

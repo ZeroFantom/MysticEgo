@@ -77,7 +77,7 @@ app.whenReady().then(()=>{
      approve:async(session,challenge)=>(await request('browser.pairingApprove',{origin:session.origin,identity:session.identity,challenge})).code});
  }
  win.on('close',event=>{if(!quitReady){event.preventDefault();app.quit();}});
- win.webContents.setWindowOpenHandler(()=>({action:'deny'}));win.webContents.on('will-navigate',e=>e.preventDefault());win.loadFile(path.join(root,'dist','index.html'));installInterfaceMcp(win,'CloudDesk');
+ win.webContents.setWindowOpenHandler(()=>({action:'deny'}));win.webContents.on('will-navigate',e=>e.preventDefault());win.loadFile(path.join(root,'dist','index.html'));installInterfaceMcp(win,'CloudDesk',0,{updates:()=>updatesController});
  const updates=path.join(bundle,'desktop','desktop-updates.cjs');
  if(fs.existsSync(updates)){
    const updater=require(updates);

@@ -192,11 +192,17 @@ try{
           });
           if(await page.locator('.appearance-style-options').isVisible()){
             await check(page,prefix+'-privacy-and-language',async()=>{
+              const headerLanguage=page.locator('.top-actions .presentation-compact select');
+              const initialWidth=await headerLanguage.locator('..').evaluate(el=>el.getBoundingClientRect().width);
               const selector=page.locator('.presentation-settings-language select');
               for(const [lang,heading] of [['en','Settings'],['zh-CN','设置'],['ko','설정'],['ru','Настройки']]){
-                await selector.selectOption(lang);
+                await headerLanguage.selectOption(lang);
                 await page.waitForFunction(lang=>document.documentElement.lang===lang,lang);
                 await visible(page.getByRole('heading',{name:heading,exact:true}));
+                assert.equal(await headerLanguage.inputValue(),lang);assert.equal(await selector.inputValue(),lang);
+                const geometry=await headerLanguage.evaluate(el=>{const p=el.parentElement,r=p.getBoundingClientRect(),c=getComputedStyle(p),select=getComputedStyle(el),arrow=p.querySelector('.presentation-chevron').getBoundingClientRect(),sr=el.getBoundingClientRect(),group=p.closest('.appearance-quick').getBoundingClientRect();return {width:r.width,height:r.height,border:c.borderTopWidth,appearance:select.appearance,aligned:Math.abs((r.top+r.bottom-group.top-group.bottom)/2)<2,arrowSeparate:sr.right<=arrow.left+1,within:r.left>=group.left&&r.right<=group.right}});
+                assert(Math.abs(geometry.width-initialWidth)<1&&geometry.aligned&&geometry.arrowSeparate&&geometry.within,JSON.stringify(geometry));
+                assert.equal(geometry.border,'0px');assert.equal(geometry.appearance,'none');
                 await noHorizontalOverflow(page);
               }
               assert.equal(await page.locator('.sidebar .browser-privacy-link').count(),1);

@@ -129,7 +129,7 @@ async function open(){
     void stop().finally(()=>window.close());
   });
   await window.loadURL(view);
-  interfaceMcp.installInterfaceMcp(window,'LocalDesktop');
+  interfaceMcp.installInterfaceMcp(window,'LocalDesktop',0,{updates:()=>updatesController});
   if(!await health())start();
 }
 if(!app.requestSingleInstanceLock())app.quit();

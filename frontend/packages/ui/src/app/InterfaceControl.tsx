@@ -9,10 +9,11 @@ type Frame={path:string;targets:Target[]};
 type Outcome={id:string;state:'done'|'failed';path:string};
 type Session={id:string;expiresAt:string;pending?:{id:string;path:string;expiresAt:string};last?:Outcome};
 const endpoint='/interface-control/sessions';
-const routePattern=/^\/(?:[a-z][a-z0-9-]*(?:\/[a-z][a-z0-9-]*)?)?$/;
+const routePattern=/^(?:\/(?:[a-z][a-z0-9-]*(?:\/[a-z][a-z0-9-]*){0,2})?|\/assistant\?tab=(?:chat|persona|models|developer))$/;
+function observedPath(path:string,search:string){const candidate=path+search;return routePattern.test(candidate)?candidate:routePattern.test(path)?path:'/unlisted'}
 const delay=(ms:number)=>new Promise<void>(resolve=>window.setTimeout(resolve,ms));
 function navigationControls(){
-  return Array.from(document.querySelectorAll<HTMLAnchorElement>('nav[data-interface-nav] a[data-interface-path]'));
+  return Array.from(document.querySelectorAll<HTMLElement>('nav[data-interface-nav] a[data-interface-path],nav.assistant-workspace-nav button[data-interface-path]'));
 }
 function readFrame(path:string):Frame{
   return {path:routePattern.test(path)?path:'/unlisted',targets:navigationControls().flatMap(a=>{
@@ -29,7 +30,8 @@ function isVisible(element:HTMLElement){
 /** Only an existing, explicitly marked navigation link may be activated. */
 export async function visibleNavigation(path:string,allowed:()=>boolean){
   if(!routePattern.test(path)||!allowed()||document.visibilityState!=='visible')return false;
-  const link=navigationControls().find(a=>a.dataset.interfacePath===path);
+  const candidates=navigationControls().filter(a=>a.dataset.interfacePath===path);
+  const link=candidates.find(isVisible)??candidates[0];
   if(!link)return false;
   if(!isVisible(link)){
     const menu=document.querySelector<HTMLButtonElement>('button[data-interface-menu]');
@@ -60,8 +62,8 @@ export function assistantNavigate(path:string){return localAction?.(path)??Promi
 
 export function InterfaceControl(){
   const {api}=useApp();
-  const {pathname}=useLocation();
-  const current=useRef(pathname);current.current=pathname;
+  const {pathname,search}=useLocation();
+  const current=useRef(observedPath(pathname,search));current.current=observedPath(pathname,search);
   const [session,setSession]=useState<Session|null>(null),[busy,setBusy]=useState(false),[message,setMessage]=useState('');
   const active=useRef<Session|null>(null),running=useRef(false),epoch=useRef(0);
   function stopLocal(){
