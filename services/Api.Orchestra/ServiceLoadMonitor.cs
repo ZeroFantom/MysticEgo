@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
+using System.Text.Json;
 
 namespace MysticEgo.Api.Orchestra;
 
@@ -13,8 +13,9 @@ public sealed class ServiceLoadMonitor : BackgroundService
         "docker.service","containerd.service","postgresql@16-mysticego.service","postgresql.service","caddy.service",
         "mysticego-default-model.service","mysticego-maintenance-rescue.service","mysticego-maintenance-rescue.path",
         "mysticego-orchestra-updater.timer","mysticego-infrastructure-reconcile.timer","mysticego-local-setup.socket"];
-    public sealed record Sample(string Unit,DateTimeOffset At,double? CpuPercent,long? MemoryBytes,long? Tasks,string? LoadState,string? ActiveState,string? SubState);
+    public sealed record Sample(string Unit,DateTimeOffset At,double? CpuPercent,long? MemoryBytes,long? Tasks,string? LoadState,string? ActiveState,string? SubState,string? Type=null,string? Result=null,long? LastCpuMilliseconds=null,long? LastPeakBytes=null,long? LastDurationMilliseconds=null,DateTimeOffset? LastFinishedAt=null,string? Measurement=null,string? LastResult=null);
     private Sample[] latest=[];
+    private readonly Dictionary<string,Sample> lastRuns=new(StringComparer.Ordinal);
     public static bool KnownUnit(string unit)=>Units.Contains(unit,StringComparer.Ordinal);
     public Sample[] Read()=>Volatile.Read(ref latest);
     protected override async Task ExecuteAsync(CancellationToken ct)
@@ -36,19 +37,69 @@ public sealed class ServiceLoadMonitor : BackgroundService
                     percentage=Math.Clamp((value-old.Cpu)/1_000_000.0/Math.Max(.001,Stopwatch.GetElapsedTime(old.Tick,tick).TotalSeconds)*100/Environment.ProcessorCount,0,100);
                 if(cpu is long used)previous[unit]=(used,tick);else previous.Remove(unit);
                 var status=states.GetValueOrDefault(unit);
-                rows.Add(new(unit,at,percentage,ReadLong(Path.Combine(directory,"memory.current")),ReadLong(Path.Combine(directory,"pids.current")),status.Load,status.Active,status.Sub));
+                var memory=ReadLong(Path.Combine(directory,"memory.current"));
+                var tasks=ReadLong(Path.Combine(directory,"pids.current"));
+                string? Get(string key)=>status?.GetValueOrDefault(key);
+                var load=Get("LoadState");var active=Get("ActiveState");var sub=Get("SubState");
+                var type=Get("Type");var result=Get("Result");
+                var inactive=load=="loaded"&&active=="inactive"&&sub=="dead";
+                var nonProcess=unit.EndsWith(".timer",StringComparison.Ordinal)||unit.EndsWith(".socket",StringComparison.Ordinal)||unit.EndsWith(".path",StringComparison.Ordinal);
+                var measurement=nonProcess?"not-applicable":inactive?"idle":percentage.HasValue||memory.HasValue||tasks.HasValue?"live":"unavailable";
+                if(inactive&&!nonProcess){if(tasks is null or 0)percentage=0;memory??=0;tasks??=0;}
+                if(nonProcess){percentage=null;memory=null;tasks=null;}
+                var start=Unsigned(Get("ExecMainStartTimestampMonotonic"));var end=Unsigned(Get("ExecMainExitTimestampMonotonic"));
+                var finished=inactive||active=="failed";
+                if(finished&&type=="oneshot"&&start>0&&end>=start)
+                {
+                    var duration=(end-start)/1000;
+                    var stamp=ParseSystemdTime(Get("ExecMainExitTimestamp"));
+                    var total=Unsigned(Get("CPUUsageNSec"))/1_000_000;
+                    var peak=Unsigned(Get("MemoryPeak"));
+                    var prior=lastRuns.GetValueOrDefault(unit);
+                    if(stamp!=null&&(prior?.LastFinishedAt!=stamp||total.HasValue||peak.HasValue))
+                        lastRuns[unit]=new(unit,at,null,null,null,load,active,sub,type,result,total??(prior?.LastFinishedAt==stamp?prior?.LastCpuMilliseconds:null),peak??(prior?.LastFinishedAt==stamp?prior?.LastPeakBytes:null),duration,stamp);
+                }
+                var last=lastRuns.GetValueOrDefault(unit);
+                var durable=ReadLastRun(unit,at);
+                if(durable is not null&&(last?.LastFinishedAt is null||durable.LastFinishedAt>=last.LastFinishedAt))last=durable;
+                rows.Add(new(unit,at,percentage,memory,tasks,load,active,sub,type,result,last?.LastCpuMilliseconds,last?.LastPeakBytes,last?.LastDurationMilliseconds,last?.LastFinishedAt,measurement,last?.LastResult??last?.Result));
             }
             Volatile.Write(ref latest,rows.ToArray());
         }while(await timer.WaitForNextTickAsync(ct));
     }
-    private static async Task<Dictionary<string,(string? Load,string? Active,string? Sub)>> UnitStates(CancellationToken ct)
+    private sealed record RunRecord(string Unit,DateTimeOffset FinishedAt,string Result,long? CpuMilliseconds,long? PeakBytes,long? DurationMilliseconds);
+    private static readonly JsonSerializerOptions Json=new(JsonSerializerDefaults.Web);
+    private static Sample? ReadLastRun(string unit,DateTimeOffset now)
     {
-        var result=new Dictionary<string,(string?,string?,string?)>(StringComparer.Ordinal);
+        if(unit is not ("mysticego-orchestra-updater.service" or "mysticego-infrastructure-reconcile.service"))return null;
+        try
+        {
+            var file=new FileInfo(Path.Combine("/var/lib/mysticego-infrastructure-status/oneshot",unit+".json"));
+            if(!file.Exists||file.Length>4096)return null;
+            var row=JsonSerializer.Deserialize<RunRecord>(File.ReadAllText(file.FullName),Json);
+            if(row is null||row.Unit!=unit||row.FinishedAt>now.AddSeconds(5)||row.FinishedAt==default)return null;
+            return new(unit,now,null,null,null,null,null,null,"oneshot",row.Result,
+                row.CpuMilliseconds is >=0?row.CpuMilliseconds:null,row.PeakBytes is >=0?row.PeakBytes:null,
+                row.DurationMilliseconds is >=0?row.DurationMilliseconds:null,row.FinishedAt,null,row.Result);
+        }
+        catch(Exception e) when(e is IOException or UnauthorizedAccessException or JsonException){return null;}
+    }
+    public static DateTimeOffset? ParseSystemdTime(string? raw)
+    {
+        if(raw is null)return null;
+        return DateTimeOffset.TryParseExact(raw,"ddd yyyy-MM-dd HH:mm:ss \'UTC\'",CultureInfo.InvariantCulture,DateTimeStyles.AssumeUniversal|DateTimeStyles.AdjustToUniversal,out var time)?time:null;
+    }
+    private static long? Unsigned(string? value)=>long.TryParse(value,NumberStyles.None,CultureInfo.InvariantCulture,out var number)&&number>=0?number:null;
+    private static async Task<Dictionary<string,Dictionary<string,string>>> UnitStates(CancellationToken ct)
+    {
+        var result=new Dictionary<string,Dictionary<string,string>>(StringComparer.Ordinal);
         try
         {
             using var deadline=CancellationTokenSource.CreateLinkedTokenSource(ct);deadline.CancelAfter(TimeSpan.FromSeconds(3));
             var start=new ProcessStartInfo("/usr/bin/systemctl"){UseShellExecute=false,RedirectStandardOutput=true,RedirectStandardError=true};
-            foreach(var arg in new[]{"show","--no-pager","--property=Id,LoadState,ActiveState,SubState"}.Concat(Units))start.ArgumentList.Add(arg);
+            foreach(var arg in new[]{"show","--no-pager","--property=Id,LoadState,ActiveState,SubState,Type,Result,CPUUsageNSec,MemoryPeak,ExecMainStartTimestampMonotonic,ExecMainExitTimestampMonotonic,ExecMainExitTimestamp"}.Concat(Units))start.ArgumentList.Add(arg);
+            start.Environment["LC_ALL"]="C";
+            start.Environment["TZ"]="UTC";
             using var process=Process.Start(start);
             if(process is null)return result;
             try
@@ -63,14 +114,14 @@ public sealed class ServiceLoadMonitor : BackgroundService
                 void Flush()
                 {
                     if(values.TryGetValue("Id",out var id)&&Units.Contains(id))
-                        result[id]=(values.GetValueOrDefault("LoadState"),values.GetValueOrDefault("ActiveState"),values.GetValueOrDefault("SubState"));
+                        result[id]=new(values,StringComparer.Ordinal);
                     values.Clear();
                 }
                 foreach(var line in raw.Replace("\r","").Split('\n'))
                 {
                     if(line.Length==0){Flush();continue;}
                     var pair=line.Split('=',2);
-                    if(pair.Length==2&&pair[1].Length<=80&&pair[1].All(c=>char.IsAsciiLetterOrDigit(c)||c is '-' or '_' or '@' or '.'))values[pair[0]]=pair[1];
+                    if(pair.Length==2&&pair[1].Length<=120&&pair[1].All(c=>char.IsAsciiLetterOrDigit(c)||c is '-' or '_' or '@' or '.' or ' ' or ':' or '+'))values[pair[0]]=pair[1];
                 }
                 Flush();
             }

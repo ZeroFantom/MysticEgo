@@ -52,10 +52,11 @@ export function InfrastructureWorkspace({section}:{section:InfrastructureSection
     </div>}
     {!!page.components.length&&<div className="infra-status-grid">{page.components.filter(name=>name!=='worker'||!!worker).map(name=><StatusCard key={name} name={name} component={status.find(c=>c.name===name)}/>)}</div>}
     {section==='metrics'&&<div className="infra-status-grid"><article className="infra-status-card"><Radio size={24}/><h3>Prometheus</h3><p>Сбор метрик Orchestra. Локальный endpoint на VPS: порт 9090.</p></article><article className="infra-status-card"><Activity size={24}/><h3>Grafana</h3><p>Панели наблюдения. Локальный endpoint на VPS: порт 3000.</p></article></div>}
+    {section==='services'&&<ServiceMaintenance/>}
     <div className="infra-actions-grid">
       <InfrastructureSetup key={section} initial={page.initial} allowed={page.actions} title={page.actionTitle}/>
       <Panel title={section==='services'?'Автоматическое обслуживание':section==='ai'?'Вычислительный контур':section==='database'?'Безопасность данных':'Просмотр диагностики'}>
-        {section==='services'&&<ServiceMaintenance/>}
+        {section==='services'&&<p>Проверенные релизы устанавливаются автоматически. Состояние и отчёты доступны выше.</p>}
         {section==='ai'&&<><p>Распознавание речи устанавливается автоматически при достаточных ресурсах VPS. Явно настроенный внешний сервис сохраняется.</p><Link className="infra-link" to="/assistant?tab=models">Вычислительные узлы и тест модели <ArrowUpRight size={16}/></Link></>}
         {section==='database'&&<><p>Существующая база и её учётные данные сохраняются. Перенос SQLite в PostgreSQL доступен только как автономная подготовка; переключение рабочей базы пока не автоматизировано.</p><p className="footnote">Не создавайте пустую замену действующей базе. Требуется проверяемая резервная копия и отдельное подтверждение.</p></>}
         {section==='metrics'&&<><p>Здесь настраиваются источники и системы сбора. Текущая нагрузка, графики ресурсов и состояние сетевых связей отображаются отдельно.</p><Link className="infra-link" to="/diagnostics">Открыть диагностику <ArrowUpRight size={16}/></Link></>}

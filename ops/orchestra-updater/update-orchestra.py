@@ -106,7 +106,7 @@ def status(phase, installed, candidate=None, targets=(), message=None, last_targ
                              message=message, lastTarget=last_target))
 
 
-MAINTENANCE_FILES = ("install.sh", "install.py", "local-runner.py", "reconcile.py", "install-voice.sh", "voice-server.py")
+MAINTENANCE_FILES = ("install.sh", "install.py", "local-runner.py", "reconcile.py", "install-voice.sh", "voice-server.py", "record-oneshot.py")
 RESCUE_FILES = ("install-worker.sh","update-orchestra.py","mysticego-orchestra-updater.service","mysticego-orchestra-updater.timer",
                 "recover-maintenance.sh","rescue-request.py","mysticego-maintenance-rescue.path","mysticego-maintenance-rescue.service")
 MAINTENANCE_HOME = Path("/opt/mysticego-infrastructure/local")
@@ -460,17 +460,8 @@ def main():
 
 
 def automatic_enabled():
-    """Read only a fixed bounded policy from the existing application inbox; default off."""
-    try:
-        directory = os.open(INBOX, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-        try:
-            fd = os.open("auto-update.json", os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
-            with os.fdopen(fd, "rb") as file:
-                return stat.S_ISREG(os.fstat(file.fileno()).st_mode) and file.read(128) == b'{"enabled":true}'
-        finally:
-            os.close(directory)
-    except OSError:
-        return False
+    """Always update by default. Legacy application-owned toggle files are ignored."""
+    return True
 
 
 def automatic_target(candidate, targets, last):

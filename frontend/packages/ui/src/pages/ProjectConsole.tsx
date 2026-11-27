@@ -5,7 +5,7 @@ import './project-console.css';
 import {useApp,useRemote} from '../app/context';
 import {Header,Panel,ErrorBanner} from '../components/primitives';
 import {useNotice} from '../app/notifications';
-import {ServiceMaintenance} from './ServiceMaintenance';
+import {Link} from 'react-router-dom';
 
 type Release={tag:string;publishedAt?:string;prerelease?:boolean};
 type PublishedRelease=Release&{name:string;publishedAt:string;url:string;notes:string;installable:boolean};
@@ -99,7 +99,7 @@ const phases:Record<string,string>={ready:'Доступно обновление
   downloading:'Скачиваем и проверяем релиз',switching:'Применяем обновление и проверяем панели',
   unavailable:'Связь службы обновления с GitHub недоступна',failed:'Обновление прервано'};
 
-function ReleaseUpdate(){return <ServiceMaintenance/>;}
+
 
 function ReleaseCard({release,latest=false}:{release:PublishedRelease;latest?:boolean}){
   return <article className={'github-release'+(latest?' github-release-latest':'')}>
@@ -133,14 +133,14 @@ export function ProjectBranches(){
   const [latest,...history]=releases.value?.releases??[];
   const refresh=()=>{releases.reload();data.reload();window.dispatchEvent(new Event('project-github-changed'));};
   return <div className="github-console">
-    <Header title="Ветки GitHub" description="Релизы, обновления сервера и ветки MysticEgo"
+    <Header title="Ветки GitHub" description="Релизы и ветки исходного кода MysticEgo"
       action={<button className="btn secondary" onClick={refresh}><RefreshCw size={16}/> Обновить данные</button>}/>
     <div className="github-repo">
       <GitPullRequest size={21}/><strong>ZeroFantom / MysticEgo</strong>
       <a href={repository} target="_blank" rel="noreferrer">Репозиторий <ArrowUpRight size={15}/></a>
     </div>
     <GitHubConnection onChange={refresh}/>
-    {releases.value?.canUpdate&&<ReleaseUpdate/>}
+    {releases.value?.canUpdate&&<Link className="btn secondary" to="/infrastructure/services">Обслуживание Orchestra <ArrowUpRight size={16}/></Link>}
     <section className="github-releases" aria-label="Релизы GitHub">
       <div className="github-section-head"><Tag size={21}/><h2>Релизы</h2></div>
       <ErrorBanner text={releases.error}/>
