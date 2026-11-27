@@ -53,7 +53,7 @@ sealed partial class CloudDesk {
             var command="cd "+remote+" && printf '%s  recover-maintenance.sh\\n' "+digest+
                 " | sha256sum -c - && bash recover-maintenance.sh "+node.ToString("D");
             var output=await SSH(args,command,10);
-            if(!output.Split('\\n').Any(line=>line.Trim()=="MAINTENANCE_RECOVERY_OK"))
+            if(!output.Split('\n').Any(line=>line.Trim()=="MAINTENANCE_RECOVERY_OK"))
                 throw new Exception("Служба не подтвердила восстановление.");
             progress("Сокет и таймеры активны. Orchestra отвечает с прежним ID.");
             return new {domain,recovered=true,output="Службы обновления и обслуживания восстановлены; проверки компонентов выполняются автоматически."};

@@ -72,7 +72,7 @@ def recover():
         with client.open("http://127.0.0.1:5500/health/live",timeout=5) as response:
             health=json.load(response)
         node=health.get("node","")
-        if health.get("status")!="alive" or health.get("kind","").lower()!="orchestra" or not re.fullmatch(r"[a-fA-F0-9-]{36}",node):
+        if health.get("status")!="alive" or health.get("kind","").lower()!="orchestra" or not isinstance(node,str) or not re.fullmatch(r"[a-fA-F0-9-]{36}",node):
             raise ValueError("invalid-node")
         subprocess.run(("bash",str(SCRIPT),node),timeout=480,check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         publish("ready")

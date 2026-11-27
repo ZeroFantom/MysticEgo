@@ -52,7 +52,7 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
         var independent = ReadRecovery();
         var maintenance = ReadMaintenance();
         var automatic = maintenance is not null && DateTimeOffset.UtcNow - maintenance.CheckedAt < TimeSpan.FromMinutes(5);
-        return Ok(new { independent, automatic, available = Directory.Exists(Inbox) && (independent is not null || automatic) });
+        return Ok(new { independent, automatic, queued = System.IO.File.Exists(Path.Combine(Inbox, "maintenance-rescue.json")) || System.IO.File.Exists(Path.Combine(Inbox, "maintenance-repair.json")), available = Directory.Exists(Inbox) && (independent is not null || automatic) });
     }
 
     [HttpPost("maintenance"), RequestSizeLimit(1024)]
@@ -64,7 +64,7 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
         var automatic = maintenance is not null && DateTimeOffset.UtcNow - maintenance.CheckedAt < TimeSpan.FromMinutes(5);
         if (!Directory.Exists(Inbox) || (independent is null && !automatic))
             return Conflict(new { error = "Привилегированный канал восстановления не подтверждён. Откройте CloudDesk → Обновление узлов → Восстановить службу обслуживания (без переустановки)." });
-        var path = Path.Combine(Inbox, automatic ? "maintenance-repair.json" : "maintenance-rescue.json");
+        var path = Path.Combine(Inbox, independent is not null ? "maintenance-rescue.json" : "maintenance-repair.json");
         var temporary = Path.Combine(Inbox, Guid.NewGuid().ToString("N") + ".tmp");
         try
         {
