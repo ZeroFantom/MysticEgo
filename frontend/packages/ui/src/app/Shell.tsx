@@ -48,6 +48,7 @@ import {AssistantCompanion} from '../avatar/AssistantCompanion';
 import {AuditSystem} from '../pages/AuditSystem';
 import {Faq} from '../pages/Faq';
 import {DeveloperPage, LicenseLink, StudioPage} from '../pages/Studio';
+import {LicensePage} from '../pages/LicensePage';
 
 declare global {interface Window {__MYSTIC_CONFIG__?:{apiUrl?:string;authUrl?:string}}}
 const modes={
@@ -266,6 +267,7 @@ export function MysticApp({mode,defaultApi}:{mode:NodeMode;title:string;defaultA
   const publicPath = location.pathname.replace(/\/$/, '');
   if (publicPath === '/share' || (portal && publicPath === '/audit-portal/share')) return <SharePage mode={portal?'audit':mode} portal={portal} scope={scope}/>;
   if (mode === 'orchestra') {
+    if (publicPath === '/license') return <LicensePage scope={scope}/>;
     if (publicPath === '/studio') return <StudioPage scope={scope}/>;
     if (publicPath === '/developer') return <DeveloperPage scope={scope}/>;
     if (publicPath === '/desktop-downloads') return <PublicDesktopDownloads scope={scope}/>;
