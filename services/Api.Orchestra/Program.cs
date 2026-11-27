@@ -81,6 +81,7 @@ app.Use(async (context,next)=>
        !context.Request.Path.Equals("/api/v1/ecosystem/capabilities", StringComparison.OrdinalIgnoreCase) &&
        !context.Request.Path.StartsWithSegments("/api/v1/managed") &&
        !context.Request.Path.Equals("/api/v1/stations/check-in",StringComparison.OrdinalIgnoreCase) &&
+       !context.Request.Path.Equals("/api/v1/stations/capacity",StringComparison.OrdinalIgnoreCase) &&
        !context.Request.Path.Equals("/api/v1/setup/enroll",StringComparison.OrdinalIgnoreCase) &&
        !context.Request.Path.Equals("/api/v1/nodes/announce",StringComparison.OrdinalIgnoreCase) &&
        !team.IsOwner(context.User) && !teamRead)
