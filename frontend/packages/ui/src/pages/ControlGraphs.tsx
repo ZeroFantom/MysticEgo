@@ -24,7 +24,7 @@ function hostGraph(root:string,rootName:string,rows:NodeStatus[]):Graph{
  return {nodes,edges};
 }
 const definitions=[
- ['proxy','Caddy / HTTPS','mysticego-orchestra.service',24,24],
+ ['proxy','Caddy / HTTPS','caddy.service',24,24],
  ['web','Веб-панели Orchestra / Audit','mysticego-orchestra.service',24,144],
  ['api','Orchestra API','mysticego-orchestra.service',320,144],
  ['auth','Auth API','mysticego-orchestra.service',616,24],
@@ -51,8 +51,8 @@ function microGraph(root:string,rows:NodeStatus[],plan?:Plan|null):Graph{
  const nodes:GraphNode[]=definitions.map(([id,title,service,x,y])=>{
   const s=plan?.services.find(s=>s.unit===service),c=plan?.components.find(c=>c.name===service);
   const confirmed=s&&fresh(s.at,20),checked=c&&fresh(c.checkedAt,180);
-  const state=id==='proxy'?'pending':confirmed?s.loadState==='not-found'?'pending':s.activeState==='failed'?'offline':s.activeState==='active'||s.type==='oneshot'&&s.result==='success'?'online':'pending':checked?c.state==='available'?'online':c.state==='disabled'?'disabled':c.state==='degraded'?'offline':'pending':'pending';
-  const subtitle=id==='proxy'?'Конфигурационная зависимость':confirmed?s.type==='oneshot'&&s.activeState==='inactive'?'Ожидает запуска':s.activeState??'Нет данных':checked?c.state:'Нет свежего замера';
+  const state=confirmed?s.loadState==='not-found'?'pending':s.activeState==='failed'?'offline':s.activeState==='active'||s.type==='oneshot'&&s.result==='success'?'online':'pending':checked?c.state==='available'?'online':c.state==='disabled'?'disabled':c.state==='degraded'?'offline':'pending':'pending';
+  const subtitle=confirmed?s.type==='oneshot'&&s.activeState==='inactive'?'Ожидает запуска':s.activeState??'Нет данных':checked?c.state:'Нет свежего замера';
   return {id,title,subtitle,state,x,y};
  });
  const edges=[...localEdges];
@@ -69,7 +69,7 @@ export function ControlGraphs({kind}:{kind:'macro'|'micro'}){
  const plan=useRemote(()=>kind==='micro'?api.request<Plan>('/orchestra/update/plan'):Promise.resolve(null),[api,kind],5000,true);
  const [zoom,setZoom]=usePanelPreference('control.'+kind+'.zoom',100,(v):v is number=>typeof v==='number'&&v>=50&&v<=160);
  const [selected,setSelected]=useState('');
- const graph=useMemo(()=>context.value&&topology.value?kind==='macro'?hostGraph(context.value.rootId,context.value.rootName,topology.value):microGraph(context.value.rootId,topology.value,plan.error?null:plan.value):null,[kind,context.value,topology.value,plan.value,plan.error]);
+ const graph=useMemo(()=>context.value&&topology.value?kind==='macro'?hostGraph(context.value.rootId,context.value.rootName,topology.error?topology.value.map(r=>({...r,report:undefined})):topology.value):microGraph(context.value.rootId,topology.error?topology.value.map(r=>({...r,report:undefined})):topology.value,plan.error?null:plan.value):null,[kind,context.value,topology.value,topology.error,plan.value,plan.error]);
  const node=graph?.nodes.find(n=>n.id===selected);
  return <div className="control-graph-page"><Header title={kind==='macro'?'Макро контрольный граф':'Микро контрольный граф'} description={kind==='macro'?'Связи зарегистрированных серверов и актуальные отчёты связи':'Службы Orchestra, веб-панели и подключённые удалённые API на одной схеме'}/>
  <nav className="control-graph-nav"><NavLink className="btn secondary" to="/infrastructure/graphs/macro">Макро</NavLink><NavLink className="btn secondary" to="/infrastructure/graphs/micro">Микро</NavLink><Link className="btn secondary" to="/nodes">Бизнес-логика</Link><Link className="btn secondary" to="/infrastructure/services">Службы и нагрузка</Link></nav>
