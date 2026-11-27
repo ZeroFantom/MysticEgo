@@ -993,7 +993,7 @@ const catalog={
 export const languages=[['en','English'],['zh-CN','简体中文'],['ko','한국어'],['ru','Русский']];
 export const fonts=[['modern','Современный'],['editorial','Редакционный'],['system','Системный'],['mono','Моноширинный']];
 let language='en',font='modern';
-export function t(source){const row=catalog[source];return !row||language==='ru'?source:row[language==='en'?0:language==='zh-CN'?1:2]}
+export function t(source){const row=Object.hasOwn(catalog,source)?catalog[source]:undefined;return !row||language==='ru'?source:row[language==='en'?0:language==='zh-CN'?1:2]}
 const fixed=[];
 export function captureStatic(root){
  const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
