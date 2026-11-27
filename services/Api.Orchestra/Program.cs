@@ -50,6 +50,7 @@ builder.Services.AddHttpClient("panel-github",client=>{
 builder.Services.AddHttpClient("panel-model",client=>client.Timeout=TimeSpan.FromSeconds(55))
     .ConfigurePrimaryHttpMessageHandler(()=>new HttpClientHandler{AllowAutoRedirect=false,UseProxy=false});
 var app=builder.Build();
+Models.Autorization.Security.WebSecurityHeaders.UseMysticWebSecurity(app);
 app.UsePanelSocialPreviews();
 app.UseDefaultFiles();
 app.UseStaticFiles();
