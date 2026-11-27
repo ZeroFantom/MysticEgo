@@ -42,7 +42,7 @@ export function panelHtml(template,role,page='root'){
   const extra=role==='orchestra'?publicPages[page]:undefined;
   const links=Object.entries(publicPages).map(([path,entry])=>'<li><a href="/'+path+'">'+escape(entry.title)+'</a> — '+escape(entry.description)+'</li>').join('');
   // The same public content is readable before React starts, for users and crawlers alike.
-  const fallback=extra?'<main><h1>'+escape(extra.title)+'</h1><p>'+escape(extra.description)+'</p><nav aria-label="Публичные страницы"><ul>'+links+'</ul></nav><p><a href="https://github.com/ZeroFantom/MysticEgo">Исходный код MysticEgo</a></p></main>':'<main><h1>'+escape(title)+'</h1><p>'+escape(roles[role].description)+'</p><p><a href="'+(page==='share'?'/':'/share')+'">'+(page==='share'?'Открыть панель':'О панели MysticEgo')+'</a></p></main>';
+  const fallback=extra?'<main><h1>'+escape(extra.title)+'</h1><p>'+escape(extra.description)+'</p><nav aria-label="Публичные страницы"><ul>'+links+'</ul></nav><p><a href="https://github.com/ZeroFantom/MysticEgo">Исходный код MysticEgo</a></p></main>':'<main><h1>'+escape(title)+'</h1><p>'+escape(roles[role].description)+'</p></main>';
   return template.replace('<div id="root"></div>','<div id="root">'+fallback+'</div>').replace('data-role="orchestra"','data-role="'+role+'"')
     .replace('<title>MysticEgo</title>','<title>'+escape(title)+'</title>')
     .replace('</head>',metadata(role,page)+'\n</head>');

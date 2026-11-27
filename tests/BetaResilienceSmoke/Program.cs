@@ -65,9 +65,9 @@ Directory.CreateDirectory(fixture);
 try
 {
     var built = Environment.GetEnvironmentVariable("MYSTICEGO_SOCIAL_DIST");
-    foreach (var kind in new[]{NodeKind.Orchestra,NodeKind.Global,NodeKind.Local,NodeKind.Agent,NodeKind.Audit})
+    foreach (var kind in new[]{NodeKind.Orchestra,NodeKind.Global,NodeKind.Local,NodeKind.Agent,NodeKind.AuditOrchestra})
     {
-        var role=kind.ToString().ToLowerInvariant();
+        var role=kind==NodeKind.AuditOrchestra?"audit":kind.ToString().ToLowerInvariant();
         var root=Path.Combine(fixture,role);
         var auditRoot=Path.Combine(fixture,"embedded-"+role);
         byte[] png=Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a1gAAAABJRU5ErkJggg==");

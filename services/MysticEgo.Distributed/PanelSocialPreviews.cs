@@ -91,7 +91,7 @@ public static class PanelSocialPreviews
                 !context.Request.Headers.ContainsKey("X-Forwarded-Proto"))
             { await next(context); return; }
 
-            var role = node.Kind.ToString().ToLowerInvariant();
+            var role = node.Kind == NodeKind.AuditOrchestra ? "audit" : node.Kind.ToString().ToLowerInvariant();
             var web = app.Environment.WebRootPath;
             var embeddedCover = node.Kind == NodeKind.Orchestra && path == "/audit-portal/og/audit.png";
             var normalCover = path == "/og/" + role + ".png";
@@ -142,7 +142,7 @@ public static class PanelSocialPreviews
 
             var rendered = Render(html, node.PublicUrl, audit);
             context.Response.ContentType = "text/html; charset=utf-8";
-            context.Response.Headers.CacheControl = "public, max-age=60";
+            context.Response.Headers.CacheControl = "no-cache";
             // Login/workspace content remains non-indexable, but the public cover is fetchable.
             if (relative == "index.html" || relative == "social/share.html")
                 context.Response.Headers["X-Robots-Tag"] = "noindex, follow, max-image-preview:large";
