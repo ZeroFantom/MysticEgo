@@ -255,7 +255,21 @@ try{
             if(route==='studio'){
               await visible(page.locator('#model'));await visible(page.locator('#partners'));
               const spaces=page.locator('#spaces .landing-space-figure img');assert.equal(await spaces.count(),3);
-              const images=await spaces.evaluateAll(async items=>Promise.all(items.map(async img=>{await img.decode();const r=img.getBoundingClientRect();return {src:img.currentSrc,width:img.naturalWidth,height:img.naturalHeight,ratio:r.width/r.height,fit:getComputedStyle(img).objectFit}})));
+              // Lazy images must enter the viewport before decode(), particularly on mobile.
+              const images=[];
+              for(let index=0;index<3;index++){
+                const picture=spaces.nth(index);
+                await picture.scrollIntoViewIfNeeded();
+                await page.waitForFunction(i=>{
+                  const img=document.querySelectorAll('#spaces .landing-space-figure img')[i];
+                  return !!img?.currentSrc&&img.complete&&img.naturalWidth>0;
+                },index);
+                images.push(await picture.evaluate(async img=>{
+                  await img.decode();
+                  const r=img.getBoundingClientRect();
+                  return {src:img.currentSrc,width:img.naturalWidth,height:img.naturalHeight,ratio:r.width/r.height,fit:getComputedStyle(img).objectFit};
+                }));
+              }
               assert.equal(new Set(images.map(i=>i.src)).size,3);
               for(const img of images){assert.deepEqual([img.width,img.height],[1672,941]);assert(Math.abs(img.ratio-1672/941)<.02);assert.equal(img.fit,'contain')}
               await hero.locator('a[href="#spaces"]').click();assert.equal(new URL(page.url()).hash,'#spaces');
