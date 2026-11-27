@@ -14,6 +14,7 @@ public sealed class GitHubWorkspace(GitHubWorkspaceClient github,IConfiguration 
     private static readonly HttpMethod Patch=new("PATCH");
     private const string DiscussionFields="id number title body closed author{login} category{id name} updatedAt comments{totalCount}";
     private const string RepositoryHead="repository(owner:\"ZeroFantom\",name:\"MysticEgo\")";
+    public bool CanWrite=>github.CanWrite;
     public object Connection(Guid actor)=>new{connected=github.CanRead,writable=github.CanWrite,githubLogin=Login(actor),repository=GitHubWorkspaceClient.Repository};
 
     /// <summary>Only operator-configured, verified GitHub account mappings are used for self-assignment.
@@ -108,6 +109,13 @@ public sealed class GitHubWorkspace(GitHubWorkspaceClient github,IConfiguration 
         var discussion=await GetDiscussion(number,ct);
         return new(Discussion(discussion),Objects(discussion["comments"]?["nodes"]).Select(x=>Comment(x,true)).ToArray(),
             discussion["comments"]?["pageInfo"]?["hasNextPage"]?.GetValue<bool>()==true);
+    }
+
+    /// <summary>Check an existing published marker before linking a pending local record.</summary>
+    public async Task<bool> HasPublicationMarker(string kind,int number,Guid id,CancellationToken ct)
+    {
+        var row=kind=="issue"?await GetIssue(number,ct):kind=="discussion"?await GetDiscussion(number,ct):throw new ArgumentException("invalid_kind");
+        return Text(row,"body").Contains("<!-- mysticego-workspace:"+id.ToString("D")+" -->",StringComparison.Ordinal);
     }
 
     /// <summary>Publish an explicit user request. No automatic write retry after an ambiguous provider response.</summary>
