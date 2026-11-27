@@ -140,6 +140,12 @@ function launchAfterExit(app,target){
   child.on('error',e=>console.warn('Update restart:',e.message));child.unref();
  });
 }
+async function confirmUpdate({product,dialog,win,candidate}){
+ if(!requiresConfirmation(product))return true;
+ const changes=releaseNotes(candidate.notes).slice(0,5000)||'Описание изменений не опубликовано.';
+ const result=await dialog.showMessageBox(win,{type:'info',title:'Обновление '+product,message:'Версия '+candidate.tag+' скачана и проверена.',detail:'Что нового:\n'+changes+'\n\nПрофили сохраняются. Для установки приложение будет перезапущено.',buttons:['Установить и перезапустить','Позже'],defaultId:1,cancelId:1,noLink:true});
+ return result.response===0;
+}
 function startDesktopUpdates({app,dialog,root,product,window,canRestart=()=>true}){
  if(process.arch!=='x64')return;
  const platform=process.platform,local=installation(root,product,platform);
@@ -157,12 +163,8 @@ function startDesktopUpdates({app,dialog,root,product,window,canRestart=()=>true
    const win=window?.();
    if(!win||win.isDestroyed())return;
    if(!canRestart())return;
-   if(requiresConfirmation(product)){
-    offered=candidate.tag;
-    const changes=candidate.notes.slice(0,5000)||'Описание изменений не опубликовано.';
-    const result=await dialog.showMessageBox(win,{type:'info',title:'Обновление '+product,message:'Версия '+candidate.tag+' скачана и проверена.',detail:'Что нового:\\n'+changes+'\\n\\nПрофили сохраняются. Для установки приложение будет перезапущено.',buttons:['Установить и перезапустить','Позже'],defaultId:1,cancelId:1,noLink:true});
-    if(result.response!==0)return;
-   }
+   if(requiresConfirmation(product))offered=candidate.tag;
+   if(!await confirmUpdate({product,dialog,win,candidate}))return;
    if(!await verified(file,candidate))throw Error('Installer verification failed');
    if(platform==='win32')await run(file,['/S'],{timeout:20*60_000,windowsHide:true});
    else await run('/bin/bash',[file,'--install-only'],{timeout:20*60_000});
@@ -170,6 +172,7 @@ function startDesktopUpdates({app,dialog,root,product,window,canRestart=()=>true
    const launcher=path.join(target,platform==='win32'?'launch.cmd':'launch.sh');
    if(!(await fs.lstat(launcher)).isFile())throw Error('New installation launcher missing');
    await saveJson(notesPath(app),{tag:candidate.tag,notes:candidate.notes});
+   if(!canRestart()){offered=null;return;}
    await fs.rm(file,{force:true});
    launchAfterExit(app,target);
    app.quit();
@@ -180,4 +183,4 @@ function startDesktopUpdates({app,dialog,root,product,window,canRestart=()=>true
  const timer=setInterval(()=>void check(),30*60_000);
  app.once('before-quit',()=>{clearTimeout(first);clearInterval(timer)});
 }
-module.exports={version,compare,select,downloadResponse,verified,stage,installation,requiresConfirmation,releaseNotes,createReleaseHighlights,startDesktopUpdates};
+module.exports={version,compare,select,downloadResponse,verified,stage,installation,requiresConfirmation,releaseNotes,createReleaseHighlights,confirmUpdate,startDesktopUpdates};
