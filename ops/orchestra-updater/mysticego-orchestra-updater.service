@@ -4,6 +4,9 @@ After=network-online.target
 
 [Service]
 Type=oneshot
+CPUAccounting=yes
+MemoryAccounting=yes
+TasksAccounting=yes
 Environment=GH_PROMPT_DISABLED=1
 EnvironmentFile=-/etc/mysticego/orchestra-updater.env
 StateDirectory=mysticego-orchestra-updater
