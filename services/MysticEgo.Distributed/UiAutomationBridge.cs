@@ -1,5 +1,8 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
+using Models.Commands.Mcp;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -14,6 +17,53 @@ public sealed class UiAutomationBridge(IConfiguration configuration, IHttpClient
     public bool IsEnabled => configuration.GetValue<bool>("UiAutomation:Enabled");
     public string? Owner => configuration["UiAutomation:Owner"] ??
         Environment.GetEnvironmentVariable("MYSTICEGO_AGENT_OWNER_USER");
+
+    private string? Token => configuration["UiAutomation:LocalToken"] ??
+        Environment.GetEnvironmentVariable("MYSTICEGO_UI_TOKEN");
+
+    public async Task<McpListToolsResult?> ToolsAsync(CancellationToken ct)
+    {
+        try
+        {
+            using var response = await SendLocalAsync("mcp", new { jsonrpc = "2.0", id = 1, method = "tools/list" }, ct);
+            if (response is null || !response.IsSuccessStatusCode) return null;
+            using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+            return json.RootElement.GetProperty("result").Deserialize<McpListToolsResult>();
+        }
+        catch (Exception e) when (e is HttpRequestException or JsonException or KeyNotFoundException or InvalidOperationException ||
+            e is OperationCanceledException && !ct.IsCancellationRequested) { return null; }
+    }
+
+    public async Task<McpCallToolResult> CallAsync(string name, JsonElement args, CancellationToken ct)
+    {
+        if (!UiAutomationController.IsOperation(name)) return McpCallToolResult.Fail("Unknown UI tool.");
+        try
+        {
+            object body = args.ValueKind == JsonValueKind.Undefined ? new { } : args;
+            using var response = await SendLocalAsync("api/v1/ui/" + name, body, ct);
+            if (response is null || !response.IsSuccessStatusCode) return McpCallToolResult.Fail("Local UI executor unavailable or operation denied.");
+            var text = await response.Content.ReadAsStringAsync(ct);
+            using var json = JsonDocument.Parse(text);
+            if (json.RootElement.TryGetProperty("image", out var image) && image.ValueKind == JsonValueKind.String)
+                return new McpCallToolResult { Content = { new McpContentBlock { Type = "image", Text = null, Data = image.GetString(), MimeType = "image/png" } } };
+            return McpCallToolResult.Ok(text);
+        }
+        catch (Exception e) when (e is HttpRequestException or JsonException ||
+            e is OperationCanceledException && !ct.IsCancellationRequested)
+        { return McpCallToolResult.Fail("Local UI operation failed."); }
+    }
+
+    private async Task<HttpResponseMessage?> SendLocalAsync(string path, object body, CancellationToken ct)
+    {
+        var token = Token;
+        if (!IsEnabled || string.IsNullOrWhiteSpace(token) || token.Length < 32) return null;
+        using var request = new HttpRequestMessage(HttpMethod.Post, "http://127.0.0.1:1247/" + path);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        request.Headers.Accept.ParseAdd("application/json");
+        request.Headers.Accept.ParseAdd("text/event-stream");
+        request.Content = JsonContent.Create(body);
+        return await clients.CreateClient("mysticego-local-ui").SendAsync(request, ct);
+    }
 
     public async Task ForwardAsync(HttpContext context, string path, CancellationToken cancellation)
     {
@@ -59,6 +109,8 @@ public sealed class UiAutomationController(NodeOptions node, UiAutomationBridge 
         "native_targets", "native_attach", "native_snapshot", "native_click", "native_key",
         "native_pointer_get", "native_pointer_set", "native_close", "native_vendor_launch", "native_replay_clicks"
     };
+
+    internal static bool IsOperation(string name) => Operations.Contains(name);
 
     private bool Allowed() =>
         node.Kind is NodeKind.Agent or NodeKind.AuditOrchestra &&
