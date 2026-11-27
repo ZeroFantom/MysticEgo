@@ -24,13 +24,14 @@ export function InfrastructureSetup({initial='monitoring',allowed,title='Раз�
   const [role,setRole]=useState(initial==='prepare-postgres'?'orchestra':'panel-data'),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const needsSecret=component==='metrics-source'||component==='auth-postgres'||component==='monitoring'&&!!url.trim();
   const showSecret=needsSecret||['postgres','postgres-native','prepare-postgres'].includes(component);
-  const candidates=[...(state.value?.localAvailable&&['monitoring','docker','lmstudio','postgres','postgres-native'].includes(component)?['@local']:[]),...(state.value?.targets??[])];
+  const candidates=[...(state.value?.localAvailable&&['monitoring','metrics-source','docker','lmstudio','postgres','postgres-native'].includes(component)?['@local']:[]),...(state.value?.targets??[])];
   const selected=candidates.includes(target)?target:candidates[0]??'';
   const targetName=(value:string)=>value==='@local'?'Этот VPS Orchestra':value;
 
   async function install(event:FormEvent){
     event.preventDefault();
     if(selected==='@local'&&['postgres','postgres-native'].includes(component)&&(bind!=='127.0.0.1'||cidr!=='127.0.0.1/32'||secret)){setError('Локальный установщик использует loopback и автоматически генерирует пароли. Для другой сети используйте доверенный SSH.');return;}
+    if(selected==='@local'&&component==='monitoring'&&url.trim()){setError('Для локального мониторинга оставьте адрес пустым. Внешний источник настраивается через доверенный SSH.');return;}
     if(!selected||busy||!window.confirm(`Установить «${items.find(([id])=>id===component)?.[1]}» на ${targetName(selected)}?`))return;
     setBusy(true);setError('');
     try {
@@ -53,7 +54,7 @@ export function InfrastructureSetup({initial='monitoring',allowed,title='Раз�
       <label>Сервер<select value={selected} onChange={e=>setTarget(e.target.value)} disabled={!candidates.length}>
         {!candidates.length&&<option value="">Нет доступного сервера</option>}
         {candidates.map(host=><option key={host} value={host}>{targetName(host)}</option>)}</select></label>
-      {!candidates.length&&<p className="footnote">{['monitoring','docker','lmstudio','postgres','postgres-native'].includes(component)
+      {!candidates.length&&<p className="footnote">{['monitoring','metrics-source','docker','lmstudio','postgres','postgres-native'].includes(component)
         ?'Установите актуальную версию Orchestra через встроенное обновление. Если привилегированный worker отсутствует, понадобится однократная настройка на VPS.'
         :'Добавьте доверенный SSH-сервер для этого компонента.'}</p>}
       {['monitoring','model-connect'].includes(component)&&<label>{component==='monitoring'?'HTTPS-адрес Orchestra':'Локальный адрес или SSH-туннель к LM Studio'}

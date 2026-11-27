@@ -235,6 +235,38 @@ try{
               await capture(page,prefix+'-'+route);
             });
           }
+          if(role==='orchestra')await check(page,prefix+'-infrastructure-workspaces',async()=>{
+            const fixture={
+              '/api/v1/managed/development-team':{owner:true},
+              '/api/v1/managed/infrastructure-setup':{localAvailable:true,targets:[]},
+              '/api/v1/managed/infrastructure-maintenance':{installed:true,workerState:'reporting',source:'host-socket',socketAvailable:true,components:['orchestra','docker','lmstudio','voice','postgres-service','database'].map(name=>({name,state:'available',message:'Служба готова',checkedAt:now}))},
+              '/api/v1/orchestra/update':{phase:'current'}
+            };
+            const handler=route=>route.fulfill({contentType:'application/json',body:JSON.stringify(fixture[new URL(route.request().url()).pathname])});
+            for(const path of Object.keys(fixture))await page.route('**'+path,handler);
+            try{
+              const pages=[['services',['docker'],['Docker / Compose']],['ai',['lmstudio','model-connect'],['LM Studio','Распознавание речи']],['database',['postgres','postgres-native','prepare-postgres','auth-postgres'],['Текущая база','Служба PostgreSQL']],['metrics',['monitoring','metrics-source'],['Prometheus','Grafana']]];
+              for(const [section,actions,titles] of pages){
+                await page.goto(origin+'/infrastructure/'+section,{waitUntil:'domcontentloaded'});
+                const workspace=page.locator('.infra-workspace');
+                await visible(workspace);
+                const selector=workspace.getByLabel('Компонент',{exact:true});
+                await visible(selector);
+                assert.deepEqual(await selector.locator('option').evaluateAll(options=>options.map(o=>o.value)),actions);
+                assert.deepEqual(await workspace.locator('.infra-status-card h3').allTextContents(),section==='services'?['Orchestra',...titles]:titles);
+                await visible(workspace.getByLabel('Сервер',{exact:true}));
+                assert.equal(await workspace.getByLabel('Сервер',{exact:true}).inputValue(),'@local');
+                for(const [theme,style] of combinations){
+                  await switchAppearance(page,theme,style);await noHorizontalOverflow(page);
+                  await capture(page,prefix+'-infra-'+section+'-'+theme+'-'+style);
+                }
+              }
+              await page.goto(origin+'/diagnostics',{waitUntil:'domcontentloaded'});
+              await visible(page.locator('.chart-line').first());
+              assert.equal(await page.getByLabel('Компонент',{exact:true}).count(),0);
+              assert.equal(await page.locator('.infra-workspace').count(),0);
+            }finally{for(const path of Object.keys(fixture))await page.unroute('**'+path,handler)}
+          });
           if(role==='orchestra')await check(page,prefix+'-public-downloads-fullscreen',async()=>{
             await page.goto(origin+'/desktop-downloads',{waitUntil:'domcontentloaded'});
             const screen=page.locator('.desktop-downloads-public');

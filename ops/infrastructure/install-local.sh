@@ -66,4 +66,11 @@ systemctl daemon-reload
 systemctl enable --now mysticego-infrastructure-reconcile.timer
 systemctl start --no-block mysticego-infrastructure-reconcile.service
 systemctl is-enabled --quiet mysticego-infrastructure-reconcile.timer
+# Refresh the already installed updater for the next timer invocation. The
+# verified full release is root-owned; never load executable code from user data.
+if [[ "$here" == /opt/mysticego/app/ops/infrastructure && -f /usr/local/libexec/mysticego/orchestra-updater.py && -f "$here/../orchestra-updater/update-orchestra.py" ]]; then
+  stage=$(mktemp /usr/local/libexec/mysticego/.orchestra-updater.XXXXXXXX)
+  install -o root -g root -m 0644 "$here/../orchestra-updater/update-orchestra.py" "$stage"
+  mv -T "$stage" /usr/local/libexec/mysticego/orchestra-updater.py
+fi
 echo 'Локальная служба обслуживания установлена; первый цикл запущен.'

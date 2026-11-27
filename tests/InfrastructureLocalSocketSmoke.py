@@ -37,6 +37,8 @@ def smoke():
             listener.listen()
             for line, expected in [
                 (b"maintenance-status\n", report),
+                (b"metrics-source "+b"a"*64+b"\n", {"component":"metrics-source","secret":"a"*64}),
+                (b"metrics-source "+b"!"*64+b"\n", None),
                 (b"docker\n", {"component": "docker"}),
                 (b"postgres\n", {"component": "postgres"}),
                 (b"postgres-native\n", {"component": "postgres-native"}),

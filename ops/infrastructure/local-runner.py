@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Run fixed Orchestra installation actions for the local service user."""
 import json
+import re
 import socket
 import struct
 import subprocess
@@ -47,6 +48,8 @@ def main():
             b"lmstudio world\n": {"component": "lmstudio", "role": "world"},
         }
         data = jobs.get(request)
+        if re.fullmatch(rb'metrics-source [a-f0-9]{64}\n', request):
+            data = {"component": "metrics-source", "secret": request[15:-1].decode('ascii')}
         if data is None:
             connection.sendall(b'{"ok":false,"message":"Invalid installation request"}\n')
             return

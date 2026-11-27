@@ -8,6 +8,8 @@ on:
       - 'services/**'
       - 'core/Models.Data/**'
       - 'ops/infrastructure/**'
+      - 'ops/orchestra-updater/**'
+      - 'tests/InfrastructureLocalSocketSmoke.py'
       - 'tests/BetaResilienceSmoke/**'
       - '.github/workflows/appearance-check.yml'
   workflow_dispatch:
@@ -42,6 +44,7 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - run: python3 -m unittest discover -s ops/infrastructure -p 'test_reconcile.py'
+      - run: python3 tests/InfrastructureLocalSocketSmoke.py
       - run: |
           python3 -m py_compile ops/infrastructure/{reconcile,voice-server,local-runner}.py
           bash -n ops/infrastructure/install-local.sh
