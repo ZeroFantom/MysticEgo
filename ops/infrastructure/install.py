@@ -320,6 +320,20 @@ def prepare_postgres(data):
     say(f"Подготовлено подключение {role} к PostgreSQL {host}:55432. Пароль сохранён только на целевом VPS.")
 
 
+def lmstudio_dependencies():
+    """Install the required llmster runtime dependency before running its installer."""
+    result = subprocess.run(("dpkg-query", "-W", "-f=${Status}", "libatomic1"),
+                            capture_output=True, text=True, timeout=10)
+    missing = []
+    if result.returncode != 0 or result.stdout.strip() != "install ok installed":
+        missing.append("libatomic1")
+    if not shutil.which("curl"):
+        missing.extend(("curl", "ca-certificates"))
+    if missing:
+        say("Устанавливаем зависимости LM Studio: " + ", ".join(missing))
+        system_packages(*missing)
+
+
 def lmstudio(data):
     role = data.get("role") or "panel-data"
     if role not in MODELS:
@@ -333,9 +347,8 @@ def lmstudio(data):
         raise ValueError("Этот сервер уже использует другой профиль LM Studio.")
     command = ("runuser", "-u", "mysticego-lm", "--", "env", f"HOME={LM_HOME}")
     cli = LM_HOME / ".lmstudio/bin/lms"
+    lmstudio_dependencies()
     if not cli.is_file():
-        if not shutil.which("curl"):
-            system_packages("curl", "ca-certificates")
         say("Устанавливаем LM Studio llmster под отдельным пользователем")
         with tempfile.NamedTemporaryFile() as install:
             run("curl", "-fsSL", "--proto", "=https", "--max-time", "120",
