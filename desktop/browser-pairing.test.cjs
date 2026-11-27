@@ -13,7 +13,7 @@ test('desktop pairing checks exact origin, opt-in and native approval; never ret
  const fake={app,dialog:{showMessageBox:async()=>{prompts++;return {response:answer}}},Menu:{getApplicationMenu:()=>null,buildFromTemplate:items=>({items}),setApplicationMenu:()=>{}}};
  const old=Module._load;let pairing;
  try{Module._load=function(name,...args){return name==='electron'?fake:old.call(this,name,...args)};pairing=require('./browser-pairing.cjs')}finally{Module._load=old}
- const controls=pairing.installBrowserPairing({product:'AuditDesktop',window:()=>({isDestroyed:()=>false}),getSession:()=>({origin:'https://example.test',identity:'actor',refreshToken:'never-return',login:'test'}),approve:async()=>{grants++;return 'a'.repeat(64)}});
+ const controls=pairing.installBrowserPairing({product:'AuditDesktop',window:()=>({isDestroyed:()=>false,setAutoHideMenuBar(){},setMenuBarVisibility(){}}),getSession:()=>({origin:'https://example.test',identity:'actor',refreshToken:'never-return',login:'test'}),approve:async()=>{grants++;return 'a'.repeat(64)}});
  const request=(url,origin,body)=>new Promise((resolve,reject)=>{
   const req=http.request({host:'127.0.0.1',port:19471,path:url,method:body?'POST':'GET',headers:{Origin:origin,...(body?{'Content-Type':'application/json'}:{})},timeout:2000},res=>{let raw='';res.on('data',c=>raw+=c);res.on('end',()=>resolve({status:res.statusCode,headers:res.headers,body:raw}))});
   req.on('error',reject);req.on('timeout',()=>req.destroy());req.end(body?JSON.stringify(body):undefined);
