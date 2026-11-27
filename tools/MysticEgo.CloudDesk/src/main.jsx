@@ -41,6 +41,18 @@ function App(){
  const [form,H]=useState({name:'mysticego-orchestra',role:'Orchestra',deploymentMethod:'native',databaseMode:'sqlite',network:'ipv4',zone:'',plan:'',os:'',host:'',port:'22',user:'root',domain:'',dnsZone:'',orchestra:'',script:'',command:'uptime'});
  const [installedTarget,setInstalledTarget]=useState(null);
  const [maintenancePlan,setMaintenancePlan]=useState(null);
+ const [maintenanceFormat,setMaintenanceFormat]=useState('xlsx'),[maintenanceExport,setMaintenanceExport]=useState(false),[maintenanceError,setMaintenanceError]=useState('');
+ async function serviceReport(scope){if(!installedTarget||maintenanceExport)return;setMaintenanceExport(true);setMaintenanceError('');
+  try{const report=await api.rpc('deploy.maintenanceReport',{domain:installedTarget.domain,node:installedTarget.node,scope,format:maintenanceFormat});
+    const bytes=Uint8Array.from(atob(report.content),c=>c.charCodeAt(0)),url=URL.createObjectURL(new Blob([bytes]));
+    const link=document.createElement('a');link.href=url;link.download='MysticEgo-'+scope+'-'+new Date().toISOString().replace(/[:.]/g,'-')+'.'+maintenanceFormat;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }catch(e){setMaintenanceError(String(e.message||e))}finally{setMaintenanceExport(false)}
+ }
+ async function setMaintenanceAuto(){if(!installedTarget||!maintenancePlan?.automaticAvailable)return;const enabled=!maintenancePlan.automaticEnabled;
+  if(!confirm(enabled?'Включить установку новых проверенных beta-релизов Orchestra с возможным перезапуском?':'Отключить автоматические обновления?'))return;
+  try{const result=await api.rpc('deploy.maintenanceAuto',{domain:installedTarget.domain,node:installedTarget.node,enabled,confirm:'AUTO_UPDATE'});setMaintenancePlan(p=>p?{...p,automaticEnabled:result.enabled}:p)}
+  catch(e){setMaintenanceError(String(e.message||e))}
+ }
  useEffect(()=>{setMaintenancePlan(null);if(tab!=='deploy'||!installedTarget||installedTarget.host!==form.host)return;let stop=false,timer;
   async function tick(){try{const plan=await api.rpc('deploy.maintenancePlan',{domain:installedTarget.domain,node:installedTarget.node});if(!stop)setMaintenancePlan(plan)}catch(e){if(!stop)setMaintenancePlan({action:'unknown',reason:String(e.message||e)})}finally{if(!stop)timer=setTimeout(tick,5000)}}
   void tick();return()=>{stop=true;clearTimeout(timer)};
@@ -214,8 +226,11 @@ function App(){
        if(!['update','repair','legacy-repair'].includes(action)||!confirm(action==='update'?'Установить '+candidate?.tag+'?':'Восстановить обслуживание? Данные сохранятся.'))return;
        runSSH('deploy.executeMaintenance',{...form,user:'root',domain:installedTarget.domain,node:installedTarget.node,serverId:installedTarget.serverId,planAction:action,candidateTag:candidate?.tag??'',candidateDigest:candidate?.digest??'',confirm:'MAINTENANCE_PLAN'});
      },'primary',wizBusy||!!busy||!['update','repair','legacy-repair'].includes(maintenancePlan?.action))}
-     <div className="fields">{maintenancePlan?.components?.map(c=><div key={c.name}><b>{c.name}</b><p>{c.state} · {new Date(c.checkedAt).toLocaleTimeString()}</p></div>)}</div>
-     <div className="fields">{maintenancePlan?.services?.map(s=><div key={s.unit}><b>{s.unit}</b><p>{s.activeState??'unknown'} · CPU {s.cpuPercent==null?'—':s.cpuPercent.toFixed(1)+'%'} · RAM {s.memoryBytes==null?'—':(s.memoryBytes/1048576).toFixed(1)+' MiB'}</p></div>)}</div>
+     {maintenancePlan?.automaticAvailable&&<label><input type="checkbox" checked={maintenancePlan.automaticEnabled===true} onChange={()=>void setMaintenanceAuto()}/> Автоматическое обновление Orchestra</label>}
+     {maintenancePlan&&!maintenancePlan.legacy&&<div className="actions"><select aria-label="Формат отчёта" value={maintenanceFormat} onChange={e=>setMaintenanceFormat(e.target.value)}><option value="xlsx">XLSX</option><option value="json">JSON</option><option value="txt">TXT</option></select>{button('Сводный отчёт',()=>void serviceReport('all'),'',maintenanceExport)}</div>}
+     {maintenanceError&&<p className="warning">{maintenanceError}</p>}
+     <div className="fields">{maintenancePlan?.components?.map(c=><div key={c.name}><b>{c.name}</b><p>{c.state} · {new Date(c.checkedAt).toLocaleTimeString()}</p>{!maintenancePlan.legacy&&button('Отчёт',()=>void serviceReport(c.name),'',maintenanceExport)}</div>)}</div>
+     <div className="fields">{maintenancePlan?.services?.map(s=><div key={s.unit}><b>{s.unit}</b><p>{s.activeState??'unknown'} · CPU {s.cpuPercent==null?'—':s.cpuPercent.toFixed(1)+'%'} · RAM {s.memoryBytes==null?'—':(s.memoryBytes/1048576).toFixed(1)+' MiB'}</p>{button('Отчёт',()=>void serviceReport(s.unit),'',maintenanceExport)}</div>)}</div>
    </>}
    </div>
    <h3>Global</h3>
