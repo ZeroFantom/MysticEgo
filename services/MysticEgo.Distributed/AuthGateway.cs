@@ -13,6 +13,10 @@ internal static class AuthGateway
         foreach (var action in new[] { "login", "refresh", "logout" })
             app.MapPost("/api/auth/" + action, (HttpContext context, IHttpClientFactory clients) =>
                 Forward(context, clients, node.AuthUrl, action)).AllowAnonymous();
+        app.MapGet("/api/auth/presentation", (HttpContext context, IHttpClientFactory clients) =>
+            Forward(context, clients, node.AuthUrl, "presentation")).RequireAuthorization();
+        app.MapPost("/api/auth/presentation", (HttpContext context, IHttpClientFactory clients) =>
+            Forward(context, clients, node.AuthUrl, "presentation")).RequireAuthorization();
         if (node.Kind is NodeKind.AuditOrchestra or NodeKind.Orchestra)
         {
             app.MapPost("/api/auth/audit/register", (HttpContext context, IHttpClientFactory clients) =>
@@ -30,6 +34,8 @@ internal static class AuthGateway
         using var request = new HttpRequestMessage(new HttpMethod(context.Request.Method), auth.TrimEnd('/') + "/api/auth/" + action);
         if (context.Connection.RemoteIpAddress is { } caller)
             request.Headers.TryAddWithoutValidation("X-Forwarded-For", caller.ToString());
+        if (action == "presentation" && AuthenticationHeaderValue.TryParse(context.Request.Headers.Authorization.ToString(),out var authorization) && authorization.Scheme == "Bearer")
+            request.Headers.Authorization = authorization;
         if (HttpMethods.IsPost(context.Request.Method))
         {
             request.Content = new StreamContent(context.Request.Body);
