@@ -24,18 +24,19 @@ export function changePresentation(patch:Partial<Presentation>){current=normaliz
 }
 export function syncAppearance(patch:Record<string,unknown>){active?.send(patch)}
 export function useAccountPresentation(authUrl:string,token:string,scope:string,applyAppearance:(value:Record<string,unknown>)=>void){
- const tokenRef=useRef(token);tokenRef.current=token;
+ const tokenRef=useRef({token,scope,authUrl});tokenRef.current={token,scope,authUrl};
  useEffect(()=>{
   let alive=true;let dirty:Record<string,unknown>={};let chain=Promise.resolve();
   problem='';current=token?defaults:guest();publish();
   if(!token||!scope){active=undefined;return}
   const endpoint=authUrl.replace(/\/$/,'')+'/api/auth/presentation';
   const request=async(patch?:Record<string,unknown>)=>{
-   const response=await fetch(endpoint,{method:patch?'POST':'GET',headers:{Authorization:'Bearer '+tokenRef.current,...(patch?{'Content-Type':'application/json'}:{})},body:patch?JSON.stringify(patch):undefined,signal:AbortSignal.timeout(10000),redirect:'error'});
+   if(tokenRef.current.scope!==scope||tokenRef.current.authUrl!==authUrl||!tokenRef.current.token)throw Error('Account changed');
+   const response=await fetch(endpoint,{method:patch?'POST':'GET',headers:{Authorization:'Bearer '+tokenRef.current.token,...(patch?{'Content-Type':'application/json'}:{})},body:patch?JSON.stringify(patch):undefined,signal:AbortSignal.timeout(10000),redirect:'error'});
    if(!response.ok)throw Error('HTTP '+response.status);return await response.json() as Record<string,unknown>
   };
   const binding={send(patch:Record<string,unknown>){Object.assign(dirty,patch);chain=chain.then(async()=>{
-   if(!alive||!Object.keys(dirty).length)return;const batch=dirty;dirty={};
+   if(!alive||tokenRef.current.scope!==scope||!Object.keys(dirty).length)return;const batch=dirty;dirty={};
    try{await request(batch);if(alive){problem='';publish()}}catch{if(alive){dirty={...batch,...dirty};problem='Настройки не синхронизированы';publish()}}
   })}};
   active=binding;
