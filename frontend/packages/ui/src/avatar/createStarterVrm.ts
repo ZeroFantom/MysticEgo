@@ -1,4 +1,4 @@
-import {BoxGeometry, Group, Mesh, MeshStandardMaterial, Scene} from 'three';
+import {BoxGeometry, Float32BufferAttribute, Group, Mesh, MeshStandardMaterial, Scene} from 'three';
 import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
 
 const extension = 'VRMC_vrm';
@@ -17,11 +17,13 @@ const meta = {
 type Dimensions = readonly [number, number, number];
 
 /** Constructs a low-poly VRM template with the humanoid joints used by the avatar player. */
-export async function createStarterVrm(): Promise<File> {
+export async function createStarterVrm(palette:'scout'|'violet'|'amber'='scout'): Promise<File> {
+  const colors={scout:['#394361','#6de0d0'],violet:['#44375c','#c6a2ff'],amber:['#4b4038','#ffb968']} as const;
+  const selected=colors[palette]??colors.scout;
   const scene = new Scene();
   const unit = new BoxGeometry(1, 1, 1);
-  const body = new MeshStandardMaterial({color: '#394361', roughness: .85});
-  const highlight = new MeshStandardMaterial({color: '#6de0d0', roughness: .65});
+  const body = new MeshStandardMaterial({color: selected[0], roughness: .85});
+  const highlight = new MeshStandardMaterial({color: selected[1], roughness: .65});
   const visor = new MeshStandardMaterial({color: '#1e2330', roughness: .4});
   const bones: Record<string, Group> = {};
 
@@ -54,6 +56,22 @@ export async function createStarterVrm(): Promise<File> {
   block(head, [.05, .04, .025], [-.071, .14, .164], highlight);
   block(head, [.05, .04, .025], [.071, .14, .164], highlight);
 
+  // Actual VRM expression morph targets on a dedicated mouth mesh.
+  const mouthGeometry=new BoxGeometry(.085,.012,.012);
+  const mouthPositions=mouthGeometry.getAttribute('position');
+  const vowelNames=['aa','ih','ou','ee','oh'] as const;
+  const mouthScales=[[1.2,5],[1.45,2],[.65,3.2],[1.55,2.7],[.8,4.6]];
+  mouthGeometry.morphAttributes.position=mouthScales.map(([sx,sy],index)=>{
+    const data=new Float32Array(mouthPositions.count*3);
+    for(let i=0;i<mouthPositions.count;i++){
+      data[i*3]=mouthPositions.getX(i)*sx;
+      data[i*3+1]=mouthPositions.getY(i)*sy;
+      data[i*3+2]=mouthPositions.getZ(i);
+    }
+    const target=new Float32BufferAttribute(data,3);target.name=vowelNames[index];return target;
+  });
+  const mouth=new Mesh(mouthGeometry,visor);mouth.name='ScoutMouth';mouth.position.set(0,.054,.155);head.add(mouth);
+  mouth.updateMorphTargets();
   for (const [side, sign] of [['left', 1], ['right', -1]] as const) {
     const arm = joint(side + 'UpperArm', chest, [sign * .26, .08, 0]);
     const forearm = joint(side + 'LowerArm', arm, [sign * .24, 0, 0]);
@@ -74,7 +92,7 @@ export async function createStarterVrm(): Promise<File> {
     afterParse() {
       // GLTFExporter assigns node indices during traversal, so map bones after export parsing.
       const output = writer as typeof writer & {
-        nodeMap: Map<Group, number>;
+        nodeMap: Map<Group | Mesh, number>;
         json: {extensions?: Record<string, unknown>};
       };
       const humanBones = Object.fromEntries(Object.entries(bones).map(([name, object]) => {
@@ -83,7 +101,10 @@ export async function createStarterVrm(): Promise<File> {
         return [name, {node}];
       }));
       output.json.extensions ??= {};
-      output.json.extensions[extension] = {specVersion: '1.0', meta, humanoid: {humanBones}};
+      const mouthNode=output.nodeMap.get(mouth);
+      if(mouthNode===undefined)throw Error('В VRM отсутствует узел рта');
+      const preset=Object.fromEntries(vowelNames.map((name,index)=>[name,{morphTargetBinds:[{node:mouthNode,index,weight:1}]}]));
+      output.json.extensions[extension] = {specVersion: '1.0', meta, humanoid: {humanBones},expressions:{preset}};
       output.extensionsUsed[extension] = true;
     },
   }));
@@ -94,6 +115,7 @@ export async function createStarterVrm(): Promise<File> {
     return new File([result], 'mysticego-scout.vrm', {type: 'model/gltf-binary'});
   } finally {
     unit.dispose();
+    mouthGeometry.dispose();
     body.dispose();
     highlight.dispose();
     visor.dispose();
