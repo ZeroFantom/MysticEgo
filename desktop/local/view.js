@@ -1,7 +1,9 @@
+import {mountDesktopUpdate} from '../control/desktop-update-view.js';
 import {renderReleaseHighlights} from '../control/release-highlights.js';
 import {initEffects} from '../control/effects.js';
 const $=id=>document.getElementById(id);
 const api=window.local;
+mountDesktopUpdate($('desktop-update-root'),window.desktopUpdates);
 initEffects($('design'));
 let dirty=false,busy=false;
 async function refresh(){

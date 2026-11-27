@@ -129,7 +129,8 @@ sealed partial class CloudDesk {
         return (rows[0],fp[1]);
     }
     static JsonObject Status(string state,string message,string fingerprint="") => new(){["state"]=state,["message"]=message,["fingerprint"]=fingerprint};
-    async Task<JsonObject> Probe(JsonObject a,bool prepare) {
+    async Task<JsonObject> Probe(JsonObject a,bool prepare,Action<string>? progress=null) {
+        progress?.Invoke("identity");
         Target(a); Port(a); CheckLocalFiles();
         if(prepare) await EnsureKey();
         if(!File.Exists(Key)) return Status("setup","SSH-ключ ещё не создан.");
@@ -138,7 +139,18 @@ sealed partial class CloudDesk {
             if(!prepare) return Status("trust","Подлинность сервера ещё не подтверждена.");
             try { var scan=await Scan(a); return Status("trust","Подтвердите отпечаток сервера через независимую консоль.",scan.fingerprint); } catch { return Status("offline","Сервер не предоставил ED25519-ключ. Проверьте состояние VPS и порт."); }
         }
-        try { await Exec("ssh",[..SshArgs(a),"true"],minutes:1); return Status("ready","SSH-авторизация по ключу подтверждена."); }
+        // Interactive checks report a real fingerprint comparison before access.
+        // Background polling retains the single strict SSH handshake.
+        if(progress!=null) {
+            (string raw,string fingerprint) scan;
+            try { scan=await Scan(a); }
+            catch { return Status("offline","Не удалось проверить ED25519-ключ сервера."); }
+            var parts=Parts(scan.raw);
+            if(!old.Any(l=>{var x=Parts(l);return x.Length>=3&&x[1]==parts[1]&&x[2]==parts[2];}))
+                return Status("changed","Ключ хоста отличается от доверенного. Перед заменой проверьте причину в Timeweb.",scan.fingerprint);
+            progress("access");
+        }
+        try { await Exec("ssh",[..SshArgs(a),"true"],minutes:1); progress?.Invoke("ready"); return Status("ready","SSH-авторизация по ключу подтверждена."); }
         catch(Exception e) {
             if(Regex.IsMatch(e.Message,"REMOTE HOST IDENTIFICATION HAS CHANGED|Host key verification failed|No ED25519 host key is known",RegexOptions.IgnoreCase)) {
                 string fp=""; if(prepare) try { fp=(await Scan(a)).fingerprint; } catch {}
@@ -148,11 +160,11 @@ sealed partial class CloudDesk {
             return Status("offline","SSH недоступен: "+Redact(e.Message));
         }
     }
-    async Task<JsonObject> Trust(JsonObject a) {
+    async Task<JsonObject> Trust(JsonObject a,Action<string>? progress=null) {
         await EnsureKey(); var scanned=await Scan(a);
         if(scanned.fingerprint!=S(a,"fingerprint")) throw new Exception("Введённый отпечаток не совпадает с текущим ключом сервера.");
         var old=await KnownLines(a); var parts=Parts(scanned.raw);
-        if(old.Any(l=>{var x=Parts(l);return x.Length>=3 && x[1]==parts[1] && x[2]==parts[2];})) return await Probe(a,true);
+        if(old.Any(l=>{var x=Parts(l);return x.Length>=3 && x[1]==parts[1] && x[2]==parts[2];})) return await Probe(a,true,progress);
         if(old.Length>0 && S(a,"replace")!="REPLACE") throw new Exception("Для изменившегося ключа нужно отдельное подтверждение.");
         var temp=Known+".new-"+Guid.NewGuid().ToString("N");
         try {
@@ -160,30 +172,30 @@ sealed partial class CloudDesk {
             if(old.Length>0) { File.Copy(Known,Known+".backup-"+Guid.NewGuid().ToString("N")); await Exec("ssh-keygen",["-R",Lookup(a),"-f",temp],minutes:1); }
             await File.AppendAllTextAsync(temp,"\n"+scanned.raw+"\n"); SetPrivateMode(temp,Private); File.Move(temp,Known,true);
         } finally { File.Delete(temp); File.Delete(temp+".old"); }
-        return await Probe(a,true);
+        return await Probe(a,true,progress);
     }
-    async Task<JsonObject> WaitForKey(JsonObject a) {
+    async Task<JsonObject> WaitForKey(JsonObject a,Action<string>? progress=null) {
         JsonObject result=Status("auth","Ожидаем применения ключа.");
-        for(int i=0;i<6;i++) { if(i>0) await Task.Delay(3000); result=await Probe(a,false); if(S(result,"state")!="auth") return result; }
+        for(int i=0;i<6;i++) { if(i>0) await Task.Delay(3000); result=await Probe(a,false,progress); if(S(result,"state")!="auth") return result; }
         result["message"]="Ключ пока не принят сервером. Возможно, Timeweb ещё применяет его. Можно повторить проверку или воспользоваться паролем."; return result;
     }
-    async Task<JsonObject> CloudKey(JsonObject a) {
+    async Task<JsonObject> CloudKey(JsonObject a,Action<string>? progress=null) {
         if(S(a,"confirm")!="ADD_KEY") throw new Exception("Подтвердите добавление ключа на VPS.");
         if(S(a,"user")!="root" || Port(a)!="22") throw new Exception("Автоматическое добавление через Timeweb доступно для root на стандартном порту 22.");
         var id=Num(a,"serverId"); var server=(await Api("servers/"+id))["server"] as JsonObject ?? throw new Exception("Сервер не найден в аккаунте Timeweb.");
         var host=S(a,"host");
         if(server["networks"] is not JsonArray nets || !nets.OfType<JsonObject>().Any(n=>n["ips"] is JsonArray ips && ips.OfType<JsonObject>().Any(ip=>S(ip,"ip")==host && S(ip,"type")=="ipv4"))) throw new Exception("IP не совпадает с сервером Timeweb. Ключ не добавлен.");
-        var state=await Probe(a,true); if(S(state,"state")!="auth") return state;
+        var state=await Probe(a,true,progress); if(S(state,"state")!="auth") return state;
         var key=await Run("key.register",new JsonObject()) as JsonNode;
         if(!int.TryParse(key?["id"]?.ToString()??key?["ssh_key"]?["id"]?.ToString(),out var kid)||kid<=0) throw new Exception("Timeweb не вернул ID публичного ключа.");
         try { await Api($"servers/{id}/ssh-keys",new {ssh_key_ids=new[]{kid}}); }
-        catch(Exception e) { var check=await Probe(a,false); if(S(check,"state")=="ready") return check; throw new Exception("Timeweb не подтвердил добавление ключа. "+Redact(e.Message)); }
-        return await WaitForKey(a);
+        catch(Exception e) { var check=await Probe(a,false,progress); if(S(check,"state")=="ready") return check; throw new Exception("Timeweb не подтвердил добавление ключа. "+Redact(e.Message)); }
+        return await WaitForKey(a,progress);
     }
-    async Task<JsonObject> PasswordKey(JsonObject a) {
+    async Task<JsonObject> PasswordKey(JsonObject a,Action<string>? progress=null) {
         if(S(a,"confirm")!="ADD_KEY") throw new Exception("Подтвердите добавление публичного ключа.");
         var password=a["password"]?.GetValue<string>()??""; a.Remove("password"); if(password.Length==0||password.Length>4096||password.Contains('\n')||password.Contains('\r')||password.Contains('\0')) throw new Exception("Введите пароль SSH (одна строка).");
-        var state=await Probe(a,true); if(S(state,"state")!="auth") return state;
+        var state=await Probe(a,true,progress); if(S(state,"state")!="auth") return state;
         var pub=PublicPart(await File.ReadAllTextAsync(Key+".pub"));
         // The password is passed directly to SSH.NET, never to a shell, disk or process arguments.
         // Authentication is permitted only for the previously confirmed ED25519 host key.
@@ -192,7 +204,7 @@ sealed partial class CloudDesk {
         if(expected.Count==0)throw new Exception("Сначала подтвердите ED25519-отпечаток сервера.");
         try { await Task.Run(()=>InstallPublicKeyWithPassword(S(a,"host"),Num(a,"port"),S(a,"user"),password,pub,expected)); }
         catch { throw new Exception("Вход по паролю или установка ключа не удались. Проверьте пароль, доверенный отпечаток и разрешение SSH-входа. Настройки sshd не менялись."); }
-        return await Probe(a,false);
+        return await Probe(a,false,progress);
     }
     async Task<object> OpenTerminal(JsonObject a) {
         var state=await Probe(a,true); if(S(state,"state")!="ready") throw new Exception(S(state,"message"));
@@ -280,11 +292,11 @@ sealed partial class CloudDesk {
                 try { return await EnsurePublicNetwork(serverId,dual); }
                 catch(Exception ex) { throw new Exception($"VPS #{serverId} уже создан. Публичная сеть не подтверждена: {ex.Message}. Не создавайте новый VPS вместо него; проверьте адреса этого сервера в панели Timeweb."); }
             }); }
-            case "ssh.prepare": return await Probe(a,true);
+            case "ssh.prepare": return await Probe(a,true,progress);
             case "ssh.status": return await Probe(a,false);
-            case "ssh.trust": return await Trust(a);
-            case "ssh.cloudKey": return await CloudKey(a);
-            case "ssh.passwordKey": return await PasswordKey(a);
+            case "ssh.trust": return await Trust(a,progress);
+            case "ssh.cloudKey": return await CloudKey(a,progress);
+            case "ssh.passwordKey": return await PasswordKey(a,progress);
             case "ssh.terminal": return await OpenTerminal(a);
             case "ssh.test": return await SSH(a,"uname -a; id; uptime",1);
             case "ssh.command": return await SSH(a,S(a,"command"),5);

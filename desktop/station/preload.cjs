@@ -4,3 +4,5 @@ contextBridge.exposeInMainWorld('station',Object.fromEntries(
     .map(name=>[name,(...args)=>ipcRenderer.invoke('station:'+name,...args)])
 ));
 
+
+contextBridge.exposeInMainWorld('desktopUpdates',Object.freeze({status:()=>ipcRenderer.invoke('desktop-update:status'),action:action=>ipcRenderer.invoke('desktop-update:action',action)}));

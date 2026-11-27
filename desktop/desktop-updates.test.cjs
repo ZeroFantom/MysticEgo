@@ -4,7 +4,7 @@ const os=require('node:os');
 const path=require('node:path');
 const fs=require('node:fs/promises');
 const crypto=require('node:crypto');
-const {select,compare,stage,verified,downloadResponse,installation,confirmUpdate,createReleaseHighlights}=require('./desktop-updates.cjs');
+const {select,compare,stage,verified,downloadResponse,installation,confirmUpdate,createReleaseHighlights,createUpdateController}=require('./desktop-updates.cjs');
 const current='v1.0.0-beta.7-r3.2.39';
 const tag='v1.0.0-beta.7-r3.2.40';
 const data=Buffer.from('verified installer');
@@ -73,4 +73,57 @@ test('highlights are version-bound, available offline and dismissed persistently
   const restarted=createReleaseHighlights({app,root,product:'AgentDesktop'});
   await restarted.load();assert.equal(restarted.get(),null);
  }finally{await fs.rm(folder,{recursive:true,force:true})}
+});
+
+test('all four products expose actionable ready, install and restart without native prompt',async()=>{
+ const folder=await fs.mkdtemp(path.join(os.tmpdir(),'update-controller-'));
+ try{
+ for(const product of ['CloudDesk','AgentDesktop','AuditDesktop','LocalDesktop']){
+  let allowed=false,installs=0,restarts=0,quits=0,clock=1000;
+  const root=path.join(folder,product,current),profile=path.join(folder,product,'profile');
+  await fs.mkdir(root,{recursive:true});
+  const win={isDestroyed:()=>false};
+  const app={getPath:()=>profile,quit:()=>{quits++}};
+  const controller=createUpdateController({app,root,product,platform:'linux',arch:'x64',window:()=>win,canRestart:()=>allowed,now:()=>clock,
+   fetcher:async()=>new Response(JSON.stringify([release(tag,[asset(product,'linux-x64.run')])])),
+   stageFile:async(c,dir,_fetch,progress)=>{await fs.mkdir(dir,{recursive:true});const file=path.join(dir,c.filename);await fs.writeFile(file,data);progress(data.length,data.length);return file},
+   verifyFile:verified,installFile:async()=>{installs++;const target=path.join(folder,product,tag);await fs.mkdir(target,{recursive:true});await fs.writeFile(path.join(target,'launch.sh'),'#!/bin/sh');allowed=false;},
+   relaunch:(_app,target)=>{assert.equal(target,path.join(folder,product,tag));restarts++}});
+  await controller.check();assert.equal(controller.status().phase,'ready');assert.equal(controller.status().bytes,data.length);
+  await controller.action('install');assert.equal(installs,0);
+  allowed=true;await controller.action('install');assert.equal(controller.status().phase,'restart-ready');assert.equal(installs,1);assert.equal(quits,0);
+  await controller.action('restart');assert.equal(restarts,0);
+  allowed=true;await controller.action('restart');assert.equal(controller.status().phase,'restarting');assert.equal(restarts,1);assert.equal(quits,1);
+  await controller.action('install');assert.equal(installs,1);assert.equal(quits,1);
+ }
+ }finally{await fs.rm(folder,{recursive:true,force:true})}
+});
+test('automatic grace, retry and unsupported ZIP are explicit states',async()=>{
+ const folder=await fs.mkdtemp(path.join(os.tmpdir(),'update-auto-'));
+ try{
+ let clock=0,attempts=0,quits=0;const product='AgentDesktop',root=path.join(folder,product,current),app={getPath:()=>folder,quit:()=>quits++};
+ const options={app,root,product,platform:'linux',arch:'x64',window:()=>({isDestroyed:()=>false}),now:()=>clock,
+  fetcher:async()=>new Response(JSON.stringify([release(tag,[asset(product,'linux-x64.run')])])),
+  stageFile:async(c,dir)=>{if(++attempts===1)throw Error('network failed');await fs.mkdir(dir,{recursive:true});const f=path.join(dir,c.filename);await fs.writeFile(f,data);return f;},
+  verifyFile:verified,installFile:async()=>{const t=path.join(folder,product,tag);await fs.mkdir(t,{recursive:true});await fs.writeFile(path.join(t,'launch.sh'),'ok')},relaunch:()=>{}};
+ const c=createUpdateController(options);await c.check();assert.equal(c.status().phase,'error');await c.action('check');assert.equal(c.status().phase,'ready');
+ clock=14999;await c.tick();assert.equal(quits,0);clock=15000;await c.tick();assert.equal(quits,1);
+ assert.equal(createUpdateController({...options,root:folder}).status().phase,'unsupported');
+ await assert.rejects(c.action('arbitrary command'),/Unknown/);
+ }finally{await fs.rm(folder,{recursive:true,force:true})}
+});
+
+test('cancelled restart preserves installed state and retries without reinstall',async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'update-cancel-'));
+ try{
+  const product='CloudDesk',root=path.join(dir,product,current);let installs=0,launches=0,cancelled=0;
+  const c=createUpdateController({app:{getPath:()=>dir,quit:()=>{}},root,product,platform:'linux',arch:'x64',window:()=>({isDestroyed:()=>false}),
+   fetcher:async()=>new Response(JSON.stringify([release(tag,[asset(product,'linux-x64.run')])])),
+   stageFile:async(c,folder)=>{await fs.mkdir(folder,{recursive:true});const file=path.join(folder,c.filename);await fs.writeFile(file,data);return file},
+   verifyFile:verified,installFile:async()=>{installs++;const target=path.join(dir,product,tag);await fs.mkdir(target,{recursive:true});await fs.writeFile(path.join(target,'launch.sh'),'ok')},
+   relaunch:()=>{launches++;return ()=>cancelled++}});
+  await c.check();await c.action('install');assert.equal(c.status().phase,'restarting');
+  c.cancelRestart(Error('operation still running'));assert.equal(c.status().phase,'restart-ready');assert.equal(cancelled,1);
+  await c.action('restart');assert.equal(installs,1);assert.equal(launches,2);
+ }finally{await fs.rm(dir,{recursive:true,force:true})}
 });

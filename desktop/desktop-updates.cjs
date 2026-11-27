@@ -98,10 +98,10 @@ async function verified(file,candidate){
   return hash.digest('hex')===candidate.digest;
  }catch{return false}
 }
-async function stage(candidate,folder,fetcher=fetch){
+async function stage(candidate,folder,fetcher=fetch,onProgress=()=>{}){
  await fs.mkdir(folder,{recursive:true,mode:0o700});
  const file=path.join(folder,candidate.tag+'-'+candidate.filename);
- if(await verified(file,candidate))return file;
+ if(await verified(file,candidate)){onProgress(candidate.size,candidate.size);return file;}
  const temp=path.join(folder,'.'+randomUUID()+'.part');
  try{
   const url='https://github.com/'+repo+'/releases/download/'+encodeURIComponent(candidate.tag)+'/'+candidate.filename;
@@ -110,7 +110,7 @@ async function stage(candidate,folder,fetcher=fetch){
   const limit=new Transform({transform(chunk,_encoding,done){
    bytes+=chunk.length;
    if(bytes>candidate.size)return done(Error('Release exceeds declared size'));
-   hash.update(chunk);done(null,chunk);
+   hash.update(chunk);onProgress(bytes,candidate.size);done(null,chunk);
   }});
   await pipeline(Readable.fromWeb(response.body),limit,createWriteStream(temp,{flags:'wx',mode:0o600}));
   if(bytes!==candidate.size||hash.digest('hex')!==candidate.digest)throw Error('Release checksum mismatch');
@@ -128,7 +128,7 @@ function installation(root,product,platform){
 function launchAfterExit(app,target){
  const env={...process.env};
  for(const key of ['CLOUDDESK_BUNDLE_ROOT','CLOUDDESK_DOTNET','CLOUDDESK_ELECTRON','CLOUDDESK_RUNTIME_DIR','MYSTICEGO_DOTNET','ELECTRON_RUN_AS_NODE'])delete env[key];
- app.once('quit',()=>{
+ const start=()=>{
   let child;
   if(process.platform==='win32'){
    const quote=s=>"'"+s.replaceAll("'","''")+"'";
@@ -138,7 +138,9 @@ function launchAfterExit(app,target){
    child=spawn('/bin/bash',['-c','for i in {1..100}; do kill -0 "$1" 2>/dev/null || break; sleep 0.2; done; kill -0 "$1" 2>/dev/null && exit 1; exec "$2"','update',String(process.pid),path.join(target,'launch.sh')],{detached:true,stdio:'ignore',env});
   }
   child.on('error',e=>console.warn('Update restart:',e.message));child.unref();
- });
+ };
+ app.once('quit',start);
+ return ()=>app.removeListener('quit',start);
 }
 async function confirmUpdate({product,dialog,win,candidate}){
  if(!requiresConfirmation(product))return true;
@@ -146,41 +148,89 @@ async function confirmUpdate({product,dialog,win,candidate}){
  const result=await dialog.showMessageBox(win,{type:'info',title:'Обновление '+product,message:'Версия '+candidate.tag+' скачана и проверена.',detail:'Что нового:\n'+changes+'\n\nПрофили сохраняются. Для установки приложение будет перезапущено.',buttons:['Установить и перезапустить','Позже'],defaultId:1,cancelId:1,noLink:true});
  return result.response===0;
 }
-function startDesktopUpdates({app,dialog,root,product,window,canRestart=()=>true}){
- if(process.arch!=='x64')return;
- const platform=process.platform,local=installation(root,product,platform);
- if(!local)return; // source checkout / legacy ZIP: no silent installation.
- let busy=false,offered=null;
+// State is owned by the main process. Renderers cannot choose URLs, files, tags or commands.
+function createUpdateController({app,root,product,platform=process.platform,arch=process.arch,window,canRestart=()=>true,
+ fetcher=fetch,stageFile=stage,verifyFile=verified,installFile=async(file)=>platform==='win32'?run(file,['/S'],{timeout:20*60_000,windowsHide:true}):run('/bin/bash',[file,'--install-only'],{timeout:20*60_000}),relaunch=launchAfterExit,now=Date.now}){
+ const local=arch==='x64'?installation(root,product,platform):null;
  const folder=path.join(app.getPath('userData'),'verified-updates',product);
+ let phase=local?'idle':'unsupported',candidate=null,file=null,target=null,bytes=0,error='',busy=false,restarting=false,autoAt=0,stopped=false;
+ let installedTarget=false,cancelLaunch=null;
+ const safe=()=>{const win=window?.();return !stopped&&!restarting&&!!win&&!win.isDestroyed()&&canRestart()};
+ const status=()=>({phase,installed:local?.installed??null,tag:candidate?.tag??null,notes:candidate?.notes??'',bytes,total:candidate?.size??0,error,canRestart:safe(),automatic:automaticProducts.has(product)});
+ const fail=(e)=>{error=String(e?.message??e).slice(0,240);phase=installedTarget?'restart-ready':'error';autoAt=0;};
  async function check(){
-  if(busy)return;busy=true;
+  if(!local||stopped||busy||restarting||installedTarget||phase==='ready')return status();
+  busy=true;phase='checking';error='';
   try{
-   const response=await fetch('https://api.github.com/repos/'+repo+'/releases?per_page=30',{redirect:'error',signal:AbortSignal.timeout(15000),headers:{'User-Agent':'MysticEgo-Desktop-Updater','Accept':'application/vnd.github+json'}});
-   if(!response.ok)return;
-   const candidate=select(await response.json(),product,platform,local.installed);
-   if(!candidate||offered===candidate.tag)return;
-   const file=await stage(candidate,folder);
-   const win=window?.();
-   if(!win||win.isDestroyed())return;
-   if(!canRestart())return;
-   if(requiresConfirmation(product))offered=candidate.tag;
-   if(!await confirmUpdate({product,dialog,win,candidate}))return;
-   if(!await verified(file,candidate))throw Error('Installer verification failed');
-   if(platform==='win32')await run(file,['/S'],{timeout:20*60_000,windowsHide:true});
-   else await run('/bin/bash',[file,'--install-only'],{timeout:20*60_000});
-   const target=path.join(local.parent,candidate.tag);
+   const response=await fetcher('https://api.github.com/repos/'+repo+'/releases?per_page=30',{redirect:'error',signal:AbortSignal.timeout(15000),headers:{'User-Agent':'MysticEgo-Desktop-Updater','Accept':'application/vnd.github+json'}});
+   if(!response.ok)throw Error('GitHub HTTP '+response.status);
+   const next=select(await response.json(),product,platform,local.installed);
+   if(!next){candidate=null;file=null;bytes=0;phase='idle';return status();}
+   candidate=next;bytes=0;phase='downloading';
+   file=await stageFile(candidate,folder,fetcher,(received)=>{bytes=received});
+   bytes=candidate.size;phase='ready';
+   // Agent and Local retain automatic updates, with time to use the visible action.
+   autoAt=automaticProducts.has(product)?now()+15000:0;
+  }catch(e){fail(e);}
+  finally{busy=false;}
+  return status();
+ }
+ async function restart(){
+  if(!installedTarget||!safe())return status();
+  try{
    const launcher=path.join(target,platform==='win32'?'launch.cmd':'launch.sh');
    if(!(await fs.lstat(launcher)).isFile())throw Error('New installation launcher missing');
-   await saveJson(notesPath(app),{tag:candidate.tag,notes:candidate.notes});
-   if(!canRestart()){offered=null;return;}
-   await fs.rm(file,{force:true});
-   launchAfterExit(app,target);
+   if(!safe())return status();
+   restarting=true;phase='restarting';error='';
+   cancelLaunch=relaunch(app,target);
    app.quit();
-  }catch(error){console.warn('Desktop update:',String(error?.message??error));}
-  finally{busy=false}
+  }catch(e){cancelRestart(e);}
+  return status();
  }
- const first=setTimeout(()=>void check(),5000+Math.random()*5000);
- const timer=setInterval(()=>void check(),30*60_000);
- app.once('before-quit',()=>{clearTimeout(first);clearInterval(timer)});
+ async function apply(){
+  if(busy||restarting||stopped)return status();
+  if(installedTarget)return restart();
+  if(phase!=='ready'||!candidate||!file||!safe())return status();
+  busy=true;phase='installing';error='';autoAt=0;
+  try{
+   if(!await verifyFile(file,candidate))throw Error('Installer verification failed');
+   if(!safe()){phase='ready';autoAt=automaticProducts.has(product)?now()+1000:0;return status();}
+   await installFile(file);
+   target=path.join(local.parent,candidate.tag);
+   const launcher=path.join(target,platform==='win32'?'launch.cmd':'launch.sh');
+   if(!(await fs.lstat(launcher)).isFile())throw Error('New installation launcher missing');
+   installedTarget=true;phase='restart-ready';
+   await saveJson(notesPath(app),{tag:candidate.tag,notes:candidate.notes});
+   await fs.rm(file,{force:true}).catch(()=>{});
+   // Do not run the installer a second time if an operation started during installation.
+   if(safe())await restart();
+  }catch(e){fail(e);}
+  finally{busy=false;}
+  return status();
+ }
+ async function action(value){
+  if(value==='check')return check();
+  if(value==='install'||value==='restart')return apply();
+  throw Error('Unknown desktop update action');
+ }
+ async function tick(){
+  if(stopped||busy||restarting)return;
+  if(automaticProducts.has(product)&&safe()&&(installedTarget||phase==='ready'&&autoAt&&now()>=autoAt))await apply();
+ }
+ function cancelRestart(reason){if(typeof cancelLaunch==='function')cancelLaunch();cancelLaunch=null;restarting=false;fail(reason);}
+ return {status,action,check,tick,restarting:()=>restarting,cancelRestart,stop:()=>{stopped=true}};
 }
-module.exports={version,compare,select,downloadResponse,verified,stage,installation,requiresConfirmation,releaseNotes,createReleaseHighlights,confirmUpdate,startDesktopUpdates};
+function registerUpdateIpc(ipcMain,window,controller){
+ const check=e=>{const win=window?.();if(!win||win.isDestroyed()||e.sender!==win.webContents||e.senderFrame!==win.webContents.mainFrame)throw Error('IPC denied');};
+ ipcMain.handle('desktop-update:status',e=>{check(e);return controller.status();});
+ ipcMain.handle('desktop-update:action',(e,action)=>{check(e);return controller.action(action);});
+}
+function startDesktopUpdates(options){
+ const controller=createUpdateController(options);
+ const first=setTimeout(()=>void controller.check(),5000);
+ const timer=setInterval(()=>void controller.check(),5*60_000);
+ const progressTimer=setInterval(()=>void controller.tick(),1000);
+ options.app.once('quit',()=>{clearTimeout(first);clearInterval(timer);clearInterval(progressTimer);controller.stop()});
+ return controller;
+}
+module.exports={version,compare,select,downloadResponse,verified,stage,installation,requiresConfirmation,releaseNotes,createReleaseHighlights,confirmUpdate,createUpdateController,registerUpdateIpc,startDesktopUpdates};

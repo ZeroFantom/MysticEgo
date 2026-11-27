@@ -1,13 +1,13 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; script-src 'self'">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>AuditDesktop</title>
-<link rel="stylesheet" href="../control/style.css"><link rel="stylesheet" href="./station.css"></head>
+<link rel="stylesheet" href="../control/style.css"><link rel="stylesheet" href="./station.css"><link rel="stylesheet" href="../control/desktop-update.css"></head>
 <body>
-<div id="embedded" class="embedded-toolbar" hidden><button id="back" data-interface-id="back" class="secondary">← Приложение</button><strong>MysticEgo</strong></div>
+<div id="embedded" class="embedded-toolbar" hidden><button id="back" data-interface-id="back" class="secondary">← Приложение</button><strong>MysticEgo</strong><button id="embedded-update" class="secondary embedded-update" type="button" hidden>Обновление</button></div>
 <div id="workspace">
 <header class="desktop-header"><img id="product-icon" class="product-icon" src="audit-icon.png" alt=""><div><h1 id="product-title">AuditDesktop</h1><p id="product-subtitle">Личный профиль MysticEgo</p></div><span id="state" class="status">Ожидание подключения</span></header>
 <main>
-<section class="desktop-card release-highlights" id="release-highlights" hidden aria-label="Что нового"><div class="row"><h2>Что нового</h2><button type="button" class="secondary">Ознакомился</button></div><pre></pre></section>
+<div id="desktop-update-root"></div><section class="desktop-card release-highlights" id="release-highlights" hidden aria-label="Что нового"><details><summary><h2>Что нового</h2></summary><pre></pre><div class="actions"><button type="button" class="secondary">Ознакомился</button></div></details></section>
 <div class="desktop-columns">
 <section class="desktop-card account-card">
 <div id="identity" hidden><div class="row"><h2 id="identity-name"></h2><button class="plain" id="logout">Выйти</button></div>

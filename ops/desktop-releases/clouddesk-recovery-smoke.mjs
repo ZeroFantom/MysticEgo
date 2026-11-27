@@ -31,3 +31,8 @@ assert(reset.includes('ownerOnly:true')&&reset.includes('release!=approval.Relea
 assert(ipc.includes('defaultId:0,cancelId:0,message:'));
 assert(resetScript.indexOf('sha256sum -c -')<resetScript.indexOf('CLOUDDESK_RESET_STEP:delete'));
 assert(resetScript.includes('PostgreSQL configuration present')&&resetScript.includes('custom/shared Caddy configuration'));
+
+assert(backend.includes('progress?.Invoke("identity")')&&backend.includes('progress("access")')&&backend.includes('progress?.Invoke("ready")'));
+assert(ipc.includes("'ssh-progress'")&&ipc.includes('flowId:p.flowId'));
+assert(ui.includes('onSshProgress?.')&&ui.includes("advance('access');advance('ready')")&&ui.includes('Подключение установлено'));
+assert(ui.includes('<DesktopUpdate/>')&&ipc.includes('registerUpdateIpc'));
