@@ -10,6 +10,9 @@ on:
       - 'frontend/packages/ui/src/pages/AvatarStudio.tsx'
       - 'frontend/scripts/avatar-motion.test.mjs'
       - 'desktop/**'
+      - 'core/Api.Auth/**'
+      - 'frontend/packages/ui/src/app/**'
+      - 'frontend/scripts/localization.test.mjs'
   workflow_dispatch:
 permissions:
   contents: read
@@ -54,7 +57,11 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - run: npm ci --prefix frontend
-      - run: node --test frontend/scripts/avatar-motion.test.mjs
+      - run: node --test frontend/scripts/avatar-motion.test.mjs frontend/scripts/localization.test.mjs
+      - run: dotnet build core/Api.Auth/Api.Auth.csproj
+      - run: node --check desktop/station/view.js
+      - run: node --check desktop/control/presentation.js
+      - run: node --check desktop/control/effects.js
       - run: npm run build --prefix frontend
       - run: npm install --prefix desktop --no-audit --no-fund
         env:
