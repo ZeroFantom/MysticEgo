@@ -12,7 +12,7 @@ namespace MysticEgo.Api.Orchestra.Controllers;
 
 [ApiController, Authorize(Policy = "operator"), Route("api/v1/orchestra/diagnostics/report")]
 public sealed class DiagnosticReportController(DevelopmentTeam team, DatabaseMaintenance database,
-    ServerTelemetry telemetry, OptionalDependencyState dependencies, ManagedNetwork network) : ControllerBase
+    ServerTelemetry telemetry, OptionalDependencyState dependencies, ManagedNetwork network, ServiceLoadMonitor serviceLoads) : ControllerBase
 {
     private static string SafeState(string? value) => value is "available" or "degraded" or "unavailable" or "repairing"
         or "checking" or "disabled" or "external" or "missing" or "waiting" or "unreachable" or "unreadable"
@@ -73,10 +73,12 @@ public sealed class DiagnosticReportController(DevelopmentTeam team, DatabaseMai
     }
 
     [HttpGet, ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-    public async Task<IActionResult> Download([FromQuery] string format = "json", CancellationToken ct = default)
+    public async Task<IActionResult> Download([FromQuery] string format = "json", [FromQuery] string scope = "all", CancellationToken ct = default)
     {
         if (!team.IsOwner(User)) return Forbid();
         if (format is not ("json" or "txt" or "xlsx")) return BadRequest(new { error = "Выберите JSON, TXT или XLSX." });
+        if(scope!="all"&&SafeName(scope)=="other"&&!ServiceLoadMonitor.KnownUnit(scope))
+            return BadRequest(new{error="Неизвестная служба."});
         var at = DateTimeOffset.UtcNow;
         var maintenance = await InfrastructureMaintenanceController.ReadAsync(database, ct);
         var checks = new List<object?[]>();
@@ -144,8 +146,30 @@ public sealed class DiagnosticReportController(DevelopmentTeam team, DatabaseMai
             new("Links", ["alias","kind","enabled","online","latencyMs","mbps","measuredUtc"], links.ToArray()),
             new("HostServices", ["unit","load","active","subState","result","exitStatus","restarts"], units)
         };
+        var load=new DiagnosticReport.Table("ServiceLoad",["unit","atUtc","cpuPercentOfHost","memoryBytes","tasks","loadState","activeState","subState"],
+            serviceLoads.Read().Select(s=>new object?[]{s.Unit,s.At,s.CpuPercent,s.MemoryBytes,s.Tasks,s.LoadState,s.ActiveState,s.SubState}).ToArray());
+        tables=[..tables,load];
+        if(scope!="all")
+        {
+            string[] matching=scope switch
+            {
+                "orchestra" or "auth"=>["mysticego-orchestra.service"],
+                "docker"=>["docker.service","containerd.service"],
+                "lmstudio"=>["mysticego-lmstudio.service","mysticego-default-model.service"],
+                "voice"=>["mysticego-voice.service"],
+                "database" or "postgres-service"=>["postgresql.service","postgresql@16-mysticego.service"],
+                "worker"=>["mysticego-infrastructure-reconcile.service","mysticego-infrastructure-reconcile.timer","mysticego-local-setup.socket","mysticego-orchestra-updater.service","mysticego-orchestra-updater.timer","mysticego-maintenance-rescue.service","mysticego-maintenance-rescue.path"],
+                _=>[scope]
+            };
+            tables=[
+                new("Summary",["field","value"],[["schemaVersion",2],["generatedUtc",at],["scope",scope],["privacy","No credentials or raw logs"],["note","Unknown measurements are null; shared unit totals are not per-process values."]]),
+                new("Checks",tables[1].Columns,checks.Where(r=>Equals(r[1],scope)).ToArray()),
+                new("HostServices",tables[4].Columns,units.Where(r=>r[0] is string u&&matching.Contains(u)).ToArray()),
+                new("ServiceLoad",load.Columns,load.Rows.Where(r=>r[0] is string u&&matching.Contains(u)).ToArray())
+            ];
+        }
         var content = DiagnosticReport.Encode(tables, format);
         var mime = format == "xlsx" ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : format == "json" ? "application/json; charset=utf-8" : "text/plain; charset=utf-8";
-        return File(content, mime, "MysticEgo-diagnostics-" + at.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + "Z." + format);
+        return File(content, mime, "MysticEgo-diagnostics-" + scope + "-" + at.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + "Z." + format);
     }
 }
