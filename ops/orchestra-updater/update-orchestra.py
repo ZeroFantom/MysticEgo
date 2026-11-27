@@ -532,7 +532,13 @@ def run_locked():
     file = STATE / "status.json"
     last = json.loads(file.read_text()) if file.exists() else {}
     candidate, targets, target = None, [], None
+    recovery_run = None
     try:
+        recovery_file = STATE / "recovery-run.json"
+        if recovery_file.exists():
+            old = json.loads(recovery_file.read_text())
+            if old.get("phase") == "running":
+                write("recovery-run.json", {**old, "phase": "interrupted", "message": "Процесс прерван. Проверьте установленную версию и журнал."})
         for component, previous in PREVIOUS.items():
             if previous.exists():
                 if last.get("phase") == "current":
@@ -558,11 +564,16 @@ def run_locked():
                 status("failed", installed, candidate, targets, "Дождитесь завершения обслуживания инфраструктуры.")
                 return
             target = "orchestra"
+            recovery_run = {"phase": "running", "mode": mode, "steps": [step["tag"] for step in expected], "completed": 0}
+            write("recovery-run.json", recovery_run)
             for index, step in enumerate(expected):
                 candidate, targets = step, ["orchestra"]
                 # Persistent guard prevents unattended retries of a failed recovery step.
                 write("automatic-attempt.json", {"tag": step["tag"]})
                 apply(step, versions(), targets, target, recovery=True, intermediate=index < len(expected)-1)
+                recovery_run["completed"] = index + 1
+                write("recovery-run.json", recovery_run)
+            write("recovery-run.json", {**recovery_run, "phase": "success"})
         elif not candidate:
             status("current", installed)
         elif isinstance(request, dict) and request.get("candidate") == candidate and request.get("target") in targets:
@@ -578,6 +589,8 @@ def run_locked():
             status("ready", installed, candidate, targets)
     except Exception as error:
         print(f"MysticEgo update failed: {type(error).__name__}: {error}", flush=True)
+        if recovery_run is not None:
+            write("recovery-run.json", {**recovery_run, "phase": "failed", "message": "Шаг восстановления не завершён. Проверьте журнал и текущую версию."})
         committed = target is not None and file.exists() and json.loads(file.read_text()).get("phase") == "current"
         if not committed:
             try:
