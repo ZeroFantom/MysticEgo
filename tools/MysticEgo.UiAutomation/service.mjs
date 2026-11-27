@@ -9,38 +9,50 @@ export class UiAutomationService {
   #active = null;
   #tail = Promise.resolve();
   #stopping = false;
+  #stopPromise = null;
+  #pending = 0;
   #recording = null;
   #replayAbort = null;
   #scenarios = new Map();
   constructor(config, engines = { chromium, electron }) {
     this.config = config;
     this.engines = engines;
+    this.lease = null;
     this.native = new NativeWindowService(config.native);
     this.library = config.scenarioDirectory ? new ScenarioLibrary(config.scenarioDirectory) : null;
   }
   run(name, args) {
+    if (name === 'ui_session_status') return Promise.resolve({ active: Boolean(this.#active), recording: Boolean(this.#recording), replaying: Boolean(this.#replayAbort), libraryEnabled: Boolean(this.library), nativeEnabled: Boolean(this.config.native), stopping: this.#stopping, pending: this.#pending, consent: this.lease?.status() ?? null });
     if (this.#stopping) return Promise.reject(new Error('Executor stopped'));
-    if (name === 'ui_session_status') return Promise.resolve({ active: Boolean(this.#active), recording: Boolean(this.#recording), replaying: Boolean(this.#replayAbort), libraryEnabled: Boolean(this.library), nativeEnabled: Boolean(this.config.native) });
+    try { this.lease?.assertActive(); } catch (err) { return Promise.reject(err); }
     if (name === 'ui_replay_cancel') {
       if (!this.#active || this.#active.id !== args.sessionId) return Promise.reject(new Error('No matching active session'));
       const running = Boolean(this.#replayAbort);
       this.#replayAbort?.abort();
       return Promise.resolve({ cancelled: running });
     }
+    if (this.#pending >= 16) return Promise.reject(new Error('Executor queue full'));
+    this.#pending++;
     const job = this.#tail.then(() => {
       if (this.#stopping) throw new Error('Executor stopped');
+      this.lease?.assertActive();
       return this.#execute(name, args);
-    });
+    }).finally(() => { this.#pending--; });
     this.#tail = job.catch(() => {});
     return job;
   }
-  async stop() {
+  stop() {
+    if (this.#stopPromise) return this.#stopPromise;
     this.#stopping = true;
+    this.lease?.revoke();
     this.#replayAbort?.abort();
     this.native.close();
-    await this.#tail;
-    this.native.close();
-    await this.#close();
+    this.#stopPromise = (async () => {
+      await this.#tail;
+      this.native.close();
+      await this.#close();
+    })();
+    return this.#stopPromise;
   }
   async #execute(name, a) {
     if (name.startsWith('native_')) return this.native.run(name, a);
@@ -95,6 +107,7 @@ export class UiAutomationService {
         for (const step of scenario.steps) {
           await interruptibleDelay(step.delayMs, controller.signal);
           if (this.#stopping || controller.signal.aborted) throw new Error('Replay cancelled');
+          this.lease?.assertActive();
           await this.#dispatch(step.name, { ...step.args, sessionId: session.id });
           completed++;
           if (controller.signal.aborted) return { replayed: completed, cancelled: true };
