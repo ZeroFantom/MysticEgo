@@ -4,13 +4,13 @@ const crypto=require('node:crypto');
 const {dialog,clipboard,Menu}=require('electron');
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const safe=/^[a-z][a-z0-9-]{0,39}$/;
-function installInterfaceMcp(win,product,port=0){
+function installInterfaceMcp(win,product,port=0,options={}){
  let server,token='',expires=0,busy=false,epoch=0,enabled=false,timeout;
  const stop=()=>{enabled=false;epoch++;token='';clearTimeout(timeout);server?.close();server=undefined;};
  function live(){return enabled&&Date.now()<expires&&!win.isDestroyed()&&win.isVisible()&&!win.isMinimized();}
  const inspectScript=`(()=>Array.from(document.querySelectorAll('[data-interface-id]')).filter(e=>!e.disabled&&!e.closest('[hidden],[inert]')&&e.getClientRects().length).map(e=>({id:e.dataset.interfaceId,label:e.getAttribute('aria-label')||e.textContent.trim().slice(0,80),active:e.classList.contains('active')||e.getAttribute('aria-pressed')==='true'||e.parentElement?.open===true})))()`;
- async function inspect(){if(!live())throw Error('Enable MCP in the visible application window.');return {product,targets:(await win.webContents.executeJavaScript(inspectScript)).filter(t=>safe.test(t.id)).slice(0,40)};}
- function tool(name,description,click=false){return {name,description,inputSchema:{type:'object',properties:click?{target:{type:'string',description:'Exact ID returned by desktop_inspect'}}:{},required:click?['target']:[],additionalProperties:false},annotations:{readOnlyHint:!click,destructiveHint:false}}}
+ async function inspect(){if(!live())throw Error('Enable MCP in the visible application window.');return {product,targets:(await win.webContents.executeJavaScript(inspectScript)).filter(t=>safe.test(t.id)).slice(0,80)};}
+ function tool(name,description,click=false,readOnly=!click){return {name,description,inputSchema:{type:'object',properties:click?{target:{type:'string',description:'Exact ID returned by desktop_inspect'}}:{},required:click?['target']:[],additionalProperties:false},annotations:{readOnlyHint:readOnly,destructiveHint:false}}}
  async function click(target){
   if(!safe.test(target)||!live()||busy)throw Error('Unavailable or busy.');
   busy=true;const generation=epoch;
@@ -33,6 +33,42 @@ function installInterfaceMcp(win,product,port=0){
    await wait(350);
    return {clicked:target,observed:await inspect()};
   }finally{busy=false;}
+ }
+ // These actions operate only on the verified updater owned by this Electron main
+ // process. No URLs, commands, passwords, local paths or arbitrary payloads.
+ function updateStatus(){
+  if(!live())throw Error('Enable MCP in the visible application window.');
+  const c=options.updates?.();if(!c)throw Error('Updater unavailable.');
+  const {phase,installed,tag,bytes,total,canRestart,automatic}=c.status();
+  return {phase,installed,tag,bytes,total,canRestart,automatic};
+ }
+ async function checkUpdate(){
+  if(!live()||busy)throw Error('Unavailable or busy.');
+  const c=options.updates?.();if(!c)throw Error('Updater unavailable.');
+  const before=updateStatus();
+  if(!['idle','error','checking','downloading','ready'].includes(before.phase))throw Error('Current update phase does not allow a check.');
+  void c.action('check').catch(()=>{});
+  return {requested:true,observed:updateStatus()};
+ }
+ async function approveUpdate(){
+  if(!live()||busy)throw Error('Unavailable or busy.');
+  const c=options.updates?.();if(!c)throw Error('Updater unavailable.');
+  const before=updateStatus(),generation=epoch;
+  if(!before.canRestart||!before.tag||!['ready','restart-ready'].includes(before.phase))throw Error('Verified update is not ready or an operation is running.');
+  busy=true;
+  try{
+   const answer=await dialog.showMessageBox(win,{type:'warning',buttons:['Отмена','Установить / перезапустить'],defaultId:0,cancelId:0,message:'MCP запрашивает обновление '+product,detail:'Версия '+before.tag+'. Приложение завершит работу и запустит новую версию. Профиль сохраняется.'});
+   if(answer.response!==1||!live()||generation!==epoch)throw Error('Update not approved.');
+   const after=updateStatus();
+   if(after.tag!==before.tag||after.phase!==before.phase||!after.canRestart)throw Error('Update state changed. Inspect again.');
+   // Return an approval receipt, not a claim that installation or restart succeeded.
+   return {receipt:{approved:true,tag:after.tag,phase:after.phase},execute:()=>{if(live()&&generation===epoch&&c.status().tag===after.tag&&c.status().phase===after.phase&&c.status().canRestart)void c.action(after.phase==='ready'?'install':'restart').catch(()=>{});}};
+  }finally{busy=false}
+ }
+ async function sshStatus(){
+  if(!live()||product!=='CloudDesk')throw Error('CloudDesk session required.');
+  const state=await win.webContents.executeJavaScript(`(()=>{const modal=document.querySelector('[data-mcp-ssh-stage]');const value=document.querySelector('[data-mcp-ssh-status]');return {stage:modal?.dataset.mcpSshStage??null,state:modal?.dataset.mcpSshState??value?.dataset.mcpSshStatus??null}})()`);
+  return {stage:['identity','access','ready'].includes(state.stage)?state.stage:null,state:['checking','ready','auth','trust','changed','offline','setup','error'].includes(state.state)?state.state:null};
  }
  function authorized(req){
   const supplied=String(req.headers.authorization||'');
@@ -57,11 +93,24 @@ function installInterfaceMcp(win,product,port=0){
    if(q.method?.startsWith('notifications/')&&q.id===undefined){reply(202);return;}
    if(q.method==='initialize'){result({protocolVersion:'2025-03-26',capabilities:{tools:{}},serverInfo:{name:'mysticego-desktop',version:'1.0.0'}});return;}
    if(q.method==='ping'){result({});return;}
-   if(q.method==='tools/list'){result({tools:[tool('desktop_inspect','Inspect only marked navigation controls'),tool('desktop_click','Click an enabled navigation control in the visible window',true)]});return;}
+   if(q.method==='tools/list'){
+    const tools=[tool('desktop_inspect','Inspect only marked safe controls'),tool('desktop_click','Click an enabled marked control in the visible window',true)];
+    if(options.updates?.())tools.push(tool('desktop_update_status','Read verified updater phase, version and progress'),tool('desktop_update_check','Request a release check and verified download; inspect status afterwards',false,false),tool('desktop_update_apply','Request local user approval to install or restart a verified update; receipt is not completion',false,false));
+    if(product==='CloudDesk')tools.push(tool('clouddesk_ssh_status','Read the current SSH connection stage and result without addresses or credentials'));
+    result({tools});return;
+   }
    if(q.method!=='tools/call'){error(-32601,'Method not found');return;}
    try{
     const name=q.params?.name;
-    const data=name==='desktop_inspect'?await inspect():name==='desktop_click'&&typeof q.params?.arguments?.target==='string'?await click(q.params.arguments.target):null;
+    const args=q.params?.arguments??{};
+    if(typeof args!=='object'||Array.isArray(args)||Object.keys(args).some(k=>name==='desktop_click'?k!=='target':true)){error(-32602,'Invalid arguments');return;}
+    if(name==='desktop_update_apply'){
+     const approved=await approveUpdate();
+     res.once('finish',approved.execute);
+     result({content:[{type:'text',text:JSON.stringify(approved.receipt)}],isError:false});return;
+    }
+    const data=name==='desktop_inspect'?await inspect():name==='desktop_click'&&typeof args.target==='string'?await click(args.target):
+      name==='desktop_update_status'?updateStatus():name==='desktop_update_check'?await checkUpdate():name==='clouddesk_ssh_status'?await sshStatus():null;
     if(!data){error(-32602,'Unknown tool or invalid target');return;}
     result({content:[{type:'text',text:JSON.stringify(data)}],isError:false});
    }catch(e){result({content:[{type:'text',text:String(e.message).slice(0,160)}],isError:true});}
@@ -69,7 +118,7 @@ function installInterfaceMcp(win,product,port=0){
  }
  async function start(){
   if(enabled)return;
-  const confirm=await dialog.showMessageBox(win,{type:'question',buttons:['Разрешить на 10 минут','Отмена'],defaultId:1,cancelId:1,message:'Разрешить MCP управлять навигацией '+product+'?',detail:'Только отмеченные элементы интерфейса. Escape отключает управление.'});
+  const confirm=await dialog.showMessageBox(win,{type:'question',buttons:['Разрешить на 10 минут','Отмена'],defaultId:1,cancelId:1,message:'Разрешить MCP управлять навигацией '+product+'?',detail:'Только отмеченные безопасные элементы, состояние и проверка обновлений. Установка и перезапуск требуют отдельного подтверждения. Escape отключает управление.'});
   if(confirm.response!==0||win.isDestroyed()||enabled)return;
   token=crypto.randomBytes(32).toString('hex');expires=Date.now()+600000;enabled=true;
   server=http.createServer({requestTimeout:5000,headersTimeout:5000},(req,res)=>void rpc(req,res));
