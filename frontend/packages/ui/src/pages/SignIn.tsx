@@ -54,7 +54,7 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
     if(!response.ok){const result=await response.json().catch(()=>({}));throw Error(result.error||'Регистрация недоступна, код '+response.status)}
    }
    const result=await signIn(authUrl,login,password);
-   onLogin({...session,authUrl,token:result.accessToken,refreshToken:result.browserSession?undefined:result.refreshToken,browserSession:result.browserSession,username:result.user?.login||login});
+   onLogin({...session,authUrl:result.browserSession?location.origin:authUrl,token:result.accessToken,refreshToken:result.browserSession?undefined:result.refreshToken,browserSession:result.browserSession,username:result.user?.login||login});
    setPassword('');
   }catch(error){setError(error instanceof Error?error.message:String(error))}
   finally{setBusy(false)}
