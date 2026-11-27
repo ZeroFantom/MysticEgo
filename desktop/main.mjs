@@ -25,8 +25,8 @@ function create(){
   webPreferences:{preload:path.join(home,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true,webSecurity:true}});
  window.setVisibleOnAllWorkspaces(true,{visibleOnFullScreen:false});
  window.webContents.setWindowOpenHandler(({url})=>{if(isLocal(url))shell.openExternal(url);return {action:'deny'}});
- window.webContents.on('will-navigate',(event,url)=>{if(!url.startsWith('file:')&&!isLocal(url))event.preventDefault()});
- const url=process.env.MYSTICEGO_DESKTOP_DEV_URL;
+ window.webContents.on('will-navigate',(event,url)=>{if(process.env.MYSTICEGO_AVATAR_HANDOFF==='1'||(!url.startsWith('file:')&&!isLocal(url)))event.preventDefault()});
+ const url=process.env.MYSTICEGO_AVATAR_HANDOFF==='1'?'':process.env.MYSTICEGO_DESKTOP_DEV_URL;
  if(url&&isLocal(url))window.loadURL(url);else window.loadFile(path.join(home,'dist','index.html'));
  window.once('ready-to-show',()=>{if(!handoffShown){dockTaskbar();if(process.env.MYSTICEGO_AVATAR_HANDOFF!=='1')window.show()}});
 }
