@@ -88,7 +88,7 @@ function discussion(topic: string) {
 }
 
 export function LicenseLink({className}: {className?: string}) {
-  return <a className={className} href={repository + '/blob/main/LICENSE'} target="_blank" rel="noreferrer">
+  return <a className={className} href="https://orchestra.isdarkline.ru/license" target="_blank" rel="noreferrer">
     PolyForm Noncommercial 1.0.0
   </a>;
 }
@@ -107,6 +107,7 @@ function PublicNavigation({page,scope}: {page: 'studio' | 'developer';scope:stri
     <nav aria-label="Страницы MysticEgo">
       <a href="/studio" aria-current={page === 'studio' ? 'page' : undefined}>Студия</a>
       <a href="/developer" aria-current={page === 'developer' ? 'page' : undefined}>Разработчик</a>
+      <a href="/license">Лицензия</a>
       <a href="/">Вход в панель <ArrowUpRight size={15} aria-hidden="true"/></a><ThemeToggle scope={scope}/>
     </nav>
   </header>;
