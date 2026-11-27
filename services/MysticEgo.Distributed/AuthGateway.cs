@@ -13,6 +13,8 @@ internal static class AuthGateway
         foreach (var action in new[] { "login", "refresh", "logout" })
             app.MapPost("/api/auth/" + action, (HttpContext context, IHttpClientFactory clients) =>
                 Forward(context, clients, node.AuthUrl, action)).AllowAnonymous();
+        app.MapGet("/api/auth/credential-policy", (HttpContext context, IHttpClientFactory clients) =>
+            Forward(context, clients, node.AuthUrl, "credential-policy")).AllowAnonymous();
         if (node.Kind is NodeKind.AuditOrchestra or NodeKind.Orchestra)
         {
             app.MapPost("/api/auth/audit/register", (HttpContext context, IHttpClientFactory clients) =>
