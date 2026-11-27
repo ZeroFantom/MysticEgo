@@ -5,8 +5,8 @@ const api=window.station;
 let initialized=false,centralEdited=false,register=false;
 let documents=null;
 let documentRequest=0;
-initEffects($('design'));
-let prefs={language:'en',font:'modern'},owner=null,preferenceGeneration=0;
+const effects=initEffects($('design'),{onChange:patch=>void savePref(patch)});
+let prefs={language:'en',font:'modern'},owner=null,preferenceGeneration=0,saveChain=Promise.resolve();
 try{prefs={...prefs,...JSON.parse(localStorage.getItem('mysticego.desktop.guest.presentation')||'{}')}}catch{}
 const host=$('presentation-controls');
 const languageSelect=document.createElement('select'),fontSelect=document.createElement('select');
@@ -16,13 +16,13 @@ for(const [caption,input] of [['Язык',languageSelect],['Шрифт',fontSele
  const label=document.createElement('label');label.textContent=caption;label.append(input);host.append(label);
 }
 captureStatic(document.body);
-function applyPrefs(){applyPresentation(prefs);languageSelect.value=prefs.language;fontSelect.value=prefs.font;$('global-panel').dataset.options='';$('login-title').textContent=t(register?'Создайте аккаунт Audit':'Войдите в MysticEgo');$('login-button').textContent=t(register?'Создать аккаунт':'Войти');$('register').textContent=t(register?'У меня есть аккаунт':'Создать аккаунт');}
+function applyPrefs(){effects?.applyAccount(prefs);applyPresentation(prefs);languageSelect.value=prefs.language;fontSelect.value=prefs.font;$('global-panel').dataset.options='';$('login-title').textContent=t(register?'Создайте аккаунт Audit':'Войдите в MysticEgo');$('login-button').textContent=t(register?'Создать аккаунт':'Войти');$('register').textContent=t(register?'У меня есть аккаунт':'Создать аккаунт');}
 applyPrefs();
 async function savePref(patch){
  const generation=preferenceGeneration;prefs={...prefs,...patch};applyPrefs();
  if(!owner){try{localStorage.setItem('mysticego.desktop.guest.presentation',JSON.stringify(prefs))}catch{};return}
- try{const result=await api.presentation(patch);if(generation===preferenceGeneration){prefs={...prefs,...result};applyPrefs();$('presentation-status').textContent=''}}
- catch{if(generation===preferenceGeneration)$('presentation-status').textContent=t('Настройки не синхронизированы')}
+ saveChain=saveChain.then(async()=>{if(generation!==preferenceGeneration)return;try{await api.presentation(patch);if(generation===preferenceGeneration)$('presentation-status').textContent=''}catch{if(generation===preferenceGeneration)$('presentation-status').textContent=t('Настройки не синхронизированы')}});
+ await saveChain;
 }
 languageSelect.onchange=()=>void savePref({language:languageSelect.value});
 fontSelect.onchange=()=>void savePref({font:fontSelect.value});
@@ -30,8 +30,8 @@ async function bindOwner(next){
  if(next===owner)return;
  owner=next;const generation=++preferenceGeneration;
  prefs={language:'en',font:'modern'};applyPrefs();$('presentation-status').textContent='';
- if(!next){languageSelect.disabled=fontSelect.disabled=false;try{prefs={...prefs,...JSON.parse(localStorage.getItem('mysticego.desktop.guest.presentation')||'{}')}}catch{}applyPrefs();return}
- languageSelect.disabled=fontSelect.disabled=true;
+ if(!next){languageSelect.disabled=fontSelect.disabled=false;$('design').inert=false;try{prefs={...prefs,...JSON.parse(localStorage.getItem('mysticego.desktop.guest.presentation')||'{}')}}catch{}applyPrefs();return}
+ languageSelect.disabled=fontSelect.disabled=true;$('design').inert=true;
  try{const result=await api.presentation();if(generation===preferenceGeneration){prefs={...prefs,...result};applyPrefs()}}
  catch{if(generation===preferenceGeneration)$('presentation-status').textContent=t('Настройки не синхронизированы')}
  finally{if(generation===preferenceGeneration){languageSelect.disabled=fontSelect.disabled=false}}
