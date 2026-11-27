@@ -28,6 +28,9 @@ export const operations = {
   ui_record_start: ['Start recording assistant click, scroll and assertion steps; no typed text', session],
   ui_record_stop: ['Stop recording and return scenario', session],
   ui_replay: ['Replay recorded steps in the same authorized session', { ...session, scenarioId: z.string().uuid() }],
+  ui_scenario_export: ['Export reviewed non-secret click/scroll/assertion steps as target-bound JSON', { ...session, scenarioId: z.string().uuid() }],
+  ui_scenario_import: ['Import reviewed JSON for the same configured target; does not execute it', { ...session, scenarioJson: z.string().max(24000) }],
+  ui_replay_cancel: ['Cancel a running UI scenario before the next action', session],
   ui_close: ['Close controlled window and session', session]
 };
 export function makeMcp(service) {
