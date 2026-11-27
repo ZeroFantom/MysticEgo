@@ -25,8 +25,6 @@ public static class Program
             builder.Configuration,
             sectionName: "Authorization");
 
-        builder.Services.AddSingleton<Models.Autorization.Services.DesktopPairing>();
-
         // ── MVC + глобальный ToolAuthorizationFilter + JSON
         builder.Services
             .AddControllers(o =>
