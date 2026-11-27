@@ -33,7 +33,7 @@ public static class CapacityAnalyzer
             }
             fresh++;
             var cpu=Percent(row.CpuPercent);var memory=Percent(row.MemoryPercent);
-            var network=Number(row.LinkMbps) is >0 and var speed && Number(row.RxBytesPerSecond) is double rx &&
+            var network=Number(row.LinkMbps) is double speed && speed>0 && Number(row.RxBytesPerSecond) is double rx &&
                 Number(row.TxBytesPerSecond) is double tx ? Math.Max(rx,tx)*8/(speed*1_000_000)*100 : (double?)null;
             var pools=(row.Pools??[]).Where(x=>x.Slots is >0 and <=1024&&x.Active>=0&&x.Active<=1024)
                 .GroupBy(x=>x.Id,StringComparer.Ordinal).Select(g=>new{Slots=g.Max(p=>p.Slots),Active=g.Max(p=>p.Active),Available=g.All(p=>p.Available)}).ToArray();
