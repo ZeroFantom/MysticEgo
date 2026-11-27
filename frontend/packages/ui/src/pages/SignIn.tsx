@@ -1,5 +1,6 @@
 import {useState,type FormEvent} from 'react';
 import {browserKind,browserLabels} from '../app/browserPolicy';
+import {DesktopSignIn} from '../app/DesktopSignIn';
 import {ArrowRight,Boxes,Eye,EyeOff,KeyRound,Network,Shield,Sparkles,UserRound} from 'lucide-react';
 import type {Session} from '../app/context';
 import {useRemote} from '../app/context';
@@ -23,6 +24,7 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
  const [login,setLogin]=useState(''),[password,setPassword]=useState(''),[nickname,setNickname]=useState('');
  const [error,setError]=useState(''),[busy,setBusy]=useState(false),[register,setRegister]=useState(false),[reveal,setReveal]=useState(false);
  const [guest,setGuest]=useState(false);
+ const [pairingBusy,setPairingBusy]=useState(false);
  const [acceptance,setAcceptance]=useState('');
  const documents=useRemote(()=>register?readRegistrationDocuments(authUrl):Promise.resolve(null),[register,authUrl]);
  const policy=documents.value?.required?documents.value:null;
@@ -39,7 +41,7 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
   setError('');
  }
  async function submit(event:FormEvent){
-  event.preventDefault();if(browserKind()==='unsupported'){setError('Браузер не поддерживается.');return;}setBusy(true);setError('');
+  event.preventDefault();if(pairingBusy)return;if(browserKind()==='unsupported'){setError('Браузер не поддерживается.');return;}setBusy(true);setError('');
   try{
    if(register){
     if(!documents.value||documents.loading||documents.error||policyKey&&acceptance!==policyKey)
@@ -66,9 +68,10 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
     <small>Браузер: {browserLabels[browserKind()]}</small>
     <h2>{guest?'Гостевой сеанс':register?'Создать аккаунт':'Войти в MysticEgo'}</h2>
     {mode==='orchestra'&&<PanelLoginLinks/>}
+    <DesktopSignIn session={session} authUrl={authUrl} onLogin={onLogin} disabled={busy||register||guest} onBusy={setPairingBusy}/>
     {mode==='audit'&&<div className="auth-tabs" role="group" aria-label="Режим авторизации" data-register={register}>
-      <button type="button" aria-pressed={!register} onClick={()=>selectMode(false)}>Вход</button>
-      <button type="button" aria-pressed={register} onClick={()=>selectMode(true)}>Регистрация</button>
+      <button type="button" aria-pressed={!register} disabled={pairingBusy} onClick={()=>selectMode(false)}>Вход</button>
+      <button type="button" aria-pressed={register} disabled={pairingBusy} onClick={()=>selectMode(true)}>Регистрация</button>
     </div>}
     {guest&&onGuest&&available.value?<GuestEntry apiUrl={session.url} onLogin={onGuest}/>:<form className="stack auth-form" onSubmit={submit}>
      <div className="auth-field">
@@ -96,13 +99,13 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
      </div>}
      {register&&documents.loading&&<p className="footnote">Загружаем документы регистрации…</p>}
      <ErrorBanner text={error||(register?documents.error:'')}/>
-     <button className="btn auth-submit" type="submit" disabled={busy||register&&(!documents.value||documents.loading||!!documents.error||!!policyKey&&acceptance!==policyKey)}>{busy?'Подождите…':register?'Создать аккаунт':'Войти'}<ArrowRight size={17}/></button>
+     <button className="btn auth-submit" type="submit" disabled={busy||pairingBusy||register&&(!documents.value||documents.loading||!!documents.error||!!policyKey&&acceptance!==policyKey)}>{busy?'Подождите…':register?'Создать аккаунт':'Войти'}<ArrowRight size={17}/></button>
      <details className="auth-connection"><summary>Адрес авторизации</summary><div className="auth-field">
       <label htmlFor="auth-url">API авторизации</label><div className="auth-control"><Network size={17} aria-hidden="true"/>
-       <input id="auth-url" type="url" value={authUrl} onChange={e=>setAuthUrl(e.target.value)} required/>
+       <input id="auth-url" type="url" disabled={pairingBusy} value={authUrl} onChange={e=>setAuthUrl(e.target.value)} required/>
       </div></div></details>
     </form>}
-    {available.value&&onGuest&&<button className="btn secondary" onClick={()=>setGuest(value=>!value)}>{guest?'Войти в аккаунт':'Временный аккаунт гостя'}</button>}
+    {available.value&&onGuest&&<button className="btn secondary" disabled={pairingBusy} onClick={()=>setGuest(value=>!value)}>{guest?'Войти в аккаунт':'Временный аккаунт гостя'}</button>}
     <footer className="auth-project">
       {mode === 'orchestra' && <a href="/studio">Студия и команда</a>}
       <LicenseLink/>
