@@ -51,8 +51,18 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
 
     public sealed record MaintenancePlan(string Action,string Reason,UpdateStatus? Update,
         InfrastructureMaintenanceController.Component[] Components,ServerSample? Host,
-        ServiceLoadMonitor.Sample[] Services,DateTimeOffset CheckedAt,bool AutomaticEnabled,bool AutomaticAvailable,ReleaseRecovery? Recovery=null);
+        ServiceLoadMonitor.Sample[] Services,DateTimeOffset CheckedAt,bool AutomaticEnabled,bool AutomaticAvailable,ReleaseRecovery? Recovery=null,RecoveryRun? RecoveryProgress=null);
     public sealed record ReleaseRecovery(string? Installed,Dictionary<string,Candidate[]> Options);
+    public sealed record RecoveryRun(string Phase,string Mode,string[] Steps,int Completed,string? Message=null);
+    private static RecoveryRun? ReadRecoveryRun()
+    {
+        try
+        {
+            var file=new FileInfo(StateDirectory+"/recovery-run.json");
+            return file.Exists&&file.Length<=8192?JsonSerializer.Deserialize<RecoveryRun>(System.IO.File.ReadAllText(file.FullName),Json):null;
+        }
+        catch(Exception e) when(e is IOException or UnauthorizedAccessException or JsonException){return null;}
+    }
     public sealed record RecoveryApproval(string Mode,string Installed,Candidate[] Releases,bool Confirmed,bool BackupConfirmed=false);
     private static ReleaseRecovery? ReadReleaseRecovery(UpdateStatus? update)
     {
@@ -80,8 +90,9 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
         var recovery=ReadRecovery();
         var maintenance=update?.Maintenance??ReadMaintenance();
         var updateFresh=now-System.IO.File.GetLastWriteTimeUtc(StateDirectory+"/status.json")<TimeSpan.FromMinutes(3);
+        var recoveryRun=ReadRecoveryRun();
         var pending=new[]{"pending.json","maintenance-rescue.json","maintenance-repair.json"}.Any(n=>System.IO.File.Exists(Path.Combine(Inbox,n)));
-        var busy=pending||serviceLoads.Read().Any(s=>s.Unit=="mysticego-infrastructure-reconcile.service"&&s.ActiveState=="activating")||update?.Phase is "switching" or "downloading"||
+        var busy=pending||recoveryRun?.Phase=="running"||serviceLoads.Read().Any(s=>s.Unit=="mysticego-infrastructure-reconcile.service"&&s.ActiveState=="activating")||update?.Phase is "switching" or "downloading"||
             recovery?.State=="repairing"&&now-recovery.CheckedAt<TimeSpan.FromMinutes(10)||
             report.Components.Any(c=>c.State=="repairing"&&now-c.CheckedAt<TimeSpan.FromMinutes(55));
         var failed=report.Components.Any(c=>c.Name is ("docker" or "lmstudio" or "voice" or "postgres-service" or "worker")&&c.State=="degraded"&&now-c.CheckedAt<TimeSpan.FromMinutes(55));
@@ -102,7 +113,7 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
             _=>"Недостаточно актуальных данных. Ожидается проверка."
         };
         var components=report.Components.Concat(peers.Snapshot().Where(p=>p.Name!="orchestra").Select(p=>new InfrastructureMaintenanceController.Component(p.Name,p.State,"HTTP health observation",p.CheckedAt,p.Reason))).ToArray();
-        return new(action,reason,update,components,telemetry.History().LastOrDefault(),serviceLoads.Read(),now,AutoEnabled(),Directory.Exists(Inbox),ReadReleaseRecovery(update));
+        return new(action,reason,update,components,telemetry.History().LastOrDefault(),serviceLoads.Read(),now,AutoEnabled(),Directory.Exists(Inbox),ReadReleaseRecovery(update),recoveryRun);
     }
 
     private static bool AutoEnabled()=>true;
