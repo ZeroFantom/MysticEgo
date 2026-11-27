@@ -99,8 +99,9 @@ export function ProfilePage(){
   const [page,setPage]=useState(0);
   const [quest,setQuest]=useState(''),[questAnswer,setQuestAnswer]=useState(''),[questStatus,setQuestStatus]=useState('');
   type QuestResult={passed:boolean;delta:number;grade:string;covered?:number;required?:number};
+  const basic=useRemote(()=>profileError&&!personal?api.request<AccountProfile>('/collective/profile'):Promise.resolve(null),[api,profileError,!!personal]);
   const quests=useRemote(()=>api.request<{id:string;title:string;npc:string;prompt:string;experience:number;difficulty:number;stat:string;attempt?:QuestResult}[]>('/collective/shard/quests'),[api]);
-  if(!personal)return <><Header title="Мой профиль" action={<button className="btn secondary" onClick={reloadProfile}>Повторить загрузку</button>}/><ErrorBanner text={profileError?'Профиль: '+profileError:''}/>{!profileError&&<div className="empty">Загружаем профиль…</div>}</>;
+  if(!personal)return <><Header title="Мой профиль" action={<button className="btn secondary" onClick={()=>{reloadProfile();basic.reload()}}>Повторить загрузку</button>}/><ErrorBanner text={profileError?'Полные данные профиля: '+profileError:''}/>{basic.value&&<section className="profile-hero" style={bannerStyle(basic.value.coverUrl)}><div className="profile-identity"><ProfileAvatar large url={basic.value.avatarUrl} name={basic.value.displayName||'Аккаунт'}/><div><h2>{basic.value.displayName||'Аккаунт'}</h2><p>{basic.value.statusText}</p></div></div><p>{basic.value.bio}</p><p className="footnote">Основные данные доступны. Игровые показатели временно не загружены; ничего не сброшено.</p></section>}{profileError&&basic.error&&<ErrorBanner text={'Основные данные: '+basic.error}/>} {(!profileError||basic.loading)&&<div className="empty">Загружаем профиль…</div>}</>;
   const {profile,game,stats,personality,progress}=personal;
   const questions=personality.questions??personality.axes.map(axis=>({id:axis.id,axis:axis.id,text:axis.question}));
   const portion=6,totalPages=Math.ceil(questions.length/portion);
