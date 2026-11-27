@@ -65,6 +65,9 @@ Description=Orchestra Maintenance Service
 After=network-online.target
 [Service]
 Type=oneshot
+CPUAccounting=yes
+MemoryAccounting=yes
+TasksAccounting=yes
 ExecStart=/usr/bin/python3 /opt/mysticego-infrastructure/local/reconcile.py
 TimeoutStartSec=50min
 UMask=0077
