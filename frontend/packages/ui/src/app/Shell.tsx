@@ -196,7 +196,7 @@ function Workspace({logout}:{logout:()=>void}){
       <Link to="/" className="brand" aria-label="MysticEgo" onClick={()=>setMobile(false)}><div className="brand-mark"><img src={"/mystic-mark.png"} alt=""/></div><strong>MysticEgo</strong></Link>
       <div className="node-label"><span className="node-icon"><ModeIcon size={18}/></span><div><strong>{t(modes[mode].name)}</strong><small>{t(modes[mode].subtitle)}</small></div></div>
       <nav aria-label={t("Главная навигация")}>{nav.map(section=><div className="nav-section" key={section.name}>
-        <div className="nav-title">{section.name}</div>
+        <div className="nav-title">{t(section.name)}</div>
         {section.items.map(item=><NavLink key={item.to} to={item.to} aria-label={t(item.label)} title={t(item.label)} end={item.to==='/'} onClick={()=>setMobile(false)} className={({isActive})=>'nav-link '+(isActive?'active':'')}>
           <item.icon size={17}/><span>{t(item.label)}</span>
         </NavLink>)}
