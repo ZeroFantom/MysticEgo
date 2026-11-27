@@ -4,6 +4,8 @@ on:
     paths:
       - 'tools/MysticEgo.UiAutomation/**'
       - '.github/workflows/ui-automation-smoke.yml'
+      - 'services/MysticEgo.Distributed/**'
+      - 'core/Models.Commands.Mcp/**'
   workflow_dispatch:
 permissions:
   contents: read
@@ -23,3 +25,15 @@ jobs:
       - run: npm test
       - run: npx playwright install --with-deps chromium
       - run: xvfb-run -a node --test browser.integration.mjs
+
+  windows-build:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet build tools/MysticEgo.UiAutomation/native/UiAutomation.Native.csproj
+      - run: dotnet build services/Api.Agent/Api.Agent.csproj
+      - run: dotnet build services/Api.AuditOrchestra/Api.AuditOrchestra.csproj
