@@ -42,6 +42,16 @@ builder.Services.AddSingleton<ServerTelemetry>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<ServerTelemetry>());
 builder.Services.AddOrchestraProxy();
 builder.Services.AddSingleton<GitHubPanel>();
+builder.Services.AddSingleton<MysticEgo.Api.Orchestra.Development.GitHubWorkspaceClient>();
+builder.Services.AddSingleton<MysticEgo.Api.Orchestra.Development.GitHubWorkspace>();
+builder.Services.AddSingleton<MysticEgo.Api.Orchestra.Development.InternalWorkspace>();
+builder.Services.AddHttpClient("workspace-github",client=>{
+    client.Timeout=TimeSpan.FromSeconds(12);
+    client.MaxResponseContentBufferSize=8*1024*1024;
+    client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("MysticEgo-Orchestra-Workspace");
+    client.DefaultRequestHeaders.Add("X-GitHub-Api-Version","2022-11-28");
+}).ConfigurePrimaryHttpMessageHandler(()=>new HttpClientHandler{AllowAutoRedirect=false,UseCookies=false,UseProxy=false});
 builder.Services.AddHttpClient("panel-github",client=>{
     client.Timeout=TimeSpan.FromSeconds(8);
     client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
