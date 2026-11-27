@@ -13,6 +13,7 @@ ENV = Path("/etc/mysticego/orchestra.env")
 rows = {}
 attempts = {}
 history = []
+SAFE_REASONS = ("CalledProcessError", "TimeoutExpired", "OSError", "PermissionError", "FileNotFoundError", "ValueError", "RuntimeError", "OtherError")
 
 def checked(*args):
     try:
@@ -52,7 +53,8 @@ def repair(name, test, action, message):
         publish(name, "available", message)
         return
     if time.time() - attempts.get(name, 0) < 900:
-        publish(name, "degraded", "Повторная попытка после паузы; проверьте журнал службы.")
+        previous_reason = rows.get(name, {}).get("reason")
+        publish(name, "degraded", "Повторная попытка после паузы; проверьте журнал службы.", previous_reason if previous_reason in SAFE_REASONS else None)
         return
     attempts[name] = time.time()
     publish(name, "repairing", "Автоматическое восстановление выполняется.")
@@ -65,7 +67,7 @@ def repair(name, test, action, message):
     except Exception as error:
         print(name + ": " + type(error).__name__, flush=True)
         reason = type(error).__name__
-        if reason not in ("CalledProcessError", "TimeoutExpired", "OSError", "PermissionError", "FileNotFoundError", "ValueError", "RuntimeError"):
+        if reason not in SAFE_REASONS:
             reason = "OtherError"
         publish(name, "degraded", "Восстановление не завершилось. Проверьте журнал службы.", reason)
 
@@ -109,8 +111,16 @@ def postgres():
 def voice_ready():
     return probe("http://127.0.0.1:1237/health") == {"status": "ready"}
 
+def voice_dependencies_ready():
+    return checked("runuser", "-u", "mysticego-voice", "--", "env",
+                   "HOME=/var/lib/mysticego-voice",
+                   "/opt/mysticego-voice/venv/bin/python", "-c",
+                   "import requests; from faster_whisper import WhisperModel")
+
+
 def voice_repair():
-    if Path("/etc/systemd/system/mysticego-voice.service").is_file():
+    if Path("/etc/systemd/system/mysticego-voice.service").is_file() and voice_dependencies_ready():
+        install.run("systemctl", "reset-failed", "mysticego-voice.service", timeout=10)
         install.run("systemctl", "restart", "mysticego-voice.service", timeout=120)
     else:
         install.run("/bin/bash", str(Path(__file__).with_name("install-voice.sh")), timeout=900)
