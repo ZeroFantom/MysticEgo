@@ -36,7 +36,13 @@ test('visible browser session, exact locator, ownership and close', async () => 
   assert.equal(scenario.steps[0].name, 'ui_click');
   assert.deepEqual(await svc.run('ui_replay', { sessionId, scenarioId: scenario.scenarioId }), { replayed: 1 });
   assert.deepEqual(clicked, ['button', { name: 'Overview', exact: true }]);
+  const exported = await svc.run('ui_scenario_export', { sessionId, scenarioId: scenario.scenarioId });
   await svc.run('ui_close', { sessionId });
   assert.equal(closed, 1);
   await assert.rejects(svc.run('ui_snapshot', { sessionId }), /No matching/);
+  const reopened = await svc.run('ui_open', { kind: 'web', target: 'https://example.test/' });
+  const imported = await svc.run('ui_scenario_import', { sessionId: reopened.sessionId, scenarioJson: exported.scenarioJson });
+  assert.equal(imported.steps, 1);
+  assert.deepEqual(await svc.run('ui_replay', { sessionId: reopened.sessionId, scenarioId: imported.scenarioId }), { replayed: 1 });
+  await svc.stop();
 });
