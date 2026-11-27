@@ -17,6 +17,14 @@ internal static class AuthGateway
             Forward(context, clients, node.AuthUrl, "presentation")).RequireAuthorization();
         app.MapPost("/api/auth/presentation", (HttpContext context, IHttpClientFactory clients) =>
             Forward(context, clients, node.AuthUrl, "presentation")).RequireAuthorization();
+        foreach (var action in new[] { "sessions", "sessions/current", "consents" })
+            app.MapGet("/api/auth/" + action, (HttpContext context, IHttpClientFactory clients) =>
+                Forward(context, clients, node.AuthUrl, action)).RequireAuthorization();
+        foreach (var action in new[] { "sessions/revoke-others", "consents", "device-grants/revoke" })
+            app.MapPost("/api/auth/" + action, (HttpContext context, IHttpClientFactory clients) =>
+                Forward(context, clients, node.AuthUrl, action)).RequireAuthorization();
+        app.MapPost("/api/auth/sessions/{id:guid}/revoke", (Guid id, HttpContext context, IHttpClientFactory clients) =>
+            Forward(context, clients, node.AuthUrl, "sessions/" + id.ToString("D") + "/revoke")).RequireAuthorization();
         if (node.Kind is NodeKind.AuditOrchestra or NodeKind.Orchestra)
         {
             app.MapPost("/api/auth/audit/register", (HttpContext context, IHttpClientFactory clients) =>
@@ -34,7 +42,7 @@ internal static class AuthGateway
         using var request = new HttpRequestMessage(new HttpMethod(context.Request.Method), auth.TrimEnd('/') + "/api/auth/" + action);
         if (context.Connection.RemoteIpAddress is { } caller)
             request.Headers.TryAddWithoutValidation("X-Forwarded-For", caller.ToString());
-        if (action == "presentation" && AuthenticationHeaderValue.TryParse(context.Request.Headers.Authorization.ToString(),out var authorization) && authorization.Scheme == "Bearer")
+        if ((action == "presentation" || action.StartsWith("sessions",StringComparison.Ordinal) || action == "consents" || action == "device-grants/revoke") && AuthenticationHeaderValue.TryParse(context.Request.Headers.Authorization.ToString(),out var authorization) && authorization.Scheme == "Bearer")
             request.Headers.Authorization = authorization;
         if (HttpMethods.IsPost(context.Request.Method))
         {
