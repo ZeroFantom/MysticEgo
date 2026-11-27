@@ -16,8 +16,8 @@ public sealed class DevelopmentWorkspaceController(DevelopmentWorkspace workspac
     public async Task<IActionResult> List(CancellationToken ct)=>await Actor(ct) is null?Forbid():Ok(await workspace.List(ct));
     [HttpPost,RequestSizeLimit(65536)]
     public Task<IActionResult> Create(DevelopmentWorkspace.CreateInput input,CancellationToken ct)=>Run((actor)=>workspace.Create(actor,input,ct),ct);
-    [HttpPost("{id:guid}/{action:regex(^(take|release|complete)$)}"),RequestSizeLimit(1024)]
-    public Task<IActionResult> Change(Guid id,string action,CancellationToken ct)=>Run(actor=>workspace.Change(id,actor,team.IsOwner(User),action,ct),ct);
+    [HttpPost("{id:guid}/{operation:regex(^(take|release|complete)$)}"),RequestSizeLimit(1024)]
+    public Task<IActionResult> Change(Guid id,string operation,CancellationToken ct)=>Run(actor=>workspace.Change(id,actor,team.IsOwner(User),operation,ct),ct);
     [HttpPost("{id:guid}/publish"),RequestSizeLimit(1024)]
     public Task<IActionResult> Publish(Guid id,CancellationToken ct)=>Run(actor=>workspace.Publish(id,actor,team.IsOwner(User),ct),ct);
     [HttpGet("{id:guid}/comments")]
