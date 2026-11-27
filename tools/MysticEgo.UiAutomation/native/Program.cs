@@ -11,6 +11,31 @@ try
     Native.SetProcessDpiAwarenessContext(new IntPtr(-4));
     var op = args[0];
     var process = args[1];
+    if (op is "animations-get" or "animations-set")
+    {
+        if (op == "animations-set")
+        {
+            if (args.Length != 3 || !bool.TryParse(args[2], out var enabled) ||
+                !Native.SetSpeed(0x1043, 0, enabled ? new IntPtr(1) : IntPtr.Zero, 3))
+                throw new InvalidOperationException();
+        }
+        if (!Native.GetSpeed(0x1042, 0, out var animations, 0)) throw new InvalidOperationException();
+        if (op == "animations-set" && (animations != 0) != bool.Parse(args[2])) throw new InvalidOperationException();
+        Console.WriteLine(JsonSerializer.Serialize(new { enabled = animations != 0 }));
+        return;
+    }
+    if (op == "colors-open")
+    {
+        Process.Start(new ProcessStartInfo("ms-settings:personalization-colors") { UseShellExecute = true });
+        Console.WriteLine("{\"opened\":true,\"note\":\"Choose the taskbar accent in Windows Settings.\"}");
+        return;
+    }
+    if (op == "desktop-create")
+    {
+        Native.CreateDesktopShortcut();
+        Console.WriteLine("{\"shortcutSent\":true,\"verified\":false,\"note\":\"Windows may switch the active desktop; verify in Task View.\"}");
+        return;
+    }
     if (op == "pointer-get" || op == "pointer-set")
     {
         if (op == "pointer-set")
@@ -121,6 +146,17 @@ internal static class Native
     {
         Send(new Input { value = new InputUnion { mouse = new Mouse { flags=right?8u:2u } } },
              new Input { value = new InputUnion { mouse = new Mouse { flags=right?16u:4u } } });
+    }
+    internal static void CreateDesktopShortcut()
+    {
+        Input K(ushort vk, bool up) => new() { type = 1, value = new InputUnion { keyboard = new Keyboard { vk = vk, flags = up ? 2u : 0u } } };
+        var size = Marshal.SizeOf<Input>();
+        Input[] sequence = [K(0x5B,false), K(0x11,false), K(0x44,false), K(0x44,true), K(0x11,true), K(0x5B,true)];
+        if (SendInput((uint)sequence.Length, sequence, size) != sequence.Length)
+        {
+            SendInput(3, [K(0x44,true), K(0x11,true), K(0x5B,true)], size);
+            throw new InvalidOperationException();
+        }
     }
     internal static void Key(ushort vk)
     {
