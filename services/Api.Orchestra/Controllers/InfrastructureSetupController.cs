@@ -57,6 +57,7 @@ public sealed class InfrastructureSetupController(IConfiguration config, Develop
         var request = input.Component switch
         {
             "docker" => "docker\n",
+            "monitoring" when string.IsNullOrEmpty(input.Url) && string.IsNullOrEmpty(input.Secret) => "monitoring\n",
             "postgres" when (input.Bind is null or "" or "127.0.0.1") && (input.Cidr is null or "" or "127.0.0.1/32") && string.IsNullOrEmpty(input.Secret) => "postgres\n",
             "postgres-native" when (input.Bind is null or "" or "127.0.0.1") && (input.Cidr is null or "" or "127.0.0.1/32") && string.IsNullOrEmpty(input.Secret) => "postgres-native\n",
             "lmstudio" when input.Role is "panel-data" or "world" => "lmstudio " + input.Role + "\n",
@@ -65,7 +66,7 @@ public sealed class InfrastructureSetupController(IConfiguration config, Develop
         if (request is null)
             return BadRequest(new { error = "На VPS Orchestra напрямую доступны Docker, LM Studio и PostgreSQL с loopback и автоматическими паролями. Подключение новой панели выполняется до её запуска." });
         if (!OperatingSystem.IsLinux() || !System.IO.File.Exists(LocalSocket))
-            return Conflict(new { error = "Локальная служба установки не найдена. Обновите Orchestra из CloudDesk." });
+            return Conflict(new { error = "Локальная служба установки не найдена. Проверьте обновление Orchestra и mysticego-local-setup.socket." });
         if (!Gate.Wait(0)) return Conflict(new { error = "Установка уже выполняется." });
         var actor = User.Identity?.Name ?? "developer";
         const string target = "Этот VPS Orchestra";
