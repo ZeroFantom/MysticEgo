@@ -4,6 +4,7 @@ import { isAbsolute } from 'node:path';
 import { NativeWindowService } from './native.mjs';
 import { parseScenario, scenarioSchema, interruptibleDelay } from './scenario.mjs';
 import { ScenarioLibrary } from './scenario-library.mjs';
+import { DesktopSettingsService } from './desktop-settings.mjs';
 
 export class UiAutomationService {
   #active = null;
@@ -19,6 +20,7 @@ export class UiAutomationService {
     this.engines = engines;
     this.lease = null;
     this.native = new NativeWindowService(config.native);
+    this.desktopSettings = new DesktopSettingsService(config.desktopSettings);
     this.library = config.scenarioDirectory ? new ScenarioLibrary(config.scenarioDirectory) : null;
   }
   run(name, args) {
@@ -55,6 +57,7 @@ export class UiAutomationService {
     return this.#stopPromise;
   }
   async #execute(name, a) {
+    if (name.startsWith('desktop_')) return this.desktopSettings.call(name,a);
     if (name.startsWith('native_')) return this.native.run(name, a);
     const session = this.#active;
     if (name === 'ui_library_list') {
