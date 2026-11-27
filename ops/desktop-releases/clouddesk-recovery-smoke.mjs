@@ -1,0 +1,17 @@
+// Static IPC contract checks complement the real offline C# selftests.
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const read=path=>readFileSync(new URL('../../'+path,import.meta.url),'utf8');
+const ipc=read('tools/MysticEgo.CloudDesk/desktop/main.cjs');
+const backend=read('tools/MysticEgo.CloudDesk/backend/Program.cs');
+const updater=read('tools/MysticEgo.CloudDesk/backend/Reupload.cs');
+const ui=read('tools/MysticEgo.CloudDesk/src/main.jsx');
+for(const action of ['deploy.inspectOrchestra','deploy.recoverMaintenance','deploy.restoreOrchestra']){
+ assert(ipc.match(/const allowed=new Set\(\[([^\]]+)\]\)/)?.[1].includes("'"+action+"'"),action+' missing IPC permission');
+ assert(backend.includes('case "'+action+'":'),action+' missing backend handler');
+}
+assert(ipc.match(/if\(\[([^\]]+)\]\.includes\(p\.action\)/)?.[1].includes("'deploy.recoverMaintenance'"),'Missing recovery progress');
+assert(!updater.includes('bash bootstrap-r31.sh'),'Legacy partial deployment still reachable');
+assert(updater.includes('new{tag,digest,confirmed=true,target="orchestra"}'));
+assert(ui.includes('candidateTag:installedTarget.candidateTag,candidateDigest:installedTarget.candidateDigest'));
+console.log('CloudDesk recovery IPC and update approval contracts passed.');
