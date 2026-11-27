@@ -49,9 +49,9 @@ export function InfrastructureSetup({initial='monitoring',allowed,title='Раз�
 
   return <Panel title={title}>
     <form className="stack" onSubmit={install}>
-      <label>Компонент<select value={component} onChange={e=>{setComponent(e.target.value);setSecret('');setUrl('');setRole(e.target.value==='prepare-postgres'?'orchestra':'panel-data')}}>
+      <label>Компонент<select aria-label="Компонент" value={component} onChange={e=>{setComponent(e.target.value);setSecret('');setUrl('');setRole(e.target.value==='prepare-postgres'?'orchestra':'panel-data')}}>
         {options.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label>
-      <label>Сервер<select value={selected} onChange={e=>setTarget(e.target.value)} disabled={!candidates.length}>
+      <label>Сервер<select aria-label="Сервер" value={selected} onChange={e=>setTarget(e.target.value)} disabled={!candidates.length}>
         {!candidates.length&&<option value="">Нет доступного сервера</option>}
         {candidates.map(host=><option key={host} value={host}>{targetName(host)}</option>)}</select></label>
       {!candidates.length&&<p className="footnote">{['monitoring','metrics-source','docker','lmstudio','postgres','postgres-native'].includes(component)
