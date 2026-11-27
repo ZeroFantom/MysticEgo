@@ -104,6 +104,48 @@ sealed partial class CloudDesk {
         finally{topologyGate.Release();}
     }
 
+    /// <summary>Export only owner-authorized sanitized reports from the bound Orchestra.</summary>
+    async Task<object> MaintenanceReportDownload(JsonObject args)
+    {
+        var format=Need(args,"format",@"\A(?:xlsx|json|txt)\z");
+        var scope=Need(args,"scope",@"\A[a-zA-Z0-9@_.-]{1,80}\z");
+        var origin=TopologyOrigin("https://"+Need(args,"domain",DnsNamePattern));
+        var root=await RequireDeveloper(origin,ownerOnly:true);
+        if(!Guid.TryParse(root,out var id)||!Guid.TryParse(S(args,"node"),out var expected)||id!=expected)throw new Exception("Сессия относится к другой Orchestra.");
+        await topologyGate.WaitAsync();
+        try
+        {
+            if(topologyOrigin!=origin||topologyRootId!=root||topologyAccess.Length==0)throw new Exception("Сессия изменена.");
+            using var request=new HttpRequestMessage(HttpMethod.Get,origin+"/api/v1/orchestra/diagnostics/report?format="+format+"&scope="+Uri.EscapeDataString(scope));
+            request.Headers.Authorization=new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer",topologyAccess);
+            using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(25));
+            using var response=await topologyHttp.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,timeout.Token);
+            response.EnsureSuccessStatusCode();
+            using var input=await response.Content.ReadAsStreamAsync(timeout.Token);
+            using var output=new MemoryStream();var chunk=new byte[8192];int count;
+            while((count=await input.ReadAsync(chunk.AsMemory(),timeout.Token))>0)
+            {if(output.Length+count>4*1024*1024)throw new Exception("Отчёт превышает лимит 4 MiB. Выберите отдельную службу.");output.Write(chunk,0,count);}
+            return new{content=Convert.ToBase64String(output.ToArray()),format,scope};
+        }
+        finally{topologyGate.Release();}
+    }
+
+    async Task<object> ConfigureMaintenanceAuto(JsonObject args)
+    {
+        if(S(args,"confirm")!="AUTO_UPDATE"||args["enabled"] is not JsonValue enabled||!enabled.TryGetValue<bool>(out var value))
+            throw new Exception("Подтвердите политику обновлений.");
+        var origin=TopologyOrigin("https://"+Need(args,"domain",DnsNamePattern));
+        var root=await RequireDeveloper(origin,ownerOnly:true);
+        if(!Guid.TryParse(root,out var id)||!Guid.TryParse(S(args,"node"),out var expected)||id!=expected)throw new Exception("Сессия относится к другой Orchestra.");
+        await topologyGate.WaitAsync();
+        try
+        {
+            if(topologyOrigin!=origin||topologyRootId!=root||topologyAccess.Length==0)throw new Exception("Сессия изменена.");
+            return await TopologyRequest(origin,"/api/v1/orchestra/update/automatic",topologyAccess,new{enabled=value,confirmed=true});
+        }
+        finally{topologyGate.Release();}
+    }
+
     /// <summary>Only exact published project releases with a SHA-256 digest can be approved.</summary>
     static bool ValidUpdateCandidate(string tag,string digest)=>
         System.Text.RegularExpressions.Regex.IsMatch(tag,@"\Av\d+\.\d+\.\d+-beta\.\d+-r\d+(?:\.\d+){0,7}\z")&&
