@@ -188,6 +188,10 @@ npm run test:social --prefix frontend
 
 ## Документация
 
+[Состояние разработки и дорожная карта](docs/development-roadmap.md) · [Development Workspace и GitHub](docs/development-workspace.md) · [Безопасность учётных данных](docs/credential-security.md)
+
+Экспериментальные возможности отмечены отдельно от изменений, влитых в main.
+
 | Раздел | Руководство |
 | :--- | :--- |
 | Оформление и анимации | [Appearance system](docs/appearance-system.md) |

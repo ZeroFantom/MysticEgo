@@ -37,6 +37,7 @@ import {Identities} from '../pages/Identities';
 import {Users} from '../pages/Users';
 import {Diagnostics} from '../pages/Diagnostics';
 import {CommandCenter} from '../pages/CommandCenter';
+import {DevelopmentWorkspace} from '../pages/DevelopmentWorkspace';
 import {DevelopmentTeam} from '../pages/DevelopmentTeam';
 import {AgentUpdates} from '../pages/AgentUpdates';
 import {AssistantPage} from '../pages/Assistant';
@@ -145,6 +146,7 @@ function Workspace({logout}:{logout:()=>void}){
   const cloudDownloads=mode==='orchestra'&&(developer.value?.owner||developer.value?.membership?.status==='approved');
   const {pathname}=useLocation();
   const nav=navigation(mode,portal);
+  if(cloudDownloads)nav.splice(nav.length-1,0,{name:'Development',items:[{to:'/development-workspace',label:'Tasks & discussions',icon:UsersRound}]});
   const infrastructureOwner=mode==='orchestra'&&developer.value?.owner===true;
   if(infrastructureOwner)nav.splice(nav.length-1,0,{name:'Инфраструктура',items:[{to:'/infrastructure/services',label:'Сервисы',icon:Container},{to:'/infrastructure/ai',label:'AI и речь',icon:BrainCircuit},{to:'/infrastructure/database',label:'Базы данных',icon:Database},{to:'/infrastructure/metrics',label:'Мониторинг',icon:Radio},{to:'/infrastructure/self-tests',label:'Автотесты',icon:Activity}]});
   if(mode==='orchestra')nav[0].items.push({to:'/project-branches',label:'Ветки GitHub',icon:Network});
@@ -214,6 +216,7 @@ function Workspace({logout}:{logout:()=>void}){
       <main className="content"><AnimatedArea><Routes>
         <Route path="/" element={mode==='orchestra'||mode==='global'||mode==='local'?<OrchestraOverview/>:mode==='audit'?<OrganizationRequests overview/>:<Overview/>}/>
         {['audit','orchestra'].includes(mode)&&<Route path="/development-team" element={<DevelopmentTeam/>}/>}
+        {mode==='orchestra'&&<Route path="/development-workspace" element={cloudDownloads?<DevelopmentWorkspace/>:<p>Development team access required.</p>}/>}
         {mode==='orchestra'&&<Route path="/model-workers" element={<Navigate to="/assistant?tab=models" replace/>}/>}
         {mode==='orchestra'&&<Route path="/clouddesk-downloads" element={cloudDownloads?<CloudDeskDownloads/>:
           <p role="status">{developer.loading?'Проверяем доступ…':'Скачивание CloudDesk доступно команде разработки.'}</p>}/>}
