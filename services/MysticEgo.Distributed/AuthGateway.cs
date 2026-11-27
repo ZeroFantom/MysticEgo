@@ -40,6 +40,8 @@ internal static class AuthGateway
             limit.MaxRequestBodySize = 16_384;
         using var client = factory.CreateClient("mysticego-logged-api");
         using var request = new HttpRequestMessage(new HttpMethod(context.Request.Method), auth.TrimEnd('/') + "/api/auth/" + action);
+        if ((action == "login" || action == "refresh") && context.Request.Headers.UserAgent.ToString() is { Length: >0 } agent)
+            request.Headers.TryAddWithoutValidation("User-Agent", agent.Length > 500 ? agent[..500] : agent);
         if (context.Connection.RemoteIpAddress is { } caller)
             request.Headers.TryAddWithoutValidation("X-Forwarded-For", caller.ToString());
         if ((action == "presentation" || action.StartsWith("sessions",StringComparison.Ordinal) || action == "consents" || action.StartsWith("device-grants/",StringComparison.Ordinal)) && AuthenticationHeaderValue.TryParse(context.Request.Headers.Authorization.ToString(),out var authorization) && authorization.Scheme == "Bearer")
