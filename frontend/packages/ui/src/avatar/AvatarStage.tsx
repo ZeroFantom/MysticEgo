@@ -77,6 +77,7 @@ export function AvatarStage({url,mime,motion='idle',mood='neutral',speech=0,vise
       const model=vrm;
       for(const [name,clip] of Object.entries(animations??{})){
        if(!clip)continue;
+       loadingClips++;
        void avatarClip(clip,model).then(animation=>{
         if(dead||!mixer)return;
         if(animation){
@@ -84,7 +85,7 @@ export function AvatarStage({url,mime,motion='idle',mood='neutral',speech=0,vise
          trackedBones.set(action,new Set(animation.tracks.map(track=>THREE.PropertyBinding.parseTrackName(track.name).nodeName)));
         }
         else setNotice('Для одного из клипов используется встроенное движение. Проверьте кости и формат анимации.');
-       }).catch(()=>{if(!dead)setNotice('Для одного из клипов используется встроенное движение. Проверьте кости и формат анимации.')});
+       }).catch(()=>{if(!dead)setNotice('Для одного из клипов используется встроенное движение. Проверьте кости и формат анимации.')}).finally(()=>{loadingClips--});
       }
      }else if(Object.keys(animations??{}).length){
       setNotice('Назначенные движения требуют модели VRM с гуманоидным скелетом.');
@@ -99,8 +100,10 @@ export function AvatarStage({url,mime,motion='idle',mood='neutral',speech=0,vise
   }
   let frame=0,t=0,previous=performance.now(),lastPlay=-1,lastMotion:AvatarMotion|undefined;
   let readyReported=false;
+  let loadingClips=0;
   const tick=(now=performance.now())=>{if(dead)return;const s=state.current;
    const dt=Math.min((now-previous)/1000,.05);previous=now;
+   if(!subject||loadingClips>0){frame=requestAnimationFrame(tick);return;}
    if(s.motion!==lastMotion||s.play!==lastPlay)t=lastMotion===undefined?Math.max(0,s.initialPhase):0;
    t+=dt*(s.appearance?.speed??1);
    const center=.84+(s.appearance?.vertical??0);
