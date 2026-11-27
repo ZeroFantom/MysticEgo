@@ -22,6 +22,7 @@ public sealed class WorkspaceThread
     [EntityKey] public Guid Id {get;set;}
     public List<WorkspaceComment> Comments {get;set;}=[];
     public DateTimeOffset? SyncedAt {get;set;}
+    public bool Truncated {get;set;}
 }
 
 /// <summary>Bounded local threads. Remote reads are on demand and cached; publication is a distinct audited action.</summary>
@@ -38,19 +39,19 @@ public sealed class WorkspaceThreads(NodeState state,WorkspaceGitHubClient githu
         try
         {
             var item=await Item(id,ct);var thread=await Thread(id,ct);
-            var failed=false;var truncated=false;
+            var failed=false;
             if(item.SyncState=="synced"&&github.Configured&&
                (thread.SyncedAt is null||DateTimeOffset.UtcNow-thread.SyncedAt>TimeSpan.FromSeconds(60)))
             {
                 try
                 {
-                    truncated=await Refresh(item,thread,ct);
+                    thread.Truncated=await Refresh(item,thread,ct);
                     thread.SyncedAt=DateTimeOffset.UtcNow;
                     await state.Data.PutAsync(thread,ct);
                 }
                 catch(Exception e) when(e is HttpRequestException or System.Text.Json.JsonException or InvalidOperationException||e is OperationCanceledException&&!ct.IsCancellationRequested){failed=true;}
             }
-            return new(thread.Comments.OrderBy(c=>c.At).ToArray(),thread.SyncedAt,failed,truncated);
+            return new(thread.Comments.OrderBy(c=>c.At).ToArray(),thread.SyncedAt,failed,thread.Truncated);
         }
         finally{gate.Release();}
     }
@@ -104,7 +105,7 @@ public sealed class WorkspaceThreads(NodeState state,WorkspaceGitHubClient githu
             {
                 var rows=(await github.Rest(HttpMethod.Get,$"issues/{item.GitHubNumber}/comments?per_page=100&page={page}",null,ct)).AsArray();
                 foreach(var row in rows.OfType<JsonObject>())Merge(thread,row["id"]!.ToString(),row["body"]?.ToString()??"",row["user"]?["login"]?.ToString(),row["created_at"]?.ToString(),null);
-                if(rows.Count<100)return false;
+                if(rows.Count<100)return thread.Comments.Count>=500;
             }
             return true;
         }
