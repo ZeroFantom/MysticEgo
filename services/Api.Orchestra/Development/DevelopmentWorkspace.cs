@@ -157,11 +157,16 @@ public sealed class DevelopmentWorkspace(NodeState state,WorkspaceGitHubClient g
 }
 
 /// <summary>Bounded polling; API reads never trigger an external request.</summary>
-public sealed class WorkspaceSyncWorker(DevelopmentWorkspace workspace):BackgroundService
+public sealed class WorkspaceSyncWorker(DevelopmentWorkspace workspace,WorkspaceSyncSignal signal):BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
-        using var timer=new PeriodicTimer(TimeSpan.FromMinutes(2));
-        do{await workspace.Sync(ct);}while(await timer.WaitForNextTickAsync(ct));
+        using var timer=new PeriodicTimer(TimeSpan.FromSeconds(15));
+        var last=DateTimeOffset.MinValue;
+        do
+        {
+            var requested=signal.Consume();
+            if(requested||DateTimeOffset.UtcNow-last>=TimeSpan.FromMinutes(2)){await workspace.Sync(ct);last=DateTimeOffset.UtcNow;}
+        }while(await timer.WaitForNextTickAsync(ct));
     }
 }
