@@ -24,10 +24,17 @@ fi
 echo 'CLOUDDESK_STEP:checksum'
 printf '%s  %s\n' "$checksum" "$archive" | sha256sum -c -
 export DEBIAN_FRONTEND=noninteractive
-echo 'CLOUDDESK_STEP:apt-update'
-apt-get update
-echo 'CLOUDDESK_STEP:apt-install'
-apt-get install -y ca-certificates caddy curl libicu74 libssl3t64 unzip gh
+if [[ ${MYSTICEGO_INSTALL_PREREQS_READY:-} == 1 ]]; then
+  # Factory reset has already installed all prerequisites before deleting state.
+  for package in ca-certificates caddy curl libicu74 libssl3t64 unzip gh; do
+    [[ $(dpkg-query -W -f='${Status}' "$package") == 'install ok installed' ]]
+  done
+else
+  echo 'CLOUDDESK_STEP:apt-update'
+  apt-get update
+  echo 'CLOUDDESK_STEP:apt-install'
+  apt-get install -y ca-certificates caddy curl libicu74 libssl3t64 unzip gh
+fi
 echo 'CLOUDDESK_STEP:unpack'
 install -d -m 0755 /opt/mysticego /etc/mysticego
 stage=$(mktemp -d /opt/mysticego/.stage.XXXXXXXX)

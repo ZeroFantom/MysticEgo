@@ -1,3 +1,4 @@
+import MaintenanceReports from './MaintenanceReports.jsx';
 import React,{useState,useEffect,useRef,useMemo} from 'react';
 import {createRoot} from 'react-dom/client';
 import './style.css';
@@ -237,10 +238,7 @@ function App(){
        </div>}
      </div>
      {maintenancePlan?.automaticAvailable&&<p>Автоматическое обновление Orchestra: {maintenancePlan.automaticEnabled?'включено':'ожидается переход на обязательную политику'}</p>}
-     {maintenancePlan&&!maintenancePlan.legacy&&<div className="actions"><select aria-label="Формат отчёта" value={maintenanceFormat} onChange={e=>setMaintenanceFormat(e.target.value)}><option value="xlsx">XLSX</option><option value="json">JSON</option><option value="txt">TXT</option></select>{button('Сводный отчёт',()=>void serviceReport('all'),'',maintenanceExport)}</div>}
-     {maintenanceError&&<p className="warning">{maintenanceError}</p>}
-     <div className="fields">{maintenancePlan?.components?.map(c=><div key={c.name}><b>{c.name}</b><p>{c.state} · {new Date(c.checkedAt).toLocaleTimeString()}</p>{!maintenancePlan.legacy&&button('Отчёт',()=>void serviceReport(c.name),'',maintenanceExport)}</div>)}</div>
-     <div className="fields">{maintenancePlan?.services?.map(s=><div key={s.unit}><b>{s.unit}</b><p>{s.activeState??'unknown'} · CPU {s.cpuPercent==null?'—':s.cpuPercent.toFixed(1)+'%'} · RAM {s.memoryBytes==null?'—':(s.memoryBytes/1048576).toFixed(1)+' MiB'}</p>{button('Отчёт',()=>void serviceReport(s.unit),'',maintenanceExport)}</div>)}</div>
+
    </>}
    </div>
    <h3>Global</h3>
@@ -253,6 +251,7 @@ function App(){
    {!monitor.nodes.some(n=>n.role==='Global')&&<p>Подключи Orchestra, чтобы выбрать зарегистрированный Global.</p>}
    <div className="actions">{button('Открыть журнал',()=>T('journal'),'subtle')}{button('Развернуть новый узел',()=>{QM('existing');T('monitor')},'subtle')}</div>
  </section>}
+ {tab==='deploy'&&installedTarget?.host===form.host&&String(installedTarget.serverId)===String(cloudId(form))&&<MaintenanceReports plan={maintenancePlan} format={maintenanceFormat} onFormat={setMaintenanceFormat} exporting={maintenanceExport} error={maintenanceError} onReport={serviceReport}/>}
  {tab==='deploy'&&<AuditPortal monitor={monitor} servers={availableCloud.map(s=>({id:s.id,name:s.name,ip:serverIp(s)}))}
    validTarget={validTarget} runSSH={runSSH} busy={!!busy||wizBusy||!!wizard}/>}
  {tab==='deploy'&&<InfrastructureSetup servers={availableCloud.map(s=>({id:s.id,name:s.name,ip:serverIp(s)}))}

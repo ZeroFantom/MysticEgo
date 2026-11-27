@@ -1,6 +1,7 @@
 import {useState,type FormEvent} from 'react';
-import {ArrowUpRight,Bot,Braces,MessageSquare,Send,Server,Sparkles} from 'lucide-react';
+import {ArrowUpRight,Bot,Braces,MessageSquare,Send,Server,Sparkles,AudioLines,Monitor,Workflow,UserRound} from 'lucide-react';
 import {Link,useSearchParams} from 'react-router-dom';
+import {useLocale} from '../app/presentation';
 import {useApp,useRemote} from '../app/context';
 import {assistantNavigate} from '../app/InterfaceControl';
 import {Panel,ErrorBanner} from '../components/primitives';
@@ -59,6 +60,7 @@ function DeveloperChat(){
 }
 
 export function AssistantPage(){
+  const t=useLocale();
   const {api,session,mode,portal}=useApp();
   const [params,setParams]=useSearchParams();
   const access=useRemote(()=>mode==='orchestra'?api.request<{developer:boolean;owner:boolean}>('/managed/panel-assistant/access'):Promise.resolve(null),[api,mode]);
@@ -93,20 +95,29 @@ export function AssistantPage(){
   return <div className="assistant-workspace">
     <header className="assistant-workspace-header">
       <div className="assistant-workspace-icon"><Bot size={25} aria-hidden="true"/></div>
-      <div><h1>Ассистент</h1><p>{mode==='orchestra'?'Диалоги, помощь с Orchestra и локальные модели':'Диалог и персональный характер'}</p></div>
+      <div className="assistant-workspace-intro"><span className="assistant-kicker">MysticEgo / {t('Ассистент')}</span><h1>{character?.name||t('Ассистент')}</h1><p>{t('Личное пространство для диалогов, действий и помощи с компьютером.')}</p></div>
       <span className="assistant-workspace-status" data-ready={!!status.value?.service.ready}>
-        {status.value?.service.ready?status.value.service.message:status.loading?'Проверяем подключение…':'Модель недоступна'}
+        {status.value?.service.ready?status.value.service.message:t(status.loading?'Проверяем подключение…':'Модель недоступна')}
       </span>
     </header>
-    <nav className="assistant-workspace-nav" aria-label="Разделы ассистента">
+    <nav className="assistant-workspace-nav" aria-label={t('Разделы ассистента')}>
       {tabs.map(({id,label,icon:Icon})=><button key={id} className="assistant-workspace-tab" type="button"
-        aria-pressed={active===id} onClick={()=>setParams(id==='chat'?{}:{tab:id})}><Icon size={17} aria-hidden="true"/>{label}</button>)}
+        aria-pressed={active===id} onClick={()=>setParams(id==='chat'?{}:{tab:id})}><Icon size={17} aria-hidden="true"/>{t(label)}</button>)}
     </nav>
     <ErrorBanner text={error||status.error||(mode==='orchestra'?access.error:'')}/>
     {mode==='orchestra'&&status.value&&!status.value.service.ready&&<p className="assistant-workspace-notice">
       После первого развёртывания LM Studio загружает модель в фоне. На VPS проверьте журнал службы <code>mysticego-default-model</code>.
     </p>}
-    {active==='chat'&&<Panel title="Личный чат"><AssistantChat status={status.value}/></Panel>}
+    {active==='chat'&&<div className="assistant-home-grid">
+      <div className="assistant-main-chat"><Panel title="Личный чат"><AssistantChat status={status.value}/></Panel></div>
+      <aside className="assistant-daily" aria-label={t('Рабочее пространство')}>
+       <div className="assistant-daily-card"><div className="assistant-daily-title"><UserRound size={18}/><h2>{t('Характер ассистента')}</h2></div><strong>{character?.name??'—'}</strong><p>{t('Настройте имя, стиль общения и голос.')}</p><button className="btn secondary" onClick={()=>setParams({tab:'persona'})}>{t('Настроить')}<ArrowUpRight size={15}/></button></div>
+       <div className="assistant-daily-card"><div className="assistant-daily-title"><AudioLines size={18}/><h2>{t('Голос')}</h2></div><strong>{character?t(character.voice?'Включено':'Выключено'):'—'}</strong><p>{t('Озвучивание ответов на вашем устройстве.')}</p><button className="btn secondary" onClick={()=>setParams({tab:'persona'})}>{t('Настроить')}<ArrowUpRight size={15}/></button></div>
+       {(!portal&&(mode==='agent'||mode==='audit'))&&<div className="assistant-daily-card"><div className="assistant-daily-title"><Monitor size={18}/><h2>{t('Аватар VRM')}</h2></div><p>{t('Модель, движения и рабочий стол.')}</p><Link className="btn secondary" to="/avatars">{t('Студия VRM')}<ArrowUpRight size={15}/></Link></div>}
+       {(!portal||mode==='orchestra')&&<div className="assistant-daily-card"><div className="assistant-daily-title"><Workflow size={18}/><h2>{t('Автоматизация')}</h2></div><p>{t('Создавайте и запускайте разрешённые сценарии.')}</p><Link className="btn secondary" to="/automation">{t('Открыть')}<ArrowUpRight size={15}/></Link></div>}
+       {access.value?.owner&&<div className="assistant-daily-card"><div className="assistant-daily-title"><Server size={18}/><h2>{t('Модели')}</h2></div><strong>{status.value?.model||'—'}</strong><button className="btn secondary" onClick={()=>setParams({tab:'models'})}>{t('Управление моделями')}<ArrowUpRight size={15}/></button></div>}
+      </aside>
+    </div>}
     {access.value?.developer&&<div hidden={active!=='developer'}><DeveloperChat/></div>}
     {active==='models'&&access.value?.owner&&<ModelWorkers/>}
     {active==='persona'&&<div className="assistant-persona">

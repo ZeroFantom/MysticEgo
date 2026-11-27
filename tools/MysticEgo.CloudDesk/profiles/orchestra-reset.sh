@@ -15,13 +15,26 @@ paths=(/opt/mysticego /etc/mysticego /var/lib/mysticego /var/lib/mysticego-orche
 units=(mysticego-orchestra-updater.timer mysticego-maintenance-rescue.path mysticego-infrastructure-reconcile.timer mysticego-local-setup.socket mysticego-orchestra-updater.service mysticego-maintenance-rescue.service mysticego-infrastructure-reconcile.service mysticego-default-model.service mysticego-voice.service mysticego-lmstudio.service mysticego-orchestra.service mysticego-local-setup@.service)
 die(){ echo "Factory reset refused: $*" >&2; exit 1; }
 health(){ curl -fsS --max-time 5 "$1" | python3 -c 'import json,sys; h=json.load(sys.stdin); assert h["status"]=="alive" and h["kind"].lower()=="orchestra"; print(h["node"])'; }
+check_paths(){
+ python3 - "${paths[@]}" /etc/caddy/Caddyfile <<'PY'
+import pathlib,sys
+paths=[pathlib.Path(p) for p in sys.argv[1:]]
+mounts=[line.split()[4] for line in pathlib.Path('/proc/self/mountinfo').read_text().splitlines()]
+for p in paths:
+    if p.resolve()!=p or p.is_symlink(): raise SystemExit("Unexpected symbolic link: "+str(p))
+    if any(m==str(p) or m.startswith(str(p)+"/") for m in mounts): raise SystemExit("Mounted storage must be handled manually: "+str(p))
+PY
+}
 preflight(){
  [[ $(health http://127.0.0.1:5500/health/live) == "$expected" ]] || die 'wrong node'
  [[ $(health "https://$domain/health/live") == "$expected" ]] || die 'wrong HTTPS node'
  [[ -d /opt/mysticego/app && -f /var/lib/mysticego/auth.db && -f /var/lib/mysticego/orchestra/node.db ]] || die 'standard local SQLite data not found'
  # Refuse anything except the native single-site profile. Never drop external DBs.
  [[ ! -e /etc/mysticego/database-staging && ! -e /opt/mysticego-infrastructure/postgres && ! -e /etc/postgresql/16/mysticego ]] || die 'PostgreSQL configuration present'
- [[ -z $(find /var/lib/mysticego -maxdepth 2 -name '*.connection' -print -quit) ]] || die 'external database connection present'
+ local connections
+ connections=$(find /var/lib/mysticego -maxdepth 2 -name '*.connection' -print -quit)
+ [[ -z $connections ]] || die 'external database connection present'
+ [[ ! -e /opt/mysticego-infrastructure/monitoring ]] || die 'managed monitoring requires separate cleanup'
  cmp -s /etc/mysticego/orchestra.env <(printf 'MYSTICEGO_CENTER_AUTH_URL=https://%s\nMYSTICEGO_CENTER_ORCHESTRA_URL=https://%s\n' "$domain" "$domain") || die 'custom environment'
  [[ $(systemctl show mysticego-orchestra.service -p FragmentPath --value) == /etc/systemd/system/mysticego-orchestra.service ]] || die 'unknown service path'
  [[ -z $(systemctl show mysticego-orchestra.service -p DropInPaths --value) ]] || die 'custom or Docker installation'
@@ -41,23 +54,18 @@ $domain {
 }
 CADDY
  ) || die 'custom/shared Caddy configuration'
- python3 - "${paths[@]}" /etc/caddy/Caddyfile <<'PY'
-import pathlib,sys
-paths=[pathlib.Path(p) for p in sys.argv[1:]]
-mounts=[line.split()[4] for line in pathlib.Path('/proc/self/mountinfo').read_text().splitlines()]
-for p in paths:
-    if p.resolve()!=p or p.is_symlink(): raise SystemExit("Unexpected symbolic link: "+str(p))
-    if any(m==str(p) or m.startswith(str(p)+"/") for m in mounts): raise SystemExit("Mounted storage must be handled manually: "+str(p))
-PY
- local u
+ check_paths
+ local u allowed known installed_units active_setups
+ installed_units=$(systemctl list-unit-files 'mysticego-*' --no-legend --plain)
  while read -r u _; do
    [[ -z $u ]] && continue
-   local known=false
+   known=false
    for allowed in "${units[@]}"; do [[ $u == "$allowed" ]] && known=true; done
    [[ $known == true ]] || die "unknown MysticEgo unit: $u"
- done < <(systemctl list-unit-files 'mysticego-*' --no-legend --plain)
+ done <<< "$installed_units"
  # No pending privileged setup instances.
- [[ -z $(systemctl list-units 'mysticego-local-setup@*.service' --state=active,activating,deactivating --no-legend --plain) ]] || die 'local setup busy'
+ active_setups=$(systemctl list-units 'mysticego-local-setup@*.service' --state=active,activating,deactivating --no-legend --plain)
+ [[ -z $active_setups ]] || die 'local setup busy'
 }
 if [[ $mode == check ]]; then
  preflight
@@ -79,11 +87,12 @@ with zipfile.ZipFile("r3.zip") as z:
     assert json.loads(z.read("MysticEgo/runtime/app/web/orchestra/release-info.json"))["installed"]==sys.argv[1], "Release mismatch"
 PY
 # Verify package prerequisites before deletion; a network failure must not wipe a working node.
+exec 9>/run/lock/mysticego-clouddesk-deploy.lock
+flock -n 9 || die 'deployment busy'
+preflight
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y ca-certificates caddy curl libicu74 libssl3t64 unzip gh
-exec 9>/run/lock/mysticego-clouddesk-deploy.lock
-flock -n 9 || die 'deployment busy'
 preflight
 echo CLOUDDESK_RESET_STEP:stop
 for u in "${units[@]}"; do
@@ -93,8 +102,10 @@ for u in "${units[@]}"; do
    if systemctl is-enabled --quiet "$u"; then systemctl disable "$u"; fi
  fi
 done
-[[ -z $(systemctl list-units 'mysticego-local-setup@*.service' --state=active,activating,deactivating --no-legend --plain) ]] || die 'local setup busy after stopping socket'
+active_setups=$(systemctl list-units 'mysticego-local-setup@*.service' --state=active,activating,deactivating --no-legend --plain)
+[[ -z $active_setups ]] || die 'local setup busy after stopping socket'
 systemctl stop caddy.service
+check_paths
 # Only the fixed, confirmed application-owned directories and unit definitions are removed.
 echo CLOUDDESK_RESET_STEP:delete
 for u in "${units[@]}"; do rm -f -- "/etc/systemd/system/$u"; done
@@ -103,7 +114,7 @@ rm -rf --one-file-system -- "${paths[@]}"
 systemctl daemon-reload
 echo CLOUDDESK_RESET_STEP:install
 # The standard installer now holds the inherited lock until it reaches maintenance recovery.
-MYSTICEGO_INSTALL_LOCK_FD=9 bash install.sh "$PWD/r3.zip" "$domain" '' "$digest" native sqlite
+MYSTICEGO_INSTALL_LOCK_FD=9 MYSTICEGO_INSTALL_PREREQS_READY=1 bash install.sh "$PWD/r3.zip" "$domain" '' "$digest" native sqlite
 new=$(health http://127.0.0.1:5500/health/live)
 [[ $new =~ ^[a-f0-9-]{36}$ && $new != "$expected" && $(health "https://$domain/health/live") == "$new" ]] || die 'new identity not verified'
 [[ -f /var/lib/mysticego/auth.db && -f /var/lib/mysticego/orchestra/node.db ]]
