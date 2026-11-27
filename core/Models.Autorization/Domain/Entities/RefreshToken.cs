@@ -3,6 +3,8 @@ namespace Models.Autorization.Domain.Entities;
 public class RefreshToken
 {
     public int Id { get; set; }
+    public Guid? SessionId { get; set; }
+    public DateTime? LastSeenUtc { get; set; }
     public Guid UserId { get; set; }
     public string Token { get; set; } = "";
     public DateTime ExpiresAt { get; set; }
