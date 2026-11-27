@@ -24,10 +24,17 @@ fi
 echo 'CLOUDDESK_STEP:checksum'
 printf '%s  %s\n' "$checksum" "$archive" | sha256sum -c -
 export DEBIAN_FRONTEND=noninteractive
-echo 'CLOUDDESK_STEP:apt-update'
-apt-get update
-echo 'CLOUDDESK_STEP:apt-install'
-apt-get install -y ca-certificates caddy curl libicu74 libssl3t64 unzip gh
+if [[ ${MYSTICEGO_INSTALL_PREREQS_READY:-} == 1 ]]; then
+  # Factory reset has already installed all prerequisites before deleting state.
+  for package in ca-certificates caddy curl libicu74 libssl3t64 unzip gh; do
+    [[ $(dpkg-query -W -f='${Status}' "$package") == 'install ok installed' ]]
+  done
+else
+  echo 'CLOUDDESK_STEP:apt-update'
+  apt-get update
+  echo 'CLOUDDESK_STEP:apt-install'
+  apt-get install -y ca-certificates caddy curl libicu74 libssl3t64 unzip gh
+fi
 echo 'CLOUDDESK_STEP:unpack'
 install -d -m 0755 /opt/mysticego /etc/mysticego
 stage=$(mktemp -d /opt/mysticego/.stage.XXXXXXXX)
@@ -137,6 +144,7 @@ for ((i=0;i<60;i++)); do
     recovery=/opt/mysticego/app/ops/orchestra-updater/recover-maintenance.sh
     if [[ -f $recovery ]]; then
       node=$(curl -fsS --max-time 5 http://127.0.0.1:5500/health/live | python3 -c 'import json,sys;print(json.load(sys.stdin)["node"])')
+      if [[ "${MYSTICEGO_INSTALL_LOCK_FD:-}" == 9 ]]; then flock -u 9; fi
       bash "$recovery" "$node" || { echo 'Orchestra работает, но установка службы обслуживания не завершена. Используйте восстановление в CloudDesk.' >&2; exit 1; }
       echo "Orchestra ready: https://$domain/ (Audit: /audit-portal/)"
       exit 0

@@ -23,3 +23,11 @@ const reportCss=read('tools/MysticEgo.CloudDesk/src/maintenance-reports.css');
 assert(ui.includes('<MaintenanceReports plan={maintenancePlan}'));
 assert(reports.includes('maintenance-card-grid')&&reports.includes('onReport(s.unit)')&&reports.includes('onReport(c.name)'));
 assert(reportCss.includes('minmax(min(100%,245px),1fr)')&&reportCss.includes('overflow-wrap:anywhere'));
+
+const reset=read('tools/MysticEgo.CloudDesk/backend/FactoryReset.cs');
+const resetScript=read('tools/MysticEgo.CloudDesk/profiles/orchestra-reset.sh');
+for(const action of ['deploy.resetPreview','deploy.factoryReset']){assert(ipc.includes("'"+action+"'"));assert(backend.includes('case "'+action+'":'));assert(ui.includes("runSSH('"+action+"'"));}
+assert(reset.includes('ownerOnly:true')&&reset.includes('release!=approval.Release')&&reset.includes('resetApproval=null'));
+assert(ipc.includes('defaultId:0,cancelId:0,message:'));
+assert(resetScript.indexOf('sha256sum -c -')<resetScript.indexOf('CLOUDDESK_RESET_STEP:delete'));
+assert(resetScript.includes('PostgreSQL configuration present')&&resetScript.includes('custom/shared Caddy configuration'));

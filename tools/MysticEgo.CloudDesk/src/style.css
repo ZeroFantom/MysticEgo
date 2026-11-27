@@ -164,3 +164,5 @@ aside .desk-art-preview{width:100%;max-height:none}
 :root[data-interface][data-theme] .auth-intro{background:var(--mystic-entry-art) center/cover no-repeat,var(--desk-panel)}
 :root[data-interface][data-theme] .auth-intro :is(h1,p){background:var(--desk-panel);color:var(--desk-ink);padding:10px;border-radius:9px}
 @media(max-width:700px){:root[data-interface][data-theme] main>header{aspect-ratio:auto;padding-bottom:calc(12vw + 12px)}}
+
+.factory-reset-box{margin-top:18px;padding:16px;border:1px solid var(--desk-warn-line);border-radius:14px;background:var(--desk-warn-bg);display:grid;gap:10px;min-width:0}.factory-reset-box h4{margin:0;color:var(--desk-warn)}.factory-reset-box p{line-height:1.6;overflow-wrap:anywhere}.factory-reset-confirm{display:grid;gap:10px;min-width:0}.factory-reset-confirm label{display:grid;gap:6px}.factory-reset-confirm code{white-space:normal;overflow-wrap:anywhere}.factory-reset-danger{color:var(--desk-on);background:#a8273e;border-color:#a8273e;font-weight:700}.factory-reset-danger:hover:not(:disabled){background:#8f2034;border-color:#a8273e;color:white}
