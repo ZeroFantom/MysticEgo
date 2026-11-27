@@ -1,3 +1,4 @@
+using MysticEgo.Api.Orchestra.Development;
 using Microsoft.AspNetCore.Authorization;
 using MysticEgo.Api.Orchestra;
 using MysticEgo.Avatar;
@@ -28,6 +29,15 @@ builder.Services.AddSocial();
 builder.Services.AddSingleton<MysticEgo.Api.Orchestra.Controllers.StickerStore>();
 builder.Services.AddSingleton<ManagedNetwork>();
 builder.Services.AddSingleton<DevelopmentTeam>();
+builder.Services.AddSingleton<WorkspaceGitHubClient>();
+builder.Services.AddSingleton<DevelopmentWorkspace>();
+builder.Services.AddHostedService<WorkspaceSyncWorker>();
+builder.Services.AddHttpClient("development-github",client=>{
+    client.Timeout=TimeSpan.FromSeconds(12);
+    client.MaxResponseContentBufferSize=4*1024*1024;
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("MysticEgo-Orchestra");
+    client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+}).ConfigurePrimaryHttpMessageHandler(()=>new HttpClientHandler{AllowAutoRedirect=false,UseCookies=false,UseProxy=false});
 builder.Services.AddSingleton<ParentAuthorization>();
 builder.Services.AddAuthorizationBuilder().AddPolicy("orchestra-executor", policy => policy
     .RequireAuthenticatedUser().RequireClaim("token_use", "device").RequireRole("agent")
