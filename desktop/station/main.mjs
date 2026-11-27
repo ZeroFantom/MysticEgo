@@ -2,6 +2,7 @@ import {app,BrowserWindow,WebContentsView,dialog,ipcMain,Menu,shell} from 'elect
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
+import {createHash,randomUUID} from 'node:crypto';
 import fs from 'node:fs/promises';
 import {mkdirSync} from 'node:fs';
 import os from 'node:os';
@@ -107,7 +108,7 @@ async function readAuth(){
       actor={...previous,token:data.accessToken,refreshToken:data.refreshToken,expiration:Date.parse(data.expiresAt)};
       return actor;
     };
-    refreshing=refreshing().catch(()=>{if(generation===accountGeneration){actor=null;playerGlobals=[];}return actor}).finally(()=>{refreshing=null});
+    refreshing=refreshing().catch(()=>{if(generation===accountGeneration)void clearRevokedAccount(generation);return actor}).finally(()=>{refreshing=null});
   }
   return refreshing;
 }
@@ -157,7 +158,7 @@ async function userSession(input){
   const data=await json(base+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({login,password})});
   accountGeneration++;
-  actor={login:data.user?.login||login,token:data.accessToken,refreshToken:data.refreshToken,expiration:Date.parse(data.expiresAt),central:base,lan:input?.lan===true};
+  actor={id:data.user?.id,login:data.user?.login||login,token:data.accessToken,refreshToken:data.refreshToken,expiration:Date.parse(data.expiresAt),central:base,lan:input?.lan===true};
   if(!isAgent)await topology().catch(()=>{});
   teamStatus=null;teamChecked=0;
   void refreshTeam();
@@ -320,6 +321,74 @@ async function acceptInvitation(text){
   void followClub();
   return 'Приглашение принято. Получаем конфигурацию у Local.';
 }
+// Account-level feature consent is not sufficient: a matching local grant generation
+// must exist in the current OS user's application data, and Auth must still allow it.
+let companionGrant=null, checkingAccount=false;
+async function localGrantIdentity(auth,scope){
+  if(!auth.id||!/^[0-9a-f-]{36}$/i.test(auth.id))throw Error('Account ID unavailable');
+  const machine=await fingerprint();
+  const hash=createHash('sha256').update('MysticEgo-device-v1:'+machine+':'+dataRoot).digest('hex');
+  const deviceId=hash.slice(0,8)+'-'+hash.slice(8,12)+'-'+hash.slice(12,16)+'-'+hash.slice(16,20)+'-'+hash.slice(20,32);
+  const key=createHash('sha256').update(JSON.stringify([auth.central,auth.id,deviceId,scope])).digest('hex');
+  return {deviceId,scope,file:path.join(dataRoot,'device-grants',key+'.json')};
+}
+async function accountSecurityRequest(auth,route,body){
+  return fetch(auth.central+'/api/auth/'+route,{
+    method:body===undefined?'GET':'POST',headers:{Authorization:'Bearer '+auth.token,...(body===undefined?{}:{'Content-Type':'application/json'})},
+    body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(6000),redirect:'error',cache:'no-store'
+  });
+}
+async function grantStatus(auth,scope){
+  const identity=await localGrantIdentity(auth,scope);
+  const response=await accountSecurityRequest(auth,'consents');
+  if(!response.ok)throw Error('Account permissions unavailable');
+  const consent=await response.json();
+  if(!consent.accepted||!consent.enabledScopes?.includes(scope))return {identity,consent,allowed:false,enabled:false};
+  let saved;
+  try{saved=JSON.parse(await fs.readFile(identity.file,'utf8'))}catch{}
+  const allowed=!!saved&&consent.grants?.some(g=>g.deviceId===identity.deviceId&&g.scope===scope&&g.grantId===saved.grantId&&g.policyVersion===consent.permissionPolicyVersion&&saved.policyVersion===g.policyVersion);
+  return {identity,consent,allowed,enabled:true};
+}
+async function approveAvatarGrant(auth,generation){
+  const state=await grantStatus(auth,'avatar-desktop');
+  if(!state.enabled)throw Error('Enable desktop avatar in Account Security and accept current documents first.');
+  if(state.allowed)return true;
+  const answer=await dialog.showMessageBox(window,{type:'question',title:'MysticEgo · VRM',
+    message:'Allow this account to move the avatar onto this desktop?',
+    detail:'This device approval is remembered for this account. You can revoke it in Account Security. It does not grant keyboard, mouse, screen capture or administrator access.',
+    buttons:['Cancel','Allow on this device'],defaultId:0,cancelId:0});
+  if(answer.response!==1||closing||generation!==accountGeneration)return false;
+  const grantId=randomUUID(),policyVersion=state.consent.permissionPolicyVersion;
+  const response=await accountSecurityRequest(auth,'device-grants/approve',{deviceId:state.identity.deviceId,scope:'avatar-desktop',grantId,policyVersion});
+  if(!response.ok||generation!==accountGeneration)return false;
+  await fs.mkdir(path.dirname(state.identity.file),{recursive:true,mode:0o700});
+  const tmp=state.identity.file+'.'+randomUUID()+'.tmp';
+  try{await fs.writeFile(tmp,JSON.stringify({grantId,policyVersion}),{mode:0o600,flag:'wx'});await fs.rename(tmp,state.identity.file)}
+  finally{await fs.rm(tmp,{force:true}).catch(()=>{})}
+  return (await grantStatus(auth,'avatar-desktop')).allowed;
+}
+async function clearRevokedAccount(generation){
+  if(generation!==accountGeneration)return;
+  accountGeneration++;actor=null;playerGlobals=[];teamStatus=null;teamChecked=0;
+  closePanel();if(recording)recording.child.stdin.end('\n');
+  if(companion)companion.child.kill();companionGrant=null;
+  await stopRunner(personalRunner);
+  personalProfile=undefined;personalFile=undefined;
+}
+async function checkAccountSecurity(){
+  if(checkingAccount||!actor||closing)return;
+  checkingAccount=true;
+  const generation=accountGeneration;
+  try{
+    const auth=await authorized();
+    const response=await accountSecurityRequest(auth,'sessions/current');
+    if(generation!==accountGeneration)return;
+    if(response.status===401||response.status===403){await clearRevokedAccount(generation);return;}
+    if(companionGrant&&companion&&(!response.ok||!(await grantStatus(auth,companionGrant)).allowed)){companion.child.kill();companionGrant=null;}
+  }catch{if(generation===accountGeneration&&companionGrant&&companion){companion.child.kill();companionGrant=null;}}
+  finally{checkingAccount=false;}
+}
+
 let handoffBusy=false;
 async function pollAvatarHandoff(){
   if(handoffBusy||closing||!actor)return;
@@ -336,13 +405,13 @@ async function pollAvatarHandoff(){
     const {request,proof}=await response.json();
     const complete=async started=>{const r=await post('/'+request.id+'/complete',{proof,started});if(!r.ok)throw Error('Запрос перехода истёк.')};
     if(companion||closing||generation!==accountGeneration){await complete(false);return;}
-    const answer=await dialog.showMessageBox(window,{type:'question',title:'MysticEgo · VRM',message:'Перенести аватар на рабочий стол?',detail:'Локальная веб-панель запрашивает '+(request.motion==='walk'?'прогулку':'переход на панель задач')+'. Ввод мыши и клавиатуры не будет перехвачен.',buttons:['Отмена','Разрешить'],defaultId:0,cancelId:0});
-    if(answer.response!==1||companion||closing||generation!==accountGeneration||Date.parse(request.expiresAt)<=Date.now()){await complete(false).catch(()=>{});return;}
+    const granted=await approveAvatarGrant(auth,generation).catch(error=>{log(error.message);return false});
+    if(!granted||companion||closing||generation!==accountGeneration||Date.parse(request.expiresAt)<=Date.now()){await complete(false).catch(()=>{});return;}
     const child=launch(process.execPath,[path.join(root,'desktop')],root,log,{
       MYSTICEGO_DOTNET:dotnet,MYSTICEGO_DESKTOP_API_URL:node.url,MYSTICEGO_DESKTOP_AUTH_URL:node.url,MYSTICEGO_DESKTOP_SCOPE:node.kind,MYSTICEGO_AVATAR_HANDOFF:'1'
     });
-    companion=child;
-    child.done.catch(error=>log(error.message)).finally(()=>{if(companion===child)companion=null});
+    companion=child;companionGrant='avatar-desktop';
+    child.done.catch(error=>log(error.message)).finally(()=>{if(companion===child){companion=null;companionGrant=null}});
     const started=await new Promise(resolve=>{
       let tail='';
       const finish=value=>{clearTimeout(timer);child.child.stdout.off('data',onData);child.child.off('close',onClose);resolve(value)};
@@ -386,8 +455,9 @@ async function open(){
   window.webContents.on('will-navigate',event=>event.preventDefault());
   const discovery=setInterval(()=>void followClub(),6000);
   const handoffs=setInterval(()=>void pollAvatarHandoff(),2500);
+  const accountChecks=setInterval(()=>void checkAccountSecurity(),10000);
   window.on('close',async event=>{
-    if(closing)return;event.preventDefault();closing=true;clearInterval(discovery);clearInterval(handoffs);closePanel();
+    if(closing)return;event.preventDefault();closing=true;clearInterval(discovery);clearInterval(handoffs);clearInterval(accountChecks);closePanel();
     if(recording)recording.child.stdin.end('\n');
     if(companion)companion.child.kill();
     await Promise.all([stop(),stopRunner(personalRunner)]);window.close();
