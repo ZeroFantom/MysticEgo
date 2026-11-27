@@ -13,6 +13,10 @@ bash MysticEgo-AuditDesktop-linux-x64.run
 
 .NET и Electron входят в комплект. Windows 10/11 x64: CloudDesk использует системный OpenSSH, если присутствуют все клиентские утилиты, иначе комплектный официальный portable OpenSSH (preview); GitHub CLI также входит в Windows-комплект. WSL не нужен. В Linux нужны GitHub CLI, OpenSSH, secret-tool и терминал Konsole, GNOME Terminal или x-terminal-emulator. Сам установщик не меняет hosts, SSH, DNS или серверы; приложение может запросить отдельную настройку при запуске. Функциональность на реальных VPS и физических Windows 10/11 требует отдельной проверки.
 
+## Интерактивная среда AgentDesktop и AuditDesktop
+
+В экспериментальной ветке [PR #72](https://github.com/ZeroFantom/MysticEgo/pull/72) запуск AgentDesktop/AuditDesktop ограничен Windows и полноценной графической сессией Linux X11; Wayland и XWayland не поддерживаются. В KDE выберите Plasma (X11) на экране входа. Это не ограничение headless-сервисов или CloudDesk. Локальный исполнитель MCP пока настраивается отдельно; упаковка в установщики и проверка на физических машинах остаются задачами перед релизом. См. [Computer Use](../../tools/MysticEgo.UiAutomation/README.md) и [VRM handoff](../../docs/local-desktop-handoff.md).
+
 ## Release CI
 Сначала собираются серверный архив и резервные ZIP, затем отдельные установщики. Linux payload проверяется при сборке; EXE собирается NSIS и проверяется сигнатура MZ. SHA256SUMS-desktop.txt публикуется вместе с релизом. Старые клиенты получают ZIP по ключам windows/linux, новые — индивидуальные ключи audit-windows и т. п.
 
