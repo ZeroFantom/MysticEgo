@@ -70,6 +70,22 @@ public sealed class InternalWorkspace(NodeState state,GitHubWorkspace github)
         finally{gate.Release();}
     }
 
+    /// <summary>Recover a lost publication response by verifying the stable marker in an existing GitHub item.</summary>
+    public async Task<InternalWorkItem> Reconcile(Guid id,int number,string login,CancellationToken ct)
+    {
+        if(number<=0)throw new ArgumentException("invalid_item");
+        await gate.WaitAsync(ct);
+        try
+        {
+            var item=await Find(id,ct);
+            if(item.Publication!="pending"||!await github.HasPublicationMarker(item.Kind,number,id,ct))
+                throw new WorkspaceProviderException(409,"publication_marker_not_verified");
+            item.Publication="published";item.GitHubNumber=number;item.UpdatedAt=DateTimeOffset.UtcNow;
+            await state.Data.PutAsync(item,ct);state.Log(login,"workspace.internal.reconcile",id.ToString(),true);return item;
+        }
+        finally{gate.Release();}
+    }
+
     public async Task<InternalWorkItem> Publish(Guid id,string? category,Guid actor,string login,bool owner,CancellationToken ct)
     {
         await gate.WaitAsync(ct);
@@ -78,11 +94,13 @@ public sealed class InternalWorkspace(NodeState state,GitHubWorkspace github)
             var item=await Find(id,ct);
             if(!owner&&item.CreatorId!=actor)throw new WorkspaceProviderException(403,"creator_or_owner_required");
             if(item.Publication!="local"||item.State!="open")throw new WorkspaceProviderException(409,"publication_locked");
+            if(!github.CanWrite)throw new WorkspaceProviderException(503,"github_write_disabled");
             // Do not publish internal comments, identities or assignees without a separate review.
             // The marker remains durable if the upstream response is lost or the process dies.
             var body=item.Body+"\n\n<!-- mysticego-workspace:"+item.Id.ToString("D")+" -->";
             GitHubWorkspace.ValidateText(body,20000,false);
             if(item.Kind=="discussion"&&string.IsNullOrWhiteSpace(category))throw new ArgumentException("discussion_category_required");
+            if(item.Kind=="discussion"&&!(await github.Categories(ct)).Any(c=>c.Id==category))throw new ArgumentException("invalid_discussion_category");
             item.Publication="pending";item.UpdatedAt=DateTimeOffset.UtcNow;
             await state.Data.PutAsync(item,ct);
             var published=await github.Create(new(item.Kind,item.Title,body,category),login,ct);
