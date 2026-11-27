@@ -31,3 +31,23 @@ export function mountDesktopUpdate(host,api){
  void refresh();timer=setInterval(refresh,500);
  return ()=>{stopped=true;clearInterval(timer);card.remove()};
 }
+
+// The embedded web panel is a separate WebContentsView. Its launcher toolbar
+// stays accessible without giving the remote page updater IPC privileges.
+export function mountToolbarUpdate(button,api){
+ if(!button||!api)return ()=>{};
+ let stopped=false,working=false,current=null,polling=false;
+ async function refresh(){
+  if(stopped||polling)return;polling=true;
+  try{
+   const state=await api.status();if(stopped)return;current=state;
+   const p=state.phase,percent=state.total?Math.floor(state.bytes*100/state.total):0;
+   button.hidden=['idle','unsupported','checking'].includes(p);
+   button.textContent=({downloading:'Обновление · '+percent+'%',ready:'Установить обновление','restart-ready':'Перезапустить',installing:'Установка…',restarting:'Перезапуск…',error:'Повторить обновление'})[p]??'Обновление';
+   button.title=(state.tag??'')+(state.error?' · '+state.error:'')+(!state.canRestart?' · Дождитесь завершения операции':'');
+   button.disabled=working||!['ready','restart-ready','error'].includes(p)||p!=='error'&&!state.canRestart;
+  }catch{}finally{polling=false}
+ }
+ button.onclick=async()=>{if(working||!current)return;working=true;button.disabled=true;try{await api.action(current.phase==='error'?'check':current.phase==='restart-ready'?'restart':'install')}finally{working=false;void refresh()}};
+ void refresh();const timer=setInterval(refresh,500);return ()=>{stopped=true;clearInterval(timer)};
+}

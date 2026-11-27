@@ -5,6 +5,7 @@ export function renderReleaseHighlights(value,dismiss){
  if(!value?.tag||!value?.notes){card.hidden=true;return}
  if(card.dataset.tag!==value.tag){
   card.dataset.tag=value.tag;
+  const details=card.querySelector('details');if(details)details.open=false;
   card.querySelector('h2').textContent='Что нового · '+value.tag;
   card.querySelector('pre').textContent=value.notes;
   const close=card.querySelector('button');

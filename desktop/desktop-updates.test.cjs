@@ -112,3 +112,18 @@ test('automatic grace, retry and unsupported ZIP are explicit states',async()=>{
  await assert.rejects(c.action('arbitrary command'),/Unknown/);
  }finally{await fs.rm(folder,{recursive:true,force:true})}
 });
+
+test('cancelled restart preserves installed state and retries without reinstall',async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'update-cancel-'));
+ try{
+  const product='CloudDesk',root=path.join(dir,product,current);let installs=0,launches=0,cancelled=0;
+  const c=createUpdateController({app:{getPath:()=>dir,quit:()=>{}},root,product,platform:'linux',arch:'x64',window:()=>({isDestroyed:()=>false}),
+   fetcher:async()=>new Response(JSON.stringify([release(tag,[asset(product,'linux-x64.run')])])),
+   stageFile:async(c,folder)=>{await fs.mkdir(folder,{recursive:true});const file=path.join(folder,c.filename);await fs.writeFile(file,data);return file},
+   verifyFile:verified,installFile:async()=>{installs++;const target=path.join(dir,product,tag);await fs.mkdir(target,{recursive:true});await fs.writeFile(path.join(target,'launch.sh'),'ok')},
+   relaunch:()=>{launches++;return ()=>cancelled++}});
+  await c.check();await c.action('install');assert.equal(c.status().phase,'restarting');
+  c.cancelRestart(Error('operation still running'));assert.equal(c.status().phase,'restart-ready');assert.equal(cancelled,1);
+  await c.action('restart');assert.equal(installs,1);assert.equal(launches,2);
+ }finally{await fs.rm(dir,{recursive:true,force:true})}
+});

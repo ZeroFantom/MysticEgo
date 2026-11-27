@@ -88,7 +88,7 @@ app.whenReady().then(()=>{
 });app.on('window-all-closed',()=>app.quit());app.on('before-quit',event=>{
  if(quitReady)return;
  event.preventDefault();if(quitting)return;quitting=true;
- Promise.resolve(center?.close()).then(()=>{backend?.stdin.end();quitReady=true;app.quit();}).catch(error=>{quitting=false;dialog.showErrorBox('CloudDesk',error.message);});
+ Promise.resolve(center?.close()).then(()=>{backend?.stdin.end();quitReady=true;app.quit();}).catch(error=>{quitting=false;if(updatesController?.restarting())updatesController.cancelRestart(error);dialog.showErrorBox('CloudDesk',error.message);});
 });
 
 }

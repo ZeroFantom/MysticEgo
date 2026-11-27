@@ -128,7 +128,7 @@ function installation(root,product,platform){
 function launchAfterExit(app,target){
  const env={...process.env};
  for(const key of ['CLOUDDESK_BUNDLE_ROOT','CLOUDDESK_DOTNET','CLOUDDESK_ELECTRON','CLOUDDESK_RUNTIME_DIR','MYSTICEGO_DOTNET','ELECTRON_RUN_AS_NODE'])delete env[key];
- app.once('quit',()=>{
+ const start=()=>{
   let child;
   if(process.platform==='win32'){
    const quote=s=>"'"+s.replaceAll("'","''")+"'";
@@ -138,7 +138,9 @@ function launchAfterExit(app,target){
    child=spawn('/bin/bash',['-c','for i in {1..100}; do kill -0 "$1" 2>/dev/null || break; sleep 0.2; done; kill -0 "$1" 2>/dev/null && exit 1; exec "$2"','update',String(process.pid),path.join(target,'launch.sh')],{detached:true,stdio:'ignore',env});
   }
   child.on('error',e=>console.warn('Update restart:',e.message));child.unref();
- });
+ };
+ app.once('quit',start);
+ return ()=>app.removeListener('quit',start);
 }
 async function confirmUpdate({product,dialog,win,candidate}){
  if(!requiresConfirmation(product))return true;
@@ -152,8 +154,8 @@ function createUpdateController({app,root,product,platform=process.platform,arch
  const local=arch==='x64'?installation(root,product,platform):null;
  const folder=path.join(app.getPath('userData'),'verified-updates',product);
  let phase=local?'idle':'unsupported',candidate=null,file=null,target=null,bytes=0,error='',busy=false,restarting=false,autoAt=0,stopped=false;
- let installedTarget=false;
- const safe=()=>!stopped&&!restarting&&canRestart()&&!!window?.()&&!window().isDestroyed();
+ let installedTarget=false,cancelLaunch=null;
+ const safe=()=>{const win=window?.();return !stopped&&!restarting&&!!win&&!win.isDestroyed()&&canRestart()};
  const status=()=>({phase,installed:local?.installed??null,tag:candidate?.tag??null,notes:candidate?.notes??'',bytes,total:candidate?.size??0,error,canRestart:safe(),automatic:automaticProducts.has(product)});
  const fail=(e)=>{error=String(e?.message??e).slice(0,240);phase=installedTarget?'restart-ready':'error';autoAt=0;};
  async function check(){
@@ -178,10 +180,11 @@ function createUpdateController({app,root,product,platform=process.platform,arch
   try{
    const launcher=path.join(target,platform==='win32'?'launch.cmd':'launch.sh');
    if(!(await fs.lstat(launcher)).isFile())throw Error('New installation launcher missing');
+   if(!safe())return status();
    restarting=true;phase='restarting';error='';
-   relaunch(app,target);
+   cancelLaunch=relaunch(app,target);
    app.quit();
-  }catch(e){restarting=false;fail(e);}
+  }catch(e){cancelRestart(e);}
   return status();
  }
  async function apply(){
@@ -191,7 +194,7 @@ function createUpdateController({app,root,product,platform=process.platform,arch
   busy=true;phase='installing';error='';autoAt=0;
   try{
    if(!await verifyFile(file,candidate))throw Error('Installer verification failed');
-   if(!safe()){phase='ready';return status();}
+   if(!safe()){phase='ready';autoAt=automaticProducts.has(product)?now()+1000:0;return status();}
    await installFile(file);
    target=path.join(local.parent,candidate.tag);
    const launcher=path.join(target,platform==='win32'?'launch.cmd':'launch.sh');
@@ -214,7 +217,8 @@ function createUpdateController({app,root,product,platform=process.platform,arch
   if(stopped||busy||restarting)return;
   if(automaticProducts.has(product)&&safe()&&(installedTarget||phase==='ready'&&autoAt&&now()>=autoAt))await apply();
  }
- return {status,action,check,tick,restarting:()=>restarting,stop:()=>{stopped=true}};
+ function cancelRestart(reason){if(typeof cancelLaunch==='function')cancelLaunch();cancelLaunch=null;restarting=false;fail(reason);}
+ return {status,action,check,tick,restarting:()=>restarting,cancelRestart,stop:()=>{stopped=true}};
 }
 function registerUpdateIpc(ipcMain,window,controller){
  const check=e=>{const win=window?.();if(!win||win.isDestroyed()||e.sender!==win.webContents||e.senderFrame!==win.webContents.mainFrame)throw Error('IPC denied');};

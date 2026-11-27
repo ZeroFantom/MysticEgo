@@ -142,7 +142,7 @@ function App(){
   W({f,pending,state:'checking',stage:'identity',message:action==='ssh.cloudKey'?'Timeweb применяет публичный ключ…':action==='ssh.passwordKey'?'Вход и установка ключа…':'Проверяем защищённое SSH-подключение…'});
   let shown='identity',chain=Promise.resolve(),stageStarted=Date.now();
   const advance=stage=>{if(!['identity','access','ready'].includes(stage))return;chain=chain.then(async()=>{
-    if(gen!==wizardGen.current||stage===shown||stage==='identity'&&shown!=='identity')return;
+    if(gen!==wizardGen.current||['identity','access','ready'].indexOf(stage)<=['identity','access','ready'].indexOf(shown))return;
     await new Promise(resolve=>setTimeout(resolve,Math.max(0,320-(Date.now()-stageStarted))));
     if(gen!==wizardGen.current)return;shown=stage;stageStarted=Date.now();
     W(w=>w?{...w,stage,message:stage==='access'?'Отпечаток совпал. Проверяем доступ по SSH-ключу…':stage==='ready'?'SSH-доступ подтверждён. Подключение готово.':w.message}:w);
@@ -152,9 +152,9 @@ function App(){
    const r=await api.rpc(action,{...sshArgs(f),...extra,flowId:String(gen)});if(gen!==wizardGen.current)return;
    await chain;if(gen!==wizardGen.current)return;
    saveStatus(f,r);
-   if(r.state==='ready'){advance('ready');await chain;if(gen!==wizardGen.current)return;W(w=>({...w,state:'ready',stage:'ready',message:r.message}));await new Promise(resolve=>setTimeout(resolve,650));if(gen!==wizardGen.current)return;SE(x=>x+1);W(null);VF('');PW('');add('ok','SSH',`${targetKey(f)} · ключ принят`);if(pending)await run(pending.action,pending.args,pending.after);}
+   if(r.state==='ready'){advance('access');advance('ready');await chain;if(gen!==wizardGen.current)return;W(w=>({...w,state:'ready',stage:'ready',message:r.message}));await new Promise(resolve=>setTimeout(resolve,650));if(gen!==wizardGen.current)return;SE(x=>x+1);W(null);VF('');PW('');add('ok','SSH',`${targetKey(f)} · ключ принят`);if(pending)await run(pending.action,pending.args,pending.after);}
    else W({f,pending,...r,stage:r.state==='auth'?'access':['trust','changed','setup'].includes(r.state)?'identity':shown});
-  }catch(e){if(gen!==wizardGen.current)return;WE(friendly(e));W(w=>({...w,state:action==='ssh.cloudKey'||action==='ssh.passwordKey'?'auth':action==='ssh.trust'?(extra.replace==='REPLACE'?'changed':'trust'):'error',fingerprint:extra.displayFingerprint??w?.fingerprint??'',message:'Операция не завершена. Выбери способ подключения.'}));}
+  }catch(e){await chain;if(gen!==wizardGen.current)return;WE(friendly(e));W(w=>({...w,stage:action==='ssh.cloudKey'||action==='ssh.passwordKey'?'access':action==='ssh.trust'?'identity':shown,state:action==='ssh.cloudKey'||action==='ssh.passwordKey'?'auth':action==='ssh.trust'?(extra.replace==='REPLACE'?'changed':'trust'):'error',fingerprint:extra.displayFingerprint??w?.fingerprint??'',message:'Операция не завершена. Выбери способ подключения.'}));}
   finally{unsubscribe?.();wizardLock.current=false;WB(false);PW('');VF('');}
  }
  const beginSSH=(f,pending=null)=>wizardStep('ssh.prepare',f,pending);

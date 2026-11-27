@@ -1,10 +1,11 @@
-import {mountDesktopUpdate} from '../control/desktop-update-view.js';
+import {mountDesktopUpdate,mountToolbarUpdate} from '../control/desktop-update-view.js';
 import {renderReleaseHighlights} from '../control/release-highlights.js';
 import {initEffects} from '../control/effects.js';
 import {applyPresentation,captureStatic,fonts,languages,t} from '../control/presentation.js';
 const $=id=>document.getElementById(id);
 const api=window.station;
 mountDesktopUpdate($('desktop-update-root'),window.desktopUpdates);
+mountToolbarUpdate($('embedded-update'),window.desktopUpdates);
 let initialized=false,centralEdited=false,register=false;
 let documents=null;
 let documentRequest=0;
