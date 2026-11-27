@@ -100,7 +100,7 @@ export function ProfilePage(){
   const [quest,setQuest]=useState(''),[questAnswer,setQuestAnswer]=useState(''),[questStatus,setQuestStatus]=useState('');
   type QuestResult={passed:boolean;delta:number;grade:string;covered?:number;required?:number};
   const quests=useRemote(()=>api.request<{id:string;title:string;npc:string;prompt:string;experience:number;difficulty:number;stat:string;attempt?:QuestResult}[]>('/collective/shard/quests'),[api]);
-  if(!personal)return <><Header title="Мой профиль"/><ErrorBanner text={profileError}/>{!profileError&&<div className="empty">Загружаем профиль…</div>}</>;
+  if(!personal)return <><Header title="Мой профиль" action={<button className="btn secondary" onClick={reloadProfile}>Повторить загрузку</button>}/><ErrorBanner text={profileError?'Профиль: '+profileError:''}/>{!profileError&&<div className="empty">Загружаем профиль…</div>}</>;
   const {profile,game,stats,personality,progress}=personal;
   const questions=personality.questions??personality.axes.map(axis=>({id:axis.id,axis:axis.id,text:axis.question}));
   const portion=6,totalPages=Math.ceil(questions.length/portion);
