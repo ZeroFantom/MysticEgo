@@ -213,6 +213,7 @@ npm run test:social --prefix frontend
 | Раздел | Руководство |
 | :--- | :--- |
 | Оформление и анимации | [Appearance system](docs/appearance-system.md) |
+| Языки, шрифты, настройки аккаунта (эксперимент) | [Localization](docs/localization.md) |
 | Превью для Telegram и VK | [Social previews](docs/panel-social-motion.md) |
 | Чаты и профиль | [Коллектив: голосовые, ответы, редактирование, удаление и пересылка](docs/collective-chat.md) |
 | Аватары и стикеры | [Создание VRM / VRMA и стикеров](docs/avatar-creation.md) |
