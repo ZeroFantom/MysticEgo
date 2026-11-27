@@ -51,7 +51,21 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
 
     public sealed record MaintenancePlan(string Action,string Reason,UpdateStatus? Update,
         InfrastructureMaintenanceController.Component[] Components,ServerSample? Host,
-        ServiceLoadMonitor.Sample[] Services,DateTimeOffset CheckedAt,bool AutomaticEnabled,bool AutomaticAvailable);
+        ServiceLoadMonitor.Sample[] Services,DateTimeOffset CheckedAt,bool AutomaticEnabled,bool AutomaticAvailable,ReleaseRecovery? Recovery=null);
+    public sealed record ReleaseRecovery(string? Installed,Dictionary<string,Candidate[]> Options);
+    public sealed record RecoveryApproval(string Mode,string Installed,Candidate[] Releases,bool Confirmed,bool BackupConfirmed=false);
+    private static ReleaseRecovery? ReadReleaseRecovery(UpdateStatus? update)
+    {
+        try
+        {
+            var file=new FileInfo(StateDirectory+"/release-options.json");
+            if(!file.Exists||file.Length>32768||DateTime.UtcNow-file.LastWriteTimeUtc>TimeSpan.FromMinutes(3))return null;
+            var options=JsonSerializer.Deserialize<ReleaseRecovery>(System.IO.File.ReadAllText(file.FullName),Json);
+            return options?.Installed==update?.Current?options:null;
+        }
+        catch(Exception e) when(e is IOException or UnauthorizedAccessException or JsonException){return null;}
+    }
+
     public sealed record PlanApproval(string Action,bool Confirmed,string? Tag=null,string? Digest=null);
 
     /// <summary>Only authoritative fresh component failure or a newer published release permits a mutation.</summary>
@@ -82,13 +96,13 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
         {
             "busy"=>"Обслуживание или обновление уже выполняется.",
             "update"=>"Доступен подтверждённый новый релиз Orchestra.",
-            "repair"=>"Обнаружена неисправность службы обслуживания или её компонентов.",
+            "repair"=>"Обнаружена неисправность службы обслуживания или её компонентов."+(maintenance?.Reason is {Length:>0} detail?" "+detail:""),
             "healthy"=>"Все проверяемые службы готовы, обновление не требуется.",
             "unavailable"=>"Канал восстановления недоступен. Используйте доверенный CloudDesk.",
             _=>"Недостаточно актуальных данных. Ожидается проверка."
         };
         var components=report.Components.Concat(peers.Snapshot().Where(p=>p.Name!="orchestra").Select(p=>new InfrastructureMaintenanceController.Component(p.Name,p.State,"HTTP health observation",p.CheckedAt,p.Reason))).ToArray();
-        return new(action,reason,update,components,telemetry.History().LastOrDefault(),serviceLoads.Read(),now,AutoEnabled(),Directory.Exists(Inbox));
+        return new(action,reason,update,components,telemetry.History().LastOrDefault(),serviceLoads.Read(),now,AutoEnabled(),Directory.Exists(Inbox),ReadReleaseRecovery(update));
     }
 
     private static bool AutoEnabled()=>true;
@@ -122,6 +136,33 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
         };
     }
 
+    [HttpPost("recovery-cycle"),RequestSizeLimit(4096)]
+    public async Task<IActionResult> ExecuteRecovery(RecoveryApproval request,CancellationToken ct)
+    {
+        if(!team.IsOwner(User))return Forbid();
+        var plan=await BuildPlan(ct);
+        if(!request.Confirmed||request.Mode is not ("reinstall" or "cycle")||
+            (request.Mode=="cycle"&&!request.BackupConfirmed)||plan.Action=="busy"||
+            !Directory.Exists(Inbox)||plan.Recovery is not { } recovery||
+            recovery.Installed!=request.Installed||recovery.Options is null||
+            !recovery.Options.TryGetValue(request.Mode,out var expected)||expected.Length==0||
+            request.Releases is null||!expected.SequenceEqual(request.Releases))
+            return Conflict(new{error="План устарел, обслуживание занято или отсутствует подтверждение резервной копии и совместимости схемы."});
+        var path=Path.Combine(Inbox,"pending.json");
+        var temporary=Path.Combine(Inbox,Guid.NewGuid().ToString("N")+".tmp");
+        try
+        {
+            System.IO.File.WriteAllText(temporary,JsonSerializer.Serialize(new{
+                recovery=request.Mode,installed=recovery.Installed,releases=expected,backupConfirmed=request.BackupConfirmed
+            },Json));
+            try{System.IO.File.Move(temporary,path);}
+            catch(IOException) when(System.IO.File.Exists(path)){return Conflict(new{error="Обновление уже ожидает запуска."});}
+            state.Log(User.Identity?.Name??"developer","orchestra.update.recovery",request.Mode+" "+request.Installed,true);
+            return Accepted(new{accepted=true});
+        }
+        finally{System.IO.File.Delete(temporary);}
+    }
+
     [HttpGet("maintenance"), ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public IActionResult Recovery()
     {
@@ -147,7 +188,7 @@ public sealed class OrchestraUpdateController(NodeState state, DevelopmentTeam t
         var automatic = maintenance is not null && DateTimeOffset.UtcNow - maintenance.CheckedAt < TimeSpan.FromMinutes(5);
         if (!Directory.Exists(Inbox) || (independent is null && !automatic))
             return Conflict(new { error = "Привилегированный канал восстановления не подтверждён. Откройте CloudDesk → Обновление узлов → Восстановить службу обслуживания (без переустановки)." });
-        var path = Path.Combine(Inbox, independent is not null ? "maintenance-rescue.json" : "maintenance-repair.json");
+        var path = Path.Combine(Inbox, automatic ? "maintenance-repair.json" : "maintenance-rescue.json");
         var temporary = Path.Combine(Inbox, Guid.NewGuid().ToString("N") + ".tmp");
         try
         {
