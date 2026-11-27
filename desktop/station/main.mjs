@@ -25,6 +25,7 @@ const userData=path.join(home,'electron');
 mkdirSync(userData,{recursive:true,mode:0o700});
 app.setPath('userData',userData);
 app.setName(product);
+let updatesController;
 const highlights=updater.createReleaseHighlights({app,root,product});
 const runtime=path.join(root,'runtime','app','bin');
 const installer=path.join(runtime,'MysticEgo.Installer.dll');
@@ -430,10 +431,13 @@ async function pollAvatarHandoff(){
   }catch(error){log('VRM: '+error.message)}
   finally{handoffBusy=false;}
 }
+let activeOperations=0;
 function handle(name,action){
-  ipcMain.handle('station:'+name,(event,...args)=>{
+  ipcMain.handle('station:'+name,async(event,...args)=>{
     if(event.sender!==window.webContents||event.senderFrame?.url!==launcher)throw Error('Недопустимый источник запроса.');
-    return action(...args);
+    if(name==='snapshot'||name==='release-highlights-dismiss')return action(...args);
+    if(updatesController?.restarting())throw Error('Приложение перезапускается.');
+    activeOperations++;try{return await action(...args)}finally{activeOperations--}
   });
 }
 async function open(){
@@ -601,7 +605,7 @@ else{
   app.whenReady().then(async()=>{
     // Keep the launcher and updates available on all supported desktop environments.
     // The separate native executor enforces its own Windows/X11 restriction.
-    await open();updater.startDesktopUpdates({app,dialog,root,product,window:()=>window,canRestart:()=>!closing&&!recording&&!savingInvitation&&!discovering&&!openingAudit&&!handoffBusy&&!checkingAccount})}).catch(error=>{dialog.showErrorBox(product,error.message);app.quit()});
+    await open();updatesController=updater.startDesktopUpdates({app,root,product,window:()=>window,canRestart:()=>!closing&&!activeOperations&&!recording&&!savingInvitation&&!discovering&&!openingAudit&&!handoffBusy&&!checkingAccount});updater.registerUpdateIpc(ipcMain,()=>window,updatesController)}).catch(error=>{dialog.showErrorBox(product,error.message);app.quit()});
   app.on('window-all-closed',()=>app.quit());
 }
 

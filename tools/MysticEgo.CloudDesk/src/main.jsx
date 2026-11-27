@@ -1,4 +1,5 @@
 import {mountDesktopUpdate} from '../../../desktop/control/desktop-update-view.js';
+import '../../../desktop/control/desktop-update.css';
 import MaintenanceReports from './MaintenanceReports.jsx';
 import React,{useState,useEffect,useRef,useMemo} from 'react';
 import {createRoot} from 'react-dom/client';

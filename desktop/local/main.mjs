@@ -17,6 +17,7 @@ const view=pathToFileURL(path.join(here,'index.html')).href;
 mkdirSync(home,{recursive:true,mode:0o700});
 app.setName('LocalDesktop');
 app.setPath('userData',path.join(home,'electron'));
+let updatesController;
 const highlights=updater.createReleaseHighlights({app,root,product:'LocalDesktop'});
 
 const guid=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
@@ -96,6 +97,7 @@ function handle(name,action,mutating=true){
   ipcMain.handle('local:'+name,async(event,...args)=>{
     if(closing||event.sender!==window.webContents||event.senderFrame?.url!==view)throw Error('Запрос отклонён.');
     if(!mutating)return action(...args);
+    if(updatesController?.restarting())throw Error('Приложение перезапускается.');
     if(busy)throw Error('Дождитесь завершения текущей операции.');
     busy=true;
     try{return await action(...args)}finally{busy=false}
@@ -134,5 +136,5 @@ if(!app.requestSingleInstanceLock())app.quit();
 else{
   app.on('second-instance',()=>window?.focus());
   app.on('window-all-closed',()=>app.quit());
-  app.whenReady().then(async()=>{await open();updater.startDesktopUpdates({app,dialog,root,product:'LocalDesktop',window:()=>window,canRestart:()=>!closing&&!busy})}).catch(error=>{console.error(error);app.quit()});
+  app.whenReady().then(async()=>{await open();updatesController=updater.startDesktopUpdates({app,root,product:'LocalDesktop',window:()=>window,canRestart:()=>!closing&&!busy});updater.registerUpdateIpc(ipcMain,()=>window,updatesController)}).catch(error=>{console.error(error);app.quit()});
 }
