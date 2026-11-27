@@ -19,7 +19,7 @@ export function Capacity(){
  return <>
   <Header title="Capacity & resilience" description="Measured resources, model availability, backlog and advisory capacity budget."/>
   <ErrorBanner text={remote.error}/>
-  {!report?<p role="status">Waiting for telemetry…</p>:<>
+  {!report||!view?<p role="status">Waiting for telemetry…</p>:<>
    <Panel title="Current assessment" aside={<button className="btn secondary" onClick={remote.reload}>Refresh</button>}>
     <div className="infra-status-grid">
       <article className="infra-status-card"><small>Reporting nodes</small><h3>{report.freshNodes}</h3><p>Stale / missing: {report.staleNodes}</p></article>
