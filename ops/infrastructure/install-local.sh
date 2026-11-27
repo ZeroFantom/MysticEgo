@@ -14,6 +14,14 @@ if [[ "$here" == /opt/mysticego/app/ops/infrastructure && -f /usr/local/libexec/
   install -o root -g root -m 0644 "$source" "$stage"
   mv -T "$stage" /usr/local/libexec/mysticego/orchestra-updater.py
 fi
+# Install fixed post-exit accounting before reloading the service definitions.
+install -d -o root -g root -m 0755 /usr/local/libexec/mysticego /var/lib/mysticego-infrastructure-status/oneshot
+install -o root -g root -m 0644 "$here/record-oneshot.py" /usr/local/libexec/mysticego/record-oneshot.py
+if [[ "$here" == /opt/mysticego/app/ops/infrastructure && -f /etc/systemd/system/mysticego-orchestra-updater.service ]]; then
+  source="$here/../orchestra-updater/mysticego-orchestra-updater.service"
+  [[ -f "$source" && ! -L "$source" && $(stat -c %u "$source") == 0 && $(( 8#$(stat -c %a "$source") & 8#022 )) == 0 ]]
+  install -o root -g root -m 0644 "$source" /etc/systemd/system/mysticego-orchestra-updater.service
+fi
 target=/opt/mysticego-infrastructure/local
 install -d -m 0700 "$target"
 # Copy the complete service before enabling its endpoints.
@@ -69,6 +77,7 @@ CPUAccounting=yes
 MemoryAccounting=yes
 TasksAccounting=yes
 ExecStart=/usr/bin/python3 /opt/mysticego-infrastructure/local/reconcile.py
+ExecStopPost=-/usr/bin/python3 /usr/local/libexec/mysticego/record-oneshot.py mysticego-infrastructure-reconcile.service
 TimeoutStartSec=50min
 UMask=0077
 UNIT
