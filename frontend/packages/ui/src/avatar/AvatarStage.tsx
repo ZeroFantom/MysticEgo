@@ -43,6 +43,7 @@ export function AvatarStage({url,mime,motion='idle',mood='neutral',speech=0,vise
   const bones=new Map<string,{node:THREE.Object3D,rest:THREE.Quaternion}>();
   const movement=new THREE.Quaternion();const pose=new THREE.Euler();
   let leftArm=-1.04,rightArm=1.04;
+  const mouth={aa:0,ih:0,ou:0,ee:0,oh:0};
   function loadBones(model:VRM){
    for(const name of ['leftUpperArm','rightUpperArm','leftUpperLeg','rightUpperLeg','leftLowerLeg','rightLowerLeg','head','spine'] as const){
     const node=model.humanoid.getNormalizedBoneNode(name);if(node)bones.set(name,{node,rest:node.quaternion.clone()});
@@ -142,7 +143,12 @@ export function AvatarStage({url,mime,motion='idle',mood='neutral',speech=0,vise
     const face=vrm.expressionManager;
     if(face){
      for(const key of ['happy','sad','angry','surprised'])face.setValue(key,key===s.mood?0.75:0);
-     for(const vowel of ['aa','ih','ou','ee','oh'] as const)face.setValue(vowel,vowel===s.viseme?Math.max(0,Math.min(1,s.speech)):0);
+     for(const vowel of ['aa','ih','ou','ee','oh'] as const){
+      const target=vowel===s.viseme?Math.max(0,Math.min(1,s.speech)):0;
+      const response=1-Math.exp(-dt*(target>mouth[vowel]?23:15));
+      mouth[vowel]+=(target-mouth[vowel])*response;
+      face.setValue(vowel,mouth[vowel]);
+     }
      face.setValue('blink',Math.sin(t*1.7)>0.985?1:0);
     }
     vrm.update(dt);
