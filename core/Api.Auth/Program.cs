@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using System.Text.Json.Serialization;
 using Api.Auth.Middleware;
 using Models.Autorization.Extensions;
+using Models.Autorization.Security;
 
 namespace Api.Auth;
 
@@ -63,6 +64,7 @@ public static class Program
         });
 
         builder.Services.AddHealthChecks();
+        builder.Services.AddTrafficProtection(builder.Configuration);
         builder.Services.AddRateLimiter(options=>
         {
             options.RejectionStatusCode=429;

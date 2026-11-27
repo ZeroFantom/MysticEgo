@@ -233,3 +233,7 @@ MysticEgo развивается как инфраструктурный про�
 ### Хранение данных
 
 SQLite по умолчанию. Для новых узлов — PostgreSQL, локальный или удалённый, обычная установка или Docker. [Настройка и ограничения миграции](ops/infrastructure/README.md#sqlite-и-postgresql).
+
+### Traffic protection
+
+[Защита от перегрузки и DDoS: HTTP admission, прокси, ограничения и развёртывание](docs/traffic-protection.md).
