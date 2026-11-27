@@ -17,6 +17,7 @@ public sealed class TrafficProtectionOptions
     public int SensitivePerMinute { get; set; } = 30;
     public int ExpensivePerSecond { get; set; } = 60;
     public int ExpensiveClientPerSecond { get; set; } = 8;
+    public int ConcurrentSensitiveRequests { get; set; } = 12;
     public int ConcurrentRequests { get; set; } = 128;
     public int ConcurrentExpensiveRequests { get; set; } = 24;
     public int ConcurrentHubRequests { get; set; } = 1024;
@@ -75,7 +76,7 @@ public static class TrafficProtection
         var o=new TrafficProtectionOptions();
         config.GetSection("TrafficProtection").Bind(o);
         if(new[]{o.GlobalPerSecond,o.ClientPerSecond,o.SensitivePerMinute,o.ExpensivePerSecond,o.ExpensiveClientPerSecond,
-            o.ConcurrentRequests,o.ConcurrentExpensiveRequests,o.ConcurrentHubRequests}.Any(x=>x<1||x>100_000))
+            o.ConcurrentSensitiveRequests,o.ConcurrentRequests,o.ConcurrentExpensiveRequests,o.ConcurrentHubRequests}.Any(x=>x<1||x>100_000))
             throw new InvalidOperationException("Invalid TrafficProtection limits.");
         var trusted=o.TrustedProxies.Select(x=>IPAddress.TryParse(x,out var ip)?Normalize(ip):
             throw new InvalidOperationException("Invalid trusted proxy address.")).ToHashSet();
@@ -99,8 +100,8 @@ public static class TrafficProtection
                 PartitionedRateLimiter.Create<HttpContext,string>(ctx=>
                 {
                     var category=Category(ctx.Request.Path);
-                    return RateLimitPartition.GetConcurrencyLimiter(category is "hub" or "expensive"?category:"http",_=>new ConcurrencyLimiterOptions
-                    {PermitLimit=category=="hub"?o.ConcurrentHubRequests:category=="expensive"?o.ConcurrentExpensiveRequests:o.ConcurrentRequests,QueueLimit=0});
+                    return RateLimitPartition.GetConcurrencyLimiter(category is "hub" or "expensive" or "sensitive"?category:"http",_=>new ConcurrencyLimiterOptions
+                    {PermitLimit=category=="hub"?o.ConcurrentHubRequests:category=="expensive"?o.ConcurrentExpensiveRequests:category=="sensitive"?o.ConcurrentSensitiveRequests:o.ConcurrentRequests,QueueLimit=0});
                 }));
             options.OnRejected=async (context,ct)=>
             {
