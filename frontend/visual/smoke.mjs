@@ -258,6 +258,7 @@ try{
                   const action=workspace.getByRole('button',{name:'Обновить / восстановить'});
                   await visible(action);
                   assert(await action.isDisabled(),'Healthy service must not allow repair');
+                  assert.equal(await workspace.getByRole('checkbox',{name:'Автоматическое обновление Orchestra'}).count(),0);
                   fixture['/api/v1/orchestra/update/plan'].action='repair';
                   fixture['/api/v1/orchestra/update/plan'].reason='Обнаружена неисправность';
                   await page.reload({waitUntil:'domcontentloaded'});
@@ -287,6 +288,17 @@ try{
                   await switchAppearance(page,theme,style);await noHorizontalOverflow(page);
                   await capture(page,prefix+'-infra-'+section+'-'+theme+'-'+style);
                 }
+              }
+              for(const kind of ['macro','micro']){
+                await page.goto(origin+'/infrastructure/graphs/'+kind,{waitUntil:'domcontentloaded'});
+                const card=page.locator('.control-graph-node').first();
+                await visible(card);
+                const old=await card.evaluate(el=>parseFloat(el.style.left));
+                await card.focus();await card.press('ArrowRight');
+                await page.waitForFunction(({id,old})=>parseFloat(document.querySelector('.control-graph-node')?.style.left??'0')>old,{id:kind,old});
+                await page.getByRole('button',{name:'Сбросить расположение'}).click();
+                await noHorizontalOverflow(page);
+                await capture(page,prefix+'-'+kind+'-graph');
               }
               await page.goto(origin+'/infrastructure/self-tests',{waitUntil:'domcontentloaded'});
               await visible(page.getByText('database.connectivity · pass'));
