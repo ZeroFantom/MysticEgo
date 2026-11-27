@@ -30,7 +30,8 @@ function isVisible(element:HTMLElement){
 /** Only an existing, explicitly marked navigation link may be activated. */
 export async function visibleNavigation(path:string,allowed:()=>boolean){
   if(!routePattern.test(path)||!allowed()||document.visibilityState!=='visible')return false;
-  const link=navigationControls().find(a=>a.dataset.interfacePath===path);
+  const candidates=navigationControls().filter(a=>a.dataset.interfacePath===path);
+  const link=candidates.find(isVisible)??candidates[0];
   if(!link)return false;
   if(!isVisible(link)){
     const menu=document.querySelector<HTMLButtonElement>('button[data-interface-menu]');

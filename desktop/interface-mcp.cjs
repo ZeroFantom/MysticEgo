@@ -8,7 +8,7 @@ function installInterfaceMcp(win,product,port=0,options={}){
  let server,token='',expires=0,busy=false,epoch=0,enabled=false,timeout;
  const stop=()=>{enabled=false;epoch++;token='';clearTimeout(timeout);server?.close();server=undefined;};
  function live(){return enabled&&Date.now()<expires&&!win.isDestroyed()&&win.isVisible()&&!win.isMinimized();}
- const inspectScript=`(()=>Array.from(document.querySelectorAll('[data-interface-id]')).filter(e=>!e.disabled&&!e.closest('[hidden],[inert]')&&e.getClientRects().length).map(e=>({id:e.dataset.interfaceId,label:e.getAttribute('aria-label')||e.textContent.trim().slice(0,80),active:e.classList.contains('active')||e.getAttribute('aria-pressed')==='true'||e.parentElement?.open===true})))()`;
+ const inspectScript=`(()=>Array.from(document.querySelectorAll('[data-interface-id]')).filter(e=>!e.disabled&&!e.closest('[hidden],[inert]')&&getComputedStyle(e).visibility==='visible'&&e.getClientRects().length).map(e=>({id:e.dataset.interfaceId,label:e.getAttribute('aria-label')||e.textContent.trim().slice(0,80),active:e.classList.contains('active')||e.getAttribute('aria-pressed')==='true'||e.parentElement?.open===true})))()`;
  async function inspect(){if(!live())throw Error('Enable MCP in the visible application window.');return {product,targets:(await win.webContents.executeJavaScript(inspectScript)).filter(t=>safe.test(t.id)).slice(0,80)};}
  function tool(name,description,click=false,readOnly=!click){return {name,description,inputSchema:{type:'object',properties:click?{target:{type:'string',description:'Exact ID returned by desktop_inspect'}}:{},required:click?['target']:[],additionalProperties:false},annotations:{readOnlyHint:readOnly,destructiveHint:false}}}
  async function click(target){
@@ -16,7 +16,7 @@ function installInterfaceMcp(win,product,port=0,options={}){
   busy=true;const generation=epoch;
   try{
    if(!(await inspect()).targets.some(x=>x.id===target))throw Error('Target is not an enabled navigation control.');
-   const script=`(()=>{const e=Array.from(document.querySelectorAll('[data-interface-id]')).find(e=>e.dataset.interfaceId===${JSON.stringify(target)});if(!e||e.disabled||e.closest('[hidden],[inert]')||!e.getClientRects().length)return null;e.scrollIntoView({block:'center',behavior:'instant'});const r=e.getBoundingClientRect();const x=Math.round(r.left+r.width/2),y=Math.round(r.top+r.height/2);if(!e.contains(document.elementFromPoint(x,y)))return null;return {x,y}})()`;
+   const script=`(()=>{const e=Array.from(document.querySelectorAll('[data-interface-id]')).find(e=>e.dataset.interfaceId===${JSON.stringify(target)}&&!e.disabled&&!e.closest('[hidden],[inert]')&&getComputedStyle(e).visibility==='visible'&&e.getClientRects().length);if(!e)return null;e.scrollIntoView({block:'center',behavior:'instant'});const r=e.getBoundingClientRect();const x=Math.round(r.left+r.width/2),y=Math.round(r.top+r.height/2);if(!e.contains(document.elementFromPoint(x,y)))return null;return {x,y}})()`;
    win.focus();const point=await win.webContents.executeJavaScript(script);
    if(!point||!live()||generation!==epoch)throw Error('Target is not visible.');
    const {x,y}=point;
