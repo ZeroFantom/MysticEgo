@@ -6,6 +6,8 @@ export class UiAutomationService {
   #active = null;
   #tail = Promise.resolve();
   #stopping = false;
+  #recording = null;
+  #scenarios = new Map();
   constructor(config, engines = { chromium, electron }) {
     this.config = config;
     this.engines = engines;
@@ -14,7 +16,7 @@ export class UiAutomationService {
     if (this.#stopping) return Promise.reject(new Error('Executor stopped'));
     const job = this.#tail.then(() => {
       if (this.#stopping) throw new Error('Executor stopped');
-      return this.#dispatch(name, args);
+      return this.#execute(name, args);
     });
     this.#tail = job.catch(() => {});
     return job;
@@ -24,7 +26,50 @@ export class UiAutomationService {
     await this.#tail;
     await this.#close();
   }
+  async #execute(name, a) {
+    const session = this.#active;
+    if (name === 'ui_record_start' || name === 'ui_record_stop' || name === 'ui_replay') {
+      if (!session || session.id !== a.sessionId) throw new Error('No matching active session');
+      if (name === 'ui_record_start') {
+        if (this.#recording) throw new Error('Recording already active');
+        this.#recording = { sessionId: session.id, started: Date.now(), steps: [] };
+        return { recording: true };
+      }
+      if (name === 'ui_record_stop') {
+        if (!this.#recording) throw new Error('No active recording');
+        const { steps } = this.#recording;
+        this.#recording = null;
+        const scenarioId = randomUUID();
+        this.#scenarios.set(scenarioId, { sessionId: session.id, steps });
+        while (this.#scenarios.size > 20) this.#scenarios.delete(this.#scenarios.keys().next().value);
+        return { scenarioId, steps };
+      }
+      if (this.#recording) throw new Error('Stop recording before replay');
+      const scenario = this.#scenarios.get(a.scenarioId);
+      if (!scenario || scenario.sessionId !== session.id) throw new Error('Unknown scenario for this session');
+      for (const step of scenario.steps) {
+        if (this.#stopping) throw new Error('Executor stopped');
+        await new Promise(resolve => setTimeout(resolve, step.delayMs));
+        if (this.#stopping) throw new Error('Executor stopped');
+        await this.#dispatch(step.name, { ...step.args, sessionId: session.id });
+      }
+      return { replayed: scenario.steps.length };
+    }
+    const result = await this.#dispatch(name, a);
+    if (this.#recording && ['ui_click', 'ui_scroll', 'ui_assert_visible'].includes(name)) {
+      const r = this.#recording;
+      if (r.steps.length < 20) {
+        const now = Date.now();
+        const { sessionId, ...args } = a;
+        r.steps.push({ name, args, delayMs: Math.min(2000, now - r.started) });
+        r.started = now;
+      }
+    }
+    return result;
+  }
   async #close() {
+    this.#recording = null;
+    this.#scenarios.clear();
     const previous = this.#active;
     this.#active = null;
     if (previous) await previous.owner.close();
