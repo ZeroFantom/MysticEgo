@@ -62,14 +62,23 @@ def repair(name, test, action, message):
         publish(name, "degraded", "Восстановление не завершилось. Проверьте журнал службы.")
 
 def lm_ready():
-    data = probe("http://127.0.0.1:1234/v1/models")
-    return isinstance(data, dict) and bool(data.get("data"))
+    # A compatibility catalog can list downloaded but unloaded models.
+    native = probe("http://127.0.0.1:1234/api/v1/models")
+    if isinstance(native, dict) and isinstance(native.get("models"), list):
+        return any(model.get("type") == "llm" and model.get("loaded_instances")
+                   for model in native["models"] if isinstance(model, dict))
+    legacy = probe("http://127.0.0.1:1234/api/v0/models")
+    if isinstance(legacy, dict) and isinstance(legacy.get("data"), list):
+        return any(model.get("state") == "loaded" and model.get("type") in ("llm", "vlm")
+                   for model in legacy["data"] if isinstance(model, dict))
+    return False
 
 def lm_repair():
-    if (install.ROOT / "lmstudio/role").is_file():
+    profile = install.ROOT / "lmstudio/role"
+    if profile.is_file() and Path("/etc/systemd/system/mysticego-lmstudio.service").is_file():
         install.run("systemctl", "restart", "mysticego-lmstudio.service", timeout=320)
     else:
-        install.lmstudio({"role": "panel-data"})
+        install.lmstudio({"role": profile.read_text().strip() if profile.is_file() else "panel-data"})
 
 def postgres():
     method = install.ROOT / "postgres/method"
@@ -125,7 +134,7 @@ def cycle():
     elif active("mysticego-default-model.service"):
         publish("lmstudio", "repairing", "Первоначальная установка модели выполняется.")
     else:
-        repair("lmstudio", lm_ready, lm_repair, "Локальный API LM Studio вернул модель.")
+        repair("lmstudio", lm_ready, lm_repair, "LM Studio сообщает о загруженной модели.")
     if configured("MYSTICEGO_AUTO_VOICE=off", "VoiceTranscription__Endpoint="):
         publish("voice", "external", "Сохранена заданная конфигурация распознавания речи.")
     else:

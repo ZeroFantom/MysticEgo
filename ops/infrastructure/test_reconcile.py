@@ -7,6 +7,13 @@ class MaintenanceTests(unittest.TestCase):
         reconcile.attempts = {}
         reconcile.rows = {}
 
+    @patch.object(reconcile, "probe")
+    def test_downloaded_model_not_ready(self, probe):
+        probe.return_value = {"models": [{"type": "llm", "loaded_instances": []}]}
+        self.assertFalse(reconcile.lm_ready())
+        probe.return_value = {"models": [{"type": "llm", "loaded_instances": [{"id": "local-model"}]}]}
+        self.assertTrue(reconcile.lm_ready())
+
     @patch.object(reconcile, "publish")
     def test_healthy_never_runs_installer(self, publish):
         action = Mock()
