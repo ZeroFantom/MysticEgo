@@ -29,6 +29,7 @@ public static class NodeSecurity
             {
                 ValidateIssuer=true,ValidIssuer=issuer,ValidateAudience=true,ValidAudience=audience,
                 ValidateIssuerSigningKey=true,IssuerSigningKey=Models.Autorization.Security.JwtSigningKeys.VerificationKey(new Models.Autorization.Configuration.JwtOptions{PublicKeyPath=publicKeyPath,SecretKey=key}),
+                ValidAlgorithms=[string.IsNullOrWhiteSpace(publicKeyPath)?SecurityAlgorithms.HmacSha256:SecurityAlgorithms.RsaSha256],
                 ValidateLifetime=true,ClockSkew=TimeSpan.FromSeconds(15),
                 NameClaimType=ClaimTypes.Name,RoleClaimType=ClaimTypes.Role
             };
