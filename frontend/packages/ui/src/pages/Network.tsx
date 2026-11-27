@@ -1,3 +1,4 @@
+import {useLocale} from '../app/presentation';
 import {usePanelPreference} from '../app/panelPreferences';
 import {ControlGraph} from '../components/ControlGraph';
 import type {GraphNode,GraphEdge} from '../components/ControlGraph';
@@ -28,6 +29,7 @@ export function useNetwork(){
 }
 
 export function OrchestraOverview(){
+  const t=useLocale();
   const {mode}=useApp();
   const navigate=useNavigate();
   const {context,topology}=useNetwork();
@@ -39,34 +41,34 @@ export function OrchestraOverview(){
   return <>
     <DashboardHero title={mode==='orchestra'?'Оркестр MysticEgo':mode==='global'?'Обзор организации':'Обзор площадки'} eyebrow={mode==='orchestra'?'ORCHESTRA · ОБЗОР':mode.toUpperCase()+' · ОБЗОР'}
       description={mode==='orchestra'?'Организации, площадки и состояние сети в едином пространстве.':'Доступные организации и площадки сети MysticEgo.'}
-      status={<span role="status">{topology.error?'Обновление недоступно':topology.value?'Топология получена':'Загрузка топологии…'}</span>}
-      action={<><Link className="btn secondary" to="/nodes"><Network size={17}/> Схема сети</Link>{(context.value?.owner??context.value?.developer)&&<Link className="btn" to="/setup"><Plus size={17}/> Развернуть Global</Link>}</>}/>
+      status={<span role="status">{t(topology.error?'Обновление недоступно':topology.value?'Топология получена':'Загрузка топологии…')}</span>}
+      action={<><Link className="btn secondary" to="/nodes"><Network size={17}/> {t("Схема сети")}</Link>{(context.value?.owner??context.value?.developer)&&<Link className="btn" to="/setup"><Plus size={17}/> {t("Развернуть Global")}</Link>}</>}/>
     <ErrorBanner text={topology.error}/>
-    {topology.value&&topology.error&&<p className="monitor-empty">Показаны последние полученные данные; обновление не удалось.</p>}
+    {topology.value&&topology.error&&<p className="monitor-empty">{t("Показаны последние полученные данные; обновление не удалось.")}</p>}
     <div className="metrics summary-grid dashboard-metrics">
       {[{icon:Cloud,count:globals.length,label:'Организации Global'},{icon:UserRound,count:people,label:'Участники'},
         {icon:Building2,count:sites,label:'Площадки Local'},{icon:Activity,count:up,label:'Global в сети'}].map(tile=>
-        <article className="metric summary-metric" key={tile.label}><tile.icon size={20}/><strong>{topology.value?tile.count:topology.loading?'…':'—'}</strong><span>{tile.label}</span></article>)}
+        <article className="metric summary-metric" key={t(tile.label)}><tile.icon size={20}/><strong>{topology.value?tile.count:topology.loading?'…':'—'}</strong><span>{tile.label}</span></article>)}
     </div>
     <div className="dashboard-monitor-grid">
-      <Panel title="Топология сети" aside={<Link className="text-link" to="/nodes">Открыть <ArrowUpRight size={15}/></Link>}>
+      <Panel title="Топология сети" aside={<Link className="text-link" to="/nodes">{t("Открыть")} <ArrowUpRight size={15}/></Link>}>
         <div className="dashboard-network">{context.value&&topology.value?<TreeGraph compact root={context.value.rootId} selected="" choose={row=>navigate('/nodes?node='+encodeURIComponent(row.node.id))}
-          rows={[{node:{id:context.value.rootId,kind:'orchestra',name:context.value.rootName||'Оркестр',parentId:'',mode:'native',enabled:true},people:0,sites:0},...topology.value.filter(row=>row.node.id!==context.value!.rootId)]}/>:<p className="monitor-empty">{topology.error||context.error?'Топология недоступна':'Загружаем топологию…'}</p>}</div>
+          rows={[{node:{id:context.value.rootId,kind:'orchestra',name:context.value.rootName||'Оркестр',parentId:'',mode:'native',enabled:true},people:0,sites:0},...topology.value.filter(row=>row.node.id!==context.value!.rootId)]}/>:<p className="monitor-empty">{t(topology.error||context.error?'Топология недоступна':'Загружаем топологию…')}</p>}</div>
       </Panel>
       {mode==='orchestra'?<DashboardTelemetry/>:<Panel title="Состояние организаций">
-        <div className="dashboard-health-list">{globals.length?globals.map(row=><div className="line" key={row.node.id}><Cloud size={18}/><div className="grow"><strong>{row.node.name}</strong></div><Badge ok={online(row)} text={nodeLabel(row)}/></div>):<p className="monitor-empty">{topology.value?'Нет организаций':'Данные недоступны'}</p>}</div>
+        <div className="dashboard-health-list">{globals.length?globals.map(row=><div className="line" key={row.node.id}><Cloud size={18}/><div className="grow"><strong>{row.node.name}</strong></div><Badge ok={online(row)} text={nodeLabel(row)}/></div>):<p className="monitor-empty">{t(topology.value?'Нет организаций':'Данные недоступны')}</p>}</div>
       </Panel>}
     </div>
     <div className="overview-grid">
       <Panel title="Организации" aside={<span className="muted">{topology.value?globals.length:'—'} Global</span>}>
-        {!topology.value?<p className="monitor-empty">{topology.error?'Данные организаций недоступны':'Загружаем организации…'}</p>:globals.length===0?<div className="network-empty"><Cloud size={28}/><p>Здесь появятся созданные Global</p>
-          {(context.value?.owner??context.value?.developer)&&<Link to="/setup" className="btn secondary">Подготовить первую организацию</Link>}</div>:
-          <div className="table-wrap"><table><thead><tr><th>Название</th><th>Участники</th><th>Local</th><th>Состояние</th></tr></thead>
+        {!topology.value?<p className="monitor-empty">{t(topology.error?'Данные организаций недоступны':'Загружаем организации…')}</p>:globals.length===0?<div className="network-empty"><Cloud size={28}/><p>{t("Здесь появятся созданные Global")}</p>
+          {(context.value?.owner??context.value?.developer)&&<Link to="/setup" className="btn secondary">{t("Подготовить первую организацию")}</Link>}</div>:
+          <div className="table-wrap"><table><thead><tr><th>{t("Название")}</th><th>{t("Участники")}</th><th>Local</th><th>{t("Состояние")}</th></tr></thead>
             <tbody>{globals.map(row=><tr key={row.node.id}><td><Link className="text-link" to={'/nodes?node='+row.node.id}><Cloud size={15}/>{row.node.name}</Link></td>
               <td>{row.people}</td><td>{row.sites}</td><td><Badge ok={online(row)} text={nodeLabel(row)}/></td></tr>)}</tbody></table></div>}
       </Panel>
-      <Panel title="Участники и площадки" aside={<span className="chart-legend"><i/>Люди<i/>Local</span>}>
-        <div className="organization-chart">{!topology.value?<p className="monitor-empty">Нет доступных данных</p>:globals.length===0?<p className="footnote">Диаграмма появится после создания Global.</p>:
+      <Panel title="Участники и площадки" aside={<span className="chart-legend"><i/>{t("Люди")}<i/>Local</span>}>
+        <div className="organization-chart">{!topology.value?<p className="monitor-empty">{t("Нет доступных данных")}</p>:globals.length===0?<p className="footnote">{t("Диаграмма появится после создания Global.")}</p>:
           globals.map(row=><div key={row.node.id} className="organization-bar">
             <strong>{row.node.name}</strong><div><span style={{width:`${row.people/maximum*100}%`}}/><b>{row.people}</b></div>
             <div><span style={{width:`${row.sites/maximum*100}%`}}/><b>{row.sites}</b></div>

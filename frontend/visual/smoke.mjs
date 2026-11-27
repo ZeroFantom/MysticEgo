@@ -191,6 +191,23 @@ try{
             await visible(page.locator('.appearance-style-options'));
           });
           if(await page.locator('.appearance-style-options').isVisible()){
+            await check(page,prefix+'-privacy-and-language',async()=>{
+              const selector=page.locator('.presentation-settings-language select');
+              for(const [lang,heading] of [['en','Settings'],['zh-CN','设置'],['ko','설정'],['ru','Настройки']]){
+                await selector.selectOption(lang);
+                await page.waitForFunction(lang=>document.documentElement.lang===lang,lang);
+                await visible(page.getByRole('heading',{name:heading,exact:true}));
+                await noHorizontalOverflow(page);
+              }
+              assert.equal(await page.locator('.sidebar .browser-privacy-link').count(),1);
+              assert.equal(await page.locator('.sidebar .browser-privacy-link').evaluate(el=>getComputedStyle(el).position),'static');
+              if(viewport.width<=850)await page.getByRole('button',{name:'Открыть меню'}).click();
+              await page.locator('.sidebar .browser-privacy-link').click();
+              await visible(privacy);
+              await privacy.getByRole('button',{name:'Отмена',exact:true}).click();
+              await privacy.waitFor({state:'hidden'});
+              if(viewport.width<=850&&await page.getByRole('button',{name:'Закрыть меню'}).isVisible())await page.getByRole('button',{name:'Закрыть меню'}).click();
+            });
             for(const [theme,style] of combinations)await check(page,prefix+'-settings-'+theme+'-'+style,async()=>{
               await switchAppearance(page,theme,style);
               const previews=await page.locator('.appearance-art-preview').evaluateAll(items=>items.map(el=>{const r=el.getBoundingClientRect(),c=getComputedStyle(el);return {ratio:r.width/r.height,fit:c.backgroundSize,repeat:c.backgroundRepeat}}));

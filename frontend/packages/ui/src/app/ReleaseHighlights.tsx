@@ -2,6 +2,7 @@ import {useEffect,useRef,useState} from 'react';
 import {Sparkles, X, ArrowUpRight} from 'lucide-react';
 import {useLocale,usePresentation} from './presentation';
 import {useBrowserConsentReady} from './BrowserPreferences';
+import ReactMarkdown from 'react-markdown';
 import type {NodeMode} from '@mysticego/sdk';
 import './release-highlights.css';
 
@@ -45,7 +46,7 @@ export function ReleaseHighlights({mode,portal}:{mode:NodeMode;portal:boolean}){
  <header className="release-highlights-heading"><div className="release-emblem"><Sparkles size={28}/></div><button className="icon-btn release-dismiss" type="button" aria-label={t('Закрыть')} onClick={dismiss}><X size={22}/></button><span className="release-version">{build.tag}</span><h2 id="release-title">{t('Что нового')}</h2><p>{t('MysticEgo стал лучше. Узнайте, что изменилось в этой версии.')}</p></header>
  <div className="release-notes" tabIndex={0} aria-label={t('Изменения версии')}>
  {value.language!=='ru'&&<p className="release-original">{t('Описание релиза доступно на русском языке.')}</p>}
- <div lang="ru">{build.notes.split(/\r?\n/).filter(line=>line.trim()&&!/^#\s/.test(line)).map((line,i)=>line.startsWith('## ')?<h3 key={i}>{line.slice(3)}</h3>:line.startsWith('- ')?<div key={i} className="release-note-item"><span aria-hidden="true"/><p>{line.slice(2)}</p></div>:<p key={i}>{line}</p>)}</div>
+ <div lang="ru" className="release-markdown"><ReactMarkdown skipHtml components={{h1:()=>null,a:({children})=><span>{children}</span>,img:()=>null}}>{build.notes}</ReactMarkdown></div>
  </div>
  <footer className="release-footer"><span>{t('Спасибо, что используете MysticEgo.')}</span><button className="btn" type="button" onClick={dismiss}>{t('Ознакомился')}</button></footer>
  </dialog></>;

@@ -1,3 +1,4 @@
+import {useLocale,usePresentation} from '../app/presentation';
 import {Activity,ArrowUpRight,BrainCircuit,Container,Database,Mic,Radio,ServerCog,ShieldCheck,RefreshCw} from 'lucide-react';
 import {Link,NavLink} from 'react-router-dom';
 import {useState} from 'react';
@@ -19,18 +20,20 @@ const icons:Record<string,typeof Activity>={orchestra:ServerCog,docker:Container
 type Component=Maintenance['components'][number];
 
 function StatusCard({component,name}:{component?:Component;name:string}){
+  const t=useLocale(),{value}=usePresentation();
   const Icon=icons[name]??Activity;
   const status=component?.state??'checking';
   return <article className="infra-status-card" data-state={status}>
-    <div className="infra-card-top"><span className="infra-status-icon"><Icon size={23}/></span><span className="infra-state"><i/>{labels[status]??status}</span></div>
-    <h3>{names[name]??name}</h3>
-    <p>{component?.message??'Пока нет подтверждённого замера этого компонента.'}</p>
-    <small>{component?'Проверено '+new Date(component.checkedAt).toLocaleString('ru-RU'):'Ожидание отчёта сервера'}</small>
+    <div className="infra-card-top"><span className="infra-status-icon"><Icon size={23}/></span><span className="infra-state"><i/>{t(labels[status]??status)}</span></div>
+    <h3>{t(names[name]??name)}</h3>
+    <p>{t(component?.message??'Пока нет подтверждённого замера этого компонента.')}</p>
+    <small>{component?t('Проверено')+' '+new Date(component.checkedAt).toLocaleString(value.language):t('Ожидание отчёта сервера')}</small>
     <ReportDownload scope={name}/>
   </article>;
 }
 
 export function InfrastructureWorkspace({section}:{section:InfrastructureSection}){
+  const t=useLocale();
   const page=sections[section];
   const {api}=useApp();
   const state=useMaintenance();
@@ -40,21 +43,21 @@ export function InfrastructureWorkspace({section}:{section:InfrastructureSection
   const Icon=page.icon;
   return <div className="infra-workspace" data-infra-section={section}>
     <header className="infra-hero">
-      <div className="infra-hero-copy"><span className="infra-eyebrow">Orchestra / Инфраструктура / {page.number}</span><h1>{page.title}</h1><p>{page.description}</p></div>
+      <div className="infra-hero-copy"><span className="infra-eyebrow">Orchestra / {t('Инфраструктура')} / {page.number}</span><h1>{t(page.title)}</h1><p>{t(page.description)}</p></div>
       <Icon className="infra-hero-icon" size={72} strokeWidth={1} aria-hidden="true"/>
     </header>
-    <nav className="infra-tabs" aria-label="Разделы инфраструктуры">{(Object.keys(sections) as InfrastructureSection[]).map(id=>{const item=sections[id];return <NavLink key={id} to={'/infrastructure/'+id}><item.icon size={17}/>{item.title}</NavLink>})}</nav>
+    <nav className="infra-tabs" aria-label={t('Разделы инфраструктуры')}>{(Object.keys(sections) as InfrastructureSection[]).map(id=>{const item=sections[id];return <NavLink key={id} to={'/infrastructure/'+id}><item.icon size={17}/>{t(item.title)}</NavLink>})}</nav>
     <ErrorBanner text={state.error}/>
     {section==='services'&&<div className="infra-worker-banner" data-state={data?.installed&&!worker?'available':'checking'}>
-      <ShieldCheck size={24}/><div><strong>{data?.installed&&!worker?'Служба обслуживания передаёт данные':worker?'Служба требует внимания':'Состояние службы обслуживания'}</strong>
+      <ShieldCheck size={24}/><div><strong>{t(data?.installed&&!worker?'Служба обслуживания передаёт данные':worker?'Служба требует внимания':'Состояние службы обслуживания')}</strong>
         <p>{worker?.message??(data?.installed?'Отчёт получен '+(data.source==='host-socket'?'через локальный сокет':'из каталога VPS')+'.':data?workerMessage(data):'Проверяем доступность службы обслуживания…')}</p>
-      </div><button className="btn secondary" onClick={state.reload} disabled={state.loading}><RefreshCw size={15}/> Проверить</button>
+      </div><button className="btn secondary" onClick={state.reload} disabled={state.loading}><RefreshCw size={15}/> {t('Проверить')}</button>
     </div>}
     {!!page.components.length&&<div className="infra-status-grid">{page.components.filter(name=>name!=='worker'||!!worker).map(name=><StatusCard key={name} name={name} component={status.find(c=>c.name===name)}/>)}</div>}
     {section==='metrics'&&<div className="infra-status-grid"><article className="infra-status-card"><Radio size={24}/><h3>Prometheus</h3><p>Сбор метрик Orchestra. Локальный endpoint на VPS: порт 9090.</p></article><article className="infra-status-card"><Activity size={24}/><h3>Grafana</h3><p>Панели наблюдения. Локальный endpoint на VPS: порт 3000.</p></article></div>}
     {section==='services'&&<ServiceMaintenance/>}
     <div className="infra-actions-grid">
-      <InfrastructureSetup key={section} initial={page.initial} allowed={page.actions} title={page.actionTitle}/>
+      <InfrastructureSetup key={section} initial={page.initial} allowed={page.actions} title={t(page.actionTitle)}/>
       <Panel title={section==='services'?'Автоматическое обслуживание':section==='ai'?'Вычислительный контур':section==='database'?'Безопасность данных':'Просмотр диагностики'}>
         {section==='services'&&<p>Проверенные релизы устанавливаются автоматически. Состояние и отчёты доступны выше.</p>}
         {section==='ai'&&<><p>Распознавание речи устанавливается автоматически при достаточных ресурсах VPS. Явно настроенный внешний сервис сохраняется.</p><Link className="infra-link" to="/assistant?tab=models">Вычислительные узлы и тест модели <ArrowUpRight size={16}/></Link></>}
