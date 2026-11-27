@@ -32,9 +32,11 @@ public sealed class AccountSessionsController(AuthDbContext db) : BaseApiControl
     [HttpGet("current")]
     public IActionResult Current()
     {
-        if(!ValidAccount)return Unauthorized();
+        // Existing pre-upgrade JWTs stay valid until normal refresh or expiration.
+        // No legacy token may list or revoke sessions; only this status check is compatible.
+        if(!CurrentUserId.HasValue||User.HasClaim("token_use","device"))return Unauthorized();
         Response.Headers.CacheControl="no-store";
-        return Ok(new {id=SessionId,active=true});
+        return Ok(new {id=SessionId,active=true,legacy=SessionId is null});
     }
 
     [HttpPost("{id:guid}/revoke")]
