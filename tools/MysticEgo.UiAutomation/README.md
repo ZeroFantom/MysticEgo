@@ -89,3 +89,28 @@ node scenario-cli.mjs remove SCENARIO_UUID
 ```
 
 Save/remove require interactive confirmation. MCP clients have read-only access to the approved library through `ui_library_list` and `ui_library_load` for an already open, matching session; neither executes the scenario. Explicit `ui_replay` is still required. Maximum 100 files, 20 steps per scenario; the library is local, not synchronized. `ui_session_status` reports active Playwright session, recording/replay and configured native/library capabilities. It does not report native window attachment state. Local terminal stop requests shutdown; an in-flight operation may finish before cleanup. The graphical consent and launcher integration remain pending.
+
+
+## Поддерживаемые графические среды / Desktop settings
+
+AgentDesktop, AuditDesktop and the UI executor accept Windows or an explicit Linux X11 session only. XWayland is not X11 for this purpose. On Linux the session must report XDG_SESSION_TYPE=x11 and DISPLAY. Select Plasma (X11) at login; no Wayland fallback. This restriction is for interactive desktop apps, not headless infrastructure services.
+
+Optional local executor configuration (example):
+```json
+{
+  "origins": ["https://orchestra.isdarkline.ru"],
+  "apps": {},
+  "desktopSettings": {
+    "enabled": true,
+    "colorSchemes": ["BreezeLight", "BreezeDark"],
+    "plasmaThemes": ["default"],
+    "allowDesktopSwitch": false
+  }
+}
+```
+
+HTTP mode requires local DESKTOP consent, in addition to ALLOW; on Windows a separate SWITCH confirmation is required if desktop switching is configured. The owner must configure the trusted absolute Windows native helper as desktopSettings.windowsHelper. No desktop settings tools are executable through stdio without the local HTTP consent.
+
+KDE Plasma X11 uses installed kreadconfig6/5, kwriteconfig6/5, gdbus, plasma-apply-colorscheme and plasma-apply-desktoptheme utilities in /usr/bin. No arbitrary shell or D-Bus operation is exposed. Color schemes and Plasma styles must be explicitly approved in local configuration. Plasma styles may use their own colors; the system scheme is not a per-panel RGB override. Animation preference readback and virtual desktop count readback verify settings; actual visual effects require the compositor/application to respect them.
+
+Tools: desktop_capabilities, desktop_animations_get/set, desktop_colors_list/set, desktop_theme_list/set, desktop_count, desktop_create, desktop_colors_open. On Windows the latter opens the official Colors Settings page, it does not set an arbitrary taskbar color; desktop_create sends the documented Win+Ctrl+D shortcut, which can switch desktops and has no automated confirmation of creation. Windows animation setting uses the client-area animation preference. On KDE the desktop is appended through KWin D-Bus without changing the current desktop. No elevation or user credentials are requested. These adapters require Windows/KDE interactive validation before release; tests mock platform utilities.
