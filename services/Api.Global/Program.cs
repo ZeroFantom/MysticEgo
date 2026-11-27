@@ -15,6 +15,7 @@ builder.Services.AddSocial();
 builder.Services.AddControllers();
 builder.Services.AddVpnServices();
 var app=builder.Build();
+Models.Autorization.Security.WebSecurityHeaders.UseMysticWebSecurity(app);
 app.UsePanelSocialPreviews();
 app.UseDefaultFiles();
 app.UseStaticFiles();
