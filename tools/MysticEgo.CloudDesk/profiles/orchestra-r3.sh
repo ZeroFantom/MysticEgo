@@ -137,6 +137,7 @@ for ((i=0;i<60;i++)); do
     recovery=/opt/mysticego/app/ops/orchestra-updater/recover-maintenance.sh
     if [[ -f $recovery ]]; then
       node=$(curl -fsS --max-time 5 http://127.0.0.1:5500/health/live | python3 -c 'import json,sys;print(json.load(sys.stdin)["node"])')
+      if [[ "${MYSTICEGO_INSTALL_LOCK_FD:-}" == 9 ]]; then flock -u 9; fi
       bash "$recovery" "$node" || { echo 'Orchestra работает, но установка службы обслуживания не завершена. Используйте восстановление в CloudDesk.' >&2; exit 1; }
       echo "Orchestra ready: https://$domain/ (Audit: /audit-portal/)"
       exit 0

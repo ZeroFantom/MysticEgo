@@ -293,6 +293,9 @@ sealed partial class CloudDesk {
             case "deploy.maintenanceAuto": return await ConfigureMaintenanceAuto(a);
             case "deploy.maintenancePlan": return await ReadMaintenancePlan(a);
             case "deploy.executeMaintenance": return await ExecuteMaintenancePlan(a,progress ?? (_ => {}));
+            case "factory-reset.selftest": return FactoryResetSelftest();
+            case "deploy.resetPreview": return await PreviewFactoryReset(a);
+            case "deploy.factoryReset": return await ExecuteFactoryReset(a,progress ?? (_ => {}));
             case "deploy.inspectOrchestra": return await InspectOrchestra(a);
             case "deploy.restoreOrchestra": return await RestoreOrchestraUpdater(a,progress ?? (_ => {}));
             case "deploy.recoverMaintenance": return await RecoverOrchestraMaintenance(a,progress ?? (_ => {}));

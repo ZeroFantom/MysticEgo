@@ -10,6 +10,7 @@
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.14"/>
   </ItemGroup>
   <ItemGroup>
+    <None Include="../profiles/orchestra-reset.sh" Link="profiles/orchestra-reset.sh" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"/>
     <None Include="../profiles/orchestra-r3.sh" Link="profiles/orchestra-r3.sh" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"/>
   </ItemGroup>
 </Project>
