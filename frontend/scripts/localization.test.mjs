@@ -4,14 +4,14 @@ import {readFile} from 'node:fs/promises';
 import {catalog} from '../packages/ui/src/app/localeCatalog.ts';
 const desktop=await readFile(new URL('../../desktop/control/presentation.js',import.meta.url),'utf8');
 const nativeCatalog=JSON.parse(desktop.slice(desktop.indexOf('={')+1,desktop.indexOf(';\nexport const languages')));
-test('Every catalog entry has three nonempty translations plus Russian source',()=>{
+test('Every catalog entry has English, Chinese, Korean and a Russian source or explicit translation',()=>{
  for(const dictionary of [catalog,nativeCatalog])for(const [key,values] of Object.entries(dictionary)){
-  assert.ok(key.trim());assert.equal(values.length,3,key);
+  assert.ok(key.trim());assert.equal(values.length,key.startsWith('permission.')?4:3,key);
   assert.ok(values.every(value=>typeof value==='string'&&value.trim()),key);
  }
 });
 test('Web and desktop shared labels agree',()=>{
- for(const key of ['Язык','Шрифт','Настройки','Войти','Выйти','Тема','Палитра','Ассистент']){
+ for(const key of ['Язык','Шрифт','Настройки','Войти','Выйти','Тема','Палитра','Ассистент','permission.avatar-desktop','permission.screen-capture','permission.replay','permission.vendor-updates']){
   assert.deepEqual(catalog[key],nativeCatalog[key],key);
  }
 });
