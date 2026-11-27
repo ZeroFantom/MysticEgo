@@ -67,6 +67,13 @@ app.whenReady().then(()=>{
  ipcMain.handle('portal',e=>{check(e);return shell.openExternal('https://timeweb.cloud/my/api-keys');});
  ipcMain.handle('script',async e=>{check(e);const r=await dialog.showOpenDialog(win,{properties:['openFile'],filters:[{name:'Bash',extensions:['sh']}]});return r.canceled?'':r.filePaths[0];});
  win=new BrowserWindow({width:1320,height:900,minWidth:900,minHeight:650,backgroundColor:'#101016',icon:path.join(__dirname,'icon.png'),webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
+ const pairingPath=path.join(bundle,'desktop','browser-pairing.cjs');
+ if(fs.existsSync(pairingPath)){
+   const pairing=require(pairingPath);
+   pairing.installBrowserPairing({product:'CloudDesk',window:()=>win,
+     getSession:async()=>{const s=await request('browser.pairingStatus',{});return s.available?s:null;},
+     approve:async(session,challenge)=>(await request('browser.pairingApprove',{origin:session.origin,identity:session.identity,challenge})).code});
+ }
  win.on('close',event=>{if(!quitReady){event.preventDefault();app.quit();}});
  win.webContents.setWindowOpenHandler(()=>({action:'deny'}));win.webContents.on('will-navigate',e=>e.preventDefault());win.loadFile(path.join(root,'dist','index.html'));
 });app.on('window-all-closed',()=>app.quit());app.on('before-quit',event=>{
