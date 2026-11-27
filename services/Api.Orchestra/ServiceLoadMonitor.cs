@@ -44,25 +44,30 @@ public sealed class ServiceLoadMonitor : BackgroundService
                 var inactive=load=="loaded"&&active=="inactive"&&sub=="dead";
                 var nonProcess=unit.EndsWith(".timer",StringComparison.Ordinal)||unit.EndsWith(".socket",StringComparison.Ordinal)||unit.EndsWith(".path",StringComparison.Ordinal);
                 var measurement=nonProcess?"not-applicable":inactive?"idle":percentage.HasValue||memory.HasValue||tasks.HasValue?"live":"unavailable";
-                if(inactive&&!nonProcess){percentage=0;memory=0;tasks=0;}
+                if(inactive&&!nonProcess){if(tasks is null or 0)percentage=0;memory??=0;tasks??=0;}
                 if(nonProcess){percentage=null;memory=null;tasks=null;}
                 var start=Unsigned(Get("ExecMainStartTimestampMonotonic"));var end=Unsigned(Get("ExecMainExitTimestampMonotonic"));
                 var finished=inactive||active=="failed";
                 if(finished&&type=="oneshot"&&start>0&&end>=start)
                 {
                     var duration=(end-start)/1000;
-                    var stamp=DateTimeOffset.TryParse(Get("ExecMainExitTimestamp"),CultureInfo.InvariantCulture,DateTimeStyles.AssumeUniversal,out var parsed)?parsed:(DateTimeOffset?)null;
+                    var stamp=ParseSystemdTime(Get("ExecMainExitTimestamp"));
                     var total=Unsigned(Get("CPUUsageNSec"))/1_000_000;
                     var peak=Unsigned(Get("MemoryPeak"));
                     var prior=lastRuns.GetValueOrDefault(unit);
                     if(stamp!=null&&(prior?.LastFinishedAt!=stamp||total.HasValue||peak.HasValue))
-                        lastRuns[unit]=new(unit,at,null,null,null,load,active,sub,type,result,total??(prior?.LastFinishedAt==stamp?prior.LastCpuMilliseconds:null),peak??(prior?.LastFinishedAt==stamp?prior.LastPeakBytes:null),duration,stamp);
+                        lastRuns[unit]=new(unit,at,null,null,null,load,active,sub,type,result,total??(prior?.LastFinishedAt==stamp?prior?.LastCpuMilliseconds:null),peak??(prior?.LastFinishedAt==stamp?prior?.LastPeakBytes:null),duration,stamp);
                 }
                 var last=lastRuns.GetValueOrDefault(unit);
                 rows.Add(new(unit,at,percentage,memory,tasks,load,active,sub,type,result,last?.LastCpuMilliseconds,last?.LastPeakBytes,last?.LastDurationMilliseconds,last?.LastFinishedAt,measurement));
             }
             Volatile.Write(ref latest,rows.ToArray());
         }while(await timer.WaitForNextTickAsync(ct));
+    }
+    public static DateTimeOffset? ParseSystemdTime(string? raw)
+    {
+        if(raw is null)return null;
+        return DateTimeOffset.TryParseExact(raw,"ddd yyyy-MM-dd HH:mm:ss \'UTC\'",CultureInfo.InvariantCulture,DateTimeStyles.AssumeUniversal|DateTimeStyles.AdjustToUniversal,out var time)?time:null;
     }
     private static long? Unsigned(string? value)=>long.TryParse(value,NumberStyles.None,CultureInfo.InvariantCulture,out var number)&&number>=0?number:null;
     private static async Task<Dictionary<string,Dictionary<string,string>>> UnitStates(CancellationToken ct)
