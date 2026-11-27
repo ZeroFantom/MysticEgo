@@ -18,6 +18,11 @@ for(const role of Object.keys(roles)){
   assert.equal(inflateSync(png.subarray(41,41+length)).length,(1200*3+1)*630);
   assert(png.length<2_000_000);
 }
+const licensePage=panelHtml(template,'orchestra','license');
+assert(licensePage.includes('Лицензия MysticEgo'));
+assert(licensePage.includes('PolyForm Noncommercial 1.0.0'));
+assert(licensePage.includes('href="/license"'));
+assert(!licensePage.includes('content="noindex"'));
 assert.throws(()=>metadata('bad'));assert.throws(()=>metadata('global','studio'));assert.throws(()=>panelHtml('bad','audit'));
 for(const page of ['root','share']){
   const html=auditCaddyHtml(template,page).replaceAll('{{placeholder "http.vars.mystic_public_origin"}}','https://audit.example.test');
