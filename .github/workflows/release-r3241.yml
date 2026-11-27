@@ -28,6 +28,42 @@ jobs:
           node-version: '24'
       - name: Check platform prerequisites
         run: ssh -V
+      - name: Read-only production preview reachability (previous deployed version)
+        if: runner.os == 'Linux'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          site=https://orchestra.isdarkline.ru
+          page="$RUNNER_TEMP/live-social.html"
+          cover="$RUNNER_TEMP/live-social.png"
+          echo "Checking existing public site before release, not claiming deployment of this build."
+          for ua in 'Mozilla/5.0' 'TelegramBot (like TwitterBot)'; do
+            echo "User-Agent: $ua"
+            curl --silent --show-error --connect-timeout 5 --max-time 15 --proto '=https' -A "$ua" -o "$page" -w 'HTML HTTP %{http_code} MIME %{content_type} bytes %{size_download}\n' "$site/"
+            if [ "$?" = 0 ]; then
+              python3 - "$page" "$site" <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          import sys
+          class Tags(HTMLParser):
+              def __init__(self):
+                  super().__init__(); self.values={}
+              def handle_starttag(self, tag, attrs):
+                  a=dict(attrs)
+                  if tag=='meta' and a.get('property','').startswith('og:'):
+                      self.values[a['property']]=a.get('content','')
+          parser=Tags()
+          parser.feed(Path(sys.argv[1]).read_text(errors='replace'))
+          for key in ('og:title','og:description','og:image','og:url'):
+              print(key, 'present' if parser.values.get(key) else 'missing')
+          print('Configured public cover URL:',parser.values.get('og:image')==sys.argv[2]+'/og/orchestra.png')
+          PY
+            fi
+          done
+          curl --silent --show-error --connect-timeout 5 --max-time 15 --proto '=https' -A 'TelegramBot (like TwitterBot)' -o "$cover" -w 'PNG HTTP %{http_code} MIME %{content_type} bytes %{size_download}\n' "$site/og/orchestra.png"
+          if [ -f "$cover" ]; then python3 -c 'from pathlib import Path; import sys; print("PNG signature:",Path(sys.argv[1]).read_bytes()[:8].hex()=="89504e470d0a1a0a")' "$cover"; fi
+          exit 0
       - name: Publish backend and exercise local platform operations
         run: |
           dotnet publish tools/MysticEgo.CloudDesk/backend/CloudDesk.csproj -c Release -o platform-out
