@@ -15,6 +15,7 @@ public sealed class ServiceLoadMonitor : BackgroundService
         "mysticego-orchestra-updater.timer","mysticego-infrastructure-reconcile.timer","mysticego-local-setup.socket"];
     public sealed record Sample(string Unit,DateTimeOffset At,double? CpuPercent,long? MemoryBytes,long? Tasks,string? LoadState,string? ActiveState,string? SubState);
     private Sample[] latest=[];
+    public static bool KnownUnit(string unit)=>Units.Contains(unit,StringComparer.Ordinal);
     public Sample[] Read()=>Volatile.Read(ref latest);
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
