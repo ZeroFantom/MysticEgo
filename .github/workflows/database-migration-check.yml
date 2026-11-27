@@ -1,0 +1,42 @@
+name: Database migration integration
+on:
+  pull_request:
+    paths:
+      - 'core/Models.Data/**'
+      - 'services/MysticEgo.Distributed/**'
+      - 'tests/RelationalStorageSmoke/**'
+      - 'tools/MysticEgo.DatabaseMigration/**'
+      - '.github/workflows/database-migration-check.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  migration:
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ['16','17']
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_USER: migration
+          POSTGRES_PASSWORD: test_only_migration
+          POSTGRES_DB: migration_test
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U migration -d migration_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet build tools/MysticEgo.DatabaseMigration/MysticEgo.DatabaseMigration.csproj -c Release
+      - run: dotnet run --project tests/RelationalStorageSmoke/RelationalStorageSmoke.csproj -c Release
+        env:
+          MYSTICEGO_TEST_POSTGRES: Host=127.0.0.1;Port=${{ job.services.postgres.ports[5432] }};Database=migration_test;Username=migration;Password=test_only_migration;Timeout=5;SSL Mode=Disable
