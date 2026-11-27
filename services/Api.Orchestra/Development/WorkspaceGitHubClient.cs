@@ -12,7 +12,7 @@ public sealed class WorkspaceGitHubClient(IHttpClientFactory clients,IConfigurat
     public string? LinkedLogin(Guid actor) => config["DevelopmentGitHub:Members:"+actor.ToString("D")];
     public async Task<JsonNode> Rest(HttpMethod method,string route,object? body,CancellationToken ct)
     {
-        if(!System.Text.RegularExpressions.Regex.IsMatch(route,@"\Aissues(?:\?state=all&per_page=100&page=[1-9][0-9]*|/[1-9][0-9]*(?:/comments)?)?\z"))
+        if(!System.Text.RegularExpressions.Regex.IsMatch(route,@"\Aissues(?:\?state=all&per_page=100&page=[1-9][0-9]*|/[1-9][0-9]*(?:/comments(?:\?per_page=100&page=[1-3])?)?)?\z"))
             throw new ArgumentException("Unsupported GitHub route");
         return await Send(method,"https://api.github.com/repos/"+GitHubPanel.Repository+"/"+route,body,ct);
     }
