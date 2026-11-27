@@ -25,7 +25,7 @@ fi
 target=/opt/mysticego-infrastructure/local
 install -d -m 0700 "$target"
 # Copy the complete service before enabling its endpoints.
-for script in install.sh install.py local-runner.py reconcile.py install-voice.sh voice-server.py; do
+for script in install.sh install.py local-runner.py reconcile.py install-voice.sh voice-server.py record-oneshot.py; do
   stage=$(mktemp "$target/.$script.XXXXXXXX")
   install -o root -g root -m 0600 "$here/$script" "$stage"
   mv -T "$stage" "$target/$script"
