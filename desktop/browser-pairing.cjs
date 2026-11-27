@@ -35,7 +35,8 @@ function installBrowserPairing({product,window,getSession,approve}){
     if(req.method==='GET'&&req.url==='/availability'){finish(200,{available:true,product});return}
     if(req.method!=='POST'||req.url!=='/approve'||!/^application\/json(?:;|$)/i.test(req.headers['content-type']||'')||prompt||Date.now()-lastPrompt<10000){finish(409,{});return}
     const body=await readBody(req);
-    if(!valid.test(body?.challenge||'')){finish(400,{});return}
+    if(typeof body?.challenge!=='string'||!valid.test(body.challenge)){finish(400,{});return}
+    if(prompt||Date.now()-lastPrompt<10000){finish(409,{});return}
     prompt=true;lastPrompt=Date.now();
     try{
      const parent=window();if(!parent||parent.isDestroyed()){finish(409,{});return}
@@ -59,10 +60,9 @@ function installBrowserPairing({product,window,getSession,approve}){
   if(enabled)start();else stop();
  }
  const previous=Menu.getApplicationMenu();
- const entries=previous?.items?.map(item=>item)||[];
  // Native menu is intentionally visible so sharing can be disabled without a web request.
  const menu=Menu.buildFromTemplate([{label:'MysticEgo',submenu:[{label:'Предлагать вход в браузере',type:'checkbox',checked:enabled,click:item=>set(item.checked)},{role:'quit'}]}]);
- if(previous&&entries.length){previous.append(menu.items[0]);Menu.setApplicationMenu(previous)}else Menu.setApplicationMenu(menu);
+ if(previous?.items?.length){previous.append(menu.items[0]);Menu.setApplicationMenu(previous)}else Menu.setApplicationMenu(menu);
  const parent=window();parent?.setAutoHideMenuBar(false);parent?.setMenuBarVisibility(true);
  if(enabled)start();
  app.once('before-quit',stop);
