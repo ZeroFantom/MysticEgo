@@ -1,3 +1,4 @@
+import {useLocale} from '../app/presentation';
 import {useEffect} from 'react';
 import {ThemeToggle} from './Settings';
 import {CinematicPreview} from '../app/CinematicPreview';
@@ -94,6 +95,7 @@ export function LicenseLink({className}: {className?: string}) {
 }
 
 function PublicNavigation({page,scope}: {page: 'studio' | 'developer';scope:string}) {
+  const t=useLocale();
   useEffect(() => {
     const previous = document.title;
     document.title = page === 'studio' ? 'Студия MysticEgo' : 'Дмитрий Колыхалов · MysticEgo';
@@ -105,29 +107,31 @@ function PublicNavigation({page,scope}: {page: 'studio' | 'developer';scope:stri
   return <header className="studio-nav">
     <a className="studio-brand" href="/studio"><Box size={21} aria-hidden="true"/>MysticEgo</a>
     <nav aria-label="Страницы MysticEgo">
-      <a href="/studio" aria-current={page === 'studio' ? 'page' : undefined}>Студия</a>
-      <a href="/developer" aria-current={page === 'developer' ? 'page' : undefined}>Разработчик</a>
-      <a href="/license">Лицензия</a>
-      <a href="/">Вход в панель <ArrowUpRight size={15} aria-hidden="true"/></a><ThemeToggle scope={scope}/>
+      <a href="/studio" aria-current={page === 'studio' ? 'page' : undefined}>{t("Студия")}</a>
+      <a href="/developer" aria-current={page === 'developer' ? 'page' : undefined}>{t("Разработчик")}</a>
+      <a href="/license">{t("Лицензия")}</a>
+      <a href="/">{t("Вход в панель")} <ArrowUpRight size={15} aria-hidden="true"/></a><ThemeToggle scope={scope}/>
     </nav>
   </header>;
 }
 
 function PublicFooter() {
+  const t=useLocale();
   return <footer className="studio-footer">
-    <a href={repository}><Github size={17} aria-hidden="true"/>Исходный код</a>
-    <span>Лицензия кода <LicenseLink/></span>
+    <a href={repository}><Github size={17} aria-hidden="true"/>{t("Исходный код")}</a>
+    <span>{t("Лицензия кода")} <LicenseLink/></span>
   </footer>;
 }
 
 export function StudioPage({scope=''}:{scope?:string}={}) {
+  const t=useLocale();
   return <div className="studio-site studio-landing" data-landing="studio">
     <PublicNavigation page="studio" scope={scope}/>
     <main className="studio-content">
       <section className="studio-hero studio-hero-cover landing-hero" aria-labelledby="studio-title">
         <div className="landing-hero-copy">
           <p className="landing-kicker">MysticEgo / Независимая студия</p>
-          <h1 id="studio-title">Студия<br/>MysticEgo</h1>
+          <h1 id="studio-title">{t("Студия")}<br/>MysticEgo</h1>
           <p>Независимая разработка программного обеспечения, персональных ИИ-ассистентов и игровых систем. От управления целыми компьютерными площадками до живого цифрового персонажа, который помогает человеку, и мира, который помнит решения своих жителей.</p>
           <div className="studio-actions">
             <a className="studio-button primary" href="#join">Присоединиться к проекту <ArrowDownRight size={17} aria-hidden="true"/></a>
@@ -140,7 +144,7 @@ export function StudioPage({scope=''}:{scope?:string}={}) {
       </section>
 
       <section id="projects" className="studio-section landing-projects" aria-labelledby="studio-direction">
-        <h2 id="studio-direction">Над чем работаем</h2>
+        <h2 id="studio-direction">{t("Над чем работаем")}</h2>
         <div className="studio-grid two landing-project-grid">
           <article className="studio-card landing-project">
             <img className="landing-project-image" src={editorialImage} alt="Рабочие станции компьютерного клуба" loading="lazy" decoding="async"/>
@@ -149,7 +153,7 @@ export function StudioPage({scope=''}:{scope?:string}={}) {
             <Server size={24} aria-hidden="true"/>
             <h3>Инфраструктура MysticEgo</h3>
             <p>Orchestra, Global, Local и Agent связывают организации, площадки и рабочие станции. Audit предоставляет личное пространство и подключение к организациям. Приоритет — надёжность развёртывания, диагностики и обновлений.</p>
-            <a href={repository}>Исходный код <ArrowUpRight size={16} aria-hidden="true"/></a>
+            <a href={repository}>{t("Исходный код")} <ArrowUpRight size={16} aria-hidden="true"/></a>
             </div>
           </article>
           <article className="studio-card landing-project">
@@ -214,7 +218,7 @@ export function StudioPage({scope=''}:{scope?:string}={}) {
       <StudioEconomics/>
 
       <section id="join" className="studio-section" aria-labelledby="studio-recruitment">
-        <h2 id="studio-recruitment">Присоединиться к разработке</h2>
+        <h2 id="studio-recruitment">{t("Присоединиться к разработке")}</h2>
         <p>Ищем участников для задач проекта и раннего прототипирования.</p>
         <div className="studio-grid">
           {roles.map(role => <article className="studio-card" key={role.title}>
@@ -230,7 +234,7 @@ export function StudioPage({scope=''}:{scope?:string}={}) {
       </section>
 
       <section id="partners" className="studio-section" aria-labelledby="studio-partners">
-        <h2 id="studio-partners">Партнёрство и финансирование</h2>
+        <h2 id="studio-partners">{t("Партнёрство и финансирование")}</h2>
         <div className="studio-grid">
           {partnerships.map(item => <article className="studio-card" key={item.title}>
             <Building2 size={21} aria-hidden="true"/>
@@ -247,6 +251,7 @@ export function StudioPage({scope=''}:{scope?:string}={}) {
 }
 
 export function DeveloperPage({scope=''}:{scope?:string}={}) {
+  const t=useLocale();
   return <div className="studio-site studio-landing" data-landing="developer">
     <PublicNavigation page="developer" scope={scope}/>
     <main className="studio-content developer-content">
@@ -267,20 +272,20 @@ export function DeveloperPage({scope=''}:{scope?:string}={}) {
       <section id="developer-contact" className="studio-section landing-contact" aria-labelledby="contact-title">
         <div className="studio-section-heading">
           <p className="landing-kicker">Контакты / Стек</p>
-          <h2 id="contact-title">На связи</h2>
+          <h2 id="contact-title">{t("На связи")}</h2>
           <div className="developer-links">
             <a href="https://t.me/ZeroPhantomLie"><Send size={18} aria-hidden="true"/><span><strong>Telegram</strong><small>@ZeroPhantomLie</small></span><ArrowUpRight size={16} aria-hidden="true"/></a>
             <a href="https://vk.com/id154351348"><Users size={18} aria-hidden="true"/><span><strong>ВКонтакте</strong><small>Профиль</small></span><ArrowUpRight size={16} aria-hidden="true"/></a>
           </div>
         </div>
         <div className="landing-tech">
-          <h2>Технический стек</h2>
+          <h2>{t("Технический стек")}</h2>
           <ul className="studio-stack">{stack.map(tech => <li key={tech}>{tech}</li>)}</ul>
         </div>
       </section>
       <section id="experience" className="studio-section landing-band landing-experience">
         <p className="landing-kicker">Практика / Разработка</p>
-        <h2>Проекты и опыт</h2>
+        <h2>{t("Проекты и опыт")}</h2>
         <div className="studio-grid">
           <article className="studio-card">
             <Workflow size={24} aria-hidden="true"/>
@@ -305,7 +310,7 @@ export function DeveloperPage({scope=''}:{scope?:string}={}) {
         </div>
       </section>
       <section className="studio-section studio-ideas">
-        <h2>Идеи, которые хочу развивать</h2>
+        <h2>{t("Идеи, которые хочу развивать")}</h2>
         <p>Инфраструктура с прозрачными правами доступа, персональный ИИ как параллельный помощник пользователя и живые цифровые персонажи. В играх — самостоятельные жители, локальные события и последствия, которые сохраняются после выхода игрока.</p>
         <a href="/studio">Подробнее о проектах студии <ArrowUpRight size={16} aria-hidden="true"/></a>
       </section>
