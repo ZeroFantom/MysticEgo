@@ -5,6 +5,7 @@ on:
       - 'desktop/**'
       - 'tools/MysticEgo.CloudDesk/desktop/**'
       - 'ops/desktop-releases/**'
+      - 'frontend/visual/desktop-update-smoke.mjs'
       - '.github/workflows/desktop-anonymous-updates.yml'
   workflow_dispatch:
 permissions:
@@ -26,3 +27,8 @@ jobs:
       - run: node --check tools/MysticEgo.CloudDesk/desktop/main.cjs
       - if: runner.os == 'Linux'
         run: bash ops/desktop-releases/linux-installer-smoke.sh
+      - if: runner.os == 'Linux'
+        run: |
+          npm --prefix frontend/visual install --ignore-scripts --no-audit --no-package-lock
+          npm --prefix frontend/visual exec -- playwright install --with-deps chromium
+          node frontend/visual/desktop-update-smoke.mjs
