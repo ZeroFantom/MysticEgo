@@ -1,6 +1,7 @@
 import { chromium, _electron as electron } from 'playwright';
 import { randomUUID } from 'node:crypto';
 import { isAbsolute } from 'node:path';
+import { NativeWindowService } from './native.mjs';
 
 export class UiAutomationService {
   #active = null;
@@ -11,6 +12,7 @@ export class UiAutomationService {
   constructor(config, engines = { chromium, electron }) {
     this.config = config;
     this.engines = engines;
+    this.native = new NativeWindowService(config.native);
   }
   run(name, args) {
     if (this.#stopping) return Promise.reject(new Error('Executor stopped'));
@@ -24,9 +26,11 @@ export class UiAutomationService {
   async stop() {
     this.#stopping = true;
     await this.#tail;
+    this.native.close();
     await this.#close();
   }
   async #execute(name, a) {
+    if (name.startsWith('native_')) return this.native.run(name, a);
     const session = this.#active;
     if (name === 'ui_record_start' || name === 'ui_record_stop' || name === 'ui_replay') {
       if (!session || session.id !== a.sessionId) throw new Error('No matching active session');
