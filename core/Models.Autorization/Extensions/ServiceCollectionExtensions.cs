@@ -69,6 +69,16 @@ public static class ServiceCollectionExtensions
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(o =>
             {
+                o.Events = new JwtBearerEvents { OnTokenValidated = async context =>
+                {
+                    var principal=context.Principal;
+                    if(principal?.FindFirst("mystic_session") is not { } claim) return; // Legacy and device tokens retain existing policy.
+                    if(!Guid.TryParse(claim.Value,out var sid)||principal.GetUserId() is not Guid uid)
+                    { context.Fail("Invalid account session"); return; }
+                    var db=context.HttpContext.RequestServices.GetRequiredService<AuthDbContext>();
+                    if(!await db.RefreshTokens.AsNoTracking().AnyAsync(t=>t.SessionId==sid&&t.UserId==uid&&t.ExpiresAt>DateTime.UtcNow&&t.User!.IsActive,context.HttpContext.RequestAborted))
+                        context.Fail("Account session revoked or expired");
+                }};
                 o.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
@@ -142,6 +152,7 @@ public static class ServiceCollectionExtensions
               """;
         await db.Database.ExecuteSqlRawAsync(acceptanceDdl, ct);
 
+        await AccountSecuritySchema.UpgradeAsync(db,ct);
         await AuthSeeder.SeedAsync(db, opt, logger, ct);
 
         var discovery = sp.GetRequiredService<IToolDiscoveryService>();
