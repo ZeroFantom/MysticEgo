@@ -31,8 +31,8 @@ export class NodeApi {
       return body.trim()?JSON.parse(body) as T:undefined as T;
     }catch(error){ if(error instanceof DOMException && (error.name==='AbortError'||error.name==='TimeoutError'))throw new Error(timeoutMessage);throw error; }finally{clearTimeout(timer)}
   }
-  async diagnosticReport(format:'json'|'txt'|'xlsx'):Promise<Blob>{
-    const response=await fetch(this.baseUrl.replace(/\/$/,'')+'/api/v1/orchestra/diagnostics/report?format='+format,{
+  async diagnosticReport(format:'json'|'txt'|'xlsx',scope='all'):Promise<Blob>{
+    const response=await fetch(this.baseUrl.replace(/\/$/,'')+'/api/v1/orchestra/diagnostics/report?format='+format+'&scope='+encodeURIComponent(scope),{
       headers:{Authorization:'Bearer '+this.getToken()},cache:'no-store',signal:AbortSignal.timeout(25000)
     });
     if(!response.ok)throw new ApiError(response.status,'Не удалось сформировать отчёт (HTTP '+response.status+').');
