@@ -5,6 +5,8 @@ on:
       - 'core/Models.Autorization/**'
       - 'core/Api.Auth/**'
       - 'tests/AuthSmoke/**'
+      - 'services/MysticEgo.Distributed/AuthGateway.cs'
+      - 'services/MysticEgo.Distributed/DiagnosticMcp.cs'
       - '.github/workflows/auth-security.yml'
   push:
     branches: [main]
@@ -12,6 +14,8 @@ on:
       - 'core/Models.Autorization/**'
       - 'core/Api.Auth/**'
       - 'tests/AuthSmoke/**'
+      - 'services/MysticEgo.Distributed/AuthGateway.cs'
+      - 'services/MysticEgo.Distributed/DiagnosticMcp.cs'
       - '.github/workflows/auth-security.yml'
   workflow_dispatch:
 permissions:
@@ -26,4 +30,5 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - run: dotnet build core/Api.Auth/Api.Auth.csproj -c Release
+      - run: dotnet build services/MysticEgo.Distributed/MysticEgo.Distributed.csproj -c Release
       - run: dotnet run --project tests/AuthSmoke/AuthSmoke.csproj -c Release
