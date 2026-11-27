@@ -203,6 +203,7 @@ sealed partial class CloudDesk {
             case "github.status": return await GitProfile();
             case "github.release": return new {tag=Tag, asset=Asset, sha256=await GithubReleaseDigest()};
             case "github.selftest": return GithubSelftest();
+            case "update.candidate.selftest": return UpdateCandidateSelftest();
             case "platform.selftest": return await PlatformSelftest();
             case "github.enable": Init(); File.Delete(GitDisabled); return new { enabled=true };
             case "github.disconnect": Init(); await File.WriteAllTextAsync(GitDisabled,"1"); return new { connected=false };
