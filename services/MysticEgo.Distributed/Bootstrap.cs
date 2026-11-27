@@ -68,6 +68,7 @@ public static class Bootstrap
         _ = app.Services.GetRequiredService<NodeState>();
         app.UseCentralConnection(node);
         app.MapAuthGateway(node);
+        app.MapBrowserSessions(node);
         app.MapGet("/api/v1/public/runtime", () => new { authUrl = node.BrowserAuthUrl ?? node.AuthUrl, nodeId = node.NodeId })
             .AllowAnonymous();
         if(hub)app.MapHub<ClusterAgentHub>("/hub/agents").RequireAuthorization("device-agent");
