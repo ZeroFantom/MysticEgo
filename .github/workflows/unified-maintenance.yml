@@ -1,0 +1,49 @@
+name: Unified maintenance and self-tests
+on:
+  pull_request:
+    paths:
+      - 'services/Api.Orchestra/**'
+      - 'tools/MysticEgo.CloudDesk/**'
+      - 'tools/MysticEgo.Installer/**'
+      - 'ops/infrastructure/**'
+      - 'ops/orchestra-updater/**'
+      - 'frontend/**'
+      - 'tests/DiagnosticReportSmoke/**'
+      - '.github/workflows/unified-maintenance.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  maintenance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: python3 -m unittest discover -s ops/infrastructure -p 'test_*.py'
+      - run: python3 -m unittest discover -s ops/orchestra-updater -p 'test_*.py'
+      - run: bash -n ops/infrastructure/install.sh && bash -n ops/infrastructure/install-local.sh
+      - run: dotnet run --project tests/DiagnosticReportSmoke/DiagnosticReportSmoke.csproj -c Release
+      - run: dotnet build tools/MysticEgo.Installer/MysticEgo.Installer.csproj -c Release
+      - run: dotnet publish tools/MysticEgo.CloudDesk/backend/CloudDesk.csproj -c Release -o "${{ runner.temp }}/clouddesk"
+      - run: node ops/desktop-releases/clouddesk-smoke.mjs dotnet "${{ runner.temp }}/clouddesk/CloudDesk.dll"
+      - run: node --check tools/MysticEgo.CloudDesk/desktop/main.cjs
+      - run: npm ci --prefix frontend
+      - run: npm run build --prefix frontend
+      - run: npm install --prefix tools/MysticEgo.CloudDesk --ignore-scripts --no-audit --no-fund
+      - run: npm run build --prefix tools/MysticEgo.CloudDesk
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet build tools/MysticEgo.Installer/MysticEgo.Installer.csproj -c Release
+      - run: dotnet build tools/MysticEgo.CloudDesk/backend/CloudDesk.csproj -c Release
