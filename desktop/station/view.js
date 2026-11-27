@@ -99,13 +99,14 @@ async function loadRegistrationDocuments(){
   const request=++documentRequest;
   documents=null;
   $('registration-document-box').hidden=true;
-  $('accept-terms').checked=false;
+  $('accept-terms').checked=false;$('registration-scopes').replaceChildren();
   if(!register)return;
   await run(async()=>{
     const result=await api['registration-documents']($('central').value,$('portal-lan').checked);
     if(request!==documentRequest||!register)return;
     documents=result;
-    $('registration-document-box').hidden=!result.required;
+    for(const scope of result.scopes){const label=document.createElement('label'),check=document.createElement('input');check.type='checkbox';check.value=scope;label.append(check,document.createTextNode(t('permission.'+scope)));$('registration-scopes').append(label)}
+    $('registration-document-box').hidden=false;
   });
 }
 $('central').oninput=()=>{
@@ -118,7 +119,7 @@ $('central').onchange=$('portal-lan').onchange=()=>{
   centralEdited=true;
   void loadRegistrationDocuments();
 };
-for(const [button,kind] of [['terms-document','terms'],['privacy-document','privacy']]){
+for(const [button,kind] of [['terms-document','terms'],['privacy-document','privacy'],['license-document','license']]){
   $(button).onclick=()=>void run(()=>api['registration-document-open'](kind,$('central').value,$('portal-lan').checked));
 }
 $('register').onclick=()=>{
@@ -137,7 +138,7 @@ $('login-form').onsubmit=event=>{
       if(register&&documents?.required&&!$('accept-terms').checked)throw Error('Примите условия использования.');
       return await api.auth({login:$('login').value,password:$('password').value,register,nickname:$('nickname').value,
         central:$('central').value,lan:$('portal-lan').checked,
-        termsVersion:documents?.terms?.version,privacyVersion:documents?.privacy?.version});
+        termsVersion:documents?.terms?.version,privacyVersion:documents?.privacy?.version,licenseVersion:documents?.license?.version,permissionPolicyVersion:documents?.permissionPolicyVersion,enabledScopes:Array.from($('registration-scopes').querySelectorAll('input:checked'),el=>el.value)});
     }
     finally{$('password').value='';$('login-button').disabled=false}
   });
