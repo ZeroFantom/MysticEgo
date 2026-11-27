@@ -25,9 +25,10 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
  const [error,setError]=useState(''),[busy,setBusy]=useState(false),[register,setRegister]=useState(false),[reveal,setReveal]=useState(false);
  const [guest,setGuest]=useState(false);
  const [acceptance,setAcceptance]=useState('');
+ const [enabledScopes,setEnabledScopes]=useState<string[]>([]);
  const documents=useRemote(()=>register?readRegistrationDocuments(authUrl):Promise.resolve(null),[register,authUrl]);
  const policy=documents.value?.required?documents.value:null;
- const policyKey=policy?JSON.stringify([authUrl,policy.terms.version,policy.privacy.version]):'';
+ const policyKey=policy?JSON.stringify([authUrl,policy.terms.version,policy.privacy.version,policy.license.version,policy.permissionPolicyVersion]):'';
  const available=useRemote(async()=>{
   if(mode!=='agent')return false;
   try{const response=await fetch(session.url+'/api/v1/guest/availability');return response.ok&&(await response.json()).available===true}catch{return false}
@@ -35,7 +36,7 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
  const [title,subtitle]=labels[mode]??labels.audit;
  function selectMode(create:boolean){
   setRegister(create);
-  setAcceptance('');
+  setAcceptance('');setEnabledScopes([]);
   setReveal(false);
   setError('');
  }
@@ -45,7 +46,7 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
    if(register){
     if(!documents.value||documents.loading||documents.error||policyKey&&acceptance!==policyKey)
      throw Error('Сначала ознакомьтесь с документами регистрации.');
-    const response=await fetch(authUrl.replace(/\/$/,'')+'/api/auth/audit/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({login,password,nickname,termsVersion:policy?.terms.version,privacyVersion:policy?.privacy.version})});
+    const response=await fetch(authUrl.replace(/\/$/,'')+'/api/auth/audit/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({login,password,nickname,termsVersion:policy?.terms.version,privacyVersion:policy?.privacy.version,licenseVersion:policy?.license.version,permissionPolicyVersion:policy?.permissionPolicyVersion,enabledScopes})});
     if(!response.ok){const result=await response.json().catch(()=>({}));throw Error(result.error||'Регистрация недоступна, код '+response.status)}
    }
    const result=await signIn(authUrl,login,password);
@@ -93,6 +94,12 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
         <span>{t("Принимаю")} <a href={policy.terms.url} target="_blank" rel="noreferrer">{t("условия использования")}</a>.</span>
        </label>
        <a href={policy.privacy.url} target="_blank" rel="noreferrer">{t("Как обрабатываются данные")}</a>
+       <a href={policy.license.url} target="_blank" rel="noreferrer">{t("Лицензия")}</a>
+       <p>{t("Подтверждаю ознакомление с условиями, политикой обработки данных и лицензией.")}</p>
+       <fieldset><legend>{t("Разрешения ассистента")}</legend>
+        <p>{t("Выберите возможности. Разрешение конкретного устройства потребуется отдельно.")}</p>
+        {policy.scopes.map(scope=><label key={scope}><input type="checkbox" checked={enabledScopes.includes(scope)} onChange={e=>setEnabledScopes(old=>e.target.checked?[...old,scope]:old.filter(x=>x!==scope))}/>{t('permission.'+scope)}</label>)}
+       </fieldset>
      </div>}
      {register&&documents.loading&&<p className="footnote">{t("Загружаем документы регистрации…")}</p>}
      <ErrorBanner text={error||(register?documents.error:'')}/>
