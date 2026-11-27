@@ -125,7 +125,8 @@ namespace Models.Autorization.Data
             {
                 e.ToTable("refresh_tokens");
                 e.HasKey(x => x.Id);
-                e.Property(x => x.Token).HasMaxLength(500).IsRequired();
+                e.Property(x => x.Token).HasMaxLength(500).IsRequired().IsConcurrencyToken();
+                e.HasIndex(x => x.SessionId).IsUnique();
                 e.Property(x => x.CreatedByIp).HasMaxLength(64);
                 e.Property(x => x.UserAgent).HasMaxLength(500);
 
