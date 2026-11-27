@@ -141,6 +141,7 @@ try{
     try{
       for(const viewport of sizes){
         const context=await browser.newContext({viewport,locale:'ru-RU',timezoneId:'UTC',colorScheme:'dark',reducedMotion:'reduce'});
+        await context.addInitScript(()=>{Object.defineProperty(navigator,'userAgentData',{configurable:true,value:{brands:[{brand:'Google Chrome',version:'140'}]}})});
         const page=await context.newPage();page.setDefaultTimeout(8000);
         const errors=[];page.on('pageerror',e=>errors.push(String(e)));
         const prefix=role+'-'+viewport.width;
@@ -148,6 +149,11 @@ try{
           await isolate(page,origin);
           await page.goto(origin+'/settings',{waitUntil:'domcontentloaded'});
           await visible(page.locator('.auth-form-card'));
+          await visible(page.getByRole('region',{name:'Настройки приватности'}));
+          await page.getByRole('button',{name:'Только необходимые'}).click();
+          await page.reload({waitUntil:'domcontentloaded'});
+          await visible(page.locator('.auth-form-card'));
+          assert.equal(await page.getByRole('region',{name:'Настройки приватности'}).count(),0);
           for(const [theme,style] of combinations)await check(page,prefix+'-login-'+theme+'-'+style,async()=>{
             await switchAppearance(page,theme,style);await checkArtwork(page,theme,style,'.auth-visual',viewport.width<=780?'hero':'entry');
             const typography=await page.locator('.auth-visual :is(.auth-brand,.auth-role)').evaluateAll(items=>items.map(el=>{const c=getComputedStyle(el);return {bg:c.backgroundColor,border:c.borderTopWidth,padding:c.paddingTop,color:c.color}}));
@@ -241,7 +247,10 @@ try{
               '/api/v1/managed/infrastructure-setup':{localAvailable:true,targets:[]},
               '/api/v1/managed/infrastructure-maintenance':{installed:true,workerState:'reporting',source:'host-socket',socketAvailable:true,components:['orchestra','docker','lmstudio','voice','postgres-service','database'].map(name=>({name,state:'available',message:'Служба готова',checkedAt:now}))},
               '/api/v1/orchestra/update':{phase:'current',protocol:2,maintenance:{state:'ready',release:'v1.0.0-beta.7-r3.2.37',checkedAt:now}},
-              '/api/v1/orchestra/update/maintenance':{available:true,automatic:true,independent:{state:'ready',checkedAt:now}}
+              '/api/v1/orchestra/update/maintenance':{available:true,automatic:true,independent:{state:'ready',checkedAt:now}},
+              '/api/v1/orchestra/update/plan':{action:'healthy',reason:'Все проверяемые службы готовы',checkedAt:now,update:{current:'v1.0.0-beta.7-r3.2.38'},components:[],services:[]},
+              '/api/v1/orchestra/update/automatic':{enabled:false,available:true},
+              '/api/v1/orchestra/self-tests':{latest:{at:now,checks:[{name:'database.connectivity',category:'storage',result:'pass',reason:'Read-only probe',at:now}]},history:[]}
             };
             const handler=route=>route.fulfill({contentType:'application/json',body:JSON.stringify(fixture[new URL(route.request().url()).pathname])});
             for(const path of Object.keys(fixture))await page.route('**'+path,handler);
@@ -252,15 +261,28 @@ try{
                 const workspace=page.locator('.infra-workspace');
                 await visible(workspace);
                 if(section==='services'){
-                  await visible(workspace.getByRole('button',{name:'Восстановить службу обслуживания'}));
-                  const route='**/api/v1/orchestra/update/maintenance';
+                  const action=workspace.getByRole('button',{name:'Обновить / восстановить'});
+                  await visible(action);
+                  assert(await action.isDisabled(),'Healthy service must not allow repair');
+                  assert.equal(await workspace.getByRole('checkbox',{name:'Автоматическое обновление Orchestra'}).count(),0);
+                  fixture['/api/v1/orchestra/update/plan'].action='repair';
+                  fixture['/api/v1/orchestra/update/plan'].reason='Обнаружена неисправность';
+                  await page.reload({waitUntil:'domcontentloaded'});
+                  await visible(action);
+                  await action.waitFor({state:'visible'});
+                  const route='**/api/v1/orchestra/update/plan';
                   await page.route(route,r=>r.request().method()==='POST'?r.fulfill({contentType:'application/json',body:'{"accepted":true}'}):r.fallback());
                   try{
-                    const sent=page.waitForRequest(r=>r.url().endsWith('/orchestra/update/maintenance')&&r.method()==='POST');
-                    await workspace.getByRole('button',{name:'Восстановить службу обслуживания'}).click();
+                    const sent=page.waitForRequest(r=>r.url().endsWith('/orchestra/update/plan')&&r.method()==='POST');
+                    page.once('dialog',dialog=>dialog.accept());
+                    await action.click();
                     await sent;
-                    await visible(workspace.getByText('Запрос принят. Служба обновления автоматически проверит установку и восстановление.'));
-                  }finally{await page.unroute(route)}
+                    await visible(workspace.getByText('Запрос принят. Проверяем результат.'));
+                  }finally{
+                    await page.unroute(route);
+                    await page.route(route,handler);
+                    fixture['/api/v1/orchestra/update/plan'].action='healthy';
+                  }
                 }
                 const selector=workspace.getByLabel('Компонент',{exact:true});
                 await visible(selector);
@@ -273,6 +295,21 @@ try{
                   await capture(page,prefix+'-infra-'+section+'-'+theme+'-'+style);
                 }
               }
+              for(const kind of ['macro','micro']){
+                await page.goto(origin+'/infrastructure/graphs/'+kind,{waitUntil:'domcontentloaded'});
+                const card=page.locator('.control-graph-node').first();
+                await visible(card);
+                const old=await card.evaluate(el=>parseFloat(el.style.left));
+                await card.focus();await card.press('ArrowRight');
+                await page.waitForFunction(({id,old})=>parseFloat(document.querySelector('.control-graph-node')?.style.left??'0')>old,{id:kind,old});
+                await page.getByRole('button',{name:'Сбросить расположение'}).click();
+                await noHorizontalOverflow(page);
+                await capture(page,prefix+'-'+kind+'-graph');
+              }
+              await page.goto(origin+'/infrastructure/self-tests',{waitUntil:'domcontentloaded'});
+              await visible(page.getByText('database.connectivity · pass'));
+              await visible(page.getByRole('button',{name:'Отчёт автотестов'}));
+              await capture(page,prefix+'-self-tests');
               await page.goto(origin+'/diagnostics',{waitUntil:'domcontentloaded'});
               await visible(page.locator('.chart-line').first());
               assert.equal(await page.getByLabel('Компонент',{exact:true}).count(),0);

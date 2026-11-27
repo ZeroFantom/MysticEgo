@@ -54,3 +54,18 @@ var legacy=BCrypt.Net.BCrypt.HashPassword("legacy test password");
 if(!hasher.Verify("legacy test password",legacy)||hasher.Verify("wrong",legacy))
     throw new Exception("Legacy BCrypt compatibility regression");
 Console.WriteLine("Credential policy, Unicode and versioned hashing smoke checks passed");
+
+var grants=new Models.Autorization.Services.DesktopPairing();
+var instant=DateTimeOffset.UtcNow;
+var verifier=new string('b',64);
+var challenge=Models.Autorization.Services.DesktopPairing.Hash(verifier);
+var account=Guid.NewGuid();
+var code=grants.Create(account,"source-proof",challenge,instant)??throw new Exception("Pairing grant missing");
+if(grants.Consume(code,new string('c',64),instant)!=null)throw new Exception("Wrong verifier accepted");
+var accepted=grants.Consume(code,verifier,instant);
+if(accepted?.UserId!=account||accepted?.SourceHash!="source-proof")throw new Exception("Pairing grant not bound to source");
+if(grants.Consume(code,verifier,instant)!=null)throw new Exception("Pairing replay accepted");
+code=grants.Create(account,"source-proof",challenge,instant)!;
+if(grants.Consume(code,verifier,instant.AddSeconds(61))!=null)throw new Exception("Expired pairing accepted");
+if(grants.Create(account,"source-proof","bad",instant)!=null)throw new Exception("Invalid challenge accepted");
+Console.WriteLine("Desktop pairing proof, expiry and replay tests passed");

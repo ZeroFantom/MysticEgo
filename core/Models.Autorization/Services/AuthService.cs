@@ -17,19 +17,21 @@ public sealed class AuthService : IAuthService
     private readonly IJwtTokenService _jwt;
     private readonly AuthorizationOptions _opt;
     private readonly ILogger<AuthService> _log;
+    private readonly DesktopPairing _pairing;
 
     public AuthService(
         AuthDbContext db,
         IPasswordHasher hasher,
         IJwtTokenService jwt,
         AuthorizationOptions opt,
-        ILogger<AuthService> log)
+        ILogger<AuthService> log, DesktopPairing pairing)
     {
         _db = db;
         _hasher = hasher;
         _jwt = jwt;
         _opt = opt;
         _log = log;
+        _pairing = pairing;
     }
 
     public async Task<AuthResponse?> LoginAsync(
@@ -93,6 +95,26 @@ public sealed class AuthService : IAuthService
         _db.RefreshTokens.RemoveRange(tokens);
         await _db.SaveChangesAsync(ct);
         return tokens.Count;
+    }
+
+    public async Task<string?> ApproveDesktopAsync(string refreshToken,string challenge,CancellationToken ct)
+    {
+        if(string.IsNullOrWhiteSpace(refreshToken)||refreshToken.Length>4096||!DesktopPairing.ValidSecret(challenge))return null;
+        var hash=HashRefreshToken(refreshToken);
+        var stored=await _db.RefreshTokens.AsNoTracking().Include(t=>t.User).FirstOrDefaultAsync(t=>t.Token==hash,ct);
+        if(stored is null||stored.ExpiresAt<=DateTime.UtcNow||stored.User?.IsActive!=true)return null;
+        return _pairing.Create(stored.UserId,hash,challenge,DateTimeOffset.UtcNow);
+    }
+
+    public async Task<AuthResponse?> RedeemDesktopAsync(string code,string verifier,string? ip,string? userAgent,CancellationToken ct)
+    {
+        var grant=_pairing.Consume(code,verifier,DateTimeOffset.UtcNow);
+        if(grant is not { } g)return null;
+        var stored=await _db.RefreshTokens.Include(t=>t.User).ThenInclude(u=>u!.UserRoles).ThenInclude(ur=>ur.Role)
+            .FirstOrDefaultAsync(t=>t.Token==g.SourceHash&&t.UserId==g.UserId,ct);
+        if(stored is null||stored.ExpiresAt<=DateTime.UtcNow||stored.User?.IsActive!=true)return null;
+        _log.LogInformation("Desktop browser pairing redeemed: {UserId}",g.UserId);
+        return await BuildAuthResponseAsync(stored.User,ip,userAgent,ct);
     }
 
     private async Task<AuthResponse> BuildAuthResponseAsync(

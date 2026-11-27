@@ -1,4 +1,6 @@
-import {app,BrowserWindow,ipcMain,shell} from 'electron';
+import {app,BrowserWindow,ipcMain,shell,dialog} from 'electron';
+import pairing from '../browser-pairing.cjs';
+import updater from '../desktop-updates.cjs';
 import {launch,json} from '../control/center.mjs';
 import {getDotnet} from '../launch-runtime.mjs';
 import {mkdirSync} from 'node:fs';
@@ -73,7 +75,7 @@ async function connect({global,login,password}){
   if(!rows.some(({node})=>node.kind==='global'&&node.id===runtime.nodeId&&node.enabled))
     throw Error('Укажите зарегистрированный Global.');
   const sites=rows.map(row=>row.node).filter(node=>node.kind==='local'&&node.enabled&&node.mode==='native'&&node.parentId===runtime.nodeId);
-  connection={base,headers,sites};
+  connection={base,headers,sites,refreshToken:auth.refreshToken,expiresAt:Date.parse(auth.expiresAt),login:auth.user?.login||login};
   return sites.map(({id,name,publicUrl})=>({id,name,publicUrl}));
 }
 async function provision(id){
@@ -103,6 +105,9 @@ async function open(){
     webPreferences:{preload:path.join(here,'preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false}});
   window.webContents.setWindowOpenHandler(()=>({action:'deny'}));
   window.webContents.on('will-navigate',event=>event.preventDefault());
+  pairing.installBrowserPairing({product:'LocalDesktop',window:()=>window,
+    getSession:()=>connection?.refreshToken&&Date.now()<connection.expiresAt?{origin:connection.base,identity:connection.headers.Authorization,login:connection.login,refreshToken:connection.refreshToken}:null,
+    approve:pairing.approveSession});
   handle('connect',connect);
   handle('provision',provision);
   handle('status',async()=>{
@@ -124,5 +129,5 @@ if(!app.requestSingleInstanceLock())app.quit();
 else{
   app.on('second-instance',()=>window?.focus());
   app.on('window-all-closed',()=>app.quit());
-  app.whenReady().then(open).catch(error=>{console.error(error);app.quit()});
+  app.whenReady().then(async()=>{await open();updater.startDesktopUpdates({app,dialog,root,product:'LocalDesktop',window:()=>window})}).catch(error=>{console.error(error);app.quit()});
 }

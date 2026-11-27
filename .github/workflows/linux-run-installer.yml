@@ -1,0 +1,18 @@
+name: Linux RUN installer
+on:
+  pull_request:
+    paths:
+      - 'ops/desktop-releases/**'
+      - 'frontend/packages/ui/src/pages/DesktopDownloads.tsx'
+      - '.github/workflows/linux-run-installer.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux-run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash -n ops/desktop-releases/linux-installer.sh
+      - run: bash ops/desktop-releases/linux-installer-smoke.sh

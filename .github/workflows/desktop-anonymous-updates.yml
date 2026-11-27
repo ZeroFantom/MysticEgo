@@ -1,0 +1,28 @@
+name: Desktop anonymous updates
+on:
+  pull_request:
+    paths:
+      - 'desktop/**'
+      - 'tools/MysticEgo.CloudDesk/desktop/**'
+      - 'ops/desktop-releases/**'
+      - '.github/workflows/desktop-anonymous-updates.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  updater:
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node --test desktop/desktop-updates.test.cjs
+      - run: node --check desktop/station/main.mjs
+      - run: node --check desktop/local/main.mjs
+      - run: node --check tools/MysticEgo.CloudDesk/desktop/main.cjs
+      - if: runner.os == 'Linux'
+        run: bash ops/desktop-releases/linux-installer-smoke.sh
