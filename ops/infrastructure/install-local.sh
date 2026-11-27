@@ -2,7 +2,7 @@
 set -euo pipefail
 [[ $EUID == 0 ]]
 . /etc/os-release
-[[ $ID == ubuntu && $VERSION_ID == 24.04 ]] || { echo 'Локальный установщик поддерживает Ubuntu 24.04 LTS.'; exit 0; }
+[[ $ID == ubuntu && $VERSION_ID == 24.04 ]] || { echo 'Локальный установщик поддерживает Ubuntu 24.04 LTS.' >&2; exit 1; }
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 target=/opt/mysticego-infrastructure/local
 install -d -m 0700 "$target"
@@ -39,7 +39,7 @@ systemctl enable --now mysticego-local-setup.socket
 
 # Installed by the existing in-panel updater as well as CloudDesk.
 install -m 0600 "$here/reconcile.py" "$here/install-voice.sh" "$here/voice-server.py" "$target/"
-install -d -m 0755 /var/lib/mysticego-infrastructure-status
+install -d -o root -g root -m 0755 /var/lib/mysticego-infrastructure-status
 cat > /etc/systemd/system/mysticego-infrastructure-reconcile.service <<'UNIT'
 [Unit]
 Description=Reconcile local MysticEgo infrastructure
@@ -65,3 +65,5 @@ fi
 systemctl daemon-reload
 systemctl enable --now mysticego-infrastructure-reconcile.timer
 systemctl start --no-block mysticego-infrastructure-reconcile.service
+systemctl is-enabled --quiet mysticego-infrastructure-reconcile.timer
+echo 'Локальная служба обслуживания установлена; первый цикл запущен.'

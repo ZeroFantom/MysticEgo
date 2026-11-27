@@ -18,6 +18,7 @@ def serve(directory):
     runner = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(runner)
     runner.DIRECTORY = Path(directory)
+    runner.REPORT = Path(directory) / "report.json"
     import pwd
     pwd.getpwnam = lambda _: SimpleNamespace(pw_uid=os.getuid())
     runner.main()
@@ -28,11 +29,14 @@ def smoke():
         directory = Path(tmp)
         (directory / "install.sh").write_text('cd -- "$(dirname -- "$0")"; cat request.json')
         (directory / "install.py").touch()
+        report = {"components": [{"name": "docker", "state": "available", "message": "ready", "checkedAt": "2026-01-01T00:00:00Z"}]}
+        (directory / "report.json").write_text(json.dumps(report))
         path = str(directory / "test.sock")
         with socket.socket(socket.AF_UNIX) as listener:
             listener.bind(path)
             listener.listen()
             for line, expected in [
+                (b"maintenance-status\n", report),
                 (b"docker\n", {"component": "docker"}),
                 (b"postgres\n", {"component": "postgres"}),
                 (b"postgres-native\n", {"component": "postgres-native"}),
@@ -52,7 +56,9 @@ def smoke():
                         with client.makefile() as source:
                             reply = json.loads(source.readline())
                         assert reply["ok"] is (expected is not None)
-                        if expected:
+                        if line == b"maintenance-status\n":
+                            assert reply["report"] == expected
+                        elif expected:
                             assert json.loads(reply["message"]) == expected
                     finally:
                         assert child.wait(timeout=6) == 0

@@ -311,9 +311,9 @@ def apply(candidate, installed, targets, target):
                 script = APP / relative
                 if script.is_file():
                     try:
-                        print(command("bash", str(script), timeout=20), flush=True)
+                        print(command("bash", str(script), timeout=90), flush=True)
                     except (OSError, subprocess.SubprocessError):
-                        print(f"Could not run {relative}.", flush=True)
+                        print(f"Could not run {relative}; check journal and retry on the VPS.", flush=True)
         previous = PREVIOUS["audit" if target == "audit" else "orchestra"]
         shutil.rmtree(previous)
 

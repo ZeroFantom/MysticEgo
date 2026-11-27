@@ -114,13 +114,14 @@ def voice_repair():
 def cycle():
     global attempts, rows
     STATUS.mkdir(mode=0o755, parents=True, exist_ok=True)
+    STATUS.chmod(0o755) # systemd UMask=0077 must not hide the public status directory
     try:
         attempts = json.loads((STATUS / "attempts.json").read_text())
     except (OSError, ValueError):
         attempts = {}
     try:
         rows = {item["name"]: item for item in json.loads((STATUS / "status.json").read_text())["components"]}
-    except (OSError, ValueError, KeyError):
+    except (OSError, ValueError, KeyError, TypeError):
         rows = {}
     publish("orchestra", "available" if active("mysticego-orchestra.service") else "degraded", "Этот VPS Orchestra.")
     if configured("MYSTICEGO_AUTO_DOCKER=off"):

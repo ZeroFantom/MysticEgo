@@ -9,6 +9,7 @@ import tempfile
 from pathlib import Path
 
 DIRECTORY = Path(__file__).resolve().parent
+REPORT = Path('/var/lib/mysticego-infrastructure-status/status.json')
 
 
 def main():
@@ -22,6 +23,20 @@ def main():
             with connection.makefile("rb") as incoming:
                 request = incoming.readline(80)
         except OSError:
+            return
+        # Read-only host report also works for Orchestra inside a container:
+        # its existing Unix socket is mounted, but the host report directory is not.
+        if request == b"maintenance-status\n":
+            try:
+                if REPORT.stat().st_size > 32768:
+                    raise ValueError("report too large")
+                report = json.loads(REPORT.read_text())
+                if not isinstance(report.get("components"), list):
+                    raise ValueError("invalid report")
+                reply = {"ok": True, "report": report}
+            except (OSError, ValueError, AttributeError):
+                reply = {"ok": False, "message": "Отчёт на хосте ещё не создан."}
+            connection.sendall((json.dumps(reply, ensure_ascii=False) + "\n").encode())
             return
         jobs = {
             b"monitoring\n": {"component": "monitoring"},
