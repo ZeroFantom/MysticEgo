@@ -26,3 +26,19 @@ try
     Console.WriteLine("AuthSmoke passed (RSA JWT, scoped permission claims and BCrypt device secrets)");
 }
 finally {try{Directory.Delete(dir,true);}catch{}}
+
+
+// Account presentation patches must be limited to safe display values.
+static bool ValidPresentation(string json)
+{
+    using var doc = System.Text.Json.JsonDocument.Parse(json);
+    return Api.Auth.Controllers.AccountPresentationStore.Valid(doc.RootElement);
+}
+if (!ValidPresentation("""{"language":"ko","font":"editorial","theme":"dark","primary":"#aabbcc","intensity":50}""") ||
+    ValidPresentation("""{"language":"xx"}""") ||
+    ValidPresentation("""{"font":"url(https://example.invalid)"}""") ||
+    ValidPresentation("""{"primary":"red;display:none"}""") ||
+    ValidPresentation("""{"allow":true}""") ||
+    ValidPresentation("""{"language":"en","language":"ru"}"""))
+    throw new Exception("Account presentation validation failed");
+Console.WriteLine("Account presentation validation passed");
