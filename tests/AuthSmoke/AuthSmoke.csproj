@@ -7,5 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../core/Models.Autorization/Models.Autorization.csproj"/>
+    <ProjectReference Include="../../core/Api.Auth/Api.Auth.csproj"/>
   </ItemGroup>
 </Project>
