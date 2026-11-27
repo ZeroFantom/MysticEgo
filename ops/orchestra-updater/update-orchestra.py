@@ -106,7 +106,7 @@ def status(phase, installed, candidate=None, targets=(), message=None, last_targ
                              message=message, lastTarget=last_target))
 
 
-MAINTENANCE_FILES = ("install.sh", "install.py", "local-runner.py", "reconcile.py", "install-voice.sh", "voice-server.py")
+MAINTENANCE_FILES = ("install.sh", "install.py", "local-runner.py", "reconcile.py", "install-voice.sh", "voice-server.py", "record-oneshot.py")
 RESCUE_FILES = ("install-worker.sh","update-orchestra.py","mysticego-orchestra-updater.service","mysticego-orchestra-updater.timer",
                 "recover-maintenance.sh","rescue-request.py","mysticego-maintenance-rescue.path","mysticego-maintenance-rescue.service")
 MAINTENANCE_HOME = Path("/opt/mysticego-infrastructure/local")
