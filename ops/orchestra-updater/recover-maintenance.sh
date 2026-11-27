@@ -25,6 +25,11 @@ paths=["runtime/app/web/orchestra/release-info.json", "ops/orchestra-updater/ins
        "ops/orchestra-updater/update-orchestra.py", "ops/orchestra-updater/mysticego-orchestra-updater.service",
        "ops/orchestra-updater/mysticego-orchestra-updater.timer"]
 paths += ["ops/infrastructure/"+name for name in ("install-local.sh","install.sh","install.py","local-runner.py","reconcile.py","install-voice.sh","voice-server.py")]
+# R3.2.37 is recoverable with the CloudDesk script; newer releases also
+# include a separate fixed-command recovery service.
+extra=["ops/orchestra-updater/"+name for name in ("recover-maintenance.sh","rescue-request.py","mysticego-maintenance-rescue.path","mysticego-maintenance-rescue.service")]
+if any((root/name).exists() for name in extra):
+    paths += extra
 for name in paths:
     path=root/name
     for part in (path,*path.parents):

@@ -114,6 +114,10 @@ public sealed class DiagnosticReportController(DevelopmentTeam team, DatabaseMai
         if (InfrastructureSetupController.DiagnosticRun() is { } setup)
             metadata.Add(["lastSetup", SafeName(setup.Component) + ": " + SafeState(setup.Status)]);
         else metadata.Add(["lastSetup", "no-retained-run"]);
+        var rescue = OrchestraUpdateController.ReadRecovery();
+        metadata.Add(["independentRecoveryState", SafeState(rescue?.State)]);
+        metadata.Add(["independentRecoveryCheckedAt", rescue?.CheckedAt]);
+        metadata.Add(["independentRecoveryReason", SafeReason(rescue?.Reason)]);
         var samples = telemetry.History();
         var links = new List<object?[]>();
         // Sequential aliases intentionally avoid exporting device names, identifiers and addresses.

@@ -1,0 +1,8 @@
+[Unit]
+Description=Orchestra independent maintenance recovery
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/libexec/mysticego/maintenance-rescue.py
+TimeoutStartSec=9min
+UMask=0077
