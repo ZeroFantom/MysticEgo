@@ -251,3 +251,7 @@ button.studio-button { background: transparent; color: inherit; }
  .studio-landing .landing-space,.studio-landing .landing-space:nth-child(even){grid-template-columns:minmax(0,1fr)}
  .studio-landing .landing-space:nth-child(even) .landing-space-figure,.studio-landing .landing-space:nth-child(even) .landing-space-copy{grid-column:auto;grid-row:auto}
 }
+
+/* Five roles including Audit; retain existing narrow viewport layout. */
+@media (min-width:1100px){.studio-landing .studio-steps{grid-template-columns:repeat(5,minmax(0,1fr))}}
+.studio-landing .landing-project > .landing-project-copy:only-child{height:100%;align-content:center}
