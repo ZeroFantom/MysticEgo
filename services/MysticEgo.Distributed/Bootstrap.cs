@@ -14,6 +14,9 @@ public static class Bootstrap
         NodeSecurity.Validate(opt);
         builder.Services.AddSingleton(opt);
         builder.Services.AddSingleton<NodeState>();
+        builder.Services.AddSingleton<ServerTelemetry>();
+        builder.Services.AddHostedService(sp=>sp.GetRequiredService<ServerTelemetry>());
+        if(kind!=NodeKind.Orchestra)builder.Services.AddHostedService<CapacityPublisher>();
         builder.Services.AddNodeApiServices();
         builder.Services.TryAddSingleton<Models.Commands.Scanner.ICapabilityScanner, Models.Commands.Scanner.CapabilityScanner>();
         builder.Services.AddSingleton<CommandCatalog>();
