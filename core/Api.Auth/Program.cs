@@ -62,6 +62,7 @@ public static class Program
             });
         });
 
+        builder.Services.AddSingleton<Api.Auth.Controllers.AccountPresentationStore>();
         builder.Services.AddHealthChecks();
         builder.Services.AddRateLimiter(options=>
         {
