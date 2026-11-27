@@ -248,9 +248,11 @@ npm run test:monitoring --prefix frontend
 Браузерные регрессии после сборки:
 
 ```bash
-npm ci --prefix frontend/visual
-npx --prefix frontend/visual playwright install chromium
-npm test --prefix frontend/visual
+npm install --prefix frontend/visual
+cd frontend/visual
+npx playwright install chromium
+npm test
+cd ../..
 ```
 
 Проверки UI executor и API:
