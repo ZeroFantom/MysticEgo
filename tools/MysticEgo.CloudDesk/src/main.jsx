@@ -48,11 +48,7 @@ function App(){
     const link=document.createElement('a');link.href=url;link.download='MysticEgo-'+scope+'-'+new Date().toISOString().replace(/[:.]/g,'-')+'.'+maintenanceFormat;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }catch(e){setMaintenanceError(String(e.message||e))}finally{setMaintenanceExport(false)}
  }
- async function setMaintenanceAuto(){if(!installedTarget||!maintenancePlan?.automaticAvailable)return;const enabled=!maintenancePlan.automaticEnabled;
-  if(!confirm(enabled?'Включить установку новых проверенных beta-релизов Orchestra с возможным перезапуском?':'Отключить автоматические обновления?'))return;
-  try{const result=await api.rpc('deploy.maintenanceAuto',{domain:installedTarget.domain,node:installedTarget.node,enabled,confirm:'AUTO_UPDATE'});setMaintenancePlan(p=>p?{...p,automaticEnabled:result.enabled}:p)}
-  catch(e){setMaintenanceError(String(e.message||e))}
- }
+
  useEffect(()=>{setMaintenancePlan(null);if(tab!=='deploy'||!installedTarget||installedTarget.host!==form.host)return;let stop=false,timer;
   async function tick(){try{const plan=await api.rpc('deploy.maintenancePlan',{domain:installedTarget.domain,node:installedTarget.node});if(!stop)setMaintenancePlan(plan)}catch(e){if(!stop)setMaintenancePlan({action:'unknown',reason:String(e.message||e)})}finally{if(!stop)timer=setTimeout(tick,5000)}}
   void tick();return()=>{stop=true;clearTimeout(timer)};
@@ -226,7 +222,7 @@ function App(){
        if(!['update','repair','legacy-repair'].includes(action)||!confirm(action==='update'?'Установить '+candidate?.tag+'?':'Восстановить обслуживание? Данные сохранятся.'))return;
        runSSH('deploy.executeMaintenance',{...form,user:'root',domain:installedTarget.domain,node:installedTarget.node,serverId:installedTarget.serverId,planAction:action,candidateTag:candidate?.tag??'',candidateDigest:candidate?.digest??'',confirm:'MAINTENANCE_PLAN'});
      },'primary',wizBusy||!!busy||!['update','repair','legacy-repair'].includes(maintenancePlan?.action))}
-     {maintenancePlan?.automaticAvailable&&<label><input type="checkbox" checked={maintenancePlan.automaticEnabled===true} onChange={()=>void setMaintenanceAuto()}/> Автоматическое обновление Orchestra</label>}
+     {maintenancePlan?.automaticAvailable&&<p>Автоматическое обновление Orchestra: {maintenancePlan.automaticEnabled?'включено':'ожидается переход на обязательную политику'}</p>}
      {maintenancePlan&&!maintenancePlan.legacy&&<div className="actions"><select aria-label="Формат отчёта" value={maintenanceFormat} onChange={e=>setMaintenanceFormat(e.target.value)}><option value="xlsx">XLSX</option><option value="json">JSON</option><option value="txt">TXT</option></select>{button('Сводный отчёт',()=>void serviceReport('all'),'',maintenanceExport)}</div>}
      {maintenanceError&&<p className="warning">{maintenanceError}</p>}
      <div className="fields">{maintenancePlan?.components?.map(c=><div key={c.name}><b>{c.name}</b><p>{c.state} · {new Date(c.checkedAt).toLocaleTimeString()}</p>{!maintenancePlan.legacy&&button('Отчёт',()=>void serviceReport(c.name),'',maintenanceExport)}</div>)}</div>

@@ -105,10 +105,10 @@ class MaintenanceTests(unittest.TestCase):
         self.assertTrue(target.exists())
 
     @patch.object(updater, "system_ok", return_value=False)
-    def test_auto_opt_in_and_no_retry(self, system_ok):
+    def test_auto_default_and_no_retry(self, system_ok):
         candidate = {"tag": "v1.0.0-beta.7-r3.2.39"}
-        self.assertIsNone(updater.automatic_target(candidate, ["orchestra"], {}))
-        (self.inbox / "auto-update.json").write_text('{"enabled":true}')
+        self.assertEqual(updater.automatic_target(candidate, ["orchestra"], {}), "orchestra")
+        (self.inbox / "auto-update.json").write_text('{"enabled":false}')
         self.assertEqual(updater.automatic_target(candidate, ["orchestra"], {}), "orchestra")
         self.assertIsNone(updater.automatic_target(candidate, ["audit"], {}))
         self.assertIsNone(updater.automatic_target(candidate, ["orchestra"], {"candidate": candidate, "phase": "failed"}))
@@ -118,7 +118,7 @@ class MaintenanceTests(unittest.TestCase):
         target = self.state / "unsafe"
         target.write_text('{"enabled":true}')
         (self.inbox / "auto-update.json").symlink_to(target)
-        self.assertFalse(updater.automatic_enabled())
+        self.assertTrue(updater.automatic_enabled())
 
 if __name__ == "__main__":
     unittest.main()

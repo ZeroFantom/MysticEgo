@@ -32,3 +32,20 @@
 @media(max-width:1000px){.infra-actions-grid{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:600px){.infra-hero{min-height:140px}.infra-hero-icon{display:none}.infra-tabs a{flex:1 1 42%;justify-content:center;padding:9px}.infra-worker-banner{flex-wrap:wrap}.infra-worker-banner>div{flex:1 1 70%}.infra-worker-banner button{width:100%}}
 @media(prefers-reduced-motion:reduce){.infra-status-card{transition:none}.infra-status-card:hover{transform:none}}
+
+/* Full-width maintenance center; controls never collapse into adjacent cards. */
+.infra-service-center{display:grid;gap:24px;min-width:0;width:100%;align-items:start}
+.infra-service-center>h2{margin:8px 0 0;font-size:1.2rem}
+.infra-service-center .panel{display:flex;flex-direction:column;align-items:stretch;gap:14px;min-width:0;padding:20px}
+.infra-service-center .infra-status-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr));gap:20px}
+.infra-service-center .infra-status-card{gap:14px;min-height:180px;overflow-wrap:anywhere}
+.infra-report-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px;min-width:0}
+.infra-report-actions select{width:auto;min-width:86px;max-width:100%;flex:0 1 auto}
+.infra-report-actions .btn{min-width:0;white-space:normal;flex:1 1 135px}
+.infra-status-card .infra-report-actions{margin-top:auto}
+.infra-resource-values{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,100px),1fr));gap:8px}
+.infra-resource-values span{display:grid;gap:4px;padding:10px;border:1px solid var(--line);border-radius:10px;color:var(--subtle)}
+.infra-resource-values b{color:var(--ink);font-variant-numeric:tabular-nums}
+.infra-last-run{display:grid;gap:8px;border-top:1px solid var(--line);padding-top:12px}
+.infra-auto-policy{padding:10px 12px;border:1px solid var(--line);border-radius:10px}
+@media(max-width:600px){.infra-service-center{gap:16px}.infra-service-center .panel{padding:14px}.infra-service-center .infra-status-grid{gap:12px}}

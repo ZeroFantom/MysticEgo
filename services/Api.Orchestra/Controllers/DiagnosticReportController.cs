@@ -146,8 +146,8 @@ public sealed class DiagnosticReportController(DevelopmentTeam team, DatabaseMai
             new("Links", ["alias","kind","enabled","online","latencyMs","mbps","measuredUtc"], links.ToArray()),
             new("HostServices", ["unit","load","active","subState","result","exitStatus","restarts"], units)
         };
-        var load=new DiagnosticReport.Table("ServiceLoad",["unit","atUtc","cpuPercentOfHost","memoryBytes","tasks","loadState","activeState","subState"],
-            serviceLoads.Read().Select(s=>new object?[]{s.Unit,s.At,s.CpuPercent,s.MemoryBytes,s.Tasks,s.LoadState,s.ActiveState,s.SubState}).ToArray());
+        var load=new DiagnosticReport.Table("ServiceLoad",["unit","atUtc","cpuPercentOfHost","memoryBytes","tasks","loadState","activeState","subState","type","result","lastCpuMilliseconds","lastPeakBytes","lastDurationMilliseconds","lastFinishedAt","measurement","lastResult"],
+            serviceLoads.Read().Select(s=>new object?[]{s.Unit,s.At,s.CpuPercent,s.MemoryBytes,s.Tasks,s.LoadState,s.ActiveState,s.SubState,s.Type,s.Result,s.LastCpuMilliseconds,s.LastPeakBytes,s.LastDurationMilliseconds,s.LastFinishedAt,s.Measurement,s.LastResult}).ToArray());
         tables=[..tables,load];
         if(scope!="all")
         {
