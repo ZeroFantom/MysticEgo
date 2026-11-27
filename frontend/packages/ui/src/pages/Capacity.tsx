@@ -1,3 +1,4 @@
+import {useState} from 'react';
 import {useApp,useRemote} from '../app/context';
 import {Header,Panel,ErrorBanner} from '../components/primitives';
 import {ResourceChart} from './Diagnostics';
@@ -9,6 +10,9 @@ const number=(v?:number)=>v==null?'—':new Intl.NumberFormat(undefined,{maximum
 export function Capacity(){
  const {api}=useApp();
  const remote=useRemote(()=>api.request<View>('/orchestra/capacity'),[api],5000,true);
+ const reserve=useRemote(()=>api.request<{configured:boolean;eligible:boolean;reason:string}>('/orchestra/capacity/reserve'),[api],5000,true);
+ const [confirm,setConfirm]=useState(false),[busy,setBusy]=useState(false),[result,setResult]=useState('');
+ async function startReserve(){setBusy(true);setResult('');try{const reply=await api.request<{status:string}>('/orchestra/capacity/reserve/start',{method:'POST',body:JSON.stringify({confirmed:true})});setResult(reply.status+' — readiness not verified');}catch(e){setResult(String(e))}finally{setBusy(false);setConfirm(false);reserve.reload()}}
  const view=remote.value,report=view?.assessment;
  const end=report?Date.parse(report.at):Date.now(),start=end-15*60*1000;
  const money=(n?:number)=>n==null?'Unknown':number(n)+' '+report?.currency+'/month';
@@ -24,6 +28,12 @@ export function Capacity(){
     </div>
     <p>Updated {new Date(report.at).toLocaleString()}</p>
     {report.warnings.map(w=><p key={w} className="footnote">{w}</p>)}
+   </Panel>
+   <Panel title="Rapid response · Timeweb">
+    <p>{reserve.value?.reason??'Checking standby configuration'}</p><ErrorBanner text={reserve.error}/>
+    <button className="btn secondary" disabled={!reserve.value?.eligible||busy} onClick={()=>setConfirm(true)}>Start configured standby</button>
+    {confirm&&<div role="alert"><p>Start the pre-provisioned VPS? This may incur provider costs. It will not automatically join production traffic.</p><button className="btn" disabled={busy} onClick={()=>void startReserve()}>Confirm start</button> <button className="btn secondary" disabled={busy} onClick={()=>setConfirm(false)}>Cancel</button></div>}
+    {result&&<p role="status">{result}</p>}
    </Panel>
    <Panel title="Primary Orchestra · 15-minute history">
     <div className="two-col">
