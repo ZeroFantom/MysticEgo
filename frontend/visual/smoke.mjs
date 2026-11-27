@@ -235,6 +235,34 @@ try{
               await capture(page,prefix+'-'+route);
             });
           }
+          if(role==='orchestra')await check(page,prefix+'-visible-interface-mcp',async()=>{
+            await page.goto(origin+'/nodes');await visible(page.locator('.mystic-workspace'));
+            const id='12345678-1234-1234-1234-123456789abc',actionId='87654321-4321-4321-4321-cba987654321';
+            let observed=false,revoked=false;
+            const root='**/api/v1/interface-control/sessions';
+            await page.route(root,async r=>{
+              const frame=r.request().postDataJSON();
+              assert.ok(frame.targets.some(t=>t.path==='/'));
+              await r.fulfill({json:{id,expiresAt:new Date(Date.now()+600000).toISOString()}});
+            });
+            await page.route(root+'/'+id+'/poll',async r=>{
+              const data=r.request().postDataJSON();
+              if(data.result?.id===actionId){observed=data.result.state==='done'&&data.frame.path==='/';}
+              await r.fulfill({json:{id,expiresAt:new Date(Date.now()+600000).toISOString(),pending:observed?null:{id:actionId,path:'/',expiresAt:new Date(Date.now()+10000).toISOString()}}});
+            });
+            await page.route(root+'/'+id,async r=>{revoked=r.request().method()==='DELETE';await r.fulfill({json:{closed:true}});});
+            page.once('dialog',dialog=>dialog.accept());
+            await page.getByRole('button',{name:'Управление MCP',exact:true}).click();
+            await page.waitForURL(url=>url.pathname==='/');
+            await page.waitForFunction(()=>!!document.querySelector('.interface-control[data-enabled="true"]'));
+            for(let n=0;n<30&&!observed;n++)await page.waitForTimeout(100);
+            assert.ok(observed,'Visible link click must report the observed route');
+            await page.keyboard.press('Escape');
+            await visible(page.getByRole('button',{name:'Управление MCP',exact:true}));
+            for(let n=0;n<20&&!revoked;n++)await page.waitForTimeout(100);
+            assert.ok(revoked,'Escape must revoke the session');
+            await page.unroute(root);await page.unroute(root+'/'+id+'/poll');await page.unroute(root+'/'+id);
+          });
           if(role==='orchestra')await check(page,prefix+'-infrastructure-workspaces',async()=>{
             const fixture={
               '/api/v1/managed/development-team':{owner:true},

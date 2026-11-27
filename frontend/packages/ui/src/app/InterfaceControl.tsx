@@ -15,7 +15,7 @@ function navigationControls(){
   return Array.from(document.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Главная навигация"] a[data-interface-path]'));
 }
 function readFrame(path:string):Frame{
-  return {path:routePattern.test(path)?path:'/',targets:navigationControls().flatMap(a=>{
+  return {path:routePattern.test(path)?path:'/unlisted',targets:navigationControls().flatMap(a=>{
     const target=a.dataset.interfacePath;
     const label=a.getAttribute('aria-label')??'';
     return target&&routePattern.test(target)&&label?[{path:target,label:label.slice(0,80)}]:[];
@@ -49,6 +49,8 @@ export async function visibleNavigation(path:string,allowed:()=>boolean){
     await delay(30);cursor.style.left=point.left+point.width/2+'px';cursor.style.top=point.top+point.height/2+'px';
     await delay(390);
     if(!allowed()||document.visibilityState!=='visible'||!link.isConnected||!isVisible(link))return false;
+    const hit=document.elementFromPoint(point.left+point.width/2,point.top+point.height/2);
+    if(!hit||!link.contains(hit))return false;
     link.focus({preventScroll:true});cursor.classList.add('clicked');link.click();
     await delay(220);return true;
   }finally{cursor.remove()}
@@ -129,8 +131,8 @@ export function InterfaceControl(){
     finally{setBusy(false)}
   }
   return <div className="interface-control" data-enabled={!!session}>
-    <button type="button" className="btn secondary" disabled={busy} onClick={()=>session?stopLocal():void start()} title="Управление интерфейсом через ассистента и MCP">
-      {session?<Square size={15}/>:<MousePointer2 size={15}/>} {session?'Остановить MCP':'Управление MCP'}
+    <button type="button" className="btn secondary" disabled={busy} onClick={()=>session?stopLocal():void start()} aria-label={session?'Остановить MCP':'Управление MCP'} title="Управление интерфейсом через ассистента и MCP">
+      {session?<Square size={15}/>:<MousePointer2 size={15}/>} <span className="interface-control-label">{session?'Остановить MCP':'Управление MCP'}</span>
     </button>
     {session&&<span className="interface-control-active" role="status">ИИ управляет навигацией · Esc</span>}
     {message&&<span className="interface-control-message" role="status">{message}</span>}

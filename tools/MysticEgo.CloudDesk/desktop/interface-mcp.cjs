@@ -37,7 +37,8 @@ function installInterfaceMcp(win,product,port=0){
  function authorized(req){
   const supplied=String(req.headers.authorization||'');
   const expected='Bearer '+token;
-  return live()&&supplied.length===expected.length&&crypto.timingSafeEqual(Buffer.from(supplied),Buffer.from(expected));
+  const a=Buffer.from(supplied),b=Buffer.from(expected);
+  return live()&&a.length===b.length&&crypto.timingSafeEqual(a,b);
  }
  async function rpc(req,res){
   res.setHeader('Cache-Control','no-store');

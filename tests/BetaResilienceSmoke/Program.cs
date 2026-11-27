@@ -48,3 +48,28 @@ SocialCheck(embeddedSocial.Contains("href=\"https://orchestra.example.test/audit
 SocialCheck(PanelSocialPreviews.Render(socialHtml, "https://user:password@example.test") == socialHtml, "unsafe origin ignored");
 SocialCheck(PanelSocialPreviews.Render(socialHtml, "javascript:alert(1)") == socialHtml, "non-HTTP origin ignored");
 SocialCheck(PanelSocialPreviews.Render("<html>old build</html>", "https://example.test") == "<html>old build</html>", "old panel untouched");
+
+// Interface automation: no cross-owner actions or invented completion.
+var interfaceControl = new InterfaceAutomation();
+var frame = new InterfaceAutomation.Frame("/",[new("/","Обзор"),new("/nodes","Узлы")]);
+var uiSession = interfaceControl.Open("developer-a","Orchestra",frame);
+if(interfaceControl.List("developer-b").Length!=0)throw new Exception("Cross-owner interface leak");
+void RejectInterface(Action operation,int code)
+{
+    try { operation(); throw new Exception("Unexpected interface permission"); }
+    catch(AssistantApiException error) when(error.StatusCode==code){}
+}
+RejectInterface(()=>interfaceControl.Navigate("developer-b",uiSession.Id,"/nodes"),404);
+RejectInterface(()=>interfaceControl.Navigate("developer-a",uiSession.Id,"/settings"),400);
+RejectInterface(()=>interfaceControl.Open("developer-a","Orchestra",new("https://other.example",[])),400);
+var queued=interfaceControl.Navigate("developer-a",uiSession.Id,"/nodes");
+if(queued.Pending is null||queued.Last is not null)throw new Exception("Navigation claimed completion before UI report");
+RejectInterface(()=>interfaceControl.Navigate("developer-a",uiSession.Id,"/"),409);
+var incorrect=interfaceControl.Poll("developer-a",uiSession.Id,frame,new(queued.Pending.Id,"done","/nodes"));
+if(incorrect.Last?.State!="failed")throw new Exception("False navigation report accepted");
+queued=interfaceControl.Navigate("developer-a",uiSession.Id,"/nodes");
+var actual=interfaceControl.Poll("developer-a",uiSession.Id,new("/nodes",frame.Targets),new(queued.Pending!.Id,"done","/nodes"));
+if(actual.Last?.State!="done"||actual.Pending is not null)throw new Exception("Actual navigation not acknowledged");
+interfaceControl.Close("developer-a",uiSession.Id);
+RejectInterface(()=>interfaceControl.Inspect("developer-a",uiSession.Id),404);
+Console.WriteLine("PASS: owner isolation, safe routes, bounded queue, observed navigation, revocation");

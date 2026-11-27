@@ -91,7 +91,7 @@ public sealed class InterfaceAutomation
     public void Close(string owner,Guid id){lock(gate){Find(owner,id);sessions.Remove(id);}}
 }
 
-[ApiController,Authorize(Policy="operator"),Route("api/v1/interface-control"),RequestSizeLimit(16384)]
+[ApiController,Authorize(Policy="operator"),Route("api/v1/interface-control"),RequestSizeLimit(16384),ResponseCache(NoStore=true,Location=ResponseCacheLocation.None)]
 public sealed class InterfaceControlController(InterfaceAutomation service,IAssistantAccessPolicy access,NodeOptions node):ControllerBase
 {
     private string? Owner()
@@ -126,7 +126,8 @@ public sealed class InterfaceControlController(InterfaceAutomation service,IAssi
         if(method=="tools/list")return Reply(new{tools=new[]{
             Tool("interface_sessions","List explicitly enabled visible windows",false,false),
             Tool("interface_inspect","Read route, allowed navigation controls and observed last result",true,false),
-            Tool("interface_navigate","Click an allowed navigation control in the selected window; inspect afterwards to verify completion",true,true)
+            Tool("interface_navigate","Click an allowed navigation control in the selected window; inspect afterwards to verify completion",true,true),
+            Tool("interface_assert_view","Check that the observed route equals the expected path; does not navigate",true,true)
         }});
         if(method!="tools/call")return Error(-32601,"Method not found");
         if(request["params"] is not JsonObject p)return Error(-32602,"Invalid params");
@@ -142,6 +143,7 @@ public sealed class InterfaceControlController(InterfaceAutomation service,IAssi
                 result=name switch{
                     "interface_inspect"=>service.Inspect(owner,session),
                     "interface_navigate"=>service.Navigate(owner,session,args?["path"]?.ToString()??""),
+                    "interface_assert_view"=>AssertView(service.Inspect(owner,session),args?["path"]?.ToString()??""),
                     _=>throw new AssistantApiException(400,"Unknown tool")
                 };
             }
@@ -149,11 +151,12 @@ public sealed class InterfaceControlController(InterfaceAutomation service,IAssi
         catch(AssistantApiException error){return Reply(new{content=new[]{new{type="text",text=error.Message}},isError=true});}
         return Reply(new{content=new[]{new{type="text",text=System.Text.Json.JsonSerializer.Serialize(result,new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))}},isError=false});
     }
+    private static object AssertView(InterfaceAutomation.View view,string expected)=>new {passed=view.Frame.Path==expected,expected,actual=view.Frame.Path,pending=view.Pending is not null};
     private static object Tool(string name,string description,bool session,bool navigation)
     {
         var properties=new Dictionary<string,object>();var required=new List<string>();
         if(session){properties["sessionId"]=new{type="string",format="uuid"};required.Add("sessionId");}
         if(navigation){properties["path"]=new{type="string",description="Exact path from interface_inspect"};required.Add("path");}
-        return new{name,description,inputSchema=new{type="object",properties,required,additionalProperties=false},annotations=new{readOnlyHint=!navigation,destructiveHint=false}};
+        return new{name,description,inputSchema=new{type="object",properties,required,additionalProperties=false},annotations=new{readOnlyHint=name!="interface_navigate",destructiveHint=false}};
     }
 }
