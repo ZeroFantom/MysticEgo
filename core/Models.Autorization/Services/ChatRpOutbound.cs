@@ -84,12 +84,12 @@ public sealed class ChatRpOutbound : IDisposable
             fields["random_id"]=(random==0?1:random).ToString(CultureInfo.InvariantCulture);
             if(invite is Guid invitation)
             {
-                // Inline text actions preserve an exact handle in the provider message text.
-                // Labels use the actual command; the adjacent caption explains acceptance.
+                // Native callback actions carry only the invitation handle.
+                // Actual sender and peer are verified on receipt.
                 fields["keyboard"]=JsonSerializer.Serialize(new{inline=true,buttons=new[]{new[]{
-                    new{action=new{type="text",label="rp:a:"+invitation.ToString("N")},color="positive"},
-                    new{action=new{type="text",label="rp:d:"+invitation.ToString("N")},color="negative"}}}});
-                fields["message"]+="\nЗелёная кнопка — принять, красная — отклонить.";
+                    new{action=new{type="callback",label="Принять",payload=JsonSerializer.Serialize(new{rp="rp:a:"+invitation.ToString("N")})},color="positive"},
+                    new{action=new{type="callback",label="Отклонить",payload=JsonSerializer.Serialize(new{rp="rp:d:"+invitation.ToString("N")})},color="negative"}}}});
+                fields["message"]+="\nОтветить может только адресат.";
             }
             // VK requires an already uploaded, operator-approved native attachment.
             if(vkAttachment is {Length:>0 and <=80}&&System.Text.RegularExpressions.Regex.IsMatch(vkAttachment,
@@ -124,6 +124,23 @@ public sealed class ChatRpOutbound : IDisposable
             using var response=await http.SendAsync(request,ct);
         }
         catch(Exception ex) when(ex is HttpRequestException or ArgumentException ||
+            ex is OperationCanceledException&&!ct.IsCancellationRequested){}
+    }
+
+    public async Task AcknowledgeVk(ChatRpDecision d,string? token,CancellationToken ct=default)
+    {
+        if(d.Realm.Provider!="vk"||!ChatRpDestination.Valid(d.Realm,d.Peer)||
+            !TelegramIdentityProof.PositiveId(d.SenderId)||d.CallbackId is not {Length:>0 and <=128} callback||
+            token is not {Length:>=16 and <=512}||!token.All(c=>char.IsAsciiLetterOrDigit(c)||c is '_' or '-' or '.'))return;
+        try
+        {
+            using var request=new HttpRequestMessage(HttpMethod.Post,"https://api.vk.com/method/messages.sendMessageEventAnswer")
+            {Content=new FormUrlEncodedContent(new Dictionary<string,string>{
+                ["access_token"]=token,["v"]="5.199",["event_id"]=callback,["user_id"]=d.SenderId,
+                ["peer_id"]=d.Peer,["event_data"]=JsonSerializer.Serialize(new{type="show_snackbar",text="Запрос обработан"})})};
+            using var response=await http.SendAsync(request,ct);
+        }
+        catch(Exception ex) when(ex is HttpRequestException or ArgumentException or InvalidOperationException||
             ex is OperationCanceledException&&!ct.IsCancellationRequested){}
     }
 

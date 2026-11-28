@@ -86,10 +86,12 @@ public sealed class ChatRpGroupDispatch(IConfiguration configuration,ChatRpRunti
     public async Task Decide(ChatRpDecision d,CancellationToken ct)
     {
         var token=MessengerConfiguration.ReplyToken(configuration,d.Realm);
-        if(d.CallbackId is string callback)await outbound.Acknowledge(d.Realm,callback,token,ct);
+        if(d.CallbackId is string callback&&d.Realm.Provider=="telegram")
+            await outbound.Acknowledge(d.Realm,callback,token,ct);
         var policy=await Policy(d.Realm,d.Peer,ct);
         if(policy is null||string.IsNullOrEmpty(token))return;
         var result=await consent.Decide(d,policy,ct);
+        if(d.Realm.Provider=="vk"&&d.CallbackId is not null)await outbound.AcknowledgeVk(d,token,ct);
         if(result is not null)await Deliver(result.Event,result.DeliveryId,policy,ct);
     }
 

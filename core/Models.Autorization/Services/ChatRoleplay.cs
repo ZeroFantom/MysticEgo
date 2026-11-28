@@ -129,7 +129,16 @@ public static class ChatRpGroupProof
     // VK inline text buttons emit message_new; the command is scoped to the actual sender and peer.
     public static ChatRpDecision? VkDecision(MessengerRealm realm,string secret,JsonElement root,DateTimeOffset now)
     {
-        if(!MessengerWebhookProof.VkEnvelope(realm,secret,root)||Text(root,"type")!="message_new"||
+        if(!MessengerWebhookProof.VkEnvelope(realm,secret,root))return null;
+        if(Text(root,"type")=="message_event")
+        {
+            if(!Obj(root,"object",out var callback)||Num(callback,"peer_id") is not long callbackPeer||
+                Id(callback,"user_id") is not string callbackUser||!EventId(Text(root,"event_id"))||
+                !EventId(Text(callback,"event_id"))||!Obj(callback,"payload",out var payload))return null;
+            return Decision(realm,callbackPeer.ToString(CultureInfo.InvariantCulture),callbackUser,
+                Text(payload,"rp"),Text(callback,"event_id"));
+        }
+        if(Text(root,"type")!="message_new"||
             !Obj(root,"object",out var obj)||!Obj(obj,"message",out var m)||Num(m,"out")!=0||
             Num(m,"peer_id") is not long peer||Id(m,"from_id") is not string sender||
             Date(m,now) is null||!EventId(Text(root,"event_id")))return null;
