@@ -9,7 +9,10 @@ public enum ChatRpAction { Hug, Pat, HighFive, Handshake, Wave, Dance, Poke, Cud
 public sealed record ChatRpDefinition(ChatRpAction Action,string Command,string Category,string Verb,bool RequiresConsent);
 public sealed record ChatRpActor(string Id,string Name);
 public sealed record ChatRpEvent(MessengerRealm Realm,string Peer,string EventId,DateTimeOffset Occurred,
-    ChatRpActor Actor,ChatRpActor Target,ChatRpAction Action);
+    ChatRpActor Actor,ChatRpActor Target,ChatRpAction Action)
+{
+    public ChatRpCustomAction? Custom { get; init; }
+}
 public sealed record ChatRpCard(string Text,string Category,bool RequiresConsent,ChatRpMedia? Media=null);
 
 public static class ChatRpCatalog
@@ -133,7 +136,8 @@ public static class ChatRpGroupProof
         return Decision(realm,peer.ToString(CultureInfo.InvariantCulture),sender,Text(m,"text"));
     }
 
-    public static ChatRpEvent? Telegram(MessengerRealm realm,string secret,string? header,JsonElement root,DateTimeOffset now)
+    public static ChatRpEvent? Telegram(MessengerRealm realm,string secret,string? header,JsonElement root,DateTimeOffset now,
+        Func<MessengerRealm,string,string?,ChatRpCustomAction?>? resolveCustom=null)
     {
         if(!realm.Valid||realm.Provider!="telegram"||!MessengerWebhookProof.SecretMatches(secret,header)||
             !TelegramIdentityProof.UniqueObject(root)||!Obj(root,"message",out var m)||
@@ -144,22 +148,31 @@ public static class ChatRpGroupProof
             m.TryGetProperty("forward_origin",out _)||m.TryGetProperty("via_bot",out _)||
             reply.TryGetProperty("forward_origin",out _)||
             TgActor(m) is not { } actor||TgActor(reply) is not { } target||actor.Id==target.Id||
-            Id(root,"update_id") is not string ev||Date(m,now) is not { } at||
-            ChatRpCatalog.Parse(Text(m,"text")) is not { } action)return null;
-        return new(realm,peer.ToString(CultureInfo.InvariantCulture),ev,at,actor,target,action.Action);
+            Id(root,"update_id") is not string ev||Date(m,now) is not { } at)return null;
+        return ResolveAction(realm,peer.ToString(CultureInfo.InvariantCulture),ev,at,actor,target,Text(m,"text"),resolveCustom);
     }
 
-    public static ChatRpEvent? Vk(MessengerRealm realm,string secret,JsonElement root,DateTimeOffset now)
+    public static ChatRpEvent? Vk(MessengerRealm realm,string secret,JsonElement root,DateTimeOffset now,
+        Func<MessengerRealm,string,string?,ChatRpCustomAction?>? resolveCustom=null)
     {
         if(!MessengerWebhookProof.VkEnvelope(realm,secret,root)||Text(root,"type")!="message_new"||
             !Obj(root,"object",out var obj)||!Obj(obj,"message",out var m)||Num(m,"out")!=0||
             Num(m,"peer_id") is not long peer||peer<2000000001||!Obj(m,"reply_message",out var reply)||
             Num(reply,"peer_id")!=peer||Id(m,"from_id") is not string actor||Id(reply,"from_id") is not string target||
-            actor==target||!EventId(Text(root,"event_id"))||Date(m,now) is not { } at||
-            ChatRpCatalog.Parse(Text(m,"text")) is not { } action)return null;
+            actor==target||!EventId(Text(root,"event_id"))||Date(m,now) is not { } at)return null;
         // VK display names must be fetched through a trusted profile resolver, never command text.
-        return new(realm,peer.ToString(CultureInfo.InvariantCulture),Text(root,"event_id")!,at,
-            new(actor,"Отправитель"),new(target,"Собеседник"),action.Action);
+        return ResolveAction(realm,peer.ToString(CultureInfo.InvariantCulture),Text(root,"event_id")!,at,
+            new(actor,"Отправитель"),new(target,"Собеседник"),Text(m,"text"),resolveCustom);
+    }
+
+    private static ChatRpEvent? ResolveAction(MessengerRealm realm,string peer,string ev,DateTimeOffset at,
+        ChatRpActor actor,ChatRpActor target,string? text,Func<MessengerRealm,string,string?,ChatRpCustomAction?>? resolveCustom)
+    {
+        var standard=ChatRpCatalog.Parse(text);
+        if(standard is not null)return new(realm,peer,ev,at,actor,target,standard.Action);
+        var custom=resolveCustom?.Invoke(realm,peer,text);
+        return custom is {Valid:true}&&custom.Command==ChatRpCustomAction.Normalize(text)?
+            new ChatRpEvent(realm,peer,ev,at,actor,target,custom.Action){Custom=custom}:null;
     }
 }
 

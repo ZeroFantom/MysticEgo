@@ -9,8 +9,10 @@ namespace Models.Autorization.Services;
 /// Admin authority and participant opt-in must be verified by operator before configuration.</summary>
 public sealed record ChatRpGroupPolicy(MessengerRealm Realm,string Peer,bool Enabled,IReadOnlySet<string> Participants)
 {
+    public ChatRpCustomCatalog CustomActions { get; init; }=ChatRpCustomCatalog.Empty;
     public bool Allows(ChatRpEvent e)=>Enabled&&Realm==e.Realm&&Peer==e.Peer&&
-        Participants.Contains(e.Actor.Id)&&Participants.Contains(e.Target.Id);
+        Participants.Contains(e.Actor.Id)&&Participants.Contains(e.Target.Id)&&
+        (e.Custom is null||e.Custom.Action==e.Action&&CustomActions.Contains(e.Custom));
 }
 
 public static class ChatRpDestination
@@ -48,7 +50,7 @@ public sealed class ChatRpRuntime(AuthDbContext db,TimeProvider clock)
         if(await db.ChatRpDeliveries.CountAsync(x=>x.Provider==e.Realm.Provider&&x.BotId==e.Realm.BotId&&
             x.Peer==e.Peer&&x.CreatedUtc>cutoff,ct)>=12)return null;
         var id=Guid.NewGuid();
-        var caption=$"{ChatRpCatalog.Name(e.Actor.Name)} {action.Verb} «{ChatRpCatalog.Name(e.Target.Name)}».";
+        var caption=e.Custom?.Render(e.Actor,e.Target)??$"{ChatRpCatalog.Name(e.Actor.Name)} {action.Verb} «{ChatRpCatalog.Name(e.Target.Name)}».";
         var inserted=await db.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO chat_rp_deliveries ("Id","Provider","BotId","Peer","EventId","ActorId","TargetId","Caption","Category","Status","CreatedUtc","ExpiresUtc")
             VALUES ({id},{e.Realm.Provider},{e.Realm.BotId},{e.Peer},{e.EventId},{e.Actor.Id},{e.Target.Id},{caption},{action.Category},{(int)ChatRpDeliveryState.Pending},{now},{now.AddMinutes(2)})

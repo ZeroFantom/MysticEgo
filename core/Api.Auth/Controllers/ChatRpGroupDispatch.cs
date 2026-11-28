@@ -16,8 +16,24 @@ public sealed class ChatRpGroupDispatch(IConfiguration configuration,ChatRpRunti
         if(section.Length!=1||!section[0].GetValue<bool>("Enabled"))return null;
         var ids=section[0].GetSection("Participants").Get<string[]>()??[];
         if(ids.Length>1000)return null;
-        return new(realm,peer,true,ids.ToHashSet(StringComparer.Ordinal));
+        var definitions=section[0].GetSection("CustomActions").GetChildren().Take(65).ToArray();
+        ChatRpCustomCatalog custom;
+        try
+        {
+            custom=new(definitions.Select(s=>
+            {
+                var category=s["Category"];
+                var definition=ChatRpCatalog.All.SingleOrDefault(a=>a.Category==category);
+                if(definition is null)throw new ArgumentException("Unknown RP category.");
+                return new ChatRpCustomAction(s["Command"]??"",definition.Action,s["Template"]??"");
+            }));
+        }
+        catch(ArgumentException){custom=ChatRpCustomCatalog.Empty;}
+        return new(realm,peer,true,ids.ToHashSet(StringComparer.Ordinal)){CustomActions=custom};
     }
+
+    public ChatRpCustomAction? ResolveCustom(MessengerRealm realm,string peer,string? text)=>
+        Baseline(realm,peer)?.CustomActions.Find(text);
 
     private async Task<ChatRpGroupPolicy?> Policy(MessengerRealm realm,string peer,CancellationToken ct)
     {
@@ -100,7 +116,8 @@ public sealed class ChatRpGroupDispatch(IConfiguration configuration,ChatRpRunti
                 catch(Exception ex) when(ex is ArgumentException or UriFormatException){}
             }
         }
-        var vk=configuration["Messenger:GroupRp:VkAttachments:"+category];
+        var vk=ChatRpVkMediaLibrary.Pick(configuration.GetSection("Messenger:GroupRp:VkMedia:"+category)
+            .GetChildren().Take(257).Select(s=>s.Value??""),configuration["Messenger:GroupRp:VkAttachments:"+category]);
         // Recheck live group opt-in and bot configuration immediately before sending.
         current=await Policy(e,ct);
         var token=MessengerConfiguration.ReplyToken(configuration,e.Realm);
