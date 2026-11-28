@@ -89,3 +89,17 @@ using(var pcData=System.Text.Json.JsonDocument.Parse("""{"uptimeMs":42,"agentThr
 }
 using(var pcIntegrations=System.Text.Json.JsonDocument.Parse("""{"lmStudioApi":true,"openRgb":false,"note":"private","nvidia":123}"""))
     Check(MysticEgo.Distributed.MobilePcPolicy.Filter("integrations.status",pcIntegrations.RootElement).Count==2,"PC diagnostics filtered boolean output");
+
+var launchQueue=new MysticEgo.Distributed.MobileLaunchQueue();
+var launchNow=DateTimeOffset.UtcNow;
+var launchPath=Path.GetFullPath("synthetic-executable");
+Check(!MysticEgo.Distributed.MobileLaunchQueue.ValidAlias("../bad")&&!MysticEgo.Distributed.MobileLaunchQueue.ValidAlias("app\n"),"Mobile launch alias restriction");
+var launch=launchQueue.Propose("owner","editor",launchPath,launchNow)??throw new Exception("Proposal missing");
+Check(launchQueue.Read("other",launch.Id,launchNow)==null&&launchQueue.Decide("other",launch.Id,true,launchNow)==null,"Mobile launch owner isolation");
+Check(launchQueue.Finish("owner",launch.Id,true,launchNow)==null,"Mobile launch requires local claim");
+Check(launchQueue.Decide("owner",launch.Id,true,launchNow)?.State=="claimed"&&launchQueue.Decide("owner",launch.Id,true,launchNow)==null,"Mobile launch claim once");
+Check(launchQueue.Finish("owner",launch.Id,true,launchNow)?.State=="launch-requested"&&launchQueue.Finish("owner",launch.Id,true,launchNow)==null,"Mobile launch receipt once");
+var expiredLaunch=launchQueue.Propose("owner","editor",launchPath,launchNow)!;
+Check(launchQueue.Decide("owner",expiredLaunch.Id,true,launchNow.AddMinutes(3))==null&&launchQueue.Read("owner",expiredLaunch.Id,launchNow.AddMinutes(3))?.State=="expired","Mobile launch expiration");
+var declinedLaunch=launchQueue.Propose("owner","editor",launchPath,launchNow.AddMinutes(3))!;
+Check(launchQueue.Decide("owner",declinedLaunch.Id,false,launchNow.AddMinutes(3))?.State=="declined"&&launchQueue.Finish("owner",declinedLaunch.Id,true,launchNow.AddMinutes(3))==null,"Mobile launch denial");

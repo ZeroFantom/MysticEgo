@@ -4,6 +4,7 @@ import {QrApprove,deviceLabel,type SessionDevice} from '../app/QrSignIn';
 import {DeviceActions} from '../app/DeviceActions';
 import {MobileAgentPanel} from '../app/MobileAgentPanel';
 import {MobilePcPanel} from '../app/MobilePcPanel';
+import {LocalMobileLaunchPanel} from '../app/LocalMobileLaunchPanel';
 import {useApp,useRemote} from '../app/context';
 import {useLocale,usePresentation} from '../app/presentation';
 import {Header,Panel,ErrorBanner} from '../components/primitives';
@@ -41,6 +42,7 @@ export function AccountSecurity(){
   <DeviceActions/>
   <MobileAgentPanel/>
   <MobilePcPanel/>
+  <LocalMobileLaunchPanel/>
   <Panel title={t('Активные сессии')} aside={<button className="btn secondary" disabled={busy} onClick={()=>sessions.reload()}>{t('Обновить')}</button>}>
    <ErrorBanner text={sessions.error}/>
    <p>{t('Тип устройства определяется по данным клиента.')}</p>

@@ -36,7 +36,9 @@ public sealed class MobilePcController(NodeOptions node,INodeAccessPolicy access
         if(method=="ping")return Result(new{});
         if(method=="tools/list")return Result(new{tools=new object[]{
             new{name="pc.list",description="List explicitly configured stations on this Orchestra.",inputSchema=Schema(new(),[])},
-            new{name="pc.diagnose",description="Read limited runtime telemetry or integration availability from an explicitly configured online station.",inputSchema=Schema(new(){["targetId"]=new{type="string",format="uuid"},["action"]=new{type="string",@enum=MobilePcPolicy.Actions}},["targetId","action"])}
+            new{name="pc.diagnose",description="Read limited runtime telemetry or integration availability from an explicitly configured online station.",inputSchema=Schema(new(){["targetId"]=new{type="string",format="uuid"},["action"]=new{type="string",@enum=MobilePcPolicy.Actions}},["targetId","action"])},
+            new{name="pc.launch.propose",description="Request local PC owner approval for a locally allowlisted alias. Does not launch.",inputSchema=Schema(new(){["targetId"]=new{type="string",format="uuid"},["alias"]=new{type="string",maxLength=40}},["targetId","alias"])},
+            new{name="pc.launch.status",description="Read a short-lived launch proposal status.",inputSchema=Schema(new(){["targetId"]=new{type="string",format="uuid"},["requestId"]=new{type="string",format="uuid"}},["targetId","requestId"])}
         }});
         if(method!="tools/call")return Error(-32601,"Method not found");
         if(!q.TryGetProperty("params",out var p)||p.ValueKind!=JsonValueKind.Object||
@@ -47,6 +49,28 @@ public sealed class MobilePcController(NodeOptions node,INodeAccessPolicy access
         {
             var rows=(await registry.ListAsync(ct)).Where(r=>allowed.Contains(r.ClientId)).Select(r=>new{id=r.ClientId,name=r.MachineName,online=r.Online,lastSeenUtc=r.LastSeenAt});
             return Content(rows);
+        }
+        if(name.GetString() is "pc.launch.propose" or "pc.launch.status")
+        {
+            var propose=name.GetString()=="pc.launch.propose";
+            var parameter=propose?"alias":"requestId";
+            if(args.EnumerateObject().Count()!=2||!args.TryGetProperty("targetId",out var targetValue)||targetValue.ValueKind!=JsonValueKind.String||!targetValue.TryGetGuid(out var station)||
+                !args.TryGetProperty(parameter,out var value)||value.ValueKind!=JsonValueKind.String||
+                (propose?!MobileLaunchQueue.ValidAlias(value.GetString()):!Guid.TryParse(value.GetString(),out _)))return Error(-32602,"Invalid arguments");
+            var command=propose?"mobile.launch.propose":"mobile.launch.status";
+            if(!config.GetValue<bool>("MobilePc:LaunchProposalsEnabled")||!allowed.Contains(station)||!access.SensitiveAllowed(User,command,false)||
+                await registry.GetByIdAsync(station,ct) is not {Online:true}||!(await capabilities.GetAsync(station,ct)).Any(c=>c.Id.Value==command))return Error(-32602,"Target or proposal unavailable");
+            if(!await InFlight.WaitAsync(0,ct))return Error(-32000,"Request limit reached");
+            try{
+                if(await commands.Dispatch(new(station,command,value.GetString(),null,15,false),User.Identity?.Name,ct) is not CommandExecutionResult execution||!execution.Success||execution.StructuredOutput is null)return Error(-32000,"Proposal unavailable");
+                var output=JsonSerializer.SerializeToElement(execution.StructuredOutput,Json);
+                if(output.ValueKind!=JsonValueKind.Object||!output.TryGetProperty("id",out var rid)||rid.ValueKind!=JsonValueKind.String||!rid.TryGetGuid(out var requestId)||
+                    !output.TryGetProperty("alias",out var alias)||alias.ValueKind!=JsonValueKind.String||!MobileLaunchQueue.ValidAlias(alias.GetString())||
+                    !output.TryGetProperty("state",out var status)||status.ValueKind!=JsonValueKind.String||status.GetString() is not ("pending" or "claimed" or "declined" or "expired" or "launch-requested" or "failed")||
+                    !output.TryGetProperty("expires",out var expires)||expires.ValueKind!=JsonValueKind.String||!expires.TryGetDateTimeOffset(out var expiration))return Error(-32000,"Invalid proposal response");
+                return Content(new{targetId=station,id=requestId,alias=alias.GetString(),state=status.GetString(),expires=expiration});
+            }catch(Exception ex) when(ex is NodeApiException or InvalidOperationException or JsonException or TimeoutException or HttpRequestException){return Error(-32000,"Proposal unavailable");}
+            finally{InFlight.Release();}
         }
         if(name.GetString()!="pc.diagnose"||args.EnumerateObject().Count()!=2||
             !args.TryGetProperty("targetId",out var t)||t.ValueKind!=JsonValueKind.String||!t.TryGetGuid(out var target)||
