@@ -56,6 +56,24 @@ def account(user, home):
         return pwd.getpwnam(user).pw_uid
 
 
+def ensure_lm_home():
+    # Factory reset removes LM_HOME but intentionally keeps the system account.
+    uid = account("mysticego-lm", LM_HOME)
+    entry = pwd.getpwnam("mysticego-lm")
+    if entry.pw_uid != uid or Path(entry.pw_dir) != LM_HOME:
+        raise ValueError("Unexpected LM Studio service account home.")
+    if LM_HOME.is_symlink():
+        raise ValueError("LM Studio home must not be a symbolic link.")
+    try:
+        LM_HOME.mkdir(mode=0o700)
+    except FileExistsError:
+        if not LM_HOME.is_dir() or LM_HOME.stat().st_uid != uid:
+            raise ValueError("Unexpected LM Studio home ownership or type.")
+    else:
+        os.chown(LM_HOME, uid, entry.pw_gid)
+    return uid
+
+
 def system_packages(*packages):
     run("apt-get", "update")
     run("apt-get", "install", "-y", "--no-install-recommends", *packages,
@@ -322,11 +340,12 @@ def prepare_postgres(data):
 
 def lmstudio_dependencies():
     """Install the required llmster runtime dependency before running its installer."""
-    result = subprocess.run(("dpkg-query", "-W", "-f=${Status}", "libatomic1"),
-                            capture_output=True, text=True, timeout=10)
     missing = []
-    if result.returncode != 0 or result.stdout.strip() != "install ok installed":
-        missing.append("libatomic1")
+    for package in ("libatomic1", "libgomp1"):
+        result = subprocess.run(("dpkg-query", "-W", "-f=${Status}", package),
+                                capture_output=True, text=True, timeout=10)
+        if result.returncode != 0 or result.stdout.strip() != "install ok installed":
+            missing.append(package)
     if not shutil.which("curl"):
         missing.extend(("curl", "ca-certificates"))
     if missing:
@@ -339,7 +358,7 @@ def lmstudio(data):
     if role not in MODELS:
         raise ValueError("Выберите профиль модели: world или panel-data.")
     model, alias, context = MODELS[role]
-    uid = account("mysticego-lm", LM_HOME)
+    uid = ensure_lm_home()
     state = ROOT / "lmstudio"
     state.mkdir(parents=True, exist_ok=True)
     profile = state / "role"
