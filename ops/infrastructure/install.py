@@ -9,6 +9,7 @@ import pwd
 import re
 import secrets
 import shutil
+import socket
 import subprocess
 import tempfile
 import time
@@ -353,6 +354,31 @@ def lmstudio_dependencies():
         system_packages(*missing)
 
 
+class ResourceDeferred(RuntimeError):
+    pass
+
+
+class ModelPortOccupied(RuntimeError):
+    pass
+
+
+def lm_port_occupied():
+    # Any listener, including a non-LM HTTP service, is a conflict.
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as connection:
+        connection.settimeout(2)
+        return connection.connect_ex(("127.0.0.1", 1234)) == 0
+
+
+def lm_provisioning_capacity(role):
+    # Conservative headroom for unpack/download, not a guarantee of model fit.
+    # Do not configure swap, kill another service or change the selected model.
+    fields = dict(line.split(":", 1) for line in Path("/proc/meminfo").read_text().splitlines() if ":" in line)
+    available = int(fields["MemAvailable"].split()[0]) * 1024
+    required_disk = (5 if role == "world" else 3) * 1024**3
+    if available < 2 * 1024**3 or shutil.disk_usage(LM_HOME).free < required_disk:
+        raise ResourceDeferred("Insufficient memory or disk for model provisioning.")
+
+
 def lm_cache_present(model):
     family = model.split("/", 1)[1]
     model_folder = LM_HOME / ".lmstudio/models"
@@ -373,6 +399,11 @@ def lmstudio(data):
         raise ValueError("Этот сервер уже использует другой профиль LM Studio.")
     command = ("runuser", "-u", "mysticego-lm", "--", "env", f"HOME={LM_HOME}")
     cli = LM_HOME / ".lmstudio/bin/lms"
+    cached = lm_cache_present(model)
+    if not cli.is_file() or not cached:
+        lm_provisioning_capacity(role)
+    if (not profile.exists() or not cached) and lm_port_occupied():
+        raise ModelPortOccupied("LM Studio port 1234 is occupied.")
     lmstudio_dependencies()
     if not cli.is_file():
         say("Устанавливаем LM Studio llmster под отдельным пользователем")
@@ -381,16 +412,8 @@ def lmstudio(data):
                 "-o", install.name, "https://lmstudio.ai/install.sh")
             os.chown(install.name, uid, -1)
             run(*command, "bash", install.name, stdin=subprocess.DEVNULL)
-    cached = lm_cache_present(model)
     if not profile.exists() or not cached:
         # A retained role file is not proof the model survived a partial deletion.
-        # Never take over an unrelated server listening on the model endpoint.
-        try:
-            request("http://127.0.0.1:1234/v1/models")
-        except OSError:
-            pass
-        else:
-            raise ValueError("Порт 1234 уже занят сервером моделей.")
         run(*command, str(cli), "daemon", "up")
         try:
             if not cached:
@@ -491,7 +514,7 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except ValueError as error:
+    except (ValueError, ResourceDeferred, ModelPortOccupied) as error:
         say(str(error))
         raise SystemExit(1)
     except (OSError, subprocess.SubprocessError):
