@@ -153,6 +153,7 @@ if(qrStore.Inspect(qrLimited.Id,qrNow)!=null||qrStore.Approve(qrLimited.Id,qrLim
 
 var deviceQueue=new Models.Autorization.Services.DeviceActionQueue();
 var deviceOwner=Guid.NewGuid();var deviceSource=Guid.NewGuid();var deviceTarget=Guid.NewGuid();var deviceNow=DateTimeOffset.UtcNow;
+deviceQueue.Presence(deviceOwner,deviceTarget,true,deviceNow);
 var deviceRequest=deviceQueue.Request(deviceOwner,deviceSource,deviceTarget,"open-assistant",deviceNow)??throw new Exception("Device request failed");
 if(deviceQueue.Request(deviceOwner,deviceSource,deviceTarget,"shell",deviceNow)!=null||deviceQueue.List(Guid.NewGuid(),deviceTarget,deviceNow).Length!=0||deviceQueue.Decide(deviceOwner,deviceSource,deviceRequest.Id,true,deviceNow)!=null)throw new Exception("Device isolation failure");
 if(deviceQueue.Decide(deviceOwner,deviceTarget,deviceRequest.Id,true,deviceNow)?.State!="approved"||deviceQueue.Decide(deviceOwner,deviceTarget,deviceRequest.Id,true,deviceNow)!=null)throw new Exception("Device replay failure");
@@ -162,6 +163,21 @@ Console.WriteLine("Device request allowlist, account isolation, target approval 
 var leaseQueue=new Models.Autorization.Services.DeviceActionQueue();
 if(!leaseQueue.Presence(deviceOwner,deviceTarget,true,deviceNow)||!leaseQueue.Ready(deviceOwner,deviceNow).Contains(deviceTarget)||leaseQueue.Ready(Guid.NewGuid(),deviceNow).Count!=0||leaseQueue.Ready(deviceOwner,deviceNow.AddSeconds(36)).Count!=0)throw new Exception("Receiving lease isolation or expiry failure");
 leaseQueue.Presence(deviceOwner,deviceTarget,true,deviceNow);leaseQueue.Presence(deviceOwner,deviceTarget,false,deviceNow);if(leaseQueue.Ready(deviceOwner,deviceNow).Count!=0)throw new Exception("Receive disable failed");
+leaseQueue.Presence(deviceOwner,deviceTarget,true,deviceNow);
 var cancelRequest=leaseQueue.Request(deviceOwner,deviceSource,deviceTarget,"open-profile",deviceNow)!;
 if(leaseQueue.Cancel(deviceOwner,deviceTarget,cancelRequest.Id,deviceNow)!=null||leaseQueue.Cancel(deviceOwner,deviceSource,cancelRequest.Id,deviceNow)?.State!="cancelled"||leaseQueue.Decide(deviceOwner,deviceTarget,cancelRequest.Id,true,deviceNow)!=null)throw new Exception("Request cancellation isolation failure");
 Console.WriteLine("Receiving lease expiry and source cancellation passed");
+
+var capabilityQueue=new Models.Autorization.Services.DeviceActionQueue();
+if(capabilityQueue.Request(deviceOwner,deviceSource,deviceTarget,"signal-device",deviceNow)!=null)throw new Exception("Offline request accepted");
+if(capabilityQueue.Presence(deviceOwner,deviceTarget,true,deviceNow,["shell"]))throw new Exception("Unknown capability registered");
+capabilityQueue.Presence(deviceOwner,deviceTarget,true,deviceNow,["signal-device","open-app-settings"]);
+if(capabilityQueue.Request(deviceOwner,deviceSource,deviceTarget,"show-device-info",deviceNow)!=null)throw new Exception("Unadvertised capability accepted");
+var nativeRequest=capabilityQueue.Request(deviceOwner,deviceSource,deviceTarget,"open-app-settings",deviceNow)!;
+capabilityQueue.Presence(deviceOwner,deviceTarget,true,deviceNow,["signal-device"]);
+if(capabilityQueue.Decide(deviceOwner,deviceTarget,nativeRequest.Id,true,deviceNow)!=null||capabilityQueue.List(deviceOwner,deviceSource,deviceNow).Single(i=>i.Id==nativeRequest.Id).State!="cancelled")throw new Exception("Removed capability request survived");
+var signalRequest=capabilityQueue.Request(deviceOwner,deviceSource,deviceTarget,"signal-device",deviceNow)!;
+if(capabilityQueue.Decide(deviceOwner,deviceTarget,signalRequest.Id,true,deviceNow.AddSeconds(36))!=null)throw new Exception("Expired receiving lease approved");
+capabilityQueue.Presence(deviceOwner,deviceTarget,true,deviceNow.AddSeconds(37),["signal-device"]);
+if(capabilityQueue.Decide(deviceOwner,deviceTarget,signalRequest.Id,true,deviceNow.AddSeconds(37))!=null)throw new Exception("Expired request resurrected");
+Console.WriteLine("Device capability, atomic receiving lease and cancellation tests passed");

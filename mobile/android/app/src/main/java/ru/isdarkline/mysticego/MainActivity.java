@@ -44,6 +44,8 @@ public final class MainActivity extends ComponentActivity {
     private Button initCamera;
     private boolean cameraReviewed;
     private PermissionRequest mediaRequest;
+    private android.app.AlertDialog localActionDialog;
+    private long lastLocalAction;
     private String mediaResource;
     private static final int MEDIA_REQUEST=311;
     private static final String RELEASES = "https://github.com/ZeroFantom/MysticEgo/releases";
@@ -153,6 +155,8 @@ public final class MainActivity extends ComponentActivity {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 if (!request.isForMainFrame()) return false;
                 String url = request.getUrl().toString();
+                String localAction=MobileLocalActions.resolve(url);
+                if(localAction!=null){if(request.hasGesture()&&view==web&&hasWindowFocus()&&MobileRoutes.trustedPage(view.getUrl())) confirmLocalAction(localAction);return true;}
                 if (request.hasGesture() && "mysticego://spatial".equals(url)) { openSpatialBrowser(); return true; }
                 if (MobileRoutes.trustedPage(url)) return false;
                 if (request.hasGesture() && RELEASES.equals(url)) openReleasePage();
@@ -191,6 +195,35 @@ public final class MainActivity extends ComponentActivity {
         setContentView(root);
         root.requestApplyInsets();
         openIntent(getIntent());
+    }
+
+    private void confirmLocalAction(String action) {
+        long now=android.os.SystemClock.elapsedRealtime();
+        if(localActionDialog!=null||now-lastLocalAction<1000||web==null||!hasWindowFocus()||!MobileRoutes.trustedPage(web.getUrl()))return;
+        lastLocalAction=now;
+        String page=web.getUrl();
+        String message;
+        switch(action){
+            case "signal-device": message="Подать короткий локальный сигнал?";break;
+            case "open-app-settings": message="Открыть системные настройки именно MysticEgo Mobile?";break;
+            case "show-device-info": message="Показать технические сведения об этом устройстве? Данные останутся на экране.";break;
+            default:return;
+        }
+        localActionDialog=new android.app.AlertDialog.Builder(this).setTitle("MysticEgo · Действие на устройстве")
+            .setMessage(message).setNegativeButton("Отмена",null).setPositiveButton("Выполнить",(dialog,which)->{
+                if(web==null||isFinishing()||!page.equals(web.getUrl())||!MobileRoutes.trustedPage(web.getUrl()))return;
+                if("signal-device".equals(action)){
+                    web.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                    Toast.makeText(this,"Локальный сигнал MysticEgo",Toast.LENGTH_SHORT).show();
+                }else if("open-app-settings".equals(action)){
+                    try{startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.fromParts("package",getPackageName(),null)));}
+                    catch(android.content.ActivityNotFoundException ex){Toast.makeText(this,"Настройки недоступны",Toast.LENGTH_SHORT).show();}
+                }else if("show-device-info".equals(action)){
+                    new android.app.AlertDialog.Builder(this).setTitle("Устройство").setMessage(deviceReport()).setPositiveButton("Закрыть",null).show();
+                }
+            }).create();
+        localActionDialog.setOnDismissListener(dialog->localActionDialog=null);
+        localActionDialog.show();
     }
 
     private void askMediaPermission(PermissionRequest request) {
@@ -278,6 +311,7 @@ public final class MainActivity extends ComponentActivity {
 
 
     @Override protected void onStop() {
+        if(localActionDialog!=null)localActionDialog.dismiss();
         denyMediaPermission();
         if(web!=null)CookieManager.getInstance().flush();
         super.onStop();
