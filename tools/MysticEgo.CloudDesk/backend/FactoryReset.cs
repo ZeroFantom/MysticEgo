@@ -114,10 +114,28 @@ sealed partial class CloudDesk
             var command="cd "+remote+" && printf '%s  reset.sh\\n%s  install.sh\\n' "+scriptDigest+" "+installerDigest+
                 " | sha256sum -c - && bash reset.sh execute "+ResetQ(identity.Domain)+" "+ResetQ(identity.Node)+" "+ResetQ(release.Tag)+" "+ResetQ(release.Digest);
             progress("Проверка цели на VPS перед необратимым сбросом");
-            var output=await SSH(args,command,45,line=>{if(line.StartsWith("CLOUDDESK_RESET_STEP:",StringComparison.Ordinal)||line.StartsWith("CLOUDDESK_STEP:",StringComparison.Ordinal))progress(line);});
+            var installStarted=false;
+            string output;
+            try {
+                output=await SSH(args,command,45,line=>{
+                    if(line=="CLOUDDESK_RESET_STEP:install")installStarted=true;
+                    if(line.StartsWith("CLOUDDESK_RESET_STEP:",StringComparison.Ordinal)||line.StartsWith("CLOUDDESK_STEP:",StringComparison.Ordinal))progress(line);
+                });
+            } catch(Exception original) when(installStarted) {
+                // An interrupted SSH session or late postcheck is not proof of a failed
+                // installation. Reconnect for read-only verification, never run execute again.
+                progress("Проверяем результат установки без повторного удаления");
+                try {
+                    output=await SSH(args,"cd "+remote+" && printf '%s  reset.sh\\n' "+scriptDigest+" | sha256sum -c - && bash reset.sh verify "+ResetQ(identity.Domain)+" "+ResetQ(identity.Node)+" "+ResetQ(release.Tag),3,
+                        line=>{if(line=="CLOUDDESK_RESET_STEP:verify")progress(line);});
+                } catch(Exception verification) {
+                    throw new Exception("Итог переустановки не подтверждён. Повторный сброс не выполнялся.\nПроверка: "+verification.Message+"\nПервоначальный результат: "+original.Message);
+                }
+            }
             var match=Regex.Match(output,@"(?m)^FACTORY_RESET_OK ([a-fA-F0-9-]{36})\r?$");
             if(!match.Success||!Guid.TryParse(match.Groups[1].Value,out var newNode)||newNode==Guid.Empty||newNode.ToString("D")==identity.Node)
                 throw new Exception("Новая Orchestra не подтвердила новый ID. Не повторяйте сброс автоматически.");
+            progress("Новая идентичность, базы, версия и службы подтверждены");
             var binding=ReadBinding(approval.ServerId);
             if(binding!=null&&SameBinding(binding,approval.Host,"Orchestra",approval.Domain))SaveBinding(binding with {Phase="installed"});
             try{await SSH(args,"rm -rf -- "+remote,1);}catch{}

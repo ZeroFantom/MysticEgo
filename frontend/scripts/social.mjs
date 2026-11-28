@@ -41,11 +41,15 @@ export function panelHtml(template,role,page='root'){
   const title=(role==='orchestra'?publicPages[page]?.title:undefined)??'MysticEgo · '+roles[role].title;
   const extra=role==='orchestra'?publicPages[page]:undefined;
   const links=Object.entries(publicPages).map(([path,entry])=>'<li><a href="/'+path+'">'+escape(entry.title)+'</a> — '+escape(entry.description)+'</li>').join('');
-  // The same public content is readable before React starts, for users and crawlers alike.
+  // Keep role metadata in the head; never flash crawler text while the panel boots.
   const fallback=extra?'<main><h1>'+escape(extra.title)+'</h1><p>'+escape(extra.description)+'</p><nav aria-label="Публичные страницы"><ul>'+links+'</ul></nav><p><a href="https://github.com/ZeroFantom/MysticEgo">Исходный код MysticEgo</a></p></main>':'<main><h1>'+escape(title)+'</h1><p>'+escape(roles[role].description)+'</p></main>';
-  return template.replace('<div id="root"></div>','<div id="root">'+fallback+'</div>').replace('data-role="orchestra"','data-role="'+role+'"')
+  const boot='<div class="mystic-panel-boot" role="status" aria-label="MysticEgo"><span aria-hidden="true"></span></div>';
+  const bootStyle='<style>.mystic-panel-boot{position:fixed;inset:0;display:grid;place-items:center;background:#0b0914;z-index:1}.mystic-panel-boot>span{display:block;width:42px;height:42px;box-sizing:border-box;border:2px solid #ffffff20;border-top-color:#b49bf7;border-radius:50%;animation:mystic-boot-spin .85s linear infinite}@keyframes mystic-boot-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.mystic-panel-boot>span{animation:none}}</style>';
+  const body=extra?fallback:boot;
+  const noScript=extra?'':'<noscript><style>.mystic-panel-boot{display:none}</style>'+fallback+'</noscript>';
+  return template.replace('<div id="root"></div>','<div id="root">'+body+'</div>'+noScript).replace('data-role="orchestra"','data-role="'+role+'"')
     .replace('<title>MysticEgo</title>','<title>'+escape(title)+'</title>')
-    .replace('</head>',metadata(role,page)+'\n</head>');
+    .replace('</head>',metadata(role,page)+'\n'+(extra?'':bootStyle)+'\n</head>');
 }
 // Original, deterministic, dependency-free concept art. PNG, not SVG, for link crawlers.
 const glyphs={

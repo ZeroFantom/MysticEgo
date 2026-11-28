@@ -147,6 +147,21 @@ try{
   for(const role of roles){
     const {server,origin}=await serve(role);
     try{
+      // Simulate slow startup: JavaScript is enabled but bundles have not loaded.
+      // The crawler description must never become visible in an ordinary browser.
+      const cold=await browser.newContext({viewport:{width:768,height:800}});
+      try{
+        const page=await cold.newPage();
+        await page.route('**/*.js',route=>route.abort());
+        await check(page,role+'-cold-start-no-social-flash',async()=>{
+          await page.goto(origin+'/',{waitUntil:'domcontentloaded'});
+          await visible(page.locator('.mystic-panel-boot'));
+          assert.equal(await page.locator('#root h1').count(),0);
+          assert.equal(await page.locator('meta[property="og:title"]').count(),1);
+          assert.equal(await page.locator('meta[property="og:description"]').count(),1);
+          assert.equal(await page.locator('meta[property="og:image"]').count(),1);
+        });
+      }finally{await cold.close()}
       for(const viewport of sizes){
         const context=await browser.newContext({viewport,locale:'ru-RU',timezoneId:'UTC',colorScheme:'dark',reducedMotion:'reduce'});
         await context.addInitScript(()=>{localStorage.setItem('mysticego.guest.presentation',JSON.stringify({language:'ru',font:'modern'}));Object.defineProperty(navigator,'userAgentData',{configurable:true,value:{brands:[{brand:'Google Chrome',version:'140'}]}})});

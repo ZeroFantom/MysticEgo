@@ -36,3 +36,8 @@ assert(backend.includes('progress?.Invoke("identity")')&&backend.includes('progr
 assert(ipc.includes("'ssh-progress'")&&ipc.includes('flowId:p.flowId'));
 assert(ui.includes('onSshProgress?.')&&ui.includes("advance('access');advance('ready')")&&ui.includes('Подключение установлено'));
 assert(ui.includes('<DesktopUpdate/>')&&ipc.includes('registerUpdateIpc'));
+
+assert(resetScript.includes('CLOUDDESK_RESET_STEP:verify')&&resetScript.includes('post-install: Auth SQLite file missing or empty'));
+assert(resetScript.includes('case "$enabled_state" in enabled|enabled-runtime|linked|linked-runtime'));
+assert(reset.includes('catch(Exception original) when(installStarted)')&&reset.includes('bash reset.sh verify'));
+assert(resetScript.indexOf('if [[ $mode == verify ]]')<resetScript.indexOf('CLOUDDESK_RESET_STEP:delete'));

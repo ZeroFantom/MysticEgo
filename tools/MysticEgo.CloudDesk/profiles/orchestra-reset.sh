@@ -5,7 +5,7 @@ umask 077
 mode=$1
 domain=$2
 expected=$3
-[[ $mode == check || $mode == execute ]]
+[[ $mode == check || $mode == execute || $mode == verify ]]
 [[ $domain =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,63}$ && $domain != *..* ]]
 [[ $expected =~ ^[a-f0-9-]{36}$ ]]
 [[ $(id -u) == 0 && $(uname -m) == x86_64 ]]
@@ -67,6 +67,40 @@ CADDY
  active_setups=$(systemctl list-units 'mysticego-local-setup@*.service' --state=active,activating,deactivating --no-legend --plain)
  [[ -z $active_setups ]] || die 'local setup busy'
 }
+# Read-only post-install verification. No cleanup or second destructive attempt.
+verify_postinstall(){
+ local wanted=$1 state_root=$2 app_root=$3 new='' remote='' installed='' i
+ echo CLOUDDESK_RESET_STEP:verify
+ for ((i=0;i<12;i++)); do
+   new=$(health http://127.0.0.1:5500/health/live 2>/dev/null) || new=''
+   remote=$(health "https://$domain/health/live" 2>/dev/null) || remote=''
+   if [[ $new =~ ^[a-f0-9-]{36}$ && $new != "$expected" && $remote == "$new" ]]; then break; fi
+   sleep 2
+ done
+ [[ $new =~ ^[a-f0-9-]{36}$ ]] || die 'post-install: local Orchestra health or node ID unavailable'
+ [[ $new != "$expected" ]] || die 'post-install: old node identity still returned'
+ [[ $remote == "$new" ]] || die 'post-install: HTTPS and local node identities differ'
+ [[ -s "$state_root/center-id.txt" ]] || die 'post-install: center-id.txt missing'
+ [[ $(cat "$state_root/center-id.txt") == "$new" ]] || die 'post-install: persisted center identity differs'
+ [[ -s "$state_root/auth.db" ]] || die 'post-install: Auth SQLite file missing or empty'
+ [[ -s "$state_root/orchestra/node.db" ]] || die 'post-install: Orchestra SQLite file missing or empty'
+ installed=$(python3 - "$app_root/runtime/app/web/orchestra/release-info.json" <<'PY'
+import json,sys
+print(json.load(open(sys.argv[1]))["installed"])
+PY
+ ) || die 'post-install: installed release metadata unavailable'
+ [[ $installed == "$wanted" ]] || die 'post-install: installed release differs from approved release'
+ systemctl is-active --quiet mysticego-orchestra.service || die 'post-install: Orchestra service is not active'
+ systemctl is-active --quiet caddy.service || die 'post-install: Caddy service is not active'
+ systemctl is-active --quiet mysticego-orchestra-updater.timer || die 'post-install: updater timer is not active'
+ systemctl is-active --quiet mysticego-local-setup.socket || die 'post-install: local setup socket is not active'
+ echo "FACTORY_RESET_OK $new"
+}
+if [[ $mode == verify ]]; then
+ [[ ${4:-} =~ ^v1\.0\.0-beta\.7-r[0-9]+\.[0-9]+\.[0-9]+$ ]] || die 'invalid verification release'
+ verify_postinstall "$4" /var/lib/mysticego /opt/mysticego/app
+ exit 0
+fi
 if [[ $mode == check ]]; then
  preflight
  echo FACTORY_RESET_PREFLIGHT_OK
@@ -99,7 +133,8 @@ for u in "${units[@]}"; do
  if [[ $u == *@.service ]]; then continue; fi
  if [[ $(systemctl show "$u" -p LoadState --value) != not-found ]]; then
    systemctl stop "$u"
-   if systemctl is-enabled --quiet "$u"; then systemctl disable "$u"; fi
+   enabled_state=$(systemctl is-enabled "$u" 2>/dev/null || true)
+   case "$enabled_state" in enabled|enabled-runtime|linked|linked-runtime) systemctl disable "$u";; esac
  fi
 done
 active_setups=$(systemctl list-units 'mysticego-local-setup@*.service' --state=active,activating,deactivating --no-legend --plain)
@@ -115,7 +150,4 @@ systemctl daemon-reload
 echo CLOUDDESK_RESET_STEP:install
 # The standard installer now holds the inherited lock until it reaches maintenance recovery.
 MYSTICEGO_INSTALL_LOCK_FD=9 MYSTICEGO_INSTALL_PREREQS_READY=1 bash install.sh "$PWD/r3.zip" "$domain" '' "$digest" native sqlite
-new=$(health http://127.0.0.1:5500/health/live)
-[[ $new =~ ^[a-f0-9-]{36}$ && $new != "$expected" && $(health "https://$domain/health/live") == "$new" ]] || die 'new identity not verified'
-[[ -f /var/lib/mysticego/auth.db && -f /var/lib/mysticego/orchestra/node.db ]]
-echo "FACTORY_RESET_OK $new"
+verify_postinstall "$tag" /var/lib/mysticego /opt/mysticego/app
