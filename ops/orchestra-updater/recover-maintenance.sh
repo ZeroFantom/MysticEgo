@@ -35,7 +35,11 @@ root=pathlib.Path(sys.argv[1])
 paths=["runtime/app/web/orchestra/release-info.json", "ops/orchestra-updater/install-worker.sh",
        "ops/orchestra-updater/update-orchestra.py", "ops/orchestra-updater/mysticego-orchestra-updater.service",
        "ops/orchestra-updater/mysticego-orchestra-updater.timer"]
-paths += ["ops/infrastructure/"+name for name in ("install-local.sh","install.sh","install.py","local-runner.py","reconcile.py","install-voice.sh","voice-server.py")]
+paths += ["ops/infrastructure/"+name for name in ("install-local.sh","install.sh","install.py","local-runner.py","reconcile.py","install-voice.sh","voice-server.py")] 
+# Older releases predate oneshot accounting. Validate it whenever present.
+accounting="ops/infrastructure/record-oneshot.py"
+if (root/accounting).exists() or (root/accounting).is_symlink():
+    paths.append(accounting)
 # R3.2.37 is recoverable with the CloudDesk script; newer releases also
 # include a separate fixed-command recovery service.
 extra=["ops/orchestra-updater/"+name for name in ("recover-maintenance.sh","rescue-request.py","mysticego-maintenance-rescue.path","mysticego-maintenance-rescue.service")]
