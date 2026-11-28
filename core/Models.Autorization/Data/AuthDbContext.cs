@@ -11,6 +11,7 @@ namespace Models.Autorization.Data
         public DbSet<AccountLicenseAcceptance> AccountLicenseAcceptances => Set<AccountLicenseAcceptance>();
         public DbSet<AccountFeatureConsent> AccountFeatureConsents => Set<AccountFeatureConsent>();
         public DbSet<AccountDeviceGrant> AccountDeviceGrants => Set<AccountDeviceGrant>();
+        public DbSet<ExternalLinkIntent> ExternalLinkIntents => Set<ExternalLinkIntent>();
         public DbSet<ExternalIdentity> ExternalIdentities => Set<ExternalIdentity>();
         public DbSet<User> Users => Set<User>();
         public DbSet<Role> Roles => Set<Role>();
@@ -25,6 +26,19 @@ namespace Models.Autorization.Data
         {
             base.OnModelCreating(mb);
             mb.Entity<ManagedIdentity>(e => { e.ToTable("managed_identities"); e.HasKey(x=>x.Id); e.Property(x=>x.Name).HasMaxLength(160).IsRequired(); e.Property(x=>x.Kind).HasMaxLength(16).IsRequired(); e.Property(x=>x.SecretHash).HasMaxLength(200).IsRequired(); e.HasIndex(x=>x.Kind); });
+
+            mb.Entity<ExternalLinkIntent>(e =>
+            {
+                e.ToTable("external_link_intents");
+                e.HasKey(x => x.CodeHash);
+                e.Property(x => x.CodeHash).HasMaxLength(64);
+                e.Property(x => x.Provider).HasMaxLength(16).IsRequired();
+                e.Property(x => x.Realm).HasMaxLength(128).IsRequired();
+                e.Property(x => x.VerifiedSubject).HasMaxLength(128);
+                e.HasIndex(x => x.ExpiresUtc);
+                e.HasIndex(x => x.UserId);
+                e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            });
 
             mb.Entity<ExternalIdentity>(e =>
             {

@@ -123,3 +123,5 @@ if(grants.Create(account,"source-proof","bad",instant)!=null)throw new Exception
 Console.WriteLine("Desktop pairing proof, expiry and replay tests passed");
 
 await ExternalIdentitySmoke.Run();
+
+await ExternalLinkSmoke.Run();

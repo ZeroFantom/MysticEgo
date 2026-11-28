@@ -16,3 +16,9 @@ Epic [#118](https://github.com/ZeroFantom/MysticEgo/issues/118). This increment 
 5. Add account UI, rate limiting, CSRF protections and provider sandbox integration tests. Do not include real provider secrets in Git. Only then connect messenger identity resolution to authoritative World Presence.
 
 Tests: `dotnet run --project tests/AuthSmoke/AuthSmoke.csproj -c Release`.
+
+## Secure account linking primitives
+
+The new `ExternalLinkIntents` service persists only SHA-256 hashes of 256-bit random, 43-character base64url challenges. The challenge expires in five minutes. It is bound to UserId, active session ID, provider and configured realm. A trusted provider adapter can set a verified subject exactly once. Only the originating account/session may read that candidate or confirm the exact displayed key. Confirmation atomically deletes the intent and persists the association within a serializable database transaction; conflicting ownership is never overwritten. Session/account activity is checked at each phase. Ordinary conflict consumes the challenge; database exceptions roll back. Expired rows can be purged. No production endpoint or DI registration is added.
+
+The service assumes verified provider assertions and recent reauthentication from its caller; it does not implement OAuth/OIDC, callback validation, user consent UI, bot webhook authentication or reauthentication itself. Before activation: rate-limit creation/confirmation, bound storage and schedule cleanup, never log codes or provider tokens, protect callbacks against CSRF, show a human-recognizable verified provider account (not only an opaque subject), verify PostgreSQL concurrency and map storage conflicts to a generic failure. A stolen challenge can stage a candidate but cannot finalize it without the original authenticated session and explicit confirmation; do not auto-confirm. External login and unlink/session revocation are separate gates.
