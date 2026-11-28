@@ -142,3 +142,7 @@ qrStore.Cancel(qrCancelled.Id,qrVerifier,qrNow);
 if(qrStore.Inspect(qrCancelled.Id,qrNow)!=null)throw new Exception("QR cancellation failed");
 if(Models.Autorization.Services.SessionDevice.Describe("Mozilla iPhone OS 18_0 Safari").Os!="iOS"||Models.Autorization.Services.SessionDevice.Describe(null).Kind!="unknown")throw new Exception("Device classification mismatch");
 Console.WriteLine("QR challenge, comparison, approval, expiry, cancellation, replay and mobile classification passed");
+
+var mobileModel=Models.Autorization.Services.SessionDevice.Describe("Android 15 Mobile MysticEgoAndroid/1 MysticModel/Google_Pixel_8");
+if(mobileModel.Model!="Google Pixel 8"||mobileModel.Client!="MysticEgo Mobile")throw new Exception("Mobile model metadata missing");
+if(Models.Autorization.Services.SessionDevice.Describe("Android 15 Mobile MysticModel/Fake").Model!=null)throw new Exception("Unmarked model accepted");

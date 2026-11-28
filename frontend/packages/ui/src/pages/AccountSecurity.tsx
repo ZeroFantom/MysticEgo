@@ -37,6 +37,7 @@ export function AccountSecurity(){
   <QrApprove session={session}/>
   <Panel title={t('Активные сессии')} aside={<button className="btn secondary" disabled={busy} onClick={()=>sessions.reload()}>{t('Обновить')}</button>}>
    <ErrorBanner text={sessions.error}/>
+   <p>{t('Тип устройства определяется по данным клиента.')}</p>
    <p>{t('Сессия считается активной до выхода, отзыва или истечения срока. Последняя активность — время обновления токена.')}</p>
    <div className="stack">
    {sessions.value?.map((row,index)=>{const device=row.device;const Icon=device?.kind==='mobile'?Smartphone:device?.kind==='tablet'?Tablet:device?.kind==='desktop'?Monitor:HelpCircle;return <article className="panel" key={row.id??'legacy-'+index}>
@@ -58,6 +59,7 @@ export function AccountSecurity(){
     <div className="actions">{([['Условия',consent.value.terms],['Обработка данных',consent.value.privacy],['Лицензия',consent.value.license]] as const).map(([label,doc])=><a key={label} href={doc.url} target="_blank" rel="noreferrer">{t(label)} · {doc.version}</a>)}</div>
     <label><input type="checkbox" checked={accepted} onChange={e=>setAccepted(e.target.checked)}/>{t('Подтверждаю ознакомление с условиями, политикой обработки данных и лицензией.')}</label>
     <p>{t('Выберите возможности. Разрешение конкретного устройства потребуется отдельно.')}</p>
+    <p>{t('Мобильное приложение: технический профиль устройства, сведения о сессии и отдельный выбор разрешений. Камера используется только для QR; отказ от необязательных прав не ограничивает обычный вход.')}</p>
     {consent.value.scopes.map(scope=><label key={scope}><input type="checkbox" checked={enabled.includes(scope)} onChange={e=>setEnabled(old=>e.target.checked?[...old,scope]:old.filter(x=>x!==scope))}/>{t('permission.'+scope)}</label>)}
     <button className="btn" disabled={!accepted||busy} onClick={()=>{const c=consent.value!;void run(()=>request('consents',{termsVersion:c.terms.version,privacyVersion:c.privacy.version,licenseVersion:c.license.version,permissionPolicyVersion:c.permissionPolicyVersion,enabledScopes:enabled}))}}>{t('Сохранить')}</button>
    </div>}

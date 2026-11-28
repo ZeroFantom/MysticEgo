@@ -1,5 +1,9 @@
 // Source phrases are stable migration keys; unknown phrases stay visible until translated.
 export const catalog:Record<string,readonly [string,string,string,string?]>={
+  "Мой QR друга": ["My friend QR","我的好友二维码","내 친구 QR"],
+  "Добавление друга по QR": ["Add a friend by QR","扫码添加好友","QR로 친구 추가"],
+  "QR содержит ссылку на публичный ID. Друг должен открыть профиль и отправить запрос; контакт появится после принятия.": ["The QR links to a public ID. Your friend must send a request, and the contact appears after acceptance.","二维码指向公开 ID。好友须发送请求，接受后建立联系。","QR에는 공개 ID 링크가 포함됩니다. 친구가 요청을 보내고 수락하면 연락처가 추가됩니다."],
+  "Мобильное приложение: технический профиль устройства, сведения о сессии и отдельный выбор разрешений. Камера используется только для QR; отказ от необязательных прав не ограничивает обычный вход.": ["Mobile app: device technical profile, session details and separate permission choices. Camera is for QR only; refusing optional permissions does not block regular sign-in.","移动应用：设备技术信息、会话信息及独立权限选择。摄像头仅用于二维码；拒绝可选权限不影响正常登录。","모바일 앱: 기기 기술 정보, 세션 정보 및 별도 권한 선택. 카메라는 QR 전용이며 선택 권한을 거부해도 일반 로그인이 가능합니다."],
   "Главная": ["Home","首页","홈"],
   "Ваши устройства, коллектив и персональный ассистент.": ["Your devices, collective and personal assistant.","您的设备、集体和个人助手。","내 기기, 커뮤니티 및 개인 어시스턴트."],
   "Вход по QR-коду": ["QR sign-in","二维码登录","QR 로그인"],
