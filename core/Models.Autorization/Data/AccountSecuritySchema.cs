@@ -39,6 +39,24 @@ public static class AccountSecuritySchema
         var timestamp=db.Database.IsNpgsql()?"timestamp with time zone":"TEXT";
         var boolean=db.Database.IsNpgsql()?"boolean":"INTEGER";
         var sql=$"""
+            CREATE TABLE IF NOT EXISTS chat_rp_consents (
+                "Id" {guid} NOT NULL PRIMARY KEY,
+                "Provider" varchar(16) NOT NULL,
+                "BotId" varchar(20) NOT NULL,
+                "Peer" varchar(24) NOT NULL,
+                "EventId" varchar(128) NOT NULL,
+                "ActorId" varchar(20) NOT NULL,
+                "TargetId" varchar(20) NOT NULL,
+                "ActorName" varchar(64) NOT NULL,
+                "TargetName" varchar(64) NOT NULL,
+                "Action" INTEGER NOT NULL,
+                "CreatedUtc" {timestamp} NOT NULL,
+                "ExpiresUtc" {timestamp} NOT NULL,
+                "Consumed" {boolean} NOT NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_chat_rp_consents_Provider_BotId_EventId"
+                ON chat_rp_consents ("Provider","BotId","EventId");
+            CREATE INDEX IF NOT EXISTS "IX_chat_rp_consents_ExpiresUtc" ON chat_rp_consents ("ExpiresUtc");
             CREATE TABLE IF NOT EXISTS chat_rp_deliveries (
                 "Id" {guid} NOT NULL PRIMARY KEY,
                 "Provider" varchar(16) NOT NULL,

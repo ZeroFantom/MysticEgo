@@ -77,6 +77,37 @@ public static class ChatRpGroupProof
         return MessengerWebhookProof.Fresh(at,now)?at:null;
     }
     private static bool EventId(string? value)=>value is {Length:>0 and <=128}&&value.All(c=>c is >= '!' and <= '~');
+    private static ChatRpDecision? Decision(MessengerRealm realm,string peer,string sender,string? command,string? callback=null)
+    {
+        if(command is null||command.Length!=37||!(command.StartsWith("rp:a:",StringComparison.Ordinal)||
+            command.StartsWith("rp:d:",StringComparison.Ordinal))||!Guid.TryParseExact(command[5..],"N",out var id)||
+            id==Guid.Empty||!ChatRpDestination.Valid(realm,peer))return null;
+        return new(realm,peer,sender,id,command[3]=='a',callback);
+    }
+
+    public static ChatRpDecision? TelegramDecision(MessengerRealm realm,string secret,string? header,JsonElement root,DateTimeOffset now)
+    {
+        if(!realm.Valid||realm.Provider!="telegram"||!MessengerWebhookProof.SecretMatches(secret,header)||
+            !TelegramIdentityProof.UniqueObject(root)||!Obj(root,"callback_query",out var q)||
+            !Obj(q,"message",out var m)||!Obj(m,"chat",out var chat)||Text(chat,"type") is not ("group" or "supergroup")||
+            m.TryGetProperty("message_thread_id",out _)||m.TryGetProperty("is_topic_message",out _)||
+            Num(chat,"id") is not long peer||!Obj(q,"from",out var from)||
+            !from.TryGetProperty("is_bot",out var bot)||bot.ValueKind!=JsonValueKind.False||
+            Id(from,"id") is not string sender||!Obj(m,"from",out var author)||Id(author,"id")!=realm.BotId||
+            Date(m,now) is null||Text(q,"id") is not {Length:>0 and <=128} callback)return null;
+        return Decision(realm,peer.ToString(CultureInfo.InvariantCulture),sender,Text(q,"data"),callback);
+    }
+
+    // VK inline text buttons emit message_new; the command is scoped to the actual sender and peer.
+    public static ChatRpDecision? VkDecision(MessengerRealm realm,string secret,JsonElement root,DateTimeOffset now)
+    {
+        if(!MessengerWebhookProof.VkEnvelope(realm,secret,root)||Text(root,"type")!="message_new"||
+            !Obj(root,"object",out var obj)||!Obj(obj,"message",out var m)||Num(m,"out")!=0||
+            Num(m,"peer_id") is not long peer||Id(m,"from_id") is not string sender||
+            Date(m,now) is null||!EventId(Text(root,"event_id")))return null;
+        return Decision(realm,peer.ToString(CultureInfo.InvariantCulture),sender,Text(m,"text"));
+    }
+
     public static ChatRpEvent? Telegram(MessengerRealm realm,string secret,string? header,JsonElement root,DateTimeOffset now)
     {
         if(!realm.Valid||realm.Provider!="telegram"||!MessengerWebhookProof.SecretMatches(secret,header)||

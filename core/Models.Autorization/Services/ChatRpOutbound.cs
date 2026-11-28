@@ -18,9 +18,18 @@ public sealed class ChatRpOutbound : IDisposable
 
     public async Task<bool> Send(ChatRpDelivery row,string? token,ChatRpMedia? media,string? vkAttachment,CancellationToken ct=default)
     {
+        return await SendCore(row,token,media,vkAttachment,null,ct);
+    }
+
+    public Task<bool> Invite(ChatRpEvent e,ChatRpConsentService.Invitation invitation,string? token,CancellationToken ct=default) =>
+        SendCore(new ChatRpDelivery{Id=invitation.Id,Provider=e.Realm.Provider,BotId=e.Realm.BotId,Peer=e.Peer,
+            Caption=invitation.Text,Category="consent"},token,null,null,invitation.Id,ct);
+
+    private async Task<bool> SendCore(ChatRpDelivery row,string? token,ChatRpMedia? media,string? vkAttachment,Guid? invite,CancellationToken ct)
+    {
         var realm=new MessengerRealm(row.Provider,row.BotId);
         if(!ChatRpDestination.Valid(realm,row.Peer)||row.Caption is not {Length:>0 and <=512}||
-            !ChatRpCatalog.All.Any(x=>x.Category==row.Category&&!x.RequiresConsent)||
+            (invite is null&&!ChatRpCatalog.All.Any(x=>x.Category==row.Category))||
             token is not {Length:>=16 and <=512})return false;
         var fields=new Dictionary<string,string>();
         string endpoint;
@@ -45,6 +54,10 @@ public sealed class ChatRpOutbound : IDisposable
                 }
             }
             if(method=="sendMessage"){fields["text"]=row.Caption;fields["disable_web_page_preview"]="true";}
+            if(invite is Guid invitation)
+                fields["reply_markup"]=JsonSerializer.Serialize(new{inline_keyboard=new[]{new[]{
+                    new{text="Принять",callback_data="rp:a:"+invitation.ToString("N")},
+                    new{text="Отклонить",callback_data="rp:d:"+invitation.ToString("N")}}}});
             endpoint="https://api.telegram.org/bot"+token+"/"+method;
         }
         else
@@ -55,6 +68,15 @@ public sealed class ChatRpOutbound : IDisposable
             var digest=SHA256.HashData(Encoding.UTF8.GetBytes("group-rp:"+row.Id.ToString("D")));
             var random=(int)(System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(digest)&0x7fffffff);
             fields["random_id"]=(random==0?1:random).ToString(CultureInfo.InvariantCulture);
+            if(invite is Guid invitation)
+            {
+                // Inline text actions preserve an exact handle in the provider message text.
+                // Labels use the actual command; the adjacent caption explains acceptance.
+                fields["keyboard"]=JsonSerializer.Serialize(new{inline=true,buttons=new[]{new[]{
+                    new{action=new{type="text",label="rp:a:"+invitation.ToString("N")},color="positive"},
+                    new{action=new{type="text",label="rp:d:"+invitation.ToString("N")},color="negative"}}}});
+                fields["message"]+="\nЗелёная кнопка — принять, красная — отклонить.";
+            }
             // VK requires an already uploaded, operator-approved native attachment.
             if(vkAttachment is {Length:>0 and <=80}&&System.Text.RegularExpressions.Regex.IsMatch(vkAttachment,
                 @"\A(?:photo|doc)-?[1-9][0-9]{0,18}_[1-9][0-9]{0,18}\z"))
@@ -73,6 +95,22 @@ public sealed class ChatRpOutbound : IDisposable
         }
         catch(Exception ex) when(ex is HttpRequestException or JsonException or ArgumentException or InvalidOperationException||
             ex is OperationCanceledException&&!ct.IsCancellationRequested){return false;}
+    }
+
+    public async Task Acknowledge(MessengerRealm realm,string callback,string? token,CancellationToken ct=default)
+    {
+        if(realm.Provider!="telegram"||!realm.Valid||token is not {Length:>=16 and <=512}||
+            !token.StartsWith(realm.BotId+":",StringComparison.Ordinal)||
+            !token[(realm.BotId.Length+1)..].All(c=>char.IsAsciiLetterOrDigit(c)||c is '_' or '-')||
+            callback is not {Length:>0 and <=128})return;
+        try
+        {
+            using var request=new HttpRequestMessage(HttpMethod.Post,"https://api.telegram.org/bot"+token+"/answerCallbackQuery")
+                {Content=new FormUrlEncodedContent(new Dictionary<string,string>{{"callback_query_id",callback}})};
+            using var response=await http.SendAsync(request,ct);
+        }
+        catch(Exception ex) when(ex is HttpRequestException or ArgumentException ||
+            ex is OperationCanceledException&&!ct.IsCancellationRequested){}
     }
 
     public void Dispose()=>http.Dispose();

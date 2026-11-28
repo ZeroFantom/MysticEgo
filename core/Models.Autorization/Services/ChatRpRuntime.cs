@@ -28,13 +28,20 @@ public static class ChatRpDestination
 /// No private account links, world messages, arbitrary text or consent-sensitive actions.</summary>
 public sealed class ChatRpRuntime(AuthDbContext db,TimeProvider clock)
 {
-    public async Task<Guid?> Queue(ChatRpEvent e,ChatRpGroupPolicy policy,CancellationToken ct=default)
+    public Task<Guid?> Queue(ChatRpEvent e,ChatRpGroupPolicy policy,CancellationToken ct=default) =>
+        QueueCore(e,policy,false,ct);
+
+    // Only ChatRpConsentService calls this inside the transaction consuming a target decision.
+    internal Task<Guid?> QueueConsented(ChatRpEvent e,ChatRpGroupPolicy policy,CancellationToken ct) =>
+        QueueCore(e,policy,true,ct);
+
+    private async Task<Guid?> QueueCore(ChatRpEvent e,ChatRpGroupPolicy policy,bool consented,CancellationToken ct)
     {
         if(!policy.Allows(e)||!ChatRpDestination.Valid(e.Realm,e.Peer)||!MessengerWebhookProof.Fresh(e.Occurred,clock.GetUtcNow())||
             !TelegramIdentityProof.PositiveId(e.Actor.Id)||!TelegramIdentityProof.PositiveId(e.Target.Id)||
             e.Actor.Id==e.Target.Id||e.EventId is not {Length:>0 and <=128}||
             e.EventId.Any(c=>!(c is >= '!' and <= '~'))||
-            ChatRpCatalog.Find(e.Action) is not {RequiresConsent:false} action)return null;
+            ChatRpCatalog.Find(e.Action) is not { } action||action.RequiresConsent&&!consented)return null;
         var now=clock.GetUtcNow().UtcDateTime;
         // Advisory throttle under concurrency; deploy a strict provider/peer limiter as well.
         var cutoff=now.AddMinutes(-1);

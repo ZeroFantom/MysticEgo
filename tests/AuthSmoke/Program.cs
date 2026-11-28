@@ -151,3 +151,5 @@ await MessengerWorldHandoffSmoke.Run();
 await ChatRpSmoke.Run();
 
 await ChatRpRuntimeSmoke.Run();
+
+await ChatRpConsentSmoke.Run();
