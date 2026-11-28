@@ -15,8 +15,16 @@ public sealed class NodeState
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(options.DataPath))!);
         var path = Path.GetFullPath(options.DataPath);
         var connection = RelationalStorage.NodeConnection(path, options.DatabaseConnection, options.DatabaseConnectionFile);
-        Journal = new AuditJournal(path + ".audit.db", RelationalStorage.IsPostgres(connection) ? connection : null);
+        var postgres = RelationalStorage.IsPostgres(connection);
         Data = new DynamicEntityStore(connection);
+        // A fresh SQLite node must have its actual database before the API advertises
+        // readiness. DynamicEntityStore intentionally opens lazily; merely creating
+        // the service or its separate audit journal did not create node.db.
+        // Initialize the existing record schema, not a placeholder file. Never
+        // switch a configured PostgreSQL provider or modify existing nonempty SQLite.
+        if (!postgres && (!File.Exists(path) || new FileInfo(path).Length == 0))
+            Data.EnsureSchemaAsync<RecordDocument>().GetAwaiter().GetResult();
+        Journal = new AuditJournal(path + ".audit.db", postgres ? connection : null);
     }
     public void Log(string actor,string action,string target,bool success,string? detail=null)
     {
