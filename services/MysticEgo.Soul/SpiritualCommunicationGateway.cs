@@ -25,7 +25,7 @@ public sealed record SpiritualContactPage(Guid Revision, IReadOnlyList<Spiritual
 
 /// <summary>Caller is already authenticated; no client-supplied world/area/friendship or provider identity.</summary>
 public sealed record SpiritualHistoryItem(Guid MessageId,string Direction,string Text,DateTimeOffset CreatedUtc);
-public sealed record SpiritualNpcTurn(Guid MessageId,string NpcName,string Text);
+public sealed record SpiritualNpcTurn(Guid MessageId,string NpcName,string Text,Guid Revision);
 public sealed record SpiritualSendRequest(Guid RequestId, string RecipientId, string Text);
 public enum SpiritualSendStatus { Unavailable, Accepted }
 public sealed record SpiritualSendResult(SpiritualSendStatus Status, Guid? MessageId = null);
@@ -266,6 +266,7 @@ public sealed class SpiritualCommunicationGateway(TimeProvider clock, SpiritualM
     {
         if(journal is null||journal.HasReply(messageId)||journal.CommittedEntry(messageId) is not { } row||
             row.Owner!=account||row.RecipientKind!=SpiritualParticipantKind.Npc||row.RecipientOwner is not null||
+            row.Message.AcceptedUtc>clock.GetUtcNow().AddSeconds(2)||
             clock.GetUtcNow()-row.Message.AcceptedUtc>TimeSpan.FromMinutes(2))return null;
         var route=Resolve(account,row.Message.RecipientId);
         if(route is null||route.Value.Pair.Sender.EntityId!=row.Message.SenderId||
@@ -282,17 +283,17 @@ public sealed class SpiritualCommunicationGateway(TimeProvider clock, SpiritualM
         {
             var row=NpcRoute(account,messageId);
             return row is not null&&labels.TryGetValue(row.Message.RecipientId,out var name)?
-                new(messageId,name,row.Message.Text):null;
+                new(messageId,name,row.Message.Text,presence.Version):null;
         }
     }
 
     /// <summary>Commit one response after rechecking both directions. Never holds the world lock
     /// during inference. This is a reference inbox, not a network delivery guarantee.</summary>
-    public bool CommitNpcReply(Guid account,Guid messageId,string text)
+    public bool CommitNpcReply(Guid account,Guid messageId,Guid expectedRevision,string text)
     {
         if(string.IsNullOrWhiteSpace(text)||text.Length>4000||
             text.Any(c=>char.IsControl(c)&&c!='\n'&&c!='\r'&&c!='\t'))return false;
-        lock(gate)return NpcRoute(account,messageId) is not null&&journal!.SaveReply(messageId,text,clock.GetUtcNow());
+        lock(gate)return expectedRevision==presence.Version&&NpcRoute(account,messageId) is not null&&journal!.SaveReply(messageId,text,clock.GetUtcNow());
     }
 
     private (WorldPresencePair Pair, SpiritualConnectionDecision Decision)? Resolve(Guid account, string recipient)
