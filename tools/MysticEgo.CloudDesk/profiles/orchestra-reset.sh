@@ -5,9 +5,9 @@ umask 077
 mode=$1
 domain=$2
 expected=$3
-[[ $mode == check || $mode == execute ]]
+[[ $mode == check || $mode == execute || $mode == verify ]]
 [[ $domain =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,63}$ && $domain != *..* ]]
-[[ $expected =~ ^[a-f0-9-]{36}$ ]]
+[[ $expected =~ ^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$ ]]
 [[ $(id -u) == 0 && $(uname -m) == x86_64 ]]
 . /etc/os-release
 [[ $ID == ubuntu && $VERSION_ID == 24.04 ]]
@@ -67,6 +67,52 @@ CADDY
  active_setups=$(systemctl list-units 'mysticego-local-setup@*.service' --state=active,activating,deactivating --no-legend --plain)
  [[ -z $active_setups ]] || die 'local setup busy'
 }
+# Read-only verification shared by normal completion and SSH reconnect.
+verify_postinstall(){
+ local wanted=$1 state_root=$2 app_root=$3 new='' public='' installed='' i
+ echo CLOUDDESK_RESET_STEP:verify-identity
+ for ((i=0;i<12;i++)); do
+   new=$(health http://127.0.0.1:5500/health/live 2>/dev/null) || new=''
+   public=$(health "https://$domain/health/live" 2>/dev/null) || public=''
+   if [[ $new =~ ^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$ && $new != "$expected" && $public == "$new" ]]; then break; fi
+   sleep 2
+ done
+ [[ $new =~ ^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$ ]] || die 'post-install: local Orchestra health or node ID unavailable'
+ [[ $new != 00000000-0000-0000-0000-000000000000 ]] || die 'post-install: empty node ID'
+ [[ $new != "$expected" ]] || die 'post-install: old node identity still returned'
+ [[ $public == "$new" ]] || die 'post-install: HTTPS and local node identities differ'
+ [[ -s "$state_root/center-id.txt" ]] || die 'post-install: center-id.txt missing'
+ [[ $(cat "$state_root/center-id.txt") == "$new" ]] || die 'post-install: persisted center identity differs'
+ echo CLOUDDESK_RESET_STEP:verify-storage
+ [[ -s "$state_root/auth.db" ]] || die 'post-install Auth SQLite store missing or empty'
+ [[ -s "$state_root/orchestra/node.db" ]] || die 'post-install Orchestra SQLite store missing or empty'
+ installed=$(python3 - "$app_root/runtime/app/web/orchestra/release-info.json" <<'PY'
+import json,sys
+print(json.load(open(sys.argv[1]))["installed"])
+PY
+ ) || die 'post-install: installed release metadata unavailable'
+ [[ $installed == "$wanted" ]] || die 'post-install: installed release differs from approved release'
+ systemctl is-active --quiet mysticego-orchestra.service || die 'post-install: Orchestra service is not active'
+ systemctl is-active --quiet caddy.service || die 'post-install: Caddy service is not active'
+ # A separate pending status preserves the R3.2.43 non-destructive repair policy.
+ if systemctl is-active --quiet mysticego-orchestra-updater.timer &&
+    systemctl is-active --quiet mysticego-local-setup.socket &&
+    systemctl is-active --quiet mysticego-infrastructure-reconcile.timer; then
+   echo CLOUDDESK_RESET_MAINTENANCE_SCHEDULED
+ else
+   echo CLOUDDESK_RESET_MAINTENANCE_PENDING
+ fi
+ echo CLOUDDESK_RESET_STEP:complete
+ echo "FACTORY_RESET_OK $new"
+}
+if [[ $mode == verify ]]; then
+ [[ ${4:-} =~ ^v1\.0\.0-beta\.7-r[0-9]+\.[0-9]+\.[0-9]+$ ]] || die 'invalid verification release'
+ # Refuse to certify a half-completed installation; no mutation except the lock file.
+ exec 9>/run/lock/mysticego-clouddesk-deploy.lock
+ flock -w 60 9 || die 'deployment still busy; verify later, do not repeat reset'
+ verify_postinstall "$4" /var/lib/mysticego /opt/mysticego/app
+ exit 0
+fi
 if [[ $mode == check ]]; then
  preflight
  echo FACTORY_RESET_PREFLIGHT_OK
@@ -124,23 +170,6 @@ flock -u 8
 echo CLOUDDESK_RESET_STEP:install
 # The standard installer borrows the deployment lock; compatible recovery keeps it held.
 MYSTICEGO_INSTALL_LOCK_FD=9 MYSTICEGO_INSTALL_PREREQS_READY=1 bash install.sh "$PWD/r3.zip" "$domain" '' "$digest" native sqlite
-# Installer readiness is not factory-reset completion. Never repeat deletion here.
-echo CLOUDDESK_RESET_STEP:verify-identity
-new=$(health http://127.0.0.1:5500/health/live) || die 'post-install local health check failed; do not repeat reset'
-[[ $new =~ ^[a-f0-9-]{36}$ && $new != "$expected" ]] || die 'new local identity not verified; do not repeat reset'
-public=$(health "https://$domain/health/live") || die 'post-install HTTPS health check failed; do not repeat reset'
-[[ $public == "$new" ]] || die 'local and HTTPS identities differ; do not repeat reset'
-echo CLOUDDESK_RESET_STEP:verify-storage
-# Health may precede initialization of the local SQLite stores. Allow a bounded
-# wait, then name the missing invariant instead of returning a silent exit 1.
-# A fresh VPS report showed node.db appearing almost five minutes after auth.db.
-# Wait up to six minutes, without requiring a user login or repeating deletion.
-for ((i=0;i<180;i++)); do
- [[ -f /var/lib/mysticego/auth.db && -f /var/lib/mysticego/orchestra/node.db ]] && break
- sleep 2
-done
-[[ -f /var/lib/mysticego/auth.db ]] || die 'post-install Auth SQLite store missing; do not repeat reset'
-[[ -f /var/lib/mysticego/orchestra/node.db ]] || die 'post-install Orchestra SQLite store missing; do not repeat reset'
-[[ $(health http://127.0.0.1:5500/health/live) == "$new" && $(health "https://$domain/health/live") == "$new" ]] || die 'identity changed during storage verification; do not repeat reset'
-echo CLOUDDESK_RESET_STEP:complete
-echo "FACTORY_RESET_OK $new"
+# The installer already waits for SQLite. Final verification adds persisted identity,
+# approved release and active core services, without retrying deletion.
+verify_postinstall "$tag" /var/lib/mysticego /opt/mysticego/app

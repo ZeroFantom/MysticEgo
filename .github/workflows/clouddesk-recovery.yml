@@ -24,6 +24,7 @@ jobs:
       - run: dotnet publish tools/MysticEgo.CloudDesk/backend/CloudDesk.csproj -c Release -o "${{ runner.temp }}/clouddesk"
       - run: node ops/desktop-releases/clouddesk-smoke.mjs dotnet "${{ runner.temp }}/clouddesk/CloudDesk.dll"
       - run: node ops/desktop-releases/clouddesk-recovery-smoke.mjs
+      - run: bash ops/desktop-releases/clouddesk-reset-postcheck-smoke.sh
       - run: node --check tools/MysticEgo.CloudDesk/desktop/main.cjs
       - run: bash -n ops/orchestra-updater/recover-maintenance.sh
       - run: bash -n tools/MysticEgo.CloudDesk/profiles/orchestra-reset.sh && bash -n tools/MysticEgo.CloudDesk/profiles/orchestra-r3.sh

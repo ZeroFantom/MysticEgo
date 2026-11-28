@@ -102,6 +102,8 @@ sealed partial class CloudDesk
         "CLOUDDESK_RESET_STEP:complete"=>"VPS · сброс подтверждён",
         "CLOUDDESK_MAINTENANCE_PENDING"=>"VPS · установка завершена, требуется безопасное восстановление обслуживания",
         "CLOUDDESK_MAINTENANCE_SCHEDULED"=>"VPS · компоненты проверяются локальной службой",
+        "CLOUDDESK_RESET_MAINTENANCE_PENDING"=>"VPS · новый узел установлен, требуется ремонт службы обслуживания",
+        "CLOUDDESK_RESET_MAINTENANCE_SCHEDULED"=>"VPS · серверное обслуживание запланировано",
         _=>null
     };
     static Guid? InstallIdentity(string output,string marker)
@@ -142,15 +144,42 @@ sealed partial class CloudDesk
             var command="cd "+remote+" && printf '%s  reset.sh\\n%s  install.sh\\n' "+scriptDigest+" "+installerDigest+
                 " | sha256sum -c - && bash reset.sh execute "+ResetQ(identity.Domain)+" "+ResetQ(identity.Node)+" "+ResetQ(release.Tag)+" "+ResetQ(release.Digest);
             progress("Проверка цели на VPS перед необратимым сбросом");
-            var output=await SSH(args,command,45,line=>{var message=DeploymentStepMessage(line);if(message!=null)progress(message);});
+            var installStarted=false;
+            var reconnectVerified=false;
+            string output;
+            try
+            {
+                output=await SSH(args,command,45,line=>{
+                    if(line.Trim()=="CLOUDDESK_RESET_STEP:install")installStarted=true;
+                    var message=DeploymentStepMessage(line);if(message!=null)progress(message);
+                });
+            }
+            catch(Exception original) when(installStarted && original is not OperationCanceledException)
+            {
+                // Verify only the exact, previously uploaded script on the same trusted VPS.
+                // Never call execute a second time.
+                progress("Проверяем результат установки без повторного удаления");
+                try
+                {
+                    await VerifyReuploadTarget(args);
+                    output=await SSH(args,"cd "+remote+" && printf '%s  reset.sh\\n' "+scriptDigest+
+                        " | sha256sum -c - && bash reset.sh verify "+ResetQ(identity.Domain)+" "+ResetQ(identity.Node)+" "+ResetQ(release.Tag),4,
+                        line=>{var message=DeploymentStepMessage(line);if(message!=null)progress(message);});
+                    reconnectVerified=true;
+                }
+                catch(Exception verification)
+                {
+                    throw new Exception("Итог переустановки не подтверждён. Повторный сброс не выполнялся.\nПроверка: "+verification.Message+"\nПервоначальный результат: "+original.Message);
+                }
+            }
             var verified=InstallIdentity(output,"FACTORY_RESET_OK");
-            if(verified is not Guid newNode||newNode.ToString("D")==identity.Node||InstallIdentity(output,"ORCHESTRA_INSTALL_OK")!=newNode)
+            if(verified is not Guid newNode||newNode.ToString("D")==identity.Node||(!reconnectVerified&&InstallIdentity(output,"ORCHESTRA_INSTALL_OK")!=newNode))
                 throw new Exception("Новая Orchestra не подтвердила новый ID. Не повторяйте сброс автоматически.");
             var binding=ReadBinding(approval.ServerId);
             if(binding!=null&&SameBinding(binding,approval.Host,"Orchestra",approval.Domain))SaveBinding(binding with {Phase="installed"});
             try{await SSH(args,"rm -rf -- "+remote,1);}catch{}
-            var maintenancePending=output.Split('\n').Any(line=>line.Trim()=="CLOUDDESK_MAINTENANCE_PENDING");
-            var maintenanceScheduled=output.Split('\n').Any(line=>line.Trim()=="CLOUDDESK_MAINTENANCE_SCHEDULED");
+            var maintenancePending=output.Split('\n').Any(line=>line.Trim()=="CLOUDDESK_RESET_MAINTENANCE_PENDING"||line.Trim()=="CLOUDDESK_MAINTENANCE_PENDING");
+            var maintenanceScheduled=!maintenancePending&&output.Split('\n').Any(line=>line.Trim()=="CLOUDDESK_RESET_MAINTENANCE_SCHEDULED");
             progress(maintenancePending?"Новый узел подтверждён; требуется восстановление обслуживания без сброса.":"Новый узел подтверждён; компоненты проверяются серверной службой.");
             return new {role="Orchestra",domain=identity.Domain,release=release.Tag,node=newNode.ToString("D"),reset=true,maintenancePending,maintenanceScheduled};
         }catch(Exception e){throw new Exception(e.Message+"\nПовторный сброс автоматически не выполняется. Если staging создан, он находится в "+remote);}

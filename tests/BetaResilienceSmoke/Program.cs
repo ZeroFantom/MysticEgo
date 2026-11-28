@@ -171,3 +171,28 @@ var graphQueued=interfaceControl.Navigate("developer-a",assistantWindow.Id,"/inf
 if(graphQueued.Pending is null)throw new Exception("Nested infrastructure route rejected");
 interfaceControl.Close("developer-a",assistantWindow.Id);
 Console.WriteLine("PASS: allowlisted assistant tabs and three-segment infrastructure navigation");
+
+ // A factory reset starts an entirely new state directory. The live endpoint must
+ // not precede creation of the real node database, even before any user visits it.
+var freshDirectory=Directory.CreateTempSubdirectory("mystic-fresh-node-").FullName;
+try
+{
+    var freshPath=Path.Combine(freshDirectory,"node.db");
+    var options=new NodeOptions{Kind=NodeKind.Orchestra,DataPath=freshPath,NodeId=Guid.NewGuid().ToString()};
+    var freshNode=new NodeState(options);
+    if(!File.Exists(freshPath)||new FileInfo(freshPath).Length==0||!await freshNode.Data.CheckHealthAsync())
+        throw new Exception("Fresh SQLite node is not initialized at startup");
+    if((await freshNode.Data.ListAsync<RecordDocument>()).Any())
+        throw new Exception("Fresh node must not contain fake records");
+    var record=new RecordDocument{Id=Guid.NewGuid(),Collection="factory-reset-smoke",Name="persisted",Data=System.Text.Json.JsonSerializer.SerializeToElement(new{fixture=true})};
+    await freshNode.Data.PutAsync(record);
+    var reopened=new NodeState(options);
+    if((await reopened.Data.GetAsync<RecordDocument>(record.Id))?.Name!="persisted")
+        throw new Exception("Node initialization modified existing data");
+    Console.WriteLine("PASS: fresh SQLite node initialized before readiness; existing records preserved");
+}
+finally
+{
+    Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+    Directory.Delete(freshDirectory,true);
+}

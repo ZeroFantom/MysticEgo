@@ -35,6 +35,10 @@ for(const step of ['verify-identity','verify-storage','complete'])assert(resetSc
 assert(resetScript.indexOf('CLOUDDESK_RESET_STEP:verify-identity')<resetScript.indexOf('CLOUDDESK_RESET_STEP:verify-storage'));
 assert(resetScript.indexOf('CLOUDDESK_RESET_STEP:verify-storage')<resetScript.indexOf('CLOUDDESK_RESET_STEP:complete'));
 assert(resetScript.indexOf('CLOUDDESK_RESET_STEP:complete')<resetScript.lastIndexOf('FACTORY_RESET_OK'));
+assert(resetScript.indexOf('if [[ $mode == verify ]]')<resetScript.indexOf('CLOUDDESK_RESET_STEP:delete'));
+assert(reset.includes('catch(Exception original) when(installStarted')&&reset.includes('bash reset.sh verify'));
+assert(resetScript.includes('persisted center identity differs')&&resetScript.includes('installed release differs from approved release'));
+assert(resetScript.includes('CLOUDDESK_RESET_MAINTENANCE_PENDING'));
 assert(resetScript.includes('post-install Auth SQLite store missing')&&resetScript.includes('post-install Orchestra SQLite store missing'));
 assert(!resetScript.includes('if systemctl is-enabled --quiet "$u"'));
 
