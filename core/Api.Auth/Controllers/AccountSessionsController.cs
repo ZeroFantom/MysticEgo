@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Models.Autorization.Attributes;
 using Models.Autorization.Data;
+using Models.Autorization.Services;
 
 namespace Api.Auth.Controllers;
 
@@ -25,7 +26,7 @@ public sealed class AccountSessionsController(AuthDbContext db) : BaseApiControl
         Response.Headers.CacheControl="no-store";
         return Ok(rows.OrderByDescending(x=>x.LastSeenUtc??x.CreatedAt).Select(x=>new {
             id=x.SessionId, current=x.SessionId==current, createdUtc=x.CreatedAt,lastSeenUtc=x.LastSeenUtc??x.CreatedAt,
-            expiresUtc=x.ExpiresAt,userAgent=x.UserAgent,ip=x.CreatedByIp,legacy=x.SessionId==null
+            expiresUtc=x.ExpiresAt,userAgent=x.UserAgent,device=SessionDevice.Describe(x.UserAgent),ip=x.CreatedByIp,legacy=x.SessionId==null
         }));
     }
 

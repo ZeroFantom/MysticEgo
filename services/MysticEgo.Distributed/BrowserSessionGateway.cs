@@ -28,7 +28,7 @@ public static class BrowserSessionGateway
         if(!string.IsNullOrWhiteSpace(origin)&&(!Uri.TryCreate(origin,UriKind.Absolute,out var parsed)||!OriginAllowed(origin,parsed.GetLeftPart(UriPartial.Authority),parsed.Authority)))
             throw new InvalidOperationException("BrowserSession:Origin must be an HTTPS origin without path, query or credentials.");
         app.MapGet("/api/auth/browser/status",()=>Results.Ok(new{enabled=!string.IsNullOrWhiteSpace(origin)})).AllowAnonymous();
-        foreach(var action in new[]{"login","refresh","logout"})
+        foreach(var action in new[]{"login","refresh","logout","qr/redeem"})
             app.MapPost("/api/auth/browser/"+action,(HttpContext context,IHttpClientFactory clients)=>
                 Handle(context,clients,node.AuthUrl,origin,action)).AllowAnonymous();
     }
@@ -45,7 +45,8 @@ public static class BrowserSessionGateway
         if(context.Request.Headers.Cookie.ToString().Split(';',StringSplitOptions.TrimEntries).Count(c=>c.StartsWith(CookieName+"=",StringComparison.Ordinal))>1)
         {context.Response.StatusCode=400;return;}
         var cookie=context.Request.Cookies[CookieName];
-        if(action!="login"&&(string.IsNullOrEmpty(cookie)||cookie.Length>500))
+        var fresh=action is "login" or "qr/redeem";
+        if(!fresh&&(string.IsNullOrEmpty(cookie)||cookie.Length>500))
         {
             context.Response.StatusCode=action=="logout"?204:401;return;
         }
@@ -54,16 +55,18 @@ public static class BrowserSessionGateway
         if(context.Connection.RemoteIpAddress is { } ip)request.Headers.TryAddWithoutValidation("X-Forwarded-For",ip.ToString());
         var ua=context.Request.Headers.UserAgent.ToString();
         if(ua.Length>0)request.Headers.TryAddWithoutValidation("User-Agent",ua[..Math.Min(ua.Length,500)]);
-        request.Content=action=="login"?new StreamContent(context.Request.Body):JsonContent.Create(new{refreshToken=cookie});
-        if(action=="login")request.Content.Headers.ContentType=new("application/json");
+        request.Content=fresh?new StreamContent(context.Request.Body):JsonContent.Create(new{refreshToken=cookie});
+        if(fresh)request.Content.Headers.ContentType=new("application/json");
         using var deadline=CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
         deadline.CancelAfter(TimeSpan.FromSeconds(15));
         try
         {
             using var result=await client.SendAsync(request,deadline.Token);
+            if(action=="qr/redeem"&&result.StatusCode==System.Net.HttpStatusCode.Accepted)
+            {context.Response.StatusCode=202;return;}
             if(!result.IsSuccessStatusCode)
             {
-                if(action!="login"&&result.StatusCode==System.Net.HttpStatusCode.Unauthorized)context.Response.Cookies.Delete(CookieName,Options());
+                if(!fresh&&result.StatusCode==System.Net.HttpStatusCode.Unauthorized)context.Response.Cookies.Delete(CookieName,Options());
                 context.Response.StatusCode=(int)result.StatusCode;return;
             }
             if(action=="logout")

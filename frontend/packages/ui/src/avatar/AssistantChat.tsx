@@ -6,6 +6,8 @@ import {ErrorBanner} from '../components/primitives';
 import {AvatarStage,type AvatarMotion} from './AvatarStage';
 import {defaultAppearance,deviceAvatar,intensityByStyle,useAvatarMedia,usePersonalAvatar,type AvatarAsset} from './PersonalAvatar';
 import {inferVisualMood,useAvatarVoice,useMusicBeat} from './avatarAudio';
+import {AvatarTransfer} from './AvatarTransfer';
+import {useIncomingAvatar,type Snapshot} from './avatarTransferState';
 
 export type Proposal={id:string;type:string;argument:string};
 export type Character={name:string;tone:string;detail:string;initiative:number;interests:string;mood:string;music:string;voice:boolean;moveDesktop:boolean;version:string};
@@ -17,7 +19,7 @@ const actions:Record<string,string>={launch_application:'Запустить пр
 const time=new Intl.DateTimeFormat('ru-RU',{hour:'2-digit',minute:'2-digit'});
 
 export function AssistantChat({status,compact=false,patrol=false}:{status?:AssistantStatus|null;compact?:boolean;patrol?:boolean}){
-  const {api,mode,portal}=useApp();
+  const {api,mode,portal,preferenceScope}=useApp();
   const localHandoff=(mode==='agent'||mode==='audit')&&!portal&&['127.0.0.1','localhost','[::1]'].includes(location.hostname);
   const hasAvatar=mode==='audit'||mode==='agent';
   const library=usePersonalAvatar(hasAvatar);
@@ -33,6 +35,9 @@ export function AssistantChat({status,compact=false,patrol=false}:{status?:Assis
   const [text,setText]=useState(''),[pending,setPending]=useState(''),[clearing,setClearing]=useState(false);
   const [error,setError]=useState(''),[proposals,setProposals]=useState<Proposal[]>([]),[result,setResult]=useState('');
   const [manualMotion,setManualMotion]=useState<AvatarMotion>(),[expression,setExpression]=useState('');
+  const [importedAvatar,setImportedAvatar]=useState<Snapshot|null>(null);
+  useEffect(()=>{setImportedAvatar(null);setManualMotion(undefined)},[preferenceScope]);
+  useIncomingAvatar('chat',value=>{setImportedAvatar(value);setManualMotion(value.motion)},!compact&&hasAvatar);
   const voice=useAvatarVoice(),music=useMusicBeat();
   const [handoff,setHandoff]=useState<Handoff|null>(null),[handoffBusy,setHandoffBusy]=useState(false),[onDesktop,setOnDesktop]=useState(false);
   const scene=useRef<HTMLDivElement>(null);
@@ -112,7 +117,7 @@ export function AssistantChat({status,compact=false,patrol=false}:{status?:Assis
       <button type="button" className="icon-btn" aria-label="Очистить историю" disabled={busy||!messages.length} onClick={()=>setClearing(value=>!value)}><Trash2 size={17}/></button>
     </div>
     {visible&&!onDesktop&&<div className="assistant-scene" ref={scene}>
-      <AvatarStage url={media.model?.url} mime={media.model?.mime} motion={moving} mood={inferVisualMood(expression)} onPlayback={(motion,seconds)=>{playback.current={motion,seconds}}}
+      <AvatarStage key={importedAvatar?'handoff-'+importedAvatar.motion+'-'+importedAvatar.phaseSeconds:'default'} url={media.model?.url} mime={media.model?.mime} motion={moving} mood={expression?inferVisualMood(expression):importedAvatar?.mood??'neutral'} initialPhase={importedAvatar?.phaseSeconds??0} play={importedAvatar?1:0} onPlayback={(motion,seconds)=>{playback.current={motion,seconds}}}
         speech={view.animateReplies?voice.speech:0} viseme={voice.viseme} beat={music.beat} animations={media.clips}
         appearance={view} intensity={intensityByStyle[selection?.motionStyle??'calm']}/>
       <div className="assistant-scene-tools"><Link to="/avatars" className="btn secondary tiny">Студия VRM</Link>
@@ -121,6 +126,8 @@ export function AssistantChat({status,compact=false,patrol=false}:{status?:Assis
         }}>{manualMotion?'Стоп':'Музыка'}</button>
         {localHandoff&&<button type="button" className="btn secondary tiny" disabled={handoffBusy||!!handoff} onClick={()=>void transfer('walk')}>На рабочий стол</button>}</div>
     </div>}
+    {!compact&&visible&&<AvatarTransfer snapshot={()=>({motion:(['idle','wave','nod','walk','sit','dance'].includes(playback.current.motion)?playback.current.motion:'idle') as Snapshot['motion'],mood:expression?inferVisualMood(expression):importedAvatar?.mood??'neutral',phaseSeconds:Math.min(3600,playback.current.seconds)})}/>}
+    {importedAvatar&&!compact&&<button className="btn secondary tiny" onClick={()=>{setImportedAvatar(null);setManualMotion(undefined)}}>Сбросить перенесённое состояние</button>}
     {handoff&&<p role="status">Подтвердите переход VRM в AgentDesktop или AuditDesktop на этом компьютере.</p>}
     {onDesktop&&<div className="line"><p role="status">Настольный аватар запущен. Для завершения прогулки используйте его кнопку «Стоп» или закройте окно.</p><button className="btn secondary tiny" type="button" onClick={()=>setOnDesktop(false)}>Показать VRM в браузере</button></div>}
     {clearing&&<div className="assistant-clear"><span>Очистить историю этого диалога?</span><button className="btn tiny" onClick={()=>void clear()}>Очистить</button>

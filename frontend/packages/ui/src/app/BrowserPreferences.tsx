@@ -3,6 +3,7 @@ import {ShieldCheck} from 'lucide-react';
 import {browserKind,browserLabels,readConsent,saveConsent} from './browserPolicy';
 import {useLocale} from './presentation';
 import './browser-preferences.css';
+import {MobileAppOffer} from './MobileAppOffer';
 const PrivacyContext=createContext({ready:true,open:()=>{},enabled:false});
 export function useBrowserConsentReady(){return useContext(PrivacyContext).ready}
 export function PrivacyLink(){const {open,enabled}=useContext(PrivacyContext);const t=useLocale();return enabled?<button type="button" className="browser-privacy-link" onClick={open}><ShieldCheck size={15} aria-hidden="true"/><span>{t('Настройки приватности')}</span></button>:null}
@@ -11,11 +12,12 @@ export function BrowserPreferences({children,publicPage=false}:{children:ReactNo
  const [consent,setConsent]=useState(readConsent),[desktop,setDesktop]=useState(false),[editing,setEditing]=useState(false);
  const dialog=useRef<HTMLDialogElement>(null);
  useEffect(()=>{document.documentElement.dataset.browser=kind;const sync=()=>setConsent(readConsent());window.addEventListener('mystic-browser-consent',sync);window.addEventListener('storage',sync);return()=>{window.removeEventListener('mystic-browser-consent',sync);window.removeEventListener('storage',sync)}},[kind]);
- const desktopApp=kind==='desktop',blocked=kind==='unsupported'&&!publicPage;
+ const desktopApp=kind==='desktop'||kind==='android',blocked=kind==='unsupported'&&!publicPage;
  const enabled=!desktopApp&&!blocked,show=enabled&&(!consent||editing);
  useEffect(()=>{const el=dialog.current;if(show&&el&&!el.open)el.showModal();else if(!show&&el?.open)el.close()},[show]);
  function save(value:boolean){setConsent(saveConsent(value));setEditing(false)}
  return <PrivacyContext.Provider value={{ready:!show,enabled:enabled&&!!consent,open:()=>{setDesktop(consent?.desktopDiscovery??false);setEditing(true)}}}>
+ {(!show||blocked)&&<MobileAppOffer/>}
  {blocked?<main className="auth-experience auth-recovery"><section className="auth-form-side"><div className="auth-form-card"><h1>{t('Браузер не поддерживается')}</h1><p>{t('Вход доступен в Mozilla Firefox, Яндекс Браузере, Microsoft Edge и Google Chrome.')}</p><p>{t('Откройте этот адрес в одном из поддерживаемых браузеров.')}</p><a href="/share">{t('О проекте MysticEgo')}</a></div></section></main>:children}
  {enabled&&consent&&<footer className="browser-public-footer"><PrivacyLink/></footer>}
  {enabled&&<dialog ref={dialog} className="browser-consent" aria-labelledby="privacy-heading" onCancel={e=>{e.preventDefault();if(consent)setEditing(false)}}>

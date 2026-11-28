@@ -3,6 +3,7 @@ import {useLocale} from '../app/presentation';
 import {useState,type FormEvent} from 'react';
 import {browserKind,browserLabels} from '../app/browserPolicy';
 import {DesktopSignIn} from '../app/DesktopSignIn';
+import {QrReceive} from '../app/QrSignIn';
 import {ArrowRight,Boxes,Eye,EyeOff,KeyRound,Network,Shield,Sparkles,UserRound} from 'lucide-react';
 import type {Session} from '../app/context';
 import {useRemote} from '../app/context';
@@ -33,7 +34,7 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
  const [login,setLogin]=useState(''),[password,setPassword]=useState(''),[nickname,setNickname]=useState('');
  const [error,setError]=useState(''),[busy,setBusy]=useState(false),[register,setRegister]=useState(false),[reveal,setReveal]=useState(false);
  const [guest,setGuest]=useState(false);
- const [pairingBusy,setPairingBusy]=useState(false);
+ const [pairingBusy,setPairingBusy]=useState(false),[qrBusy,setQrBusy]=useState(false);
  const [acceptance,setAcceptance]=useState('');
  const [enabledScopes,setEnabledScopes]=useState<string[]>([]);
  const documents=useRemote(()=>register?readRegistrationDocuments(authUrl):Promise.resolve(null),[register,authUrl]);
@@ -51,7 +52,7 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
   setError('');
  }
  async function submit(event:FormEvent){
-  event.preventDefault();if(pairingBusy)return;if(browserKind()==='unsupported'){setError('Браузер не поддерживается.');return;}setBusy(true);setError('');
+  event.preventDefault();if(pairingBusy||qrBusy)return;if(browserKind()==='unsupported'){setError('Браузер не поддерживается.');return;}setBusy(true);setError('');
   try{
    if(register){
     if(!documents.value||documents.loading||documents.error||policyKey&&acceptance!==policyKey)
@@ -65,7 +66,7 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
   }catch(error){setError(error instanceof Error?error.message:String(error))}
   finally{setBusy(false)}
  }
- return <main className="auth-experience">
+ return <main className="auth-experience" data-mobile-app={browserKind()==='android'?'true':undefined}>
   <section className="auth-visual">
    <div className="auth-brand"><Boxes size={24}/> MysticEgo</div>
    <div className="auth-orbit" aria-hidden="true"><i/><i/><i/><span className="auth-emblem"><Shield size={48}/></span></div>
@@ -78,10 +79,11 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
     <small>{t('Браузер')}: {browserLabels[browserKind()]}</small>
     <h2>{guest?t("Гостевой сеанс"):register?t("Создать аккаунт"):t("Войти в MysticEgo")}</h2>
     {mode==='orchestra'&&<PanelLoginLinks/>}
-    <DesktopSignIn session={session} authUrl={authUrl} onLogin={onLogin} disabled={busy||register||guest} onBusy={setPairingBusy}/>
+    {!register&&!guest&&<QrReceive session={session} authUrl={authUrl} disabled={busy||pairingBusy} onLogin={onLogin} onBusy={setQrBusy}/>}
+    {browserKind()!=='android'&&<DesktopSignIn session={session} authUrl={authUrl} onLogin={onLogin} disabled={busy||qrBusy||register||guest} onBusy={setPairingBusy}/>}
     {mode==='audit'&&<div className="auth-tabs" role="group" aria-label={t("Режим авторизации")} data-register={register}>
-      <button type="button" aria-pressed={!register} disabled={pairingBusy} onClick={()=>selectMode(false)}>{t("Вход")}</button>
-      <button type="button" aria-pressed={register} disabled={pairingBusy} onClick={()=>selectMode(true)}>{t("Регистрация")}</button>
+      <button type="button" aria-pressed={!register} disabled={pairingBusy||qrBusy} onClick={()=>selectMode(false)}>{t("Вход")}</button>
+      <button type="button" aria-pressed={register} disabled={pairingBusy||qrBusy} onClick={()=>selectMode(true)}>{t("Регистрация")}</button>
     </div>}
     {guest&&onGuest&&available.value?<GuestEntry apiUrl={session.url} onLogin={onGuest}/>:<form className="stack auth-form" onSubmit={submit}>
      <div className="auth-field">
@@ -108,6 +110,7 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
        <a href={policy.privacy.url} target="_blank" rel="noreferrer">{t("Как обрабатываются данные")}</a>
        <a href={policy.license.url} target="_blank" rel="noreferrer">{t("Лицензия")}</a>
        <p>{t("Подтверждаю ознакомление с условиями, политикой обработки данных и лицензией.")}</p>
+       <p>{t("Мобильное приложение: технический профиль устройства, сведения о сессии и отдельный выбор разрешений. Камера используется только для QR; отказ от необязательных прав не ограничивает обычный вход.")}</p>
        <fieldset><legend>{t("Разрешения ассистента")}</legend>
         <p>{t("Выберите возможности. Разрешение конкретного устройства потребуется отдельно.")}</p>
         {policy.scopes.map(scope=><label key={scope}><input type="checkbox" checked={enabledScopes.includes(scope)} onChange={e=>setEnabledScopes(old=>e.target.checked?[...old,scope]:old.filter(x=>x!==scope))}/>{t('permission.'+scope)}</label>)}
@@ -115,13 +118,13 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
      </div>}
      {register&&documents.loading&&<p className="footnote">{t("Загружаем документы регистрации…")}</p>}
      <ErrorBanner text={error||(register?documents.error:'')}/>
-     <button className="btn auth-submit" type="submit" disabled={busy||pairingBusy||register&&(!documents.value||documents.loading||!!documents.error||!!policyKey&&acceptance!==policyKey)}>{busy?t("Подождите…"):register?t("Создать аккаунт"):t("Войти")}<ArrowRight size={17}/></button>
+     <button className="btn auth-submit" type="submit" disabled={busy||pairingBusy||qrBusy||register&&(!documents.value||documents.loading||!!documents.error||!!policyKey&&acceptance!==policyKey)}>{busy?t("Подождите…"):register?t("Создать аккаунт"):t("Войти")}<ArrowRight size={17}/></button>
      <details className="auth-connection"><summary>{t("Адрес авторизации")}</summary><div className="auth-field">
       <label htmlFor="auth-url">{t("API авторизации")}</label><div className="auth-control"><Network size={17} aria-hidden="true"/>
-       <input id="auth-url" type="url" disabled={pairingBusy} value={authUrl} onChange={e=>setAuthUrl(e.target.value)} required/>
+       <input id="auth-url" type="url" disabled={pairingBusy||qrBusy} value={authUrl} onChange={e=>setAuthUrl(e.target.value)} required/>
       </div></div></details>
     </form>}
-    {available.value&&onGuest&&<button className="btn secondary" disabled={pairingBusy} onClick={()=>setGuest(value=>!value)}>{guest?t("Войти в аккаунт"):t("Временный аккаунт гостя")}</button>}
+    {available.value&&onGuest&&<button className="btn secondary" disabled={pairingBusy||qrBusy} onClick={()=>setGuest(value=>!value)}>{guest?t("Войти в аккаунт"):t("Временный аккаунт гостя")}</button>}
     <footer className="auth-project">
       {mode === 'orchestra' && <a href="/studio">{t("Студия и команда")}</a>}
       <LicenseLink/>

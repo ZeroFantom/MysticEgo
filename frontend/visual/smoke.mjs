@@ -438,7 +438,9 @@ try{
               await noHorizontalOverflow(page);
               await capture(page,prefix+'-public-downloads-'+theme+'-'+style);
             }
-            assert.equal(await screen.locator('.desktop-download-card').count(),3);
+            assert.equal(await screen.locator('.desktop-download-card').count(),4);
+            await visible(screen.locator('.desktop-download-card[data-product="android"]'));
+            await visible(screen.getByRole('heading',{name:'MysticEgo Mobile · Android'}));
             assert.equal(await screen.locator('.desktop-download-platforms a').count(),6);
             await screen.locator('a[href="#applications"]').click();
             assert.equal(new URL(page.url()).hash,'#applications');

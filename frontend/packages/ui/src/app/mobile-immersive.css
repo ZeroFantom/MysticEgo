@@ -1,0 +1,20 @@
+/* Mobile-only design derived from MysticEgo's lunar portal concept. Preserve existing themes and desktop layout. */
+[data-mobile-app=true]{--mobile-accent:#b9a2ff;--mobile-space:#171327}
+[data-mobile-app=true] .mobile-home-hero{position:relative;overflow:hidden;min-height:190px;padding:24px 20px;margin-bottom:20px;border-radius:24px;color:#fff;background:linear-gradient(90deg,#151226e8,#16152d65),url('./appearance-art/immersive-dark-hero.webp') center/cover;box-shadow:0 12px 30px #08071444;border:1px solid #aa91ff55}
+.mobile-home-hero span{font-size:.7rem;letter-spacing:.18em;font-weight:700}.mobile-home-hero h1{font-size:clamp(22px,6vw,32px);margin:14px 0 5px;line-height:1.15}.mobile-home-hero p{max-width:30ch;font-size:.9rem;line-height:1.5}.mobile-home-hero .btn{margin-top:8px}
+.mobile-bottom-nav{display:none}
+@media(max-width:850px){
+ .mystic-workspace[data-mobile-app=true] .content{padding-bottom:110px}
+ .mystic-workspace[data-mobile-app=true] .mobile-bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:30;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;padding:8px 4px max(8px,env(safe-area-inset-bottom));background:var(--surface,#19172a);border-top:1px solid var(--line,#4c3f73);box-shadow:0 -10px 30px #10102030}
+ .mobile-bottom-nav a{display:grid;justify-items:center;align-content:center;gap:4px;min-height:54px;padding:5px 1px;border-radius:13px;color:var(--ink,#e9e4fa);font-size:clamp(9px,2.4vw,12px);text-align:center;overflow-wrap:anywhere}
+ .mobile-bottom-nav a.active{color:var(--accent,#b9a2ff);background:color-mix(in srgb,var(--accent,#b9a2ff) 17%,transparent)}
+ .mobile-bottom-nav a:focus-visible{outline:2px solid var(--accent,#b9a2ff)}
+ .mystic-workspace[data-mobile-app=true] .panel{border-radius:20px}
+ .auth-experience[data-mobile-app=true]{display:flex;flex-direction:column;min-height:100dvh}
+ .auth-experience[data-mobile-app=true] .auth-visual{display:flex;min-height:260px;padding:22px;position:relative;background:linear-gradient(180deg,#120e25aa,#17132755 45%,#171327),url('./appearance-art/immersive-dark-entry.webp') center/cover;color:#fff}
+ .auth-experience[data-mobile-app=true] .auth-visual .auth-orbit{display:none}
+ .auth-experience[data-mobile-app=true] .auth-form-side{padding:18px 16px 32px;width:100%;min-width:0}
+ .auth-experience[data-mobile-app=true] .auth-form-card{max-width:520px;width:100%;margin:auto}
+ .auth-experience[data-mobile-app=true] .btn,.mystic-workspace[data-mobile-app=true] .btn{min-height:44px}
+}
+@media(prefers-reduced-motion:reduce){[data-mobile-app=true] .mobile-bottom-nav *{transition:none!important;animation:none!important}}

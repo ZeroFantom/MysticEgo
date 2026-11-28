@@ -72,6 +72,31 @@ await using(var db=new AuthDbContext(dbOptions))
     var count=await db.RefreshTokens.Where(x=>x.UserId==owner.Id&&(x.SessionId==null||x.SessionId!=current)).ExecuteDeleteAsync();
     if(count!=1||!await db.RefreshTokens.AnyAsync(x=>x.SessionId==current)||!await db.RefreshTokens.AnyAsync(x=>x.SessionId==unrelated))
         throw new Exception("Revoking other sessions did not preserve current/unrelated sessions");
+    var enrolled=new AccountMobileAgent{Id=Guid.NewGuid(),UserId=owner.Id,Name="Test Android",Os="Android 15",SecretHash=new string('A',64),CreatedUtc=DateTime.UtcNow};
+    db.AccountMobileAgents.Add(enrolled);await db.SaveChangesAsync();
+    if(await db.AccountMobileAgents.CountAsync(x=>x.UserId==other.Id)!=0)throw new Exception("Mobile Agent account isolation");
+    var now=DateTime.UtcNow;
+    await db.AccountMobileAgents.Where(x=>x.Id==enrolled.Id).ExecuteUpdateAsync(x=>x.SetProperty(a=>a.LastSeenUtc,now));
+    var history=new Models.Autorization.Services.MobileAgentHistory(db);
+    var job=await history.Request(owner.Id,current,enrolled.Id,"battery-status",now,default)??throw new Exception("Mobile history admission");
+    if(await history.Request(owner.Id,current,enrolled.Id,"shell",now,default)!=null||
+        (await history.Pending(other.Id,enrolled.Id,now,default)).Count!=0||
+        await history.Decide(owner.Id,Guid.NewGuid(),job.Id,true,now,default)!=null||
+        await history.Complete(owner.Id,enrolled.Id,job.Id,true,"50",now,default)!=null)throw new Exception("Mobile history isolation");
+    if((await history.Decide(owner.Id,enrolled.Id,job.Id,true,now,default))?.State!="accepted"||
+        await history.Decide(owner.Id,enrolled.Id,job.Id,true,now,default)!=null||
+        await history.Complete(owner.Id,enrolled.Id,job.Id,true,"999",now,default)!=null||
+        (await history.Complete(owner.Id,enrolled.Id,job.Id,true,"52",now,default))?.State!="reported-success"||
+        await history.Complete(owner.Id,enrolled.Id,job.Id,true,"52",now,default)!=null)throw new Exception("Mobile transition replay");
+    db.ChangeTracker.Clear();
+    var persisted=await new Models.Autorization.Services.MobileAgentHistory(db).Read(owner.Id,null,now.AddMinutes(3),default);
+    if(persisted.Single().Result!="52"||(await history.Read(other.Id,null,now,default)).Count!=0)throw new Exception("Mobile durable history");
+    var job2=await history.Request(owner.Id,current,enrolled.Id,"vibrate",now,default)??throw new Exception("Mobile second job");
+    await history.Revoke(owner.Id,enrolled.Id,now,default);
+    if(await history.Decide(owner.Id,enrolled.Id,job2.Id,true,now,default)!=null||
+        (await history.Read(owner.Id,null,now,default)).Single(x=>x.Id==job2.Id).State!="revoked")throw new Exception("Mobile revoke ledger");
+    await history.Cleanup(owner.Id,now.AddDays(31),default);
+    if((await history.Read(owner.Id,null,now.AddDays(31),default)).Count!=0)throw new Exception("Mobile history retention");
     var grant=new AccountDeviceGrant{UserId=owner.Id,DeviceId=Guid.NewGuid(),GrantId=Guid.NewGuid(),Scope="avatar-desktop",PolicyVersion="1",GrantedUtc=DateTime.UtcNow};
     db.AccountDeviceGrants.Add(grant);await db.SaveChangesAsync();
     var revoked=await db.AccountDeviceGrants.Where(x=>x.UserId==other.Id&&x.DeviceId==grant.DeviceId).ExecuteUpdateAsync(s=>s.SetProperty(x=>x.RevokedUtc,DateTime.UtcNow));
@@ -121,3 +146,70 @@ code=grants.Create(account,"source-proof",challenge,instant)!;
 if(grants.Consume(code,verifier,instant.AddSeconds(61))!=null)throw new Exception("Expired pairing accepted");
 if(grants.Create(account,"source-proof","bad",instant)!=null)throw new Exception("Invalid challenge accepted");
 Console.WriteLine("Desktop pairing proof, expiry and replay tests passed");
+
+var qrStore=new Models.Autorization.Services.QrSignIn();
+var qrPairing=new Models.Autorization.Services.DesktopPairing();
+var qrVerifier=new string('a',64);var qrOther=new string('b',64);
+var qrNow=DateTimeOffset.UtcNow;var qrAccount=Guid.NewGuid();
+var qrView=qrStore.Start(Models.Autorization.Services.DesktopPairing.Hash(qrVerifier),"Android 15 Mobile MysticEgoAndroid/1",qrNow)??throw new Exception("QR start failed");
+if(qrView.Device.Client!="MysticEgo Mobile"||qrView.Device.Os!="Android")throw new Exception("Mobile device not classified");
+if(qrStore.Redeem(qrView.Id,qrOther,qrNow).State!="invalid"||qrStore.Redeem(qrView.Id,qrVerifier,qrNow).State!="pending")throw new Exception("QR proof not enforced");
+if(qrStore.Approve(qrView.Id,"wrong",qrAccount,"source",qrPairing,qrNow))throw new Exception("QR comparison bypassed");
+if(!qrStore.Approve(qrView.Id,qrView.Comparison,qrAccount,"source",qrPairing,qrNow)||qrStore.Approve(qrView.Id,qrView.Comparison,qrAccount,"source",qrPairing,qrNow))throw new Exception("QR approval replay");
+var qrGrant=qrStore.Redeem(qrView.Id,qrVerifier,qrNow).Grant??throw new Exception("QR grant missing");
+if(qrPairing.Consume(qrGrant,qrVerifier,qrNow)?.UserId!=qrAccount||qrStore.Redeem(qrView.Id,qrVerifier,qrNow).Grant!=null)throw new Exception("QR replay accepted");
+var qrExpired=qrStore.Start(Models.Autorization.Services.DesktopPairing.Hash(qrVerifier),null,qrNow)!;
+if(qrStore.Inspect(qrExpired.Id,qrNow.AddMinutes(3))!=null)throw new Exception("Expired QR visible");
+var qrCancelled=qrStore.Start(Models.Autorization.Services.DesktopPairing.Hash(qrVerifier),null,qrNow)!;
+qrStore.Cancel(qrCancelled.Id,qrOther,qrNow);
+if(qrStore.Inspect(qrCancelled.Id,qrNow)==null)throw new Exception("Foreign verifier cancelled QR");
+qrStore.Cancel(qrCancelled.Id,qrVerifier,qrNow);
+if(qrStore.Inspect(qrCancelled.Id,qrNow)!=null)throw new Exception("QR cancellation failed");
+if(Models.Autorization.Services.SessionDevice.Describe("Mozilla iPhone OS 18_0 Safari").Os!="iOS"||Models.Autorization.Services.SessionDevice.Describe(null).Kind!="unknown")throw new Exception("Device classification mismatch");
+Console.WriteLine("QR challenge, comparison, approval, expiry, cancellation, replay and mobile classification passed");
+
+var mobileModel=Models.Autorization.Services.SessionDevice.Describe("Android 15 Mobile MysticEgoAndroid/1 MysticModel/Google_Pixel_8");
+if(mobileModel.Model!="Google Pixel 8"||mobileModel.Client!="MysticEgo Mobile")throw new Exception("Mobile model metadata missing");
+if(Models.Autorization.Services.SessionDevice.Describe("Android 15 Mobile MysticModel/Fake").Model!=null)throw new Exception("Unmarked model accepted");
+
+var qrLimited=qrStore.Start(Models.Autorization.Services.DesktopPairing.Hash(qrVerifier),null,qrNow)!;
+for(var i=0;i<5;i++)if(qrStore.Approve(qrLimited.Id,"invalid",qrAccount,"source",qrPairing,qrNow))throw new Exception("Invalid comparison approved");
+if(qrStore.Inspect(qrLimited.Id,qrNow)!=null||qrStore.Approve(qrLimited.Id,qrLimited.Comparison,qrAccount,"source",qrPairing,qrNow))throw new Exception("QR attempt limit bypassed");
+
+var deviceQueue=new Models.Autorization.Services.DeviceActionQueue();
+var deviceOwner=Guid.NewGuid();var deviceSource=Guid.NewGuid();var deviceTarget=Guid.NewGuid();var deviceNow=DateTimeOffset.UtcNow;
+var deviceRequest=deviceQueue.Request(deviceOwner,deviceSource,deviceTarget,"open-assistant",deviceNow)??throw new Exception("Device request failed");
+if(deviceQueue.Request(deviceOwner,deviceSource,deviceTarget,"shell",deviceNow)!=null||deviceQueue.List(Guid.NewGuid(),deviceTarget,deviceNow).Length!=0||deviceQueue.Decide(deviceOwner,deviceSource,deviceRequest.Id,true,deviceNow)!=null)throw new Exception("Device isolation failure");
+if(deviceQueue.Decide(deviceOwner,deviceTarget,deviceRequest.Id,true,deviceNow)?.State!="approved"||deviceQueue.Decide(deviceOwner,deviceTarget,deviceRequest.Id,true,deviceNow)!=null)throw new Exception("Device replay failure");
+if(deviceQueue.List(deviceOwner,deviceTarget,deviceNow.AddMinutes(3)).Length!=0)throw new Exception("Device request expiry failure");
+Console.WriteLine("Device request allowlist, account isolation, target approval and replay checks passed");
+
+var leaseQueue=new Models.Autorization.Services.DeviceActionQueue();
+if(!leaseQueue.Presence(deviceOwner,deviceTarget,true,deviceNow)||!leaseQueue.Ready(deviceOwner,deviceNow).Contains(deviceTarget)||leaseQueue.Ready(Guid.NewGuid(),deviceNow).Count!=0||leaseQueue.Ready(deviceOwner,deviceNow.AddSeconds(36)).Count!=0)throw new Exception("Receiving lease isolation or expiry failure");
+leaseQueue.Presence(deviceOwner,deviceTarget,true,deviceNow);leaseQueue.Presence(deviceOwner,deviceTarget,false,deviceNow);if(leaseQueue.Ready(deviceOwner,deviceNow).Count!=0)throw new Exception("Receive disable failed");
+var cancelRequest=leaseQueue.Request(deviceOwner,deviceSource,deviceTarget,"open-profile",deviceNow)!;
+if(leaseQueue.Cancel(deviceOwner,deviceTarget,cancelRequest.Id,deviceNow)!=null||leaseQueue.Cancel(deviceOwner,deviceSource,cancelRequest.Id,deviceNow)?.State!="cancelled"||leaseQueue.Decide(deviceOwner,deviceTarget,cancelRequest.Id,true,deviceNow)!=null)throw new Exception("Request cancellation isolation failure");
+Console.WriteLine("Receiving lease expiry and source cancellation passed");
+
+var nativeQueue=new Models.Autorization.Services.MobileAgentRequests();
+var nativeOwner=Guid.NewGuid();var nativeSession=Guid.NewGuid();var nativeTarget=Guid.NewGuid();var nativeNow=DateTimeOffset.UtcNow;
+var nativeTicket=nativeQueue.Issue(nativeOwner,nativeSession,nativeNow)!;
+if(nativeQueue.Consume(nativeTicket,nativeNow)?.Owner!=nativeOwner||nativeQueue.Consume(nativeTicket,nativeNow)!=null)throw new Exception("Native pairing ticket replay");
+var expiredTicket=nativeQueue.Issue(nativeOwner,nativeSession,nativeNow)!;
+if(nativeQueue.Consume(expiredTicket,nativeNow.AddMinutes(3))!=null)throw new Exception("Native pairing expiry");
+var nativeSecret=Models.Autorization.Services.MobileAgentRequests.Secret();
+if(!Models.Autorization.Services.MobileAgentRequests.Match(Models.Autorization.Services.MobileAgentRequests.Hash(nativeSecret),nativeSecret)||Models.Autorization.Services.MobileAgentRequests.Match(Models.Autorization.Services.MobileAgentRequests.Hash(nativeSecret),new string('b',64)))throw new Exception("Native secret comparison");
+Console.WriteLine("Mobile Agent pairing ticket and secret validation passed");
+
+var avatarQueue=new Models.Autorization.Services.DeviceActionQueue();
+var avatarState=new Models.Autorization.Services.DeviceActionQueue.AvatarSnapshot("wave","happy",1.25);
+if(avatarQueue.Handoff(deviceOwner,deviceSource,deviceTarget,avatarState,deviceNow)!=null)throw new Exception("Avatar handoff without readiness");
+avatarQueue.Presence(deviceOwner,deviceTarget,true,deviceNow);
+if(avatarQueue.Handoff(deviceOwner,deviceSource,deviceTarget,avatarState with{PhaseSeconds=double.NaN},deviceNow)!=null||
+    avatarQueue.Handoff(deviceOwner,deviceSource,deviceTarget,avatarState with{Motion="shell"},deviceNow)!=null)throw new Exception("Invalid avatar state accepted");
+var avatarOffer=avatarQueue.Handoff(deviceOwner,deviceSource,deviceTarget,avatarState,deviceNow)??throw new Exception("Avatar handoff missing");
+if(avatarQueue.List(Guid.NewGuid(),deviceTarget,deviceNow).Length!=0||avatarQueue.Decide(deviceOwner,deviceSource,avatarOffer.Id,true,deviceNow)!=null)throw new Exception("Avatar isolation");
+if(avatarQueue.Decide(deviceOwner,deviceTarget,avatarOffer.Id,true,deviceNow)?.Avatar!=avatarState||avatarQueue.Decide(deviceOwner,deviceTarget,avatarOffer.Id,true,deviceNow)!=null)throw new Exception("Avatar one-shot decision");
+var avatarStale=avatarQueue.Handoff(deviceOwner,deviceSource,deviceTarget,avatarState,deviceNow)!;
+avatarQueue.Presence(deviceOwner,deviceTarget,false,deviceNow);
+if(avatarQueue.Decide(deviceOwner,deviceTarget,avatarStale.Id,true,deviceNow)!=null)throw new Exception("Avatar readiness revoked");

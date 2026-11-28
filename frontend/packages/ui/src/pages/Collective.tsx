@@ -1,5 +1,9 @@
 import {useEffect,useRef,useState,type FormEvent} from 'react';
 import {useSearchParams} from 'react-router-dom';
+import {QRCodeSVG} from 'qrcode.react';
+import {QrCode} from 'lucide-react';
+import {ANDROID_ORIGIN} from '../app/androidLaunch';
+import {useLocale} from '../app/presentation';
 import {ArrowLeft,Check,Copy,Link2,MessageCircle,MoreHorizontal,Search,Send,Smile,Sticker as StickerIcon,Sparkles,UserPlus,X} from 'lucide-react';
 import {useApp,useRemote} from '../app/context';
 import {useNoticeFeed} from '../app/notifications';
@@ -26,6 +30,7 @@ function decodeSearch(value:string):string{
 
 export function Collective(){
   const {api,personal,session}=useApp();
+  const t=useLocale();const [friendQr,setFriendQr]=useState(false);
   const [params]=useSearchParams();
   const [input,setInput]=useState(params.get('add')??'');
   const [query,setQuery]=useState(params.get('add')??'');
@@ -83,6 +88,7 @@ export function Collective(){
   const central=useRemote(()=>api.request<{orchestraUrl:string}>('/managed/context'),[api]);
   const messages=useRemote(()=>selected?api.request<Message[]>('/collective/messages/'+selected.id):Promise.resolve([]),[api,selected?.id],3000,true);
   const mine=personal?.game.id;
+  const friendLink=mine?ANDROID_ORIGIN+'/audit-portal/collective?add='+encodeURIComponent(mine):'';
   const newest=messages.value?.at(-1);
   const lastId=newest&&(newest.sender===selected?.id||newest.recipient===selected?.id)?newest.id:undefined;
   function scrollDown(){
@@ -243,7 +249,9 @@ export function Collective(){
     <Header title="Коллектив" description="Чаты и контакты MysticEgo" action={mine&&<div className="row-actions">
       <button className="btn secondary" onClick={()=>void copy(false)}><Copy size={15}/> Мой ID</button>
       <button className="btn secondary" onClick={()=>void copy(true)}><Link2 size={16}/> Поделиться</button>
+      {location.origin===ANDROID_ORIGIN&&<button className="btn secondary" type="button" aria-expanded={friendQr} onClick={()=>setFriendQr(v=>!v)}><QrCode size={18}/>{t("Мой QR друга")}</button>}
     </div>}/>
+    {friendQr&&friendLink&&<section className="panel qr-sign-in"><h2>{t('Добавление друга по QR')}</h2><div className="qr-paper"><QRCodeSVG value={friendLink} size={192} level="M" marginSize={4}/></div><p>{t('QR содержит ссылку на публичный ID. Друг должен открыть профиль и отправить запрос; контакт появится после принятия.')}</p><label>{t('Скопируйте ссылку запроса')}<input readOnly value={friendLink} onFocus={e=>e.target.select()}/></label><button className="btn secondary" type="button" onClick={()=>setFriendQr(false)}>{t('Закрыть')}</button></section>}
     <ErrorBanner text={error||contacts.error||people.error}/>
     <div className="collective-layout mystic-chats" data-chat-open={!!selected}>
       <aside className="chat-sidebar" aria-label="Чаты и контакты">

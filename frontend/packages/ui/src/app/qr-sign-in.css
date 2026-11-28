@@ -1,0 +1,10 @@
+.qr-sign-in,.qr-receive,.qr-approve,.qr-confirm{display:grid;gap:12px;min-width:0}
+.qr-receive{padding:16px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.qr-paper{background:white;padding:8px;width:fit-content;max-width:100%;border-radius:12px;justify-self:center}
+.qr-paper svg{display:block;max-width:100%;height:auto}
+.qr-comparison{font-size:1.4rem;font-variant-numeric:tabular-nums;letter-spacing:.12em}
+.qr-approve label,.qr-receive label,.qr-confirm label{display:grid;gap:8px;min-width:0}
+.qr-approve input,.qr-receive input{width:100%;min-width:0;padding:10px;border:1px solid var(--line);background:var(--canvas);color:var(--ink);border-radius:10px}
+.qr-camera{width:100%;max-width:420px;max-height:280px;object-fit:cover;border-radius:16px}
+.session-device{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0}
+.session-agent{overflow-wrap:anywhere}
