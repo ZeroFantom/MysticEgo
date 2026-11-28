@@ -158,3 +158,10 @@ if(deviceQueue.Request(deviceOwner,deviceSource,deviceTarget,"shell",deviceNow)!
 if(deviceQueue.Decide(deviceOwner,deviceTarget,deviceRequest.Id,true,deviceNow)?.State!="approved"||deviceQueue.Decide(deviceOwner,deviceTarget,deviceRequest.Id,true,deviceNow)!=null)throw new Exception("Device replay failure");
 if(deviceQueue.List(deviceOwner,deviceTarget,deviceNow.AddMinutes(3)).Length!=0)throw new Exception("Device request expiry failure");
 Console.WriteLine("Device request allowlist, account isolation, target approval and replay checks passed");
+
+var leaseQueue=new Models.Autorization.Services.DeviceActionQueue();
+if(!leaseQueue.Presence(deviceOwner,deviceTarget,true,deviceNow)||!leaseQueue.Ready(deviceOwner,deviceNow).Contains(deviceTarget)||leaseQueue.Ready(Guid.NewGuid(),deviceNow).Count!=0||leaseQueue.Ready(deviceOwner,deviceNow.AddSeconds(36)).Count!=0)throw new Exception("Receiving lease isolation or expiry failure");
+leaseQueue.Presence(deviceOwner,deviceTarget,true,deviceNow);leaseQueue.Presence(deviceOwner,deviceTarget,false,deviceNow);if(leaseQueue.Ready(deviceOwner,deviceNow).Count!=0)throw new Exception("Receive disable failed");
+var cancelRequest=leaseQueue.Request(deviceOwner,deviceSource,deviceTarget,"open-profile",deviceNow)!;
+if(leaseQueue.Cancel(deviceOwner,deviceTarget,cancelRequest.Id,deviceNow)!=null||leaseQueue.Cancel(deviceOwner,deviceSource,cancelRequest.Id,deviceNow)?.State!="cancelled"||leaseQueue.Decide(deviceOwner,deviceTarget,cancelRequest.Id,true,deviceNow)!=null)throw new Exception("Request cancellation isolation failure");
+Console.WriteLine("Receiving lease expiry and source cancellation passed");

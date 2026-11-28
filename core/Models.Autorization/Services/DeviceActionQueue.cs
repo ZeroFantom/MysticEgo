@@ -7,9 +7,29 @@ public sealed class DeviceActionQueue
     public sealed record Item(Guid Id,Guid Owner,Guid Source,Guid Target,string Action,DateTimeOffset Expires,string State);
     private readonly object gate=new();
     private readonly Dictionary<Guid,Item> items=new();
+    private readonly Dictionary<(Guid Owner,Guid Session),DateTimeOffset> receiving=new();
     private void Prune(DateTimeOffset now)
     {
         foreach(var id in items.Where(p=>p.Value.Expires<=now).Select(p=>p.Key).ToArray())items.Remove(id);
+        foreach(var key in receiving.Where(p=>p.Value<=now).Select(p=>p.Key).ToArray())receiving.Remove(key);
+    }
+    public bool Presence(Guid owner,Guid session,bool enabled,DateTimeOffset now)
+    {
+        if(owner==Guid.Empty||session==Guid.Empty)return false;
+        lock(gate)
+        {
+            Prune(now);var key=(owner,session);
+            if(!enabled){receiving.Remove(key);return true;}
+            if(!receiving.ContainsKey(key)&&receiving.Count>=1000)return false;
+            receiving[key]=now.AddSeconds(35);return true;
+        }
+    }
+    public HashSet<Guid> Ready(Guid owner,DateTimeOffset now)
+    {lock(gate){Prune(now);return receiving.Keys.Where(k=>k.Owner==owner).Select(k=>k.Session).ToHashSet();}}
+    public Item? Cancel(Guid owner,Guid session,Guid id,DateTimeOffset now)
+    {
+        lock(gate){Prune(now);if(!items.TryGetValue(id,out var item)||item.Owner!=owner||item.Source!=session||item.State!="pending")return null;
+            var result=item with{State="cancelled"};items[id]=result;return result;}
     }
     public Item? Request(Guid owner,Guid source,Guid target,string action,DateTimeOffset now)
     {
