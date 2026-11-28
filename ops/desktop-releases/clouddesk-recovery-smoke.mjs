@@ -31,6 +31,13 @@ assert(reset.includes('ownerOnly:true')&&reset.includes('release!=approval.Relea
 assert(ipc.includes('defaultId:0,cancelId:0,message:'));
 assert(resetScript.indexOf('sha256sum -c -')<resetScript.indexOf('CLOUDDESK_RESET_STEP:delete'));
 assert(resetScript.includes('PostgreSQL configuration present')&&resetScript.includes('custom/shared Caddy configuration'));
+for(const step of ['verify-identity','verify-storage','complete'])assert(resetScript.includes('CLOUDDESK_RESET_STEP:'+step));
+assert(resetScript.indexOf('CLOUDDESK_RESET_STEP:verify-identity')<resetScript.indexOf('CLOUDDESK_RESET_STEP:verify-storage'));
+assert(resetScript.indexOf('CLOUDDESK_RESET_STEP:verify-storage')<resetScript.indexOf('CLOUDDESK_RESET_STEP:complete'));
+assert(resetScript.indexOf('CLOUDDESK_RESET_STEP:complete')<resetScript.lastIndexOf('FACTORY_RESET_OK'));
+assert(resetScript.includes('post-install Auth SQLite store missing')&&resetScript.includes('post-install Orchestra SQLite store missing'));
+assert(!resetScript.includes('if systemctl is-enabled --quiet "$u"'));
+
 
 assert(backend.includes('progress?.Invoke("identity")')&&backend.includes('progress("access")')&&backend.includes('progress?.Invoke("ready")'));
 assert(ipc.includes("'ssh-progress'")&&ipc.includes('flowId:p.flowId'));
