@@ -136,7 +136,7 @@ echo 'CLOUDDESK_STEP:start'
 systemctl enable --now mysticego-orchestra.service
 echo 'CLOUDDESK_STEP:local-health'
 for ((i=0;i<60;i++)); do
-  if curl -fsS --max-time 2 http://127.0.0.1:5500/health/live >/dev/null; then
+  if curl -fs --max-time 2 http://127.0.0.1:5500/health/live >/dev/null 2>&1; then
     echo 'CLOUDDESK_STEP:https'
     systemctl enable caddy.service
     systemctl restart caddy.service
