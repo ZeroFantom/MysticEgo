@@ -49,6 +49,12 @@ internal static class MessengerOutboundSmoke
         Check(await outbound.Reply(vk,vkMessage,MessengerIngressStatus.Unlinked,new string('v',32))&&f.LastBody==previous,"stable VK random_id");
         f.Response="{\"error\":{\"error_code\":5}}";
         Check(!await outbound.Reply(vk,vkMessage,MessengerIngressStatus.Unlinked,new string('v',32)),"VK application failure");
+        f.Response="{\"ok\":true}";
+        var target=new MessengerWorldHandoff.ReplyDestination(Guid.NewGuid(),Guid.NewGuid(),"telegram","123","42",now.UtcDateTime);
+        Check(await outbound.DiscoveryReply(target,"Окружение: Хранитель",token),"discovery reply");
+        Check(f.LastBody.Contains("chat_id=42")&&f.LastBody.Contains("link_preview_options"),"private target and previews disabled");
+        Check(!await outbound.DiscoveryReply(target with {Subject="-1001"},"test",token),"group target denied");
+        Check(!await outbound.DiscoveryReply(target,"test","124:"+new string('t',32)),"wrong token denied");
         Console.WriteLine("Messenger outbound fixed destinations, safe replies and provider response checks passed");
     }
 }

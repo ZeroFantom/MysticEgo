@@ -33,24 +33,41 @@ public sealed class MessengerOutbound : IDisposable
             message.Sender.Provider!=realm.Provider||message.Sender.BotId!=realm.BotId||
             !TelegramIdentityProof.PositiveId(message.Sender.UserId)||!ValidToken(realm,token))
             return false;
+        return await Send(realm,message.Sender.UserId,message.EventId,text,token,ct);
+    }
+
+    // Internal trusted transport only: destination must come from a claimed ingress record.
+    public Task<bool> DiscoveryReply(MessengerWorldHandoff.ReplyDestination destination,string text,string? token,
+        CancellationToken ct=default)
+    {
+        var realm=new MessengerRealm(destination.Provider,destination.BotId);
+        if(destination.CommandId==Guid.Empty||!realm.Valid||!TelegramIdentityProof.PositiveId(destination.Subject)||
+            !ValidToken(realm,token)||string.IsNullOrWhiteSpace(text)||text.Length>3500||
+            text.Any(c=>char.IsControl(c)&&c!='\n'))return Task.FromResult(false);
+        return Send(realm,destination.Subject,"world:"+destination.CommandId.ToString("N"),text,token,ct);
+    }
+
+    private async Task<bool> Send(MessengerRealm realm,string subject,string eventId,string text,string? token,CancellationToken ct)
+    {
         try
         {
-            // Never echo input, link challenges, provider subjects or account details.
+            // No markup parsing, URLs or interactive payloads are introduced by this transport.
             var fields=new Dictionary<string,string>();
             string endpoint;
             if(realm.Provider=="telegram")
             {
                 endpoint="https://api.telegram.org/bot"+token+"/sendMessage";
-                fields["chat_id"]=message.Sender.UserId;
+                fields["chat_id"]=subject;
+                fields["link_preview_options"]="{\"is_disabled\":true}";
                 fields["text"]=text;
             }
             else
             {
                 endpoint="https://api.vk.com/method/messages.send";
                 fields["access_token"]=token!;
-                fields["peer_id"]=message.Sender.UserId;
+                fields["peer_id"]=subject;
                 fields["message"]=text;
-                fields["random_id"]=RandomId(realm,message.EventId).ToString(CultureInfo.InvariantCulture);
+                fields["random_id"]=RandomId(realm,eventId).ToString(CultureInfo.InvariantCulture);
                 fields["v"]="5.199";
             }
             using var request=new HttpRequestMessage(HttpMethod.Post,endpoint){Content=new FormUrlEncodedContent(fields)};

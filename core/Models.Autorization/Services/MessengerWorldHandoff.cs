@@ -88,6 +88,23 @@ public sealed class MessengerWorldHandoff(AuthDbContext db, TimeProvider clock)
             .SetProperty(c=>c.LeaseOwner,(Guid?)null).SetProperty(c=>c.LeaseUntilUtc,(DateTime?)null),ct)==1;
     }
 
+    public sealed record ReplyDestination(Guid CommandId,Guid UserId,string Provider,string BotId,string Subject,DateTime LinkedUtc);
+    // Claim the sole outbound attempt using the existing terminal transition. No retry after
+    // an ambiguous provider result; a crash can lose a reply, never authorize a second attempt.
+    public async Task<ReplyDestination?> TakeDiscoveryReply(Guid worker,Guid id,Guid lease,CancellationToken ct=default)
+    {
+        if(worker==Guid.Empty||id==Guid.Empty||lease==Guid.Empty)return null;
+        var row=await Held(worker,id,lease,Now).AsNoTracking().SingleOrDefaultAsync(ct);
+        if(row is null||!IsWorldCommand(row.Command))return null;
+        if(!await Complete(worker,id,lease,true,ct))return null;
+        return new(row.Id,row.UserId,row.Provider,row.BotId,row.Subject,row.LinkedUtc);
+    }
+
+    public Task<bool> ReplyStillLinked(ReplyDestination destination,CancellationToken ct=default)=>
+        Live(Now).AnyAsync(c=>c.Id==destination.CommandId&&c.Status==MessengerCommandState.Completed&&
+            c.UserId==destination.UserId&&c.Provider==destination.Provider&&c.BotId==destination.BotId&&
+            c.Subject==destination.Subject&&c.LinkedUtc==destination.LinkedUtc,ct);
+
     /// <summary>Trusted maintenance; erase expired/revoked/exhausted command content.
     /// Retain terminal IDs until expiry+2 days to supplement ingress receipt dedup.</summary>
     public async Task<int> Cleanup(CancellationToken ct=default)

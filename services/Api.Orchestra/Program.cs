@@ -26,6 +26,7 @@ builder.Services.AddHostedService(sp=>sp.GetRequiredService<NativeDeploymentJobs
 builder.Services.AddSoul();
 builder.Services.AddScoped<SoulMirrorReader>();
 builder.Services.AddSingleton(new WorldPresenceFeedReader(TimeProvider.System));
+builder.Services.AddHostedService<MessengerDiscoveryWorker>();
 builder.Services.AddSingleton<MiniSoulIdentity>();
 builder.Services.AddAvatar(AvatarNode.Orchestra);
 builder.Services.AddSocial();

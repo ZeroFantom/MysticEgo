@@ -64,6 +64,15 @@ internal static class MessengerWorldHandoffSmoke
         Check(!await queue.Validate(worker,revoke.Id,revoke.LeaseId),"relinked identity");
         await queue.Cleanup();
         Check(await db.MessengerWorldCommands.AsNoTracking().AnyAsync(x=>x.Id==revoke.Id&&x.Status==MessengerCommandState.Rejected&&x.Command==""),"revoked payload erased");
+        clock.Current=DateTimeOffset.UtcNow.AddSeconds(2);
+        Check(await ingress.Process(realm,Event("/nearby"),queueWorld:true)==MessengerIngressStatus.WorldQueued,"discovery queued");
+        var discovery=(await queue.Claim(worker))!;
+        Check(await queue.TakeDiscoveryReply(other,discovery.Id,discovery.LeaseId) is null,"wrong worker reply");
+        var destination=(await queue.TakeDiscoveryReply(worker,discovery.Id,discovery.LeaseId))!;
+        Check(destination.Subject=="42"&&destination.UserId==user.Id&&await queue.ReplyStillLinked(destination),"exact private reply");
+        Check(await queue.TakeDiscoveryReply(worker,discovery.Id,discovery.LeaseId) is null,"reply attempt once");
+        await db.ExternalIdentities.Where(i=>i.Provider==key.Provider&&i.Realm==key.Realm&&i.Subject==key.Subject).ExecuteDeleteAsync();
+        Check(!await queue.ReplyStillLinked(destination),"revoked before outbound");
         Console.WriteLine("Messenger world handoff receipt, lease, replay and revocation checks passed");
     }
 }
