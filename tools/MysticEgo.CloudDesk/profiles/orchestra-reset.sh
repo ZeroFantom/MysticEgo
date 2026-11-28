@@ -7,7 +7,7 @@ domain=$2
 expected=$3
 [[ $mode == check || $mode == execute || $mode == verify ]]
 [[ $domain =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,63}$ && $domain != *..* ]]
-[[ $expected =~ ^[a-f0-9-]{36}$ ]]
+[[ $expected =~ ^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$ ]]
 [[ $(id -u) == 0 && $(uname -m) == x86_64 ]]
 . /etc/os-release
 [[ $ID == ubuntu && $VERSION_ID == 24.04 ]]
@@ -74,10 +74,11 @@ verify_postinstall(){
  for ((i=0;i<12;i++)); do
    new=$(health http://127.0.0.1:5500/health/live 2>/dev/null) || new=''
    remote=$(health "https://$domain/health/live" 2>/dev/null) || remote=''
-   if [[ $new =~ ^[a-f0-9-]{36}$ && $new != "$expected" && $remote == "$new" ]]; then break; fi
+   if [[ $new =~ ^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$ && $new != "$expected" && $remote == "$new" ]]; then break; fi
    sleep 2
  done
- [[ $new =~ ^[a-f0-9-]{36}$ ]] || die 'post-install: local Orchestra health or node ID unavailable'
+ [[ $new =~ ^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$ ]] || die 'post-install: local Orchestra health or node ID unavailable'
+ [[ $new != 00000000-0000-0000-0000-000000000000 ]] || die 'post-install: empty node ID'
  [[ $new != "$expected" ]] || die 'post-install: old node identity still returned'
  [[ $remote == "$new" ]] || die 'post-install: HTTPS and local node identities differ'
  [[ -s "$state_root/center-id.txt" ]] || die 'post-install: center-id.txt missing'
@@ -149,5 +150,5 @@ rm -rf --one-file-system -- "${paths[@]}"
 systemctl daemon-reload
 echo CLOUDDESK_RESET_STEP:install
 # The standard installer now holds the inherited lock until it reaches maintenance recovery.
-MYSTICEGO_INSTALL_LOCK_FD=9 MYSTICEGO_INSTALL_PREREQS_READY=1 bash install.sh "$PWD/r3.zip" "$domain" '' "$digest" native sqlite
+MYSTICEGO_INSTALL_LOCK_FD=9 MYSTICEGO_INSTALL_PREREQS_READY=1 bash install.sh "$PWD/r3.zip" "$domain" '' "$digest" native sqlite || die 'post-install: installer returned a failure; verify existing state before any retry'
 verify_postinstall "$tag" /var/lib/mysticego /opt/mysticego/app
