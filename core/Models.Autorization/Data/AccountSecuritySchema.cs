@@ -39,6 +39,16 @@ public static class AccountSecuritySchema
         var timestamp=db.Database.IsNpgsql()?"timestamp with time zone":"TEXT";
         var boolean=db.Database.IsNpgsql()?"boolean":"INTEGER";
         var sql=$"""
+            CREATE TABLE IF NOT EXISTS external_identities (
+                "Provider" varchar(16) NOT NULL,
+                "Realm" varchar(128) NOT NULL,
+                "Subject" varchar(128) NOT NULL,
+                "UserId" {guid} NOT NULL REFERENCES users("Id") ON DELETE CASCADE,
+                "LinkedUtc" {timestamp} NOT NULL,
+                PRIMARY KEY ("Provider","Realm","Subject")
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_external_identities_UserId_Provider_Realm"
+                ON external_identities ("UserId","Provider","Realm");
             CREATE TABLE IF NOT EXISTS account_license_acceptances (
                 "UserId" {guid} NOT NULL REFERENCES users("Id") ON DELETE CASCADE,
                 "Version" varchar(80) NOT NULL,

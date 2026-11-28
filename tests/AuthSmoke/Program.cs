@@ -121,3 +121,5 @@ code=grants.Create(account,"source-proof",challenge,instant)!;
 if(grants.Consume(code,verifier,instant.AddSeconds(61))!=null)throw new Exception("Expired pairing accepted");
 if(grants.Create(account,"source-proof","bad",instant)!=null)throw new Exception("Invalid challenge accepted");
 Console.WriteLine("Desktop pairing proof, expiry and replay tests passed");
+
+await ExternalIdentitySmoke.Run();
