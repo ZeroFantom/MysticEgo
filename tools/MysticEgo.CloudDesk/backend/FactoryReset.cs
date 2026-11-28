@@ -81,6 +81,34 @@ sealed partial class CloudDesk
         resetApproval=approval;
         return new {nonce=approval.Nonce,domain=identity.Domain,node=identity.Node,host=approval.Host,serverId=approval.ServerId,tag=release.Tag,digest=release.Digest,expiresAt=approval.Expires};
     }
+    static string? DeploymentStepMessage(string line)=>line.Trim() switch
+    {
+        "CLOUDDESK_STEP:checksum"=>"VPS · проверка архива",
+        "CLOUDDESK_STEP:apt-update"=>"VPS · обновление списка пакетов",
+        "CLOUDDESK_STEP:apt-install"=>"VPS · установка системных зависимостей",
+        "CLOUDDESK_STEP:unpack"=>"VPS · распаковка MysticEgo и .NET",
+        "CLOUDDESK_STEP:configure"=>"VPS · настройка systemd и Caddy",
+        "CLOUDDESK_STEP:start"=>"VPS · запуск Orchestra",
+        "CLOUDDESK_STEP:local-health"=>"VPS · проверка локальной идентичности",
+        "CLOUDDESK_STEP:https"=>"VPS · проверка HTTPS",
+        "CLOUDDESK_STEP:verify-storage"=>"VPS · ожидание готовности хранилища",
+        "CLOUDDESK_STEP:maintenance"=>"VPS · восстановление службы обслуживания",
+        "CLOUDDESK_STEP:complete"=>"VPS · подтверждение установки",
+        "CLOUDDESK_RESET_STEP:stop"=>"VPS · остановка служб перед подтверждённым сбросом",
+        "CLOUDDESK_RESET_STEP:delete"=>"VPS · удаление подтверждённых данных",
+        "CLOUDDESK_RESET_STEP:install"=>"VPS · установка нового узла",
+        "CLOUDDESK_RESET_STEP:verify-identity"=>"VPS · подтверждение новой идентичности",
+        "CLOUDDESK_RESET_STEP:verify-storage"=>"VPS · проверка новых файлов SQLite",
+        "CLOUDDESK_RESET_STEP:complete"=>"VPS · сброс подтверждён",
+        "CLOUDDESK_MAINTENANCE_PENDING"=>"VPS · установка завершена, требуется безопасное восстановление обслуживания",
+        "CLOUDDESK_MAINTENANCE_SCHEDULED"=>"VPS · компоненты проверяются локальной службой",
+        _=>null
+    };
+    static Guid? InstallIdentity(string output,string marker)
+    {
+        var matches=Regex.Matches(output,@"(?m)^"+Regex.Escape(marker)+@" ([a-fA-F0-9-]{36})\r?$");
+        return matches.Count==1&&Guid.TryParse(matches[0].Groups[1].Value,out var node)&&node!=Guid.Empty?node:null;
+    }
     async Task<object> ExecuteFactoryReset(JsonObject args,Action<string> progress)
     {
         var approval=resetApproval;
@@ -114,9 +142,9 @@ sealed partial class CloudDesk
             var command="cd "+remote+" && printf '%s  reset.sh\\n%s  install.sh\\n' "+scriptDigest+" "+installerDigest+
                 " | sha256sum -c - && bash reset.sh execute "+ResetQ(identity.Domain)+" "+ResetQ(identity.Node)+" "+ResetQ(release.Tag)+" "+ResetQ(release.Digest);
             progress("Проверка цели на VPS перед необратимым сбросом");
-            var output=await SSH(args,command,45,line=>{if(line.StartsWith("CLOUDDESK_RESET_STEP:",StringComparison.Ordinal)||line.StartsWith("CLOUDDESK_STEP:",StringComparison.Ordinal))progress(line);});
-            var match=Regex.Match(output,@"(?m)^FACTORY_RESET_OK ([a-fA-F0-9-]{36})\r?$");
-            if(!match.Success||!Guid.TryParse(match.Groups[1].Value,out var newNode)||newNode==Guid.Empty||newNode.ToString("D")==identity.Node)
+            var output=await SSH(args,command,45,line=>{var message=DeploymentStepMessage(line);if(message!=null)progress(message);});
+            var verified=InstallIdentity(output,"FACTORY_RESET_OK");
+            if(verified is not Guid newNode||newNode.ToString("D")==identity.Node||InstallIdentity(output,"ORCHESTRA_INSTALL_OK")!=newNode)
                 throw new Exception("Новая Orchestra не подтвердила новый ID. Не повторяйте сброс автоматически.");
             var binding=ReadBinding(approval.ServerId);
             if(binding!=null&&SameBinding(binding,approval.Host,"Orchestra",approval.Domain))SaveBinding(binding with {Phase="installed"});
@@ -137,6 +165,14 @@ sealed partial class CloudDesk
             throw new Exception("Factory reset policy regression.");
         var rejected=false;try{ResetReleaseFromMetadata(new JsonObject{["tag_name"]=ResetNewestTag(rows),["draft"]=true},ResetNewestTag(rows));}catch{rejected=true;}
         if(!rejected)throw new Exception("Draft accepted for factory reset.");
-        return new {passed=6};
+        var node=Guid.Parse("12345678-1234-4234-9234-123456789abc");
+        var marker="ORCHESTRA_INSTALL_OK "+node.ToString("D");
+        if(InstallIdentity(marker+"\r\n","ORCHESTRA_INSTALL_OK")!=node||
+            InstallIdentity(marker+"\n"+marker,"ORCHESTRA_INSTALL_OK")!=null||
+            InstallIdentity("ORCHESTRA_INSTALL_OK "+Guid.Empty.ToString("D"),"ORCHESTRA_INSTALL_OK")!=null||
+            DeploymentStepMessage("CLOUDDESK_RESET_STEP:verify-storage")==null||
+            DeploymentStepMessage("unstructured output")!=null)
+            throw new Exception("Installation evidence or progress mapping regression.");
+        return new {passed=11};
     }
 }

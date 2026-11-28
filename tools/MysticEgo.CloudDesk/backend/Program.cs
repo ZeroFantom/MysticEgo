@@ -505,32 +505,22 @@ sealed partial class CloudDesk {
             SaveBinding(binding with {Phase="installing"});
             progress("Запуск установочного скрипта на VPS");
             void ReportInstallerStep(string line) {
-                var message = line switch {
-                    "CLOUDDESK_STEP:checksum" => "VPS · проверка архива",
-                    "CLOUDDESK_STEP:apt-update" => "VPS · обновление списка пакетов",
-                    "CLOUDDESK_STEP:apt-install" => "VPS · установка Caddy и системных зависимостей",
-                    "CLOUDDESK_STEP:unpack" => "VPS · распаковка MysticEgo и .NET",
-                    "CLOUDDESK_STEP:configure" => "VPS · настройка systemd и Caddy",
-                    "CLOUDDESK_STEP:start" => "VPS · запуск Orchestra",
-                    "CLOUDDESK_STEP:local-health" => "VPS · ожидание локального health check",
-                    "CLOUDDESK_STEP:https" => "VPS · запуск Caddy и проверка HTTPS",
-                    "CLOUDDESK_STEP:verify-storage" => "VPS · ожидание готовности хранилища",
-                    "CLOUDDESK_STEP:maintenance" => "VPS · восстановление локального обслуживания",
-                    "CLOUDDESK_STEP:complete" => "VPS · подтверждение идентичности и установки",
-                    _ => null
-                };
-                if (message != null) progress(message);
+                var message=DeploymentStepMessage(line);
+                if(message!=null)progress(message);
             }
             var locked=role=="Orchestra"?"exec 9>/run/lock/mysticego-clouddesk-deploy.lock; flock -n 9 && export MYSTICEGO_INSTALL_LOCK_FD=9 && "+command: "flock -n /run/lock/mysticego-clouddesk-deploy.lock bash -c "+Q(command);
             var output=await SSH(a,"bash -c "+Q(locked),45,
                 onOutput:role=="Orchestra"?ReportInstallerStep:null);
-            if(role=="Orchestra"&&!Regex.IsMatch(output,@"(?m)^ORCHESTRA_INSTALL_OK [a-fA-F0-9-]{36}\r?$"))
+            Guid? installedNode=role=="Orchestra"?InstallIdentity(output,"ORCHESTRA_INSTALL_OK"):null;
+            if(role=="Orchestra"&&installedNode is null)
                 throw new Exception("Не подтверждена готовность Orchestra. Не повторяйте установку.");
             var maintenancePending=role=="Orchestra"&&output.Split('\n').Any(line=>line.Trim()=="CLOUDDESK_MAINTENANCE_PENDING");
             var maintenanceScheduled=role=="Orchestra"&&output.Split('\n').Any(line=>line.Trim()=="CLOUDDESK_MAINTENANCE_SCHEDULED");
             progress(maintenancePending?"Orchestra установлена. Требуется восстановление обслуживания без сброса.":"Установка завершена. Удаление временных файлов на VPS");
             SaveBinding(binding with {Phase="installed"}); try{await SSH(a,"rm -rf -- "+remote,1);}catch{}
-            return new {role,domain,release=release.Tag,output,maintenancePending,maintenanceScheduled};
+            return new {role,domain,release=release.Tag,node=installedNode?.ToString("D"),
+                output=role=="Orchestra"?"Orchestra и хранилище подтверждены. Диагностика компонентов доступна в серверном отчёте.":output,
+                maintenancePending,maintenanceScheduled};
         } catch(Exception e) { throw new Exception(e.Message+"\nЕсли каталог был создан, диагностика сохранена на сервере: "+remote); }
         finally { Directory.Delete(temp,true); }
     }

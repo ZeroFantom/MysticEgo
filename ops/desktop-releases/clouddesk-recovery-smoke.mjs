@@ -43,3 +43,19 @@ assert(backend.includes('progress?.Invoke("identity")')&&backend.includes('progr
 assert(ipc.includes("'ssh-progress'")&&ipc.includes('flowId:p.flowId'));
 assert(ui.includes('onSshProgress?.')&&ui.includes("advance('access');advance('ready')")&&ui.includes('Подключение установлено'));
 assert(ui.includes('<DesktopUpdate/>')&&ipc.includes('registerUpdateIpc'));
+
+const install=read('tools/MysticEgo.CloudDesk/profiles/orchestra-r3.sh');
+const recovery=read('ops/orchestra-updater/recover-maintenance.sh');
+assert(backend.includes('role=="Orchestra"?await LatestResetRelease()'),'Fresh Orchestra must not use the historical bundle');
+assert(backend.includes('MYSTICEGO_INSTALL_LOCK_FD=9')&&recovery.includes('--inherited-deploy-lock'),'Deployment must not reacquire its own lock');
+assert(install.includes('libatomic1 libgomp1')&&resetScript.includes('libatomic1 libgomp1'));
+assert(resetScript.indexOf('flock -n 8')<resetScript.indexOf('CLOUDDESK_RESET_STEP:stop'),'Local provisioning lock must be checked before stopping services');
+assert(install.indexOf('CLOUDDESK_STEP:verify-storage')<install.indexOf('CLOUDDESK_STEP:maintenance'));
+assert(install.indexOf('CLOUDDESK_STEP:maintenance')<install.lastIndexOf('ORCHESTRA_INSTALL_OK'));
+assert(install.includes('for attempt in 1 2')&&install.includes('CLOUDDESK_MAINTENANCE_PENDING')&&install.includes('CLOUDDESK_MAINTENANCE_SCHEDULED'));
+assert(factoryMarkerCheck());
+function factoryMarkerCheck(){return reset.includes('InstallIdentity(output,"FACTORY_RESET_OK")')&&reset.includes('InstallIdentity(output,"ORCHESTRA_INSTALL_OK")!=newNode')}
+assert(ui.includes('maintenance-pending')&&ui.includes('maintenance-scheduled')&&ui.includes('Восстановить службы через SSH'));
+assert(updater.includes('action is "legacy-repair" or "unavailable"')&&updater.includes('ownerNode!=node'));
+assert(reports.includes('c.nextRetryAt')&&reports.includes('c.reason'));
+console.log('CloudDesk verified install, maintenance recovery and pending-state contracts passed.');
