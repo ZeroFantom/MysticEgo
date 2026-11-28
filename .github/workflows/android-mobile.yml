@@ -8,6 +8,9 @@ on:
       - 'frontend/packages/ui/src/app/browserPolicy.ts'
       - 'frontend/packages/ui/src/app/BrowserPreferences.tsx'
       - 'frontend/scripts/android-launch.test.mjs'
+      - 'frontend/scripts/device-actions.test.mjs'
+      - 'frontend/packages/ui/src/app/deviceActionPolicy.ts'
+      - 'frontend/packages/ui/src/app/DeviceActions.tsx'
       - '.github/workflows/android-mobile.yml'
   workflow_dispatch:
 
@@ -24,7 +27,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: node --test frontend/scripts/android-launch.test.mjs
+      - run: node --test frontend/scripts/android-launch.test.mjs frontend/scripts/device-actions.test.mjs
   android:
     runs-on: ubuntu-24.04
     timeout-minutes: 25

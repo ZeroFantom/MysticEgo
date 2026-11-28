@@ -1,4 +1,5 @@
 import {Capacity} from '../pages/Capacity';
+import {DeviceActions} from './DeviceActions';
 import {browserKind} from './browserPolicy';
 import './mobile-immersive.css';
 import {InterfaceControl} from './InterfaceControl';
@@ -230,7 +231,7 @@ function Workspace({logout}:{logout:()=>void}){
         <div className="breadcrumb"><span>{t(modes[mode].name)}</span><ChevronRight size={14}/><strong>{t(current)}</strong></div>
         <div className="top-actions"><InterfaceControl/><MaintenanceNotices enabled={mode==='orchestra'&&developer.value?.owner===true}/><ThemeToggle scope={preferenceScope}/><AccountMenu logout={logout}/><NotificationsFloat/></div>
       </header>
-      <main className="content">{android&&pathname==='/'&&<section className="mobile-home-hero"><span>MYSTICEGO / MOBILE</span><h1>{t('Личное пространство')}</h1><p>{t('Ваши устройства, коллектив и персональный ассистент.')}</p><Link to="/assistant" className="btn"><Sparkles size={17}/>{t('Ассистент')}</Link></section>}<AnimatedArea><Routes>
+      <main className="content"><DeviceActions key={preferenceScope}/>{android&&pathname==='/'&&<section className="mobile-home-hero"><span>MYSTICEGO / MOBILE</span><h1>{t('Личное пространство')}</h1><p>{t('Ваши устройства, коллектив и персональный ассистент.')}</p><Link to="/assistant" className="btn"><Sparkles size={17}/>{t('Ассистент')}</Link></section>}<AnimatedArea><Routes>
         <Route path="/" element={mode==='orchestra'||mode==='global'||mode==='local'?<OrchestraOverview/>:mode==='audit'?<OrganizationRequests overview/>:<Overview/>}/>
         {['audit','orchestra'].includes(mode)&&<Route path="/development-team" element={<DevelopmentTeam/>}/>}
         {mode==='orchestra'&&<Route path="/development-workspace" element={cloudDownloads?<DevelopmentWorkspace/>:<p>{t('Development team access required.')}</p>}/>}

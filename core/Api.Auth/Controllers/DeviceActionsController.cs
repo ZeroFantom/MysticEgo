@@ -25,12 +25,12 @@ public sealed class DeviceActionsController(AuthDbContext db,DeviceActionQueue q
         return Ok(queue.List(CurrentUserId.Value,Sid.Value,DateTimeOffset.UtcNow).Select(x=>new{x.Id,x.Source,x.Target,x.Action,x.Expires,x.State,incoming=x.Target==Sid.Value}));
     }
 
-    public sealed record ReceiveState(bool Enabled);
+    public sealed record ReceiveState(bool Enabled,string[]? Actions=null);
     [HttpPost("presence"),RequestSizeLimit(1024)]
     public async Task<IActionResult> Presence(ReceiveState input,CancellationToken ct)
     {
         if(!Account||!await Active(CurrentUserId!.Value,Sid!.Value,ct))return Unauthorized();
-        return queue.Presence(CurrentUserId.Value,Sid.Value,input.Enabled,DateTimeOffset.UtcNow)?Ok(new{enabled=input.Enabled}):StatusCode(429);
+        return queue.Presence(CurrentUserId.Value,Sid.Value,input.Enabled,DateTimeOffset.UtcNow,input.Actions)?Ok(new{enabled=input.Enabled}):StatusCode(429);
     }
 
     public sealed record CancelInput(Guid Id);
@@ -68,13 +68,13 @@ public sealed class DeviceActionsController(AuthDbContext db,DeviceActionQueue q
         if(id.ValueKind is not (JsonValueKind.String or JsonValueKind.Number))return BadRequest();
         IActionResult Result(object value)=>Ok(new{jsonrpc="2.0",id,result=value});
         IActionResult Error(int code,string message)=>Ok(new{jsonrpc="2.0",id,error=new{code,message}});
-        if(name=="initialize")return Result(new{protocolVersion="2024-11-05",capabilities=new{tools=new{}},serverInfo=new{name="MysticEgo Device Requests",version="0.1"}});
+        if(name=="initialize")return Result(new{protocolVersion="2024-11-05",capabilities=new{tools=new{}},serverInfo=new{name="MysticEgo Device Requests",version="0.2"}});
         if(name=="ping")return Result(new{});
         object Schema(Dictionary<string,object> properties,string[] required)=>new{type="object",properties,required,additionalProperties=false};
         var idSchema=new{type="string",format="uuid"};
         if(name=="tools/list")return Result(new{tools=new object[]{
             new{name="device.list",description="List other active sessions belonging to the authenticated account and their foreground receive readiness.",inputSchema=Schema(new(),[])},
-            new{name="device.request",description="Request a visible navigation action in another receiving session. Requires confirmation there.",inputSchema=Schema(new(){["targetId"]=idSchema,["action"]=new{type="string",@enum=DeviceActionQueue.Allowed}},["targetId","action"])},
+            new{name="device.request",description="Request an advertised, fixed action in another receiving session. Requires local confirmation. Native actions require an additional local gesture.",inputSchema=Schema(new(){["targetId"]=idSchema,["action"]=new{type="string",@enum=DeviceActionQueue.Allowed}},["targetId","action"])},
             new{name="device.status",description="Read status of an unexpired request belonging to this session. Approved means accepted, not verified execution.",inputSchema=Schema(new(){["requestId"]=idSchema},["requestId"])},
             new{name="device.cancel",description="Cancel a pending request created by the current session.",inputSchema=Schema(new(){["requestId"]=idSchema},["requestId"])}
         }});
@@ -85,10 +85,10 @@ public sealed class DeviceActionsController(AuthDbContext db,DeviceActionQueue q
         IActionResult Content(object value)=>Result(new{content=new[]{new{type="text",text=JsonSerializer.Serialize(value,new JsonSerializerOptions(JsonSerializerDefaults.Web))}},isError=false});
         if(tool.GetString()=="device.list"&&args.EnumerateObject().Count()==0)
         {
-            var ready=queue.Ready(owner,now);
+            var ready=queue.Capabilities(owner,now);
             var active=await db.RefreshTokens.AsNoTracking().Where(x=>x.UserId==owner&&x.SessionId!=null&&x.SessionId!=source&&x.ExpiresAt>DateTime.UtcNow&&x.User!.IsActive)
                 .Select(x=>new{x.SessionId,x.UserAgent}).Take(100).ToListAsync(ct);
-            return Content(active.Select(x=>new{id=x.SessionId,device=SessionDevice.Describe(x.UserAgent),ready=ready.Contains(x.SessionId!.Value)}));
+            return Content(active.Select(x=>new{id=x.SessionId,device=SessionDevice.Describe(x.UserAgent),ready=ready.ContainsKey(x.SessionId!.Value),actions=ready.GetValueOrDefault(x.SessionId.Value)??Array.Empty<string>()}));
         }
         if(tool.GetString() is "device.status" or "device.cancel")
         {
