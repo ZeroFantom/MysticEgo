@@ -166,7 +166,7 @@ class EmbeddedModelActivity : Activity() {
                 Engine(EngineConfig(modelPath=model.absolutePath,backend=Backend.CPU(),maxNumTokens=2048,cacheDir=cache.absolutePath)).use { engine ->
                     engine.initialize()
                     engine.createConversation(ConversationConfig(automaticToolCalling=false,maxOutputToken=512)).use { conversation ->
-                        result=conversation.sendMessage(text).text.orEmpty().take(8000).ifBlank { "Модель не вернула текст." }
+                        result=conversation.sendMessage(text).toString().take(8000).ifBlank { "Модель не вернула текст." }
                     }
                 }
             }catch(_:Exception){}catch(_:LinkageError){}finally{running.set(false)}
