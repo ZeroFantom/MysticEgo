@@ -18,6 +18,9 @@ export default function MaintenanceReports({plan,format,onFormat,exporting,error
   <div className="maintenance-card-grid">{components.map(c=><article className="maintenance-report-card" key={c.name}>
     <div className="maintenance-card-title"><span className="maintenance-card-icon" aria-hidden="true">◈</span><State state={c.state}/></div>
     <h4>{labels[c.name]??c.name}</h4><small>{time(c.checkedAt)}</small>
+    {c.message&&<p>{c.message}</p>}
+    {c.reason&&<small>Причина: {c.reason}</small>}
+    {c.state==='degraded'&&c.nextRetryAt&&<small>Следующая попытка: {new Date(c.nextRetryAt).toLocaleString()}</small>}
     {!plan.legacy&&<button data-interface-id={/^[a-z][a-z0-9-]{0,26}$/.test(c.name)?'report-'+c.name:undefined} disabled={exporting} onClick={()=>void onReport(c.name)}>Скачать отчёт</button>}
   </article>)}</div>
   {!components.length&&<p>Нет отчёта о компонентах.</p>}

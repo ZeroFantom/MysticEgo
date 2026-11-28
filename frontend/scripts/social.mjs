@@ -43,9 +43,15 @@ export function panelHtml(template,role,page='root'){
   const links=Object.entries(publicPages).map(([path,entry])=>'<li><a href="/'+path+'">'+escape(entry.title)+'</a> — '+escape(entry.description)+'</li>').join('');
   // The same public content is readable before React starts, for users and crawlers alike.
   const fallback=extra?'<main><h1>'+escape(extra.title)+'</h1><p>'+escape(extra.description)+'</p><nav aria-label="Публичные страницы"><ul>'+links+'</ul></nav><p><a href="https://github.com/ZeroFantom/MysticEgo">Исходный код MysticEgo</a></p></main>':'<main><h1>'+escape(title)+'</h1><p>'+escape(roles[role].description)+'</p></main>';
-  return template.replace('<div id="root"></div>','<div id="root">'+fallback+'</div>').replace('data-role="orchestra"','data-role="'+role+'"')
+  // Entry pages must never paint the crawler/no-JS text while the JS app starts.
+  // Keep public share and editorial pages readable before React, and preserve metadata.
+  const entry=page==='root';
+  const boot='<div class="mystic-entry-boot" role="status" aria-label="Загрузка MysticEgo"><span aria-hidden="true"></span></div>';
+  const entryStyle='<style id="mystic-entry-style">#root>.mystic-entry-boot{position:fixed;inset:0;display:grid;place-items:center;background:var(--mystic-bg,#101019);color:var(--mystic-primary,#c0a8ff)}.mystic-entry-boot>span{width:28px;height:28px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;opacity:.75;animation:mystic-entry-spin .85s linear infinite}@keyframes mystic-entry-spin{to{transform:rotate(360deg)}}@view-transition{navigation:auto}::view-transition-old(root),::view-transition-new(root){animation-duration:220ms}@media(prefers-reduced-motion:reduce){.mystic-entry-boot>span,::view-transition-old(root),::view-transition-new(root){animation:none!important}}:root[data-ui-motion=off] .mystic-entry-boot>span,:root[data-ui-motion=off]::view-transition-old(root),:root[data-ui-motion=off]::view-transition-new(root){animation:none!important}@media(prefers-color-scheme:light){#root>.mystic-entry-boot{background:var(--mystic-bg,#f7f6fc);color:var(--mystic-primary,#6842b9)}}</style>';
+  const initial=entry?boot+'<noscript><style>.mystic-entry-boot{display:none!important}</style>'+fallback+'</noscript>':fallback;
+  return template.replace('<div id="root"></div>','<div id="root">'+initial+'</div>').replace('data-role="orchestra"','data-role="'+role+'"')
     .replace('<title>MysticEgo</title>','<title>'+escape(title)+'</title>')
-    .replace('</head>',metadata(role,page)+'\n</head>');
+    .replace('</head>',metadata(role,page)+(entry?'\n'+entryStyle:'')+'\n</head>');
 }
 // Original, deterministic, dependency-free concept art. PNG, not SVG, for link crawlers.
 const glyphs={

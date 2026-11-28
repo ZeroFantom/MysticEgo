@@ -213,7 +213,7 @@ sealed partial class CloudDesk {
     public async Task<object?> Run(string action,JsonObject a,Action<string>? progress=null) {
         switch(action) {
             case "github.status": return await GitProfile();
-            case "github.release": return new {tag=Tag, asset=Asset, sha256=await GithubReleaseDigest()};
+            case "github.release": { var release=await LatestResetRelease(); return new {tag=release.Tag, asset=release.Asset, sha256=release.Digest}; }
             case "github.selftest": return GithubSelftest();
             case "update.candidate.selftest": return UpdateCandidateSelftest();
             case "platform.selftest": return await PlatformSelftest();
@@ -484,13 +484,14 @@ sealed partial class CloudDesk {
         progress("Проверка закрепления VPS, IP и DNS");
         var binding=await ReserveBinding(a); var check=await DeployPreflight(a); if(!Bool(check,"ready",true)) throw new Exception(S(check,"message"));
         progress("Проверка релиза и контрольной суммы в GitHub");
-        var digest=await GithubReleaseDigest();
+        var release=role=="Orchestra"?await LatestResetRelease():new ResetRelease(Tag,Asset,await GithubReleaseDigest());
+        var digest=release.Digest;
         progress("Проверка ОС и прав на VPS через SSH");
         await SSH(a,"test \"$(id -u)\" = 0 && test \"$(uname -m)\" = x86_64 && command -v bash && command -v flock && . /etc/os-release && test \"$ID:$VERSION_ID\" = ubuntu:24.04",1);
         var temp=Directory.CreateTempSubdirectory("mysticego-").FullName; var remote="/root/.clouddesk-"+Guid.NewGuid().ToString("N");
         try {
             progress("Загрузка ZIP-архива релиза из GitHub");
-            await Exec("gh",["release","download",Tag,"--repo",Repo,"--pattern",Asset,"--dir",temp]); var file=Path.Combine(temp,Asset);
+            await Exec("gh",["release","download",release.Tag,"--repo",Repo,"--pattern",release.Asset,"--dir",temp]); var file=Path.Combine(temp,release.Asset);
             progress("Проверка SHA-256 скачанного архива");
             using(var fs=File.OpenRead(file)) { if(Convert.ToHexString(await SHA256.HashDataAsync(fs)).ToLowerInvariant()!=digest) throw new Exception("SHA-256 архива релиза не совпадает"); }
             progress("Подготовка временного каталога на VPS");
@@ -504,23 +505,22 @@ sealed partial class CloudDesk {
             SaveBinding(binding with {Phase="installing"});
             progress("Запуск установочного скрипта на VPS");
             void ReportInstallerStep(string line) {
-                var message = line switch {
-                    "CLOUDDESK_STEP:checksum" => "VPS · проверка архива",
-                    "CLOUDDESK_STEP:apt-update" => "VPS · обновление списка пакетов",
-                    "CLOUDDESK_STEP:apt-install" => "VPS · установка Caddy и системных зависимостей",
-                    "CLOUDDESK_STEP:unpack" => "VPS · распаковка MysticEgo и .NET",
-                    "CLOUDDESK_STEP:configure" => "VPS · настройка systemd и Caddy",
-                    "CLOUDDESK_STEP:start" => "VPS · запуск Orchestra",
-                    "CLOUDDESK_STEP:local-health" => "VPS · ожидание локального health check",
-                    "CLOUDDESK_STEP:https" => "VPS · запуск Caddy и проверка HTTPS",
-                    _ => null
-                };
-                if (message != null) progress(message);
+                var message=DeploymentStepMessage(line);
+                if(message!=null)progress(message);
             }
-            var output=await SSH(a,"flock -n /run/lock/mysticego-clouddesk-deploy.lock bash -c "+Q(command),25,
+            var locked=role=="Orchestra"?"exec 9>/run/lock/mysticego-clouddesk-deploy.lock; flock -n 9 && export MYSTICEGO_INSTALL_LOCK_FD=9 && "+command: "flock -n /run/lock/mysticego-clouddesk-deploy.lock bash -c "+Q(command);
+            var output=await SSH(a,"bash -c "+Q(locked),45,
                 onOutput:role=="Orchestra"?ReportInstallerStep:null);
-            progress("Установка завершена. Удаление временных файлов на VPS");
-            SaveBinding(binding with {Phase="installed"}); await SSH(a,"rm -rf -- "+remote,1); return new {role,domain,release=Tag,output};
+            Guid? installedNode=role=="Orchestra"?InstallIdentity(output,"ORCHESTRA_INSTALL_OK"):null;
+            if(role=="Orchestra"&&installedNode is null)
+                throw new Exception("Не подтверждена готовность Orchestra. Не повторяйте установку.");
+            var maintenancePending=role=="Orchestra"&&output.Split('\n').Any(line=>line.Trim()=="CLOUDDESK_MAINTENANCE_PENDING");
+            var maintenanceScheduled=role=="Orchestra"&&output.Split('\n').Any(line=>line.Trim()=="CLOUDDESK_MAINTENANCE_SCHEDULED");
+            progress(maintenancePending?"Orchestra установлена. Требуется восстановление обслуживания без сброса.":"Установка завершена. Удаление временных файлов на VPS");
+            SaveBinding(binding with {Phase="installed"}); try{await SSH(a,"rm -rf -- "+remote,1);}catch{}
+            return new {role,domain,release=release.Tag,node=installedNode?.ToString("D"),
+                output=role=="Orchestra"?"Orchestra и хранилище подтверждены. Диагностика компонентов доступна в серверном отчёте.":output,
+                maintenancePending,maintenanceScheduled};
         } catch(Exception e) { throw new Exception(e.Message+"\nЕсли каталог был создан, диагностика сохранена на сервере: "+remote); }
         finally { Directory.Delete(temp,true); }
     }

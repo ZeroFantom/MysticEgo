@@ -28,6 +28,8 @@ function StatusCard({component,name}:{component?:Component;name:string}){
     <h3>{t(names[name]??name)}</h3>
     <p>{t(component?.message??'Пока нет подтверждённого замера этого компонента.')}</p>
     <small>{component?t('Проверено')+' '+new Date(component.checkedAt).toLocaleString(value.language):t('Ожидание отчёта сервера')}</small>
+    {component?.reason&&<small className="footnote">{t('Причина')}: {component.reason}</small>}
+    {component?.state==='degraded'&&component.nextRetryAt&&<small className="footnote">{t('Следующая попытка')}: {new Date(component.nextRetryAt).toLocaleString(value.language)}</small>}
     <ReportDownload scope={name}/>
   </article>;
 }

@@ -63,17 +63,53 @@ class MaintenanceTests(unittest.TestCase):
     @patch.object(updater, "maintenance_ready", return_value=True)
     @patch.object(updater, "command")
     def test_fresh_report_no_install(self, command, ready, trust):
-        self.report.write_text("{}")
+        self.report.write_text('{"components":[{"name":"orchestra","state":"available"}]}')
         self.assertTrue(updater.ensure_maintenance(self.release))
         command.assert_not_called()
         self.assertEqual(self.status()["state"], "ready")
 
     @patch.object(updater, "trusted_file", return_value=True)
     @patch.object(updater, "maintenance_ready", return_value=True)
-    @patch.object(updater, "system_ok", side_effect=[False, True])
-    def test_missing_report_starts_reconcile(self, system_ok, ready, trust):
+    @patch.object(updater, "system_ok", return_value=False)
+    @patch.object(updater, "schedule_reconcile")
+    def test_missing_report_starts_reconcile(self, schedule, system_ok, ready, trust):
         self.assertTrue(updater.ensure_maintenance(self.release))
-        system_ok.assert_called_with("start", "--no-block", "mysticego-infrastructure-reconcile.service")
+        schedule.assert_called_once_with(self.release)
+        self.assertEqual(self.status()["state"], "waiting")
+
+    def test_corrupt_report_not_fresh(self):
+        self.report.write_text("{}")
+        self.assertFalse(updater.report_fresh())
+        self.report.write_text("invalid json")
+        self.assertFalse(updater.report_fresh())
+
+    def test_updater_does_not_consume_work_while_infrastructure_locked(self):
+        import fcntl
+        deploy = self.state / "deploy.lock"
+        infra = self.state / "infra.lock"
+        with patch.object(updater, "DEPLOYMENT_LOCK", deploy), patch.object(updater, "INFRASTRUCTURE_LOCK", infra), patch.object(updater, "run_locked") as work:
+            with infra.open("a") as held:
+                fcntl.flock(held, fcntl.LOCK_EX)
+                updater.main()
+                work.assert_not_called()
+            updater.main()
+            work.assert_called_once()
+
+    def test_reconcile_scheduled_after_locks_released_even_if_offline(self):
+        import fcntl
+        deploy = self.state / "deploy.lock"
+        infra = self.state / "infra.lock"
+        def work():
+            updater.schedule_reconcile(self.release)
+            raise SystemExit(1)
+        def start(*args):
+            with infra.open("a") as held:
+                fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return True
+        with patch.object(updater, "DEPLOYMENT_LOCK", deploy), patch.object(updater, "INFRASTRUCTURE_LOCK", infra), patch.object(updater, "run_locked", side_effect=work), patch.object(updater, "system_ok", side_effect=start) as system:
+            with self.assertRaises(SystemExit):
+                updater.main()
+            system.assert_called_once_with("start", "--no-block", updater.RECONCILE_SERVICE)
 
     @patch.object(updater, "ensure_maintenance")
     @patch.object(updater, "versions", return_value=("v1.0.0-beta.7-r3.2.37", None))

@@ -16,9 +16,16 @@ health() {
 }
 [[ $(health) == "$expected" ]] || { echo 'Wrong Orchestra node.' >&2; exit 1; }
 # Share the deployment lock with the privileged updater.
-exec 9>/run/lock/mysticego-clouddesk-deploy.lock
 stage='deployment-lock'
-flock -w 120 9
+inherited=false
+if [[ ${2:-} == --inherited-deploy-lock ]]; then
+  [[ $(readlink "/proc/$$/fd/9") == /run/lock/mysticego-clouddesk-deploy.lock ]]
+  flock -n 9
+  inherited=true
+else
+  exec 9>/run/lock/mysticego-clouddesk-deploy.lock
+  flock -w 120 9
+fi
 [[ $(health) == "$expected" ]]
 systemctl is-active --quiet mysticego-orchestra.service
 stage='trusted-release-validation'
@@ -28,7 +35,11 @@ root=pathlib.Path(sys.argv[1])
 paths=["runtime/app/web/orchestra/release-info.json", "ops/orchestra-updater/install-worker.sh",
        "ops/orchestra-updater/update-orchestra.py", "ops/orchestra-updater/mysticego-orchestra-updater.service",
        "ops/orchestra-updater/mysticego-orchestra-updater.timer"]
-paths += ["ops/infrastructure/"+name for name in ("install-local.sh","install.sh","install.py","local-runner.py","reconcile.py","install-voice.sh","voice-server.py")]
+paths += ["ops/infrastructure/"+name for name in ("install-local.sh","install.sh","install.py","local-runner.py","reconcile.py","install-voice.sh","voice-server.py")] 
+# Older releases predate oneshot accounting. Validate it whenever present.
+accounting="ops/infrastructure/record-oneshot.py"
+if (root/accounting).exists() or (root/accounting).is_symlink():
+    paths.append(accounting)
 # R3.2.37 is recoverable with the CloudDesk script; newer releases also
 # include a separate fixed-command recovery service.
 extra=["ops/orchestra-updater/"+name for name in ("recover-maintenance.sh","rescue-request.py","mysticego-maintenance-rescue.path","mysticego-maintenance-rescue.service")]
@@ -67,6 +78,8 @@ systemctl is-active --quiet mysticego-local-setup.socket
 stage='health-verification'
 [[ $(health) == "$expected" ]]
 # Release lock before triggering immediate status publication; the timer also retries.
-flock -u 9
-systemctl start --no-block mysticego-orchestra-updater.service
+if [[ $inherited == false ]]; then
+  flock -u 9
+  systemctl start --no-block mysticego-orchestra-updater.service
+fi
 echo 'MAINTENANCE_RECOVERY_OK'

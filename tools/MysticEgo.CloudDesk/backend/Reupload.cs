@@ -81,7 +81,7 @@ sealed partial class CloudDesk {
         if(domain!=S(args,"domain"))throw new Exception("Домен изменился.");
         var plan=System.Text.Json.JsonSerializer.SerializeToNode(await ReadMaintenancePlan(args))!.AsObject();
         if(S(plan,"action")!=action)throw new Exception("Состояние изменилось. Повторите проверку.");
-        if(action=="legacy-repair")
+        if(action is "legacy-repair" or "unavailable")
         {
             var copy=(JsonObject)args.DeepClone();copy["confirm"]="RECOVER_MAINTENANCE";
             return await RecoverOrchestraMaintenance(copy,progress);
@@ -171,6 +171,9 @@ sealed partial class CloudDesk {
         if(response is not JsonObject info || S(info,"status")!="alive" || !S(info,"kind").Equals("orchestra",StringComparison.OrdinalIgnoreCase)
             || !Guid.TryParse(S(info,"node"),out var node) || node==Guid.Empty)
             throw new Exception("Не удалось подтвердить ID действующей Orchestra.");
+        var owner=await RequireDeveloper(TopologyOrigin("https://"+domain),ownerOnly:true);
+        if(!Guid.TryParse(owner,out var ownerNode)||ownerNode!=node||!Guid.TryParse(S(args,"node"),out var selectedNode)||selectedNode!=node)
+            throw new Exception("Сессия владельца или выбранный узел не совпадает с VPS.");
         var script=Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,"..","..","..","ops","orchestra-updater","recover-maintenance.sh"));
         if(!File.Exists(script))throw new Exception("Распакуйте актуальный полный архив MysticEgo.");
         var digest=Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(script))).ToLowerInvariant();
@@ -186,7 +189,7 @@ sealed partial class CloudDesk {
             if(!output.Split('\n').Any(line=>line.Trim()=="MAINTENANCE_RECOVERY_OK"))
                 throw new Exception("Служба не подтвердила восстановление.");
             progress("Сокет и таймеры активны. Orchestra отвечает с прежним ID.");
-            return new {domain,recovered=true,output="Службы обновления и обслуживания восстановлены; проверки компонентов выполняются автоматически."};
+            return new {domain,recovered=true,maintenanceScheduled=true,output="Службы обновления и обслуживания восстановлены; проверки компонентов выполняются автоматически."};
         } finally {
             try {await SSH(args,"rm -rf -- "+remote,1);}catch {}
         }
