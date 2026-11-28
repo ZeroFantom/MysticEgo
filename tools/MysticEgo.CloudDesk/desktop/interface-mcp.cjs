@@ -9,7 +9,8 @@ function installInterfaceMcp(win,product,port=0,options={}){
  const stop=()=>{enabled=false;epoch++;token='';clearTimeout(timeout);server?.close();server=undefined;};
  function live(){return enabled&&Date.now()<expires&&!win.isDestroyed()&&win.isVisible()&&!win.isMinimized();}
  const inspectScript=`(()=>Array.from(document.querySelectorAll('[data-interface-id]')).filter(e=>!e.disabled&&!e.closest('[hidden],[inert]')&&getComputedStyle(e).visibility==='visible'&&e.getClientRects().length).map(e=>({id:e.dataset.interfaceId,label:e.getAttribute('aria-label')||e.textContent.trim().slice(0,80),active:e.classList.contains('active')||e.getAttribute('aria-pressed')==='true'||e.parentElement?.open===true})))()`;
- async function inspect(){if(!live())throw Error('Enable MCP in the visible application window.');return {product,targets:(await win.webContents.executeJavaScript(inspectScript)).filter(t=>safe.test(t.id)).slice(0,80)};}
+ function requireLease(generation){if(!live()||generation!==epoch)throw Error('MCP session closed.');}
+ async function inspect(){const generation=epoch;requireLease(generation);const targets=await win.webContents.executeJavaScript(inspectScript);requireLease(generation);return {product,targets:targets.filter(t=>safe.test(t.id)).slice(0,80)};}
  function tool(name,description,click=false,readOnly=!click){return {name,description,inputSchema:{type:'object',properties:click?{target:{type:'string',description:'Exact ID returned by desktop_inspect'}}:{},required:click?['target']:[],additionalProperties:false},annotations:{readOnlyHint:readOnly,destructiveHint:false}}}
  async function click(target){
   if(!safe.test(target)||!live()||busy)throw Error('Unavailable or busy.');
@@ -17,8 +18,9 @@ function installInterfaceMcp(win,product,port=0,options={}){
   try{
    if(!(await inspect()).targets.some(x=>x.id===target))throw Error('Target is not an enabled navigation control.');
    const script=`(()=>{const e=Array.from(document.querySelectorAll('[data-interface-id]')).find(e=>e.dataset.interfaceId===${JSON.stringify(target)}&&!e.disabled&&!e.closest('[hidden],[inert]')&&getComputedStyle(e).visibility==='visible'&&e.getClientRects().length);if(!e)return null;e.scrollIntoView({block:'center',behavior:'instant'});const r=e.getBoundingClientRect();const x=Math.round(r.left+r.width/2),y=Math.round(r.top+r.height/2);if(!e.contains(document.elementFromPoint(x,y)))return null;return {x,y}})()`;
+   requireLease(generation);
    win.focus();const point=await win.webContents.executeJavaScript(script);
-   if(!point||!live()||generation!==epoch)throw Error('Target is not visible.');
+   if(!point||!live()||generation!==epoch||!win.isFocused()||!Number.isSafeInteger(point.x)||!Number.isSafeInteger(point.y)||point.x<0||point.y<0||point.x>32767||point.y>32767)throw Error('Target is not visible.');
    const {x,y}=point;
    // Visible indicator is generated from fixed code and bounded numeric coordinates.
    await win.webContents.executeJavaScript(`(()=>{const e=document.createElement('div');e.textContent='➤';e.setAttribute('aria-hidden','true');e.style.cssText='position:fixed;pointer-events:none;z-index:2147483647;color:#a78bfa;font-size:28px;text-shadow:0 0 5px white;transition:left .28s,top .28s;left:50%;top:50%';document.body.append(e);requestAnimationFrame(()=>requestAnimationFrame(()=>{e.style.left=${x}+'px';e.style.top=${y}+'px'}));setTimeout(()=>e.remove(),1100)})()`);
@@ -26,12 +28,14 @@ function installInterfaceMcp(win,product,port=0,options={}){
    if(!live()||generation!==epoch||!win.isFocused())throw Error('Stopped or focus lost.');
    // Re-resolve the actual element before dispatching native Chromium input.
    const next=await win.webContents.executeJavaScript(script);
-   if(!next||next.x!==x||next.y!==y||!live()||generation!==epoch)throw Error('Target moved.');
+   if(!next||next.x!==x||next.y!==y||!live()||generation!==epoch||!win.isFocused())throw Error('Target moved or focus lost.');
    win.webContents.sendInputEvent({type:'mouseMove',x,y});
    win.webContents.sendInputEvent({type:'mouseDown',x,y,button:'left',clickCount:1});
    win.webContents.sendInputEvent({type:'mouseUp',x,y,button:'left',clickCount:1});
    await wait(350);
-   return {clicked:target,observed:await inspect()};
+   requireLease(generation);
+   const observed=await inspect();requireLease(generation);
+   return {clicked:target,observed};
   }finally{busy=false;}
  }
  // These actions operate only on the verified updater owned by this Electron main
@@ -67,7 +71,9 @@ function installInterfaceMcp(win,product,port=0,options={}){
  }
  async function sshStatus(){
   if(!live()||product!=='CloudDesk')throw Error('CloudDesk session required.');
+  const generation=epoch;
   const state=await win.webContents.executeJavaScript(`(()=>{const modal=document.querySelector('[data-mcp-ssh-stage]');const value=document.querySelector('[data-mcp-ssh-status]');return {stage:modal?.dataset.mcpSshStage??null,state:modal?.dataset.mcpSshState??value?.dataset.mcpSshStatus??null}})()`);
+  requireLease(generation);
   return {stage:['identity','access','ready'].includes(state.stage)?state.stage:null,state:['checking','ready','auth','trust','changed','offline','setup','error'].includes(state.state)?state.state:null};
  }
  function authorized(req){
@@ -89,7 +95,7 @@ function installInterfaceMcp(win,product,port=0,options={}){
    if(!authorized(req)){reply(403,{error:'Session closed'});return;}
    const result=value=>reply(200,{jsonrpc:'2.0',id:q.id??null,result:value});
    const error=(code,message)=>reply(200,{jsonrpc:'2.0',id:q.id??null,error:{code,message}});
-   if(q.jsonrpc!=='2.0'){error(-32600,'Invalid request');return;}
+   if(!q||typeof q!=='object'||Array.isArray(q)||q.jsonrpc!=='2.0'||typeof q.method!=='string'){reply(400,{jsonrpc:'2.0',id:null,error:{code:-32600,message:'Invalid request'}});return;}
    if(q.method?.startsWith('notifications/')&&q.id===undefined){reply(202);return;}
    if(q.method==='initialize'){result({protocolVersion:'2025-03-26',capabilities:{tools:{}},serverInfo:{name:'mysticego-desktop',version:'1.0.0'}});return;}
    if(q.method==='ping'){result({});return;}
@@ -100,6 +106,8 @@ function installInterfaceMcp(win,product,port=0,options={}){
     result({tools});return;
    }
    if(q.method!=='tools/call'){error(-32601,'Method not found');return;}
+   // Side effects require a request/response exchange, not a notification.
+   if(typeof q.id!=='string'&&!(typeof q.id==='number'&&Number.isFinite(q.id))){error(-32600,'Tool call requires a request ID');return;}
    try{
     const name=q.params?.name;
     const args=q.params?.arguments??{};
