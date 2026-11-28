@@ -353,6 +353,13 @@ def lmstudio_dependencies():
         system_packages(*missing)
 
 
+def lm_cache_present(model):
+    family = model.split("/", 1)[1]
+    model_folder = LM_HOME / ".lmstudio/models"
+    return any(path.is_file() and path.stat().st_size > 0 and family in path.parent.name.lower()
+               and "q4_k_m" in path.name.lower() for path in model_folder.glob("*/*/*.gguf"))
+
+
 def lmstudio(data):
     role = data.get("role") or "panel-data"
     if role not in MODELS:
@@ -374,7 +381,10 @@ def lmstudio(data):
                 "-o", install.name, "https://lmstudio.ai/install.sh")
             os.chown(install.name, uid, -1)
             run(*command, "bash", install.name, stdin=subprocess.DEVNULL)
-    if not profile.exists():
+    cached = lm_cache_present(model)
+    if not profile.exists() or not cached:
+        # A retained role file is not proof the model survived a partial deletion.
+        # Never take over an unrelated server listening on the model endpoint.
         try:
             request("http://127.0.0.1:1234/v1/models")
         except OSError:
@@ -383,10 +393,6 @@ def lmstudio(data):
             raise ValueError("Порт 1234 уже занят сервером моделей.")
         run(*command, str(cli), "daemon", "up")
         try:
-            family = model.split("/", 1)[1]
-            model_folder = LM_HOME / ".lmstudio/models"
-            cached = any(path.is_file() and family in path.parent.name.lower()
-                         and "q4_k_m" in path.name.lower() for path in model_folder.glob("*/*/*.gguf"))
             if not cached:
                 say(f"Скачиваем модель {model}")
                 run(*command, str(cli), "get", model + "@q4_k_m", "--gguf", "--yes", stdin=subprocess.DEVNULL)
