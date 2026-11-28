@@ -1,7 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {Sparkles,ShieldCheck,Compass,MessagesSquare,Users,Backpack,ScrollText,BookOpen,Landmark,LogOut,Lock} from 'lucide-react';
-import {exchange,status,logout,MiniRequestError} from './mini-api';
+import {exchange,status,logout,soul,MiniRequestError,type SoulResponse} from './mini-api';
 import './mini.css';
 
 type TelegramWebApp={
@@ -11,7 +11,6 @@ type TelegramWebApp={
 const telegram=()=>(window as Window&{Telegram?:{WebApp?:TelegramWebApp}}).Telegram?.WebApp;
 type Stage='launch'|'loading'|'linked'|'denied'|'expired'|'unavailable'|'closed';
 const sections=[
-  {name:'Душа',detail:'Активное воплощение',icon:Sparkles},
   {name:'Духовная связь',detail:'Личные диалоги',icon:MessagesSquare},
   {name:'Окружение',detail:'Доступные персонажи',icon:Compass},
   {name:'Друзья',detail:'Связи между игроками',icon:Users},
@@ -25,6 +24,9 @@ function App(){
   const [theme,setTheme]=useState<'dark'|'light'>(telegram()?.colorScheme==='light'?'light':'dark');
   const [available,setAvailable]=useState(false);
   const [seconds,setSeconds]=useState(0);
+  const [soulData,setSoulData]=useState<SoulResponse|null>(null);
+  const [soulState,setSoulState]=useState<'idle'|'loading'|'ready'|'unavailable'>('idle');
+  const soulBusy=useRef(false);
   const secret=useRef<string|null>(null);
   const deadline=useRef(0);
   const busy=useRef(false);
@@ -41,7 +43,7 @@ function App(){
     return()=>{mounted.current=false;tg?.offEvent?.('themeChanged',update);secret.current=null;};
   },[]);
   const clear=(next:Stage)=>{
-    secret.current=null;deadline.current=0;setSeconds(0);setAvailable(false);setStage(next);
+    secret.current=null;deadline.current=0;setSeconds(0);setAvailable(false);setSoulData(null);setSoulState('idle');setStage(next);
   };
   async function connect(){
     if(busy.current||attempted.current)return;
@@ -89,6 +91,20 @@ function App(){
     document.addEventListener('visibilitychange',visibility);
     return()=>{window.clearInterval(timer);window.clearInterval(poll);document.removeEventListener('visibilitychange',visibility)};
   },[stage]);
+  async function loadSoul(){
+    const token=secret.current;
+    if(!token||soulBusy.current)return;
+    soulBusy.current=true;setSoulData(null);setSoulState('loading');
+    try{
+      const data=await soul(token);
+      if(mounted.current&&secret.current===token){setSoulData(data);setSoulState('ready')}
+    }catch(error){
+      if(mounted.current&&secret.current===token){
+        if(error instanceof MiniRequestError&&error.status===401)clear('expired');
+        else setSoulState('unavailable');
+      }
+    }finally{soulBusy.current=false}
+  }
   async function disconnect(){
     const token=secret.current;
     clear('closed');
@@ -119,6 +135,20 @@ function App(){
         <button className="mini-primary" onClick={close} disabled={!telegram()?.close}>Закрыть Mini App</button>
       </>}
     </section>
+    {stage==='linked'&&<section className="mini-panel" aria-labelledby="soul-heading">
+      <h2 id="soul-heading"><Sparkles size={20}/> Состояние души</h2>
+      {soulState==='loading'?<p>Получаем игровой профиль…</p>:soulState==='unavailable'?<p>Сервис души сейчас недоступен.</p>:
+        soulData?.exists&&soulData.soul?<div className="mini-soul">
+          <p>{soulData.soul.state==='EgoShard'?'Осколок Эго':'Цифровая душа'} · ранг {soulData.soul.rank}</p>
+          <div className="mini-session"><span>Уровень</span><strong>{soulData.soul.level}</strong></div>
+          <div className="mini-session"><span>Опыт</span><strong>{soulData.soul.experience} XP</strong></div>
+          {soulData.soul.toNext>0&&<progress aria-label="Прогресс уровня" max={soulData.soul.toNext} value={Math.min(soulData.soul.inLevel,soulData.soul.toNext)}/>}
+          <div className="mini-session"><span>Свободные очки</span><strong>{soulData.soul.availablePoints}</strong></div>
+          {soulData.soul.attributes.map(a=><div className="mini-session" key={a.id}><span>{a.label}</span><strong>{a.locked?'Закрыто':a.value}</strong></div>)}
+          <p className="mini-note">Игровые характеристики. Текущая область и активное воплощение пока не подтверждаются.</p>
+        </div>:soulData?.exists===false?<p>Душа ещё не создана. Создание доступно в основном приложении.</p>:<p>Загрузи существующий игровой профиль. Данные доступны только для чтения.</p>}
+      <button className="mini-secondary" disabled={soulState==='loading'} onClick={()=>void loadSoul()}>{soulState==='loading'?'Загрузка…':'Обновить состояние души'}</button>
+    </section>}
     {stage==='linked'&&<section aria-labelledby="sections"><div className="mini-section-heading"><h2 id="sections">Твой мир</h2><small>В разработке</small></div>
       <div className="mini-grid">{sections.map(({name,detail,icon:Icon})=><article key={name} className="mini-tile" aria-label={name+' — пока недоступно'}>
         <div><Icon size={23}/><Lock size={13}/></div><h3>{name}</h3><p>{detail}</p></article>)}</div>

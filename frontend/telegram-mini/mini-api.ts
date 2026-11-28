@@ -38,3 +38,28 @@ export async function status(token:string):Promise<MiniStatus>{
 export async function logout(token:string):Promise<void>{
   await request('logout',{},token);
 }
+
+export type SoulAttribute={id:string;label:string;value:number|null;locked:boolean};
+export type SoulView={state:'EgoShard'|'DigitalSoul';level:number;rank:string;experience:number;inLevel:number;toNext:number;availablePoints:number;attributes:SoulAttribute[]};
+export type SoulResponse={exists:boolean;soul:SoulView|null;placementAvailable:false};
+export function validSoul(value:unknown):value is SoulResponse{
+  if(!value||typeof value!=='object')return false;
+  const v=value as Partial<SoulResponse>;
+  if(v.placementAvailable!==false||typeof v.exists!=='boolean')return false;
+  if(!v.exists)return v.soul===null;
+  const s=v.soul;
+  const integer=(n:unknown,min=0,max=1000000)=>typeof n==='number'&&Number.isInteger(n)&&n>=min&&n<=max;
+  return Boolean(s&&(s.state==='EgoShard'||s.state==='DigitalSoul')&&integer(s.level,1,90)&&
+    /^(F|E|D|C|B|A|S|SS|SSS)$/.test(s.rank)&&integer(s.experience)&&integer(s.inLevel)&&integer(s.toNext)&&
+    integer(s.availablePoints)&&Array.isArray(s.attributes)&&s.attributes.length<=16&&
+    s.attributes.every(a=>a&&typeof a.id==='string'&&a.id.length<=64&&typeof a.label==='string'&&a.label.length<=80&&
+      typeof a.locked==='boolean'&&(a.locked?a.value===null:integer(a.value,0,100))));
+}
+export async function soul(token:string):Promise<SoulResponse>{
+  const response=await fetch('/api/mini/soul',{method:'POST',headers:{'Content-Type':'application/json','X-Mystic-Mini-Session':token},
+    body:'{}',credentials:'omit',cache:'no-store',redirect:'error',referrerPolicy:'no-referrer',signal:AbortSignal.timeout(20000)});
+  if(!response.ok)throw new MiniRequestError(response.status);
+  const value:unknown=await response.json();
+  if(!validSoul(value))throw new MiniRequestError(502);
+  return value;
+}

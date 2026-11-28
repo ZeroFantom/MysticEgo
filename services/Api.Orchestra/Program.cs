@@ -24,6 +24,8 @@ builder.Services.AddSingleton<NativeDeploymentJobs>();
 builder.Services.AddSingleton<INativeDeploymentPlanService,NativeDeploymentPlanService>();
 builder.Services.AddHostedService(sp=>sp.GetRequiredService<NativeDeploymentJobs>());
 builder.Services.AddSoul();
+builder.Services.AddScoped<SoulMirrorReader>();
+builder.Services.AddSingleton<MiniSoulIdentity>();
 builder.Services.AddAvatar(AvatarNode.Orchestra);
 builder.Services.AddSocial();
 builder.Services.AddSingleton<MysticEgo.Api.Orchestra.Controllers.StickerStore>();
