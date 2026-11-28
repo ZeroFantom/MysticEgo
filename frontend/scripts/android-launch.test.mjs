@@ -25,5 +25,5 @@ test('launch links preserve only known routes and fixed fallback',()=>{
  assert.ok(androidLaunch('/assistant').includes('package='+ANDROID_PACKAGE+';'));
  assert.ok(androidLaunch('/assistant').includes('S.browser_fallback_url='+encodeURIComponent(ANDROID_FALLBACK)));
  const java=readFileSync(new URL('../../mobile/android/app/src/main/java/ru/isdarkline/mysticego/MobileRoutes.java',import.meta.url),'utf8');
- for(const [key,value] of Object.entries(ANDROID_ROUTES))assert.ok(java.includes('Map.entry("'+key+'", "'+value+'")'),key);
+ for(const [key,value] of Object.entries(ANDROID_ROUTES))assert.ok(java.includes('routes.put("'+key+'", "'+value+'")'),key);
 });

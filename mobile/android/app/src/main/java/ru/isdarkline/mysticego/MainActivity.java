@@ -1,6 +1,7 @@
 package ru.isdarkline.mysticego;
 
 import android.app.Activity;
+import android.graphics.Bitmap;
 import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
@@ -80,6 +81,15 @@ public final class MainActivity extends Activity {
                 if (request.hasGesture() && RELEASES.equals(url)) openReleasePage();
                 else Toast.makeText(MainActivity.this, "External navigation blocked", Toast.LENGTH_SHORT).show();
                 return true;
+            }
+            @Override public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                // Defense in depth for navigation paths not seen by shouldOverrideUrlLoading.
+                if (!MobileRoutes.trustedPage(url)) {
+                    view.stopLoading();
+                    view.loadUrl(MobileRoutes.HOME);
+                    return;
+                }
+                super.onPageStarted(view, url, favicon);
             }
             @Override public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
                 handler.cancel();
