@@ -1,7 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {createRoot} from 'react-dom/client';
-import {Sparkles,ShieldCheck,Compass,MessagesSquare,Users,Backpack,ScrollText,BookOpen,Landmark,LogOut,Lock} from 'lucide-react';
-import {exchange,status,logout,soul,MiniRequestError,type SoulResponse} from './mini-api';
+import {Sparkles,ShieldCheck,Compass,MessagesSquare,Backpack,ScrollText,BookOpen,Landmark,LogOut,Lock} from 'lucide-react';
+import {exchange,status,logout,soul,presence,MiniRequestError,type SoulResponse,type PresenceResponse} from './mini-api';
 import './mini.css';
 
 type TelegramWebApp={
@@ -12,8 +12,6 @@ const telegram=()=>(window as Window&{Telegram?:{WebApp?:TelegramWebApp}}).Teleg
 type Stage='launch'|'loading'|'linked'|'denied'|'expired'|'unavailable'|'closed';
 const sections=[
   {name:'Духовная связь',detail:'Личные диалоги',icon:MessagesSquare},
-  {name:'Окружение',detail:'Доступные персонажи',icon:Compass},
-  {name:'Друзья',detail:'Связи между игроками',icon:Users},
   {name:'Инвентарь',detail:'Предметы воплощения',icon:Backpack},
   {name:'Задания',detail:'Текущие цели',icon:ScrollText},
   {name:'Хроники',detail:'События мира',icon:BookOpen},
@@ -27,6 +25,11 @@ function App(){
   const [soulData,setSoulData]=useState<SoulResponse|null>(null);
   const [soulState,setSoulState]=useState<'idle'|'loading'|'ready'|'unavailable'>('idle');
   const soulBusy=useRef(false);
+  const [world,setWorld]=useState<PresenceResponse|null>(null);
+  const [worldState,setWorldState]=useState<'idle'|'loading'|'ready'|'unavailable'>('idle');
+  const worldBusy=useRef(false);
+  const worldDeadline=useRef(0);
+  const worldEpoch=useRef(0);
   const secret=useRef<string|null>(null);
   const deadline=useRef(0);
   const busy=useRef(false);
@@ -43,7 +46,7 @@ function App(){
     return()=>{mounted.current=false;tg?.offEvent?.('themeChanged',update);secret.current=null;};
   },[]);
   const clear=(next:Stage)=>{
-    secret.current=null;deadline.current=0;setSeconds(0);setAvailable(false);setSoulData(null);setSoulState('idle');setStage(next);
+    secret.current=null;deadline.current=0;setSeconds(0);setAvailable(false);setSoulData(null);setSoulState('idle');worldEpoch.current++;worldDeadline.current=0;setWorld(null);setWorldState('idle');setStage(next);
   };
   async function connect(){
     if(busy.current||attempted.current)return;
@@ -70,6 +73,7 @@ function App(){
       const remaining=Math.max(0,Math.ceil((deadline.current-Date.now())/1000));
       if(remaining===0){clear('expired');return}
       setSeconds(remaining);
+      if(worldDeadline.current&&Date.now()>=worldDeadline.current){worldDeadline.current=0;setWorld(null);setWorldState('idle')}
     };
     const check=async()=>{
       const token=secret.current;
@@ -85,7 +89,7 @@ function App(){
         }
       }finally{checkBusy.current=false}
     };
-    const visibility=()=>{if(document.visibilityState==='visible'){tick();void check()}};
+    const visibility=()=>{worldEpoch.current++;worldDeadline.current=0;setWorld(null);setWorldState('idle');if(document.visibilityState==='visible'){tick();void check()}};
     const timer=window.setInterval(tick,1000);
     const poll=window.setInterval(()=>{if(document.visibilityState==='visible')void check()},30000);
     document.addEventListener('visibilitychange',visibility);
@@ -104,6 +108,24 @@ function App(){
         else setSoulState('unavailable');
       }
     }finally{soulBusy.current=false}
+  }
+  async function loadWorld(){
+    const token=secret.current;
+    if(!token||worldBusy.current)return;
+    worldBusy.current=true;const epoch=++worldEpoch.current;const start=Date.now();
+    setWorld(null);setWorldState('loading');
+    try{
+      const data=await presence(token);
+      if(!mounted.current||secret.current!==token||worldEpoch.current!==epoch)return;
+      const until=start+data.freshForSeconds*1000;
+      if(!data.snapshotAvailable||until<=Date.now()){setWorldState('unavailable');return}
+      worldDeadline.current=until;setWorld(data);setWorldState('ready');
+    }catch(error){
+      if(mounted.current&&secret.current===token&&worldEpoch.current===epoch){
+        if(error instanceof MiniRequestError&&error.status===401)clear('expired');
+        else setWorldState('unavailable');
+      }
+    }finally{worldBusy.current=false}
   }
   async function disconnect(){
     const token=secret.current;
@@ -148,6 +170,22 @@ function App(){
           <p className="mini-note">Игровые характеристики. Текущая область и активное воплощение пока не подтверждаются.</p>
         </div>:soulData?.exists===false?<p>Душа ещё не создана. Создание доступно в основном приложении.</p>:<p>Загрузи существующий игровой профиль. Данные доступны только для чтения.</p>}
       <button className="mini-secondary" disabled={soulState==='loading'} onClick={()=>void loadSoul()}>{soulState==='loading'?'Загрузка…':'Обновить состояние души'}</button>
+    </section>}
+    {stage==='linked'&&<section className="mini-panel" aria-labelledby="presence-heading">
+      <h2 id="presence-heading"><Compass size={20}/> Окружение</h2>
+      {worldState==='loading'?<p>Проверяем состояние мира…</p>:worldState==='unavailable'?<p>Свежие данные мира недоступны.</p>:
+        world?.presence?<div>
+          <p>Воплощение: {world.presence.embodiment??'Имя не опубликовано'}</p>
+          <p>Область: {world.presence.area??'Название не опубликовано'}</p>
+          <h3>Рядом</h3>
+          {world.presence.nearby.length===0?<p>Доступных собеседников нет.</p>:world.presence.nearby.map((c,i)=>
+            <div className="mini-session" key={i}><span>{c.name}</span><strong>{c.kind==='npc'?'NPC':'Игрок'}</strong></div>)}
+          <h3>Друзья</h3>
+          {world.presence.friends.length===0?<p>Доступных друзей нет.</p>:world.presence.friends.map((c,i)=>
+            <div className="mini-session" key={i}><span>{c.name}</span><strong>{c.reachability==='friend'?'Другая область':'Рядом'}</strong></div>)}
+          <p className="mini-note">Снимок только для просмотра. Отправка сообщений ещё не подключена.</p>
+        </div>:world?.snapshotAvailable?<p>Активное воплощение не подтверждено.</p>:<p>Обнови список доступных собеседников.</p>}
+      <button className="mini-secondary" disabled={worldState==='loading'} onClick={()=>void loadWorld()}>Обновить окружение</button>
     </section>}
     {stage==='linked'&&<section aria-labelledby="sections"><div className="mini-section-heading"><h2 id="sections">Твой мир</h2><small>В разработке</small></div>
       <div className="mini-grid">{sections.map(({name,detail,icon:Icon})=><article key={name} className="mini-tile" aria-label={name+' — пока недоступно'}>

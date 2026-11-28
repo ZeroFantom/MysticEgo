@@ -63,3 +63,24 @@ export async function soul(token:string):Promise<SoulResponse>{
   if(!validSoul(value))throw new MiniRequestError(502);
   return value;
 }
+
+export type PresenceContact={name:string;kind:'npc'|'player';reachability:'local'|'friend'};
+export type PresenceView={embodiment:string|null;area:string|null;nearby:PresenceContact[];friends:PresenceContact[]};
+export type PresenceResponse={snapshotAvailable:boolean;presence:PresenceView|null;freshForSeconds:number};
+export async function presence(token:string):Promise<PresenceResponse>{
+  const response=await fetch('/api/mini/presence',{method:'POST',headers:{'Content-Type':'application/json','X-Mystic-Mini-Session':token},
+    body:'{}',credentials:'omit',cache:'no-store',redirect:'error',referrerPolicy:'no-referrer',signal:AbortSignal.timeout(20000)});
+  if(!response.ok)throw new MiniRequestError(response.status);
+  const value=await response.json() as Partial<PresenceResponse>|null;
+  const label=(s:unknown)=>s===null||typeof s==='string'&&s.length>0&&s.length<=80;
+  const contacts=(items:unknown,friend:boolean)=>Array.isArray(items)&&items.length<=20&&items.every(c=>
+    c&&typeof c.name==='string'&&label(c.name)&&(c.kind==='npc'||c.kind==='player')&&
+    (c.reachability==='local'||friend&&c.reachability==='friend')&&(!friend||c.kind==='player'));
+  if(!value||typeof value.snapshotAvailable!=='boolean'||typeof value.freshForSeconds!=='number'||
+    !Number.isInteger(value.freshForSeconds)||value.freshForSeconds<0||value.freshForSeconds>15||
+    (!value.snapshotAvailable&&(value.presence!==null||value.freshForSeconds!==0))||
+    (value.snapshotAvailable&&value.freshForSeconds===0)||
+    (value.presence!==null&&(!value.presence||!label(value.presence.embodiment)||!label(value.presence.area)||
+      !contacts(value.presence.nearby,false)||!contacts(value.presence.friends,true))))throw new MiniRequestError(502);
+  return value as PresenceResponse;
+}
