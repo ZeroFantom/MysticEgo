@@ -21,6 +21,8 @@ using MysticEgo.Api.Orchestra;
 using MysticEgo.WorldAI;
 using Microsoft.Data.Sqlite;
 
+SpiritualConnectionSmoke.Run();
+
 var tmp=Directory.CreateTempSubdirectory("collective-http-").FullName;
 void Check(bool ok,string message){if(!ok)throw new Exception(message);}
 var key=Encoding.UTF8.GetBytes("isolated-collective-test-secret-32-bytes");
