@@ -16,9 +16,16 @@ health() {
 }
 [[ $(health) == "$expected" ]] || { echo 'Wrong Orchestra node.' >&2; exit 1; }
 # Share the deployment lock with the privileged updater.
-exec 9>/run/lock/mysticego-clouddesk-deploy.lock
 stage='deployment-lock'
-flock -w 120 9
+inherited=false
+if [[ ${2:-} == --inherited-deploy-lock ]]; then
+  [[ $(readlink "/proc/$/fd/9") == /run/lock/mysticego-clouddesk-deploy.lock ]]
+  flock -n 9
+  inherited=true
+else
+  exec 9>/run/lock/mysticego-clouddesk-deploy.lock
+  flock -w 120 9
+fi
 [[ $(health) == "$expected" ]]
 systemctl is-active --quiet mysticego-orchestra.service
 stage='trusted-release-validation'
@@ -67,6 +74,8 @@ systemctl is-active --quiet mysticego-local-setup.socket
 stage='health-verification'
 [[ $(health) == "$expected" ]]
 # Release lock before triggering immediate status publication; the timer also retries.
-flock -u 9
-systemctl start --no-block mysticego-orchestra-updater.service
+if [[ $inherited == false ]]; then
+  flock -u 9
+  systemctl start --no-block mysticego-orchestra-updater.service
+fi
 echo 'MAINTENANCE_RECOVERY_OK'
