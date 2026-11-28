@@ -92,7 +92,7 @@ flock -n 9 || die 'deployment busy'
 preflight
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y ca-certificates caddy curl libicu74 libssl3t64 unzip gh
+apt-get install -y ca-certificates caddy curl libicu74 libssl3t64 unzip gh libatomic1 libgomp1
 preflight
 echo CLOUDDESK_RESET_STEP:stop
 for u in "${units[@]}"; do
@@ -109,6 +109,9 @@ for u in "${units[@]}"; do
 done
 active_setups=$(systemctl list-units 'mysticego-local-setup@*.service' --state=active,activating,deactivating --no-legend --plain)
 [[ -z $active_setups ]] || die 'local setup busy after stopping socket'
+# All activation units are stopped; exclude any remaining local provisioning.
+exec 8>/run/lock/mysticego-infrastructure.lock
+flock -n 8 || die 'infrastructure setup busy; no deletion performed'
 systemctl stop caddy.service
 check_paths
 # Only the fixed, confirmed application-owned directories and unit definitions are removed.
@@ -117,6 +120,7 @@ for u in "${units[@]}"; do rm -f -- "/etc/systemd/system/$u"; done
 rm -f -- /etc/caddy/Caddyfile
 rm -rf --one-file-system -- "${paths[@]}"
 systemctl daemon-reload
+flock -u 8
 echo CLOUDDESK_RESET_STEP:install
 # The standard installer now holds the inherited lock until it reaches maintenance recovery.
 MYSTICEGO_INSTALL_LOCK_FD=9 MYSTICEGO_INSTALL_PREREQS_READY=1 bash install.sh "$PWD/r3.zip" "$domain" '' "$digest" native sqlite
