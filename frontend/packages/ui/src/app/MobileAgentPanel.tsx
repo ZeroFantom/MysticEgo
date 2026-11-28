@@ -10,7 +10,7 @@ const states:Record<string,string>={pending:'Ожидает подтвержде
 export function MobileAgentPanel(){
  const {session,preferenceScope}=useApp();
  const eligible=location.origin===ANDROID_ORIGIN&&session.authUrl.replace(/\/$/,'')===location.origin;
- const [ticket,setTicket]=useState(''),[target,setTarget]=useState(''),[action,setAction]=useState<keyof typeof actions>('battery-status'),[busy,setBusy]=useState(false),[error,setError]=useState(''),[revoke,setRevoke]=useState('');
+ const [enrollmentConsent,setEnrollmentConsent]=useState(false),[ticket,setTicket]=useState(''),[target,setTarget]=useState(''),[action,setAction]=useState<keyof typeof actions>('battery-status'),[busy,setBusy]=useState(false),[error,setError]=useState(''),[revoke,setRevoke]=useState('');
  const generation=useRef(0);
  async function call(path:string,body?:unknown){
   const r=await fetch('/api/auth/mobile-agent/'+path,{method:body===undefined?'GET':'POST',headers:{Authorization:'Bearer '+session.token,...(body===undefined?{}:{'Content-Type':'application/json'})},body:body===undefined?undefined:JSON.stringify(body),credentials:'omit',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(12000)});
@@ -23,14 +23,15 @@ export function MobileAgentPanel(){
  }
  const devices=useRemote<Device[]>(()=>eligible?call('devices'):Promise.resolve([]),[eligible,preferenceScope,session.token],15000);
  const jobs=useRemote<Item[]>(()=>eligible?mcp('mobile.status'):Promise.resolve([]),[eligible,preferenceScope,session.token],10000);
- useEffect(()=>{generation.current++;setTicket('');setTarget('');setRevoke('');setError('');setBusy(false);return()=>{generation.current++}},[preferenceScope,session.token]);
+ useEffect(()=>{generation.current++;setEnrollmentConsent(false);setTicket('');setTarget('');setRevoke('');setError('');setBusy(false);return()=>{generation.current++}},[preferenceScope,session.token]);
  useEffect(()=>{if(!ticket)return;const timer=window.setTimeout(()=>setTicket(''),120000);return()=>window.clearTimeout(timer)},[ticket]);
  async function run(work:()=>Promise<void>){const current=generation.current;setBusy(true);setError('');try{await work();if(current===generation.current){devices.reload();jobs.reload()}}catch(e){if(current===generation.current)setError(String(e))}finally{if(current===generation.current)setBusy(false)}}
  if(!eligible)return null;
  return <Panel title="Зарегистрированные телефоны · Mobile Agent">
   <p>Отдельная регистрация Android, не равная веб-сессии. Приём работает только на открытом экране MCP в приложении. Последний сигнал не гарантирует, что телефон всё ещё доступен.</p>
   <ErrorBanner text={error||devices.error||jobs.error}/>
-  <button className="btn secondary" disabled={busy} onClick={()=>void run(async()=>{const current=generation.current;const r=await call('ticket',{});if(current===generation.current&&typeof r?.code==='string')setTicket(r.code)})}>Создать код регистрации</button>
+  <label><input type="checkbox" checked={enrollmentConsent} onChange={e=>setEnrollmentConsent(e.target.checked)}/> Создаю отдельный отзывной ключ для собственного телефона; он действует независимо от выхода из веб-панели.</label>
+  <button className="btn secondary" disabled={busy||!enrollmentConsent} onClick={()=>void run(async()=>{const current=generation.current;const r=await call('ticket',{consent:true});if(current===generation.current&&typeof r?.code==='string')setTicket(r.code)})}>Создать код регистрации</button>
   {ticket&&<div className="panel stack"><p>Одноразовый код действует две минуты. Вставьте его в нативный экран MCP приложения. Не передавайте код другим людям.</p><input readOnly value={ticket} onFocus={e=>e.target.select()}/><button className="btn secondary" onClick={()=>setTicket('')}>Скрыть код</button></div>}
   {devices.value?.map(d=><article className="panel" key={d.id}><strong>{d.name} · {d.os}</strong><p>{d.revokedUtc?'Отозван':d.ready?'Недавний сигнал':'Нет недавнего сигнала'}</p><small>{d.lastSeenUtc?new Date(d.lastSeenUtc).toLocaleString():'Сигналов пока нет'}</small>{!d.revokedUtc&&<div><button className="btn secondary" disabled={busy} onClick={()=>setRevoke(d.id)}>Отозвать ключ</button></div>}</article>)}
   {revoke&&<div className="panel"><p>Отозвать независимый ключ телефона? Обычная веб-сессия не завершится автоматически.</p><button className="btn" disabled={busy} onClick={()=>void run(async()=>{await call('revoke',{id:revoke});setRevoke('')})}>Подтвердить отзыв</button><button className="btn secondary" onClick={()=>setRevoke('')}>Отмена</button></div>}

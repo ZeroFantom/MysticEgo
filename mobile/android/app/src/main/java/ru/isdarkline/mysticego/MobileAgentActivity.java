@@ -40,6 +40,7 @@ public final class MobileAgentActivity extends Activity {
     private EditText code;
     private LinearLayout requests,layout;
     private Button toggle,connect,forget;
+    private android.widget.CheckBox enrollmentConsent;
     private AlertDialog confirmation;
     private final Runnable pollTask=this::poll;
 
@@ -59,6 +60,8 @@ public final class MobileAgentActivity extends Activity {
         label("MysticEgo · Mobile Agent",24);
         label("В безопасности аккаунта создайте одноразовый код регистрации, вставьте его здесь и свяжите телефон со своим аккаунтом. Ключ хранится отдельно от веб-сессии. Приём запросов работает только пока этот экран открыт; каждое действие подтверждается на телефоне.",15);
         code=new EditText(this);code.setHint("Код регистрации (64 символа)");code.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);code.setSaveEnabled(false);layout.addView(code);
+        enrollmentConsent=new android.widget.CheckBox(this);enrollmentConsent.setText("Я разрешаю отдельную регистрацию телефона, передачу модели и версии ОС и приём только подтверждённых мной действий.");enrollmentConsent.setTextColor(Color.WHITE);layout.addView(enrollmentConsent);
+        enrollmentConsent.setOnCheckedChangeListener((v,checked)->render());
         connect=button("Зарегистрировать устройство",this::enroll);
         toggle=button("Включить приём",()->{if(receiving)stopReceive();else if(credential!=null){receiving=true;epoch++;render();poll();}});
         forget=button("Удалить локальный ключ",()->new AlertDialog.Builder(this).setTitle("Удалить ключ?")
@@ -72,7 +75,7 @@ public final class MobileAgentActivity extends Activity {
     private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
     private TextView label(String value,int size){TextView v=new TextView(this);v.setText(value);v.setTextColor(Color.rgb(230,224,250));v.setTextSize(size);v.setPadding(0,dp(12),0,dp(8));layout.addView(v);return v;}
     private Button button(String title,Runnable action){Button b=new Button(this);b.setText(title);b.setOnClickListener(v->action.run());layout.addView(b);return b;}
-    private void render(){if(destroyed)return;boolean paired=credential!=null;code.setEnabled(!paired&&!busy);connect.setEnabled(!paired&&!busy);toggle.setEnabled(paired&&resumed&&!busy);toggle.setText(receiving?"Остановить приём":"Включить приём");forget.setEnabled(!busy);if(paired&&!receiving&&!busy&&status.getText().length()==0)status.setText("Устройство зарегистрировано: "+credential.id);}
+    private void render(){if(destroyed)return;boolean paired=credential!=null;code.setEnabled(!paired&&!busy);connect.setEnabled(!paired&&!busy&&enrollmentConsent.isChecked());enrollmentConsent.setEnabled(!paired&&!busy);toggle.setEnabled(paired&&resumed&&!busy);toggle.setText(receiving?"Остановить приём":"Включить приём");forget.setEnabled(!busy);if(paired&&!receiving&&!busy&&status.getText().length()==0)status.setText("Устройство зарегистрировано: "+credential.id);}
     private static Object call(String route,JSONObject body,AgentCredential agent)throws Exception{
         HttpURLConnection http=(HttpURLConnection)new URL(MobileRoutes.ORIGIN+"/api/auth/mobile-agent/"+route).openConnection();
         try{
@@ -90,19 +93,19 @@ public final class MobileAgentActivity extends Activity {
     }
     private static String limit(String value,int max){value=value.replaceAll("[\\p{Cntrl}]"," ").trim();return value.substring(0,Math.min(max,value.length()));}
     private void enroll(){
-        if(busy||credential!=null||!resumed)return;
+        if(busy||credential!=null||!resumed||!enrollmentConsent.isChecked())return;
         String ticket=code.getText().toString().trim();if(!AgentCredential.validSecret(ticket)){status.setText("Введите действующий код из безопасности аккаунта.");return;}
         code.setText("");busy=true;render();status.setText("Регистрация…");
         executor.execute(()->{
             AgentCredential stored=null;String error=null;
             try{
-                JSONObject body=new JSONObject().put("code",ticket).put("name",limit(Build.MANUFACTURER+" "+Build.MODEL,100)).put("os",limit("Android "+Build.VERSION.RELEASE,40));
+                JSONObject body=new JSONObject().put("consent",true).put("code",ticket).put("name",limit(Build.MANUFACTURER+" "+Build.MODEL,100)).put("os",limit("Android "+Build.VERSION.RELEASE,40));
                 JSONObject result=(JSONObject)call("enroll",body,null);
                 AgentCredential candidate=new AgentCredential(result.getString("id"),result.getString("secret"));
                 AgentCredential.save(getApplicationContext(),candidate);stored=candidate;
             }catch(Exception e){error="Не удалось зарегистрировать устройство. Создайте новый код; проверьте список устройств в аккаунте.";}
             final AgentCredential value=stored;final String message=error;
-            runOnUiThread(()->{if(destroyed)return;busy=false;credential=value;status.setText(value==null?message:"Устройство зарегистрировано. Включите приём вручную.");render();});
+            runOnUiThread(()->{if(destroyed)return;busy=false;credential=value;enrollmentConsent.setChecked(false);status.setText(value==null?message:"Устройство зарегистрировано. Включите приём вручную.");render();});
         });
     }
     private void poll(){

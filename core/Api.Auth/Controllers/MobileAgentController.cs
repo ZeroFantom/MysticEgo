@@ -19,18 +19,20 @@ public sealed class MobileAgentController(AuthDbContext db,MobileAgentRequests q
     private Task<bool> Active(Guid owner,Guid session,CancellationToken ct)=>db.RefreshTokens.AsNoTracking().AnyAsync(x=>x.UserId==owner&&x.SessionId==session&&x.ExpiresAt>DateTime.UtcNow&&x.User!.IsActive,ct);
     private async Task<bool> AccountActive(CancellationToken ct)=>Account&&await Active(CurrentUserId!.Value,Sid!.Value,ct);
 
+    public sealed record TicketInput(bool Consent);
     [Authorize,HttpPost("ticket"),RequestSizeLimit(1024)]
-    public async Task<IActionResult> Ticket(CancellationToken ct)
+    public async Task<IActionResult> Ticket(TicketInput input,CancellationToken ct)
     {
         if(!await AccountActive(ct))return Unauthorized();
+        if(!input.Consent)return BadRequest();
         var code=queue.Issue(CurrentUserId!.Value,Sid!.Value,DateTimeOffset.UtcNow);
         return code is null?StatusCode(429):Ok(new{code,expiresIn=120});
     }
-    public sealed record EnrollInput(string Code,string Name,string Os);
+    public sealed record EnrollInput(string Code,string Name,string Os,bool Consent);
     [AllowAnonymous,HttpPost("enroll"),RequestSizeLimit(2048)]
     public async Task<IActionResult> Enroll(EnrollInput input,CancellationToken ct)
     {
-        if(string.IsNullOrWhiteSpace(input.Name)||input.Name.Length>100||input.Name.Any(char.IsControl)||string.IsNullOrWhiteSpace(input.Os)||input.Os.Length>40||input.Os.Any(char.IsControl))return BadRequest();
+        if(!input.Consent||string.IsNullOrWhiteSpace(input.Name)||input.Name.Length>100||input.Name.Any(char.IsControl)||string.IsNullOrWhiteSpace(input.Os)||input.Os.Length>40||input.Os.Any(char.IsControl))return BadRequest();
         var ticket=queue.Consume(input.Code,DateTimeOffset.UtcNow);
         if(ticket is null||!await Active(ticket.Owner,ticket.Session,ct))return Unauthorized();
         if(await db.AccountMobileAgents.CountAsync(x=>x.UserId==ticket.Owner,ct)>=40)return Conflict(new{error="Device registration limit"});

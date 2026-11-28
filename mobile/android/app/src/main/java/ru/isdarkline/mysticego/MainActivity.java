@@ -126,14 +126,17 @@ public final class MainActivity extends ComponentActivity {
         title.setTextColor(Color.WHITE);
         title.setTextSize(18);
         title.setPadding(dp(12), 0, dp(4), 0);
-        bar.addView(title, new LinearLayout.LayoutParams(0, dp(52), 1));
+        root.addView(title, new LinearLayout.LayoutParams(-1, dp(36)));
+        title.setGravity(Gravity.CENTER_VERTICAL);
         bar.addView(button("←", "Back", () -> { if (web.canGoBack()) web.goBack(); else web.loadUrl(MobileRoutes.HOME); }));
         bar.addView(button("⌂", "Home", () -> web.loadUrl(MobileRoutes.HOME)));
         bar.addView(button("QR", "Scan sign-in or friend QR", this::scanQr));
         bar.addView(button("AI", "Локальная модель", () -> startActivity(new Intent(this,LocalModelActivity.class))));
         bar.addView(button("MCP", "Mobile Agent", () -> startActivity(new Intent(this,MobileAgentActivity.class))));
         bar.addView(button("↻", "Reload", () -> web.reload()));
-        root.addView(bar);
+        android.widget.HorizontalScrollView actionScroll=new android.widget.HorizontalScrollView(this);
+        actionScroll.setHorizontalScrollBarEnabled(false);actionScroll.setFillViewport(false);
+        actionScroll.addView(bar);root.addView(actionScroll,new LinearLayout.LayoutParams(-1,-2));
 
         web = new WebView(this);
         WebView.setWebContentsDebuggingEnabled(false);
