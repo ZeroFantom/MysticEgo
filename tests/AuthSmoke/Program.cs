@@ -125,3 +125,5 @@ Console.WriteLine("Desktop pairing proof, expiry and replay tests passed");
 await ExternalIdentitySmoke.Run();
 
 await ExternalLinkSmoke.Run();
+
+await ProviderProofSmoke.Run();
