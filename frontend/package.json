@@ -11,7 +11,7 @@
     "dev:global": "npm run dev -w @mysticego/global",
     "dev:local": "npm run dev -w @mysticego/local",
     "dev:agent": "npm run dev -w @mysticego/agent",
-    "build": "tsc --noEmit && node scripts/social.test.mjs && npm run test:appearance && node scripts/monitoring.test.mjs && node scripts/build.mjs",
+    "build": "tsc --noEmit && node scripts/social.test.mjs && npm run test:appearance && node scripts/monitoring.test.mjs && node scripts/telegram-mini.test.mjs && node scripts/build.mjs",
     "typecheck": "npm run typecheck -ws --if-present",
     "dev:orchestra": "npm run dev -w @mysticego/orchestra",
     "dev:audit": "npm run dev -w @mysticego/audit",
