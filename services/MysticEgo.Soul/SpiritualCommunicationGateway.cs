@@ -12,6 +12,7 @@ public sealed record SpiritualWorldSnapshot(IReadOnlyList<WorldPlacement> Placem
     // Optional trusted in-world labels. Unnamed entities are not exposed in discovery.
     public IReadOnlyList<SpiritualContactLabel> ContactLabels { get; init; } = [];
     public IReadOnlyList<SpiritualAreaLabel> AreaLabels { get; init; } = [];
+    public IReadOnlyList<SpiritualNpcProfile> NpcProfiles { get; init; } = [];
 }
 public sealed record SpiritualAreaLabel(string WorldId,string AreaId,string Name);
 public sealed record SpiritualPublicContact(string Name,string Kind,string Reachability);
@@ -25,7 +26,16 @@ public sealed record SpiritualContactPage(Guid Revision, IReadOnlyList<Spiritual
 
 /// <summary>Caller is already authenticated; no client-supplied world/area/friendship or provider identity.</summary>
 public sealed record SpiritualHistoryItem(Guid MessageId,string Direction,string Text,DateTimeOffset CreatedUtc);
-public sealed record SpiritualNpcTurn(Guid MessageId,string NpcName,string Text,Guid Revision);
+// Profiles originate exclusively in the trusted simulation, not player speech or generated output.
+public sealed record SpiritualNpcProfile(string EntityId,string Personality,string SpeechStyle,
+    IReadOnlyList<string> KnownFacts,bool RecallDialogue=false);
+public sealed record SpiritualNpcCharacter(string Personality,string SpeechStyle,IReadOnlyList<string> KnownFacts,bool RecallDialogue);
+public sealed record SpiritualNpcMemory(string PlayerSpeech,string NpcSpeech);
+public sealed record SpiritualNpcTurn(Guid MessageId,string NpcName,string Text,Guid Revision)
+{
+    public SpiritualNpcCharacter? Character {get;init;}
+    public IReadOnlyList<SpiritualNpcMemory> Memory {get;init;}=[];
+}
 public sealed record SpiritualSendRequest(Guid RequestId, string RecipientId, string Text);
 public enum SpiritualSendStatus { Unavailable, Accepted }
 public sealed record SpiritualSendResult(SpiritualSendStatus Status, Guid? MessageId = null);
@@ -55,6 +65,7 @@ public sealed class SpiritualCommunicationGateway(TimeProvider clock, SpiritualM
     private HashSet<(string First, string Second)> friends = new();
     private Dictionary<string, string> labels = new(StringComparer.Ordinal);
     private Dictionary<(string World,string Area),string> areas=new();
+    private Dictionary<string,SpiritualNpcCharacter> npcProfiles=new(StringComparer.Ordinal);
     private readonly Dictionary<(Guid Account, Guid Request), Entry> requests = new();
     private readonly Queue<Entry> pending = new();
     private readonly Dictionary<Guid, SpiritualMessage> delivered = new();
@@ -111,10 +122,25 @@ public sealed class SpiritualCommunicationGateway(TimeProvider clock, SpiritualM
                 area.Name.Length>80||area.Name!=area.Name.Trim()||area.Name.Any(char.IsControl)||
                 !nextAreas.TryAdd((area.WorldId,area.AreaId),area.Name))
                 throw new ArgumentException("Invalid area label.");
+        var nextProfiles=new Dictionary<string,SpiritualNpcCharacter>(StringComparer.Ordinal);
+        static bool ProfileText(string? text,int limit)=>!string.IsNullOrWhiteSpace(text)&&text.Length<=limit&&
+            !text.Any(char.IsControl);
+        if(snapshot.NpcProfiles is null||snapshot.NpcProfiles.Count>2048)throw new ArgumentException("Invalid NPC profiles.");
+        foreach(var profile in snapshot.NpcProfiles)
+        {
+            if(profile is null||!entities.TryGetValue(profile.EntityId,out var target)||
+                target.Presence.Kind!=SpiritualParticipantKind.Npc||!nextLabels.ContainsKey(profile.EntityId)||
+                !ProfileText(profile.Personality,500)||!ProfileText(profile.SpeechStyle,160)||
+                profile.KnownFacts is null||profile.KnownFacts.Count>8||
+                profile.KnownFacts.Any(f=>!ProfileText(f,240))||
+                !nextProfiles.TryAdd(profile.EntityId,new(profile.Personality,profile.SpeechStyle,
+                    Array.AsReadOnly(profile.KnownFacts.ToArray()),profile.RecallDialogue)))
+                throw new ArgumentException("Invalid NPC profile.");
+        }
         lock (gate)
         {
             if (!presence.TryReplace(expected, placements, out revision)) return false;
-            active = nextActive; permissions = nextPermissions; friends = nextFriends; labels = nextLabels; areas=nextAreas;
+            active = nextActive; permissions = nextPermissions; friends = nextFriends; labels = nextLabels; areas=nextAreas; npcProfiles=nextProfiles;
             snapshotReady = true;
             return true;
         }
@@ -282,8 +308,10 @@ public sealed class SpiritualCommunicationGateway(TimeProvider clock, SpiritualM
         lock(gate)
         {
             var row=NpcRoute(account,messageId);
-            return row is not null&&labels.TryGetValue(row.Message.RecipientId,out var name)?
-                new(messageId,name,row.Message.Text,presence.Version):null;
+            if(row is null||!labels.TryGetValue(row.Message.RecipientId,out var name))return null;
+            var character=npcProfiles.GetValueOrDefault(row.Message.RecipientId);
+            var memory=character?.RecallDialogue==true?journal!.NpcMemory(row,6):[];
+            return new(messageId,name,row.Message.Text,presence.Version){Character=character,Memory=memory};
         }
     }
 

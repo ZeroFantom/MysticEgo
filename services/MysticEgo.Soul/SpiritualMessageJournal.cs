@@ -136,6 +136,34 @@ public sealed class SpiritualMessageJournal
         return cmd.ExecuteNonQuery()==1;
     }
 
+    // Exact account, incarnation, world and NPC; only prior completed exchanges.
+    // Never retrieve personal memories, other players, other NPCs or later concurrent turns.
+    internal IReadOnlyList<SpiritualNpcMemory> NpcMemory(JournalEntry current,int limit)
+    {
+        using var db=Open();using var cmd=db.CreateCommand();
+        cmd.CommandText="""
+            SELECT m.text,r.text FROM spiritual_messages m
+            JOIN spiritual_npc_replies r ON r.parent=m.id
+            WHERE m.status=1 AND m.recipient_kind=2 AND m.owner=$owner
+              AND m.sender=$sender AND m.recipient=$npc AND m.world=$world
+              AND m.seq<(SELECT seq FROM spiritual_messages WHERE id=$current)
+              AND r.created<=$accepted
+            ORDER BY m.seq DESC LIMIT $limit
+            """;
+        cmd.Parameters.AddWithValue("$owner",current.Owner.ToString("D"));
+        cmd.Parameters.AddWithValue("$sender",current.Message.SenderId);
+        cmd.Parameters.AddWithValue("$npc",current.Message.RecipientId);
+        cmd.Parameters.AddWithValue("$world",current.Message.WorldId);
+        cmd.Parameters.AddWithValue("$current",current.Message.Id.ToString("D"));
+        cmd.Parameters.AddWithValue("$accepted",current.Message.AcceptedUtc.ToUniversalTime().ToString("O"));
+        cmd.Parameters.AddWithValue("$limit",limit);
+        using var rows=cmd.ExecuteReader();var result=new List<SpiritualNpcMemory>();
+        static string Bounded(string text)=>text.Length<=400?text:text[..400];
+        while(rows.Read())result.Add(new(Bounded(rows.GetString(0)),Bounded(rows.GetString(1))));
+        result.Reverse();
+        return result.AsReadOnly();
+    }
+
     // Only committed messages for the authenticated owner and current owned embodiment.
     // No caller-supplied peer or global message lookup. Includes replies even after movement.
     internal IReadOnlyList<SpiritualHistoryItem> History(Guid account,string entity,int limit)

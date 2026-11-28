@@ -29,6 +29,7 @@ await MessengerWorldBridgeSmoke.Run();
 await SoulMirrorSmoke.Run();
 await WorldPresenceFeedSmoke.Run();
 SpiritualDialogueSmoke.Run();
+SpiritualNpcMemorySmoke.Run();
 
 var tmp=Directory.CreateTempSubdirectory("collective-http-").FullName;
 void Check(bool ok,string message){if(!ok)throw new Exception(message);}

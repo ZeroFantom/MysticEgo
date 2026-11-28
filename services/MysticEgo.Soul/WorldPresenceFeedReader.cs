@@ -32,7 +32,7 @@ public sealed class WorldPresenceFeedReader(TimeProvider clock)
             var feed=JsonSerializer.Deserialize<WorldPresenceFeed>(bytes,Json);
             if(feed?.Snapshot is not { } snapshot||!Fresh(feed.PublishedUtc)||
                 snapshot.Placements is null||snapshot.ActiveEmbodiments is null||snapshot.Permissions is null||
-                snapshot.Friendships is null||snapshot.ContactLabels is null||snapshot.AreaLabels is null||
+                snapshot.Friendships is null||snapshot.ContactLabels is null||snapshot.AreaLabels is null||snapshot.NpcProfiles is null||
                 snapshot.Placements.Count>2048||snapshot.ActiveEmbodiments.Count>1024||
                 snapshot.Permissions.Count>8192||snapshot.Friendships.Count>8192||
                 snapshot.ContactLabels.Count>2048||snapshot.AreaLabels.Count>2048)return Unavailable();
