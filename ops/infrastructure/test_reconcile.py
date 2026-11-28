@@ -9,12 +9,16 @@ class MaintenanceTests(unittest.TestCase):
     def setUp(self):
         reconcile.attempts = {}
         reconcile.rows = {}
+        reconcile.history = []
 
+    @patch.object(reconcile, "lm_role", return_value="panel-data")
     @patch.object(reconcile, "probe")
-    def test_downloaded_model_not_ready(self, probe):
+    def test_downloaded_model_not_ready(self, probe, role):
         probe.return_value = {"models": [{"type": "llm", "loaded_instances": []}]}
         self.assertFalse(reconcile.lm_ready())
-        probe.return_value = {"models": [{"type": "llm", "loaded_instances": [{"id": "local-model"}]}]}
+        probe.return_value = {"models": [{"type": "llm", "loaded_instances": [{"id": "unrelated-model"}]}]}
+        self.assertFalse(reconcile.lm_ready())
+        probe.return_value = {"models": [{"type": "llm", "loaded_instances": [{"id": "mysticego-panel-data"}]}]}
         self.assertTrue(reconcile.lm_ready())
 
     @patch.object(reconcile, "publish")
@@ -49,6 +53,62 @@ class MaintenanceTests(unittest.TestCase):
         reconcile.postgres()
         repair.assert_not_called()
         self.assertEqual(publish.call_args.args[:2], ("postgres-service", "external"))
+
+class RecoveryPolicyTests(unittest.TestCase):
+    def setUp(self):
+        reconcile.attempts = {}
+        reconcile.rows = {}
+        reconcile.history = []
+
+    @patch.object(reconcile, "publish")
+    def test_probe_error_does_not_mutate(self, publish):
+        action = Mock()
+        reconcile.repair("lmstudio", Mock(side_effect=OSError()), action, "ready")
+        action.assert_not_called()
+        self.assertEqual(publish.call_args.args[3], "OSError")
+
+    def test_retry_dates_and_history_only_on_transition(self):
+        with tempfile.TemporaryDirectory() as folder, patch.object(reconcile, "STATUS", Path(folder)):
+            reconcile.attempts["lmstudio"] = 1000
+            reconcile.publish("lmstudio", "degraded", "retry", "CalledProcessError")
+            reconcile.publish("voice", "available", "ready")
+            reconcile.publish("lmstudio", "degraded", "retry", "CalledProcessError")
+            self.assertEqual(len(reconcile.history), 2)
+            report = __import__("json").loads((Path(folder) / "status.json").read_text())
+            model = next(c for c in report["components"] if c["name"] == "lmstudio")
+            self.assertEqual(model["nextRetryAt"], "1970-01-01T00:31:40+00:00")
+            reconcile.attempts.clear()
+            reconcile.publish("lmstudio", "available", "ready")
+            self.assertNotIn("nextRetryAt", reconcile.rows["lmstudio"])
+            self.assertEqual(len(reconcile.history), 3)
+
+    @patch.object(reconcile.install, "lmstudio")
+    @patch.object(reconcile.install, "run")
+    @patch.object(reconcile.install, "lmstudio_dependencies")
+    @patch.object(reconcile.install, "ensure_lm_home")
+    @patch.object(reconcile.install, "lm_cache_present", return_value=False)
+    @patch.object(reconcile.Path, "is_symlink", return_value=False)
+    @patch.object(reconcile.Path, "is_file", return_value=True)
+    @patch.object(reconcile, "lm_role", return_value="panel-data")
+    def test_retained_unit_with_missing_model_reprovisions(self, role, is_file, symlink, cache, home, deps, run, setup):
+        reconcile.lm_repair()
+        run.assert_called_once_with("systemctl", "stop", "mysticego-lmstudio.service", timeout=120)
+        setup.assert_called_once_with({"role": "panel-data"})
+
+    @patch.object(reconcile.install, "lmstudio")
+    @patch.object(reconcile.install, "run")
+    @patch.object(reconcile.install, "lmstudio_dependencies")
+    @patch.object(reconcile.install, "ensure_lm_home")
+    @patch.object(reconcile.install, "lm_cache_present", return_value=True)
+    @patch.object(reconcile.Path, "is_symlink", return_value=False)
+    @patch.object(reconcile.Path, "is_file", return_value=True)
+    @patch.object(reconcile, "lm_role", return_value="world")
+    def test_intact_artifacts_restart_without_reinstall(self, role, is_file, symlink, cache, home, deps, run, setup):
+        reconcile.lm_repair()
+        setup.assert_not_called()
+        self.assertEqual([c.args[:2] for c in run.call_args_list],
+                         [("systemctl", "reset-failed"), ("systemctl", "restart")])
+
 
 class ModelHomeTests(unittest.TestCase):
     def test_retained_account_recreates_deleted_home(self):
