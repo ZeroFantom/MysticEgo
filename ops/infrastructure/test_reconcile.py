@@ -110,6 +110,32 @@ class RecoveryPolicyTests(unittest.TestCase):
                          [("systemctl", "reset-failed"), ("systemctl", "restart")])
 
 
+class ModelResourceTests(unittest.TestCase):
+    @patch.object(reconcile.install.shutil, "disk_usage")
+    @patch.object(reconcile.install.Path, "read_text", return_value="MemAvailable: 1048576 kB\n")
+    def test_low_memory_defers_provisioning(self, read, disk):
+        disk.return_value = Mock(free=10 * 1024**3)
+        with self.assertRaises(reconcile.install.ResourceDeferred):
+            reconcile.install.lm_provisioning_capacity("panel-data")
+
+    @patch.object(reconcile.install.shutil, "disk_usage")
+    @patch.object(reconcile.install.Path, "read_text", return_value="MemAvailable: 3145728 kB\n")
+    def test_capacity_is_profile_specific(self, read, disk):
+        disk.return_value = Mock(free=4 * 1024**3)
+        reconcile.install.lm_provisioning_capacity("panel-data")
+        with self.assertRaises(reconcile.install.ResourceDeferred):
+            reconcile.install.lm_provisioning_capacity("world")
+
+    @patch.object(reconcile.install.socket, "socket")
+    def test_occupied_endpoint_detects_any_listener(self, sock):
+        connection = sock.return_value.__enter__.return_value
+        connection.connect_ex.return_value = 0
+        self.assertTrue(reconcile.install.lm_port_occupied())
+        connection.connect_ex.return_value = 111
+        self.assertFalse(reconcile.install.lm_port_occupied())
+        connection.connect_ex.assert_called_with(("127.0.0.1", 1234))
+
+
 class ModelHomeTests(unittest.TestCase):
     def test_retained_account_recreates_deleted_home(self):
         with tempfile.TemporaryDirectory() as temp:
