@@ -11,6 +11,7 @@ namespace Models.Autorization.Data
         public DbSet<AccountLicenseAcceptance> AccountLicenseAcceptances => Set<AccountLicenseAcceptance>();
         public DbSet<AccountFeatureConsent> AccountFeatureConsents => Set<AccountFeatureConsent>();
         public DbSet<AccountDeviceGrant> AccountDeviceGrants => Set<AccountDeviceGrant>();
+        public DbSet<MessengerEventReceipt> MessengerEventReceipts => Set<MessengerEventReceipt>();
         public DbSet<ExternalLoginFlow> ExternalLoginFlows => Set<ExternalLoginFlow>();
         public DbSet<ExternalIdentityAudit> ExternalIdentityAudits => Set<ExternalIdentityAudit>();
         public DbSet<ExternalOAuthFlow> ExternalOAuthFlows => Set<ExternalOAuthFlow>();
@@ -29,6 +30,16 @@ namespace Models.Autorization.Data
         {
             base.OnModelCreating(mb);
             mb.Entity<ManagedIdentity>(e => { e.ToTable("managed_identities"); e.HasKey(x=>x.Id); e.Property(x=>x.Name).HasMaxLength(160).IsRequired(); e.Property(x=>x.Kind).HasMaxLength(16).IsRequired(); e.Property(x=>x.SecretHash).HasMaxLength(200).IsRequired(); e.HasIndex(x=>x.Kind); });
+
+            mb.Entity<MessengerEventReceipt>(e =>
+            {
+                e.ToTable("messenger_event_receipts");
+                e.HasKey(x => new { x.Provider, x.BotId, x.EventId });
+                e.Property(x => x.Provider).HasMaxLength(16);
+                e.Property(x => x.BotId).HasMaxLength(20);
+                e.Property(x => x.EventId).HasMaxLength(128);
+                e.HasIndex(x => x.ReceivedUtc);
+            });
 
             mb.Entity<ExternalLoginFlow>(e =>
             {

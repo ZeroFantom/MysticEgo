@@ -39,6 +39,15 @@ public static class AccountSecuritySchema
         var timestamp=db.Database.IsNpgsql()?"timestamp with time zone":"TEXT";
         var boolean=db.Database.IsNpgsql()?"boolean":"INTEGER";
         var sql=$"""
+            CREATE TABLE IF NOT EXISTS messenger_event_receipts (
+                "Provider" varchar(16) NOT NULL,
+                "BotId" varchar(20) NOT NULL,
+                "EventId" varchar(128) NOT NULL,
+                "ReceivedUtc" {timestamp} NOT NULL,
+                PRIMARY KEY ("Provider","BotId","EventId")
+            );
+            CREATE INDEX IF NOT EXISTS "IX_messenger_event_receipts_ReceivedUtc"
+                ON messenger_event_receipts ("ReceivedUtc");
             CREATE TABLE IF NOT EXISTS external_login_flows (
                 "StateHash" varchar(64) NOT NULL PRIMARY KEY,
                 "BrowserHash" varchar(64) NOT NULL,

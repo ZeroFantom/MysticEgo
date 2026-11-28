@@ -141,3 +141,5 @@ await ExternalLoginSmoke.Run();
 ExternalLoginHttpSmoke.Run();
 
 await MessengerIdentitySmoke.Run();
+
+await MessengerIngressSmoke.Run();

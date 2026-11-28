@@ -77,12 +77,17 @@ public static class Program
         // The external service uses the existing AuthService issuance implementation.
         builder.Services.AddScoped<AuthService>();
         builder.Services.AddScoped<ExternalLoginService>();
+        builder.Services.AddScoped<MessengerIdentityService>();
+        builder.Services.AddScoped<MessengerIngress>();
         builder.Services.AddHealthChecks();
         builder.Services.AddTrafficProtection(builder.Configuration);
         builder.Services.AddRateLimiter(options=>
         {
             options.RejectionStatusCode=429;
             options.AddPolicy("auth-sensitive",ctx=>RateLimitPartition.GetFixedWindowLimiter(
+                ctx.Connection.RemoteIpAddress?.ToString()??"unknown",_=>new FixedWindowRateLimiterOptions
+                {PermitLimit=120,Window=TimeSpan.FromMinutes(1),QueueLimit=0,AutoReplenishment=true}));
+            options.AddPolicy("messenger-webhook",ctx=>RateLimitPartition.GetFixedWindowLimiter(
                 ctx.Connection.RemoteIpAddress?.ToString()??"unknown",_=>new FixedWindowRateLimiterOptions
                 {PermitLimit=120,Window=TimeSpan.FromMinutes(1),QueueLimit=0,AutoReplenishment=true}));
             options.AddPolicy("external-link",ctx=>RateLimitPartition.GetFixedWindowLimiter(
