@@ -60,6 +60,32 @@ public sealed class WorldAuthorityStore
 
     internal WorldAuthorityRevision? Current()=>ReadCurrent(path);
 
+    /// <summary>Trusted running host only. Advance logical time and renew freshness of the
+    /// same state revision. A stale host cannot renew a changed world. Never call on startup
+    /// merely because an old database exists.</summary>
+    internal bool TryTick(long expected)
+    {
+        if(expected<=0)return false;
+        using var db=Open(path,SqliteOpenMode.ReadWrite);
+        using var tx=db.BeginTransaction(deferred:false);
+        using var cmd=db.CreateCommand();cmd.Transaction=tx;
+        cmd.CommandText="SELECT payload FROM world_authority WHERE singleton=1 AND revision=$revision";
+        cmd.Parameters.AddWithValue("$revision",expected);
+        if(cmd.ExecuteScalar() is not byte[] bytes||bytes.Length>WorldPresenceFeedReader.MaxBytes)return false;
+        var feed=JsonSerializer.Deserialize<WorldPresenceFeed>(bytes,WorldPresenceFeedReader.Json);
+        var now=clock.GetUtcNow().ToUniversalTime();
+        if(feed is null||feed.SimulationTick<0||feed.SimulationTick==long.MaxValue||
+            feed.PublishedUtc<=now.AddSeconds(-15)||feed.PublishedUtc>now||
+            WorldPresenceFeedReader.Validate(feed.Snapshot,clock) is null)return false;
+        var updated=JsonSerializer.SerializeToUtf8Bytes(feed with {PublishedUtc=now,
+            SimulationTick=feed.SimulationTick+1},WorldPresenceFeedReader.Json);
+        if(updated.Length>WorldPresenceFeedReader.MaxBytes)return false;
+        cmd.CommandText="UPDATE world_authority SET payload=$payload WHERE singleton=1 AND revision=$revision";
+        cmd.Parameters.AddWithValue("$payload",updated);
+        if(cmd.ExecuteNonQuery()!=1)return false;
+        tx.Commit();return true;
+    }
+
     private sealed record Lifetime(string World,int Kind,string? Owner,bool Retired);
 
     /// <summary>Atomic compare-and-swap. The simulation supplies complete placements, active
@@ -79,9 +105,23 @@ public sealed class WorldAuthorityStore
         using var db=Open(path,SqliteOpenMode.ReadWrite);
         using var tx=db.BeginTransaction(deferred:false);
         using var cmd=db.CreateCommand();cmd.Transaction=tx;
-        cmd.CommandText="SELECT revision FROM world_authority WHERE singleton=1";
-        revision=Convert.ToInt64(cmd.ExecuteScalar());
-        if(revision!=expected)return false;
+        cmd.CommandText="SELECT revision,payload FROM world_authority WHERE singleton=1";
+        long tick=0;
+        using(var row=cmd.ExecuteReader())
+        {
+            if(!row.Read())return false;
+            revision=row.GetInt64(0);
+            if(revision!=expected)return false;
+            if(!row.IsDBNull(1))
+            {
+                var old=JsonSerializer.Deserialize<WorldPresenceFeed>((byte[])row.GetValue(1),WorldPresenceFeedReader.Json);
+                if(old is null||old.SimulationTick<0)return false;
+                tick=old.SimulationTick;
+            }
+        }
+        // Preserve logical time across gameplay mutations, inside the same transaction.
+        bytes=JsonSerializer.SerializeToUtf8Bytes(copy with {SimulationTick=tick},WorldPresenceFeedReader.Json);
+        if(bytes.Length>WorldPresenceFeedReader.MaxBytes)return false;
         var lifetimes=new Dictionary<string,Lifetime>(StringComparer.Ordinal);
         cmd.CommandText="SELECT entity,world,kind,owner,retired FROM world_entity_lifetimes LIMIT 65537";
         using(var rows=cmd.ExecuteReader())

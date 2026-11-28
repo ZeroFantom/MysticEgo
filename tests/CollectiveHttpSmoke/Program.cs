@@ -30,6 +30,7 @@ await SoulMirrorSmoke.Run();
 await WorldPresenceFeedSmoke.Run();
 await WorldAuthoritySmoke.Run();
 await WorldSimulationSmoke.Run();
+await WorldSimulationHostSmoke.Run();
 SpiritualDialogueSmoke.Run();
 SpiritualNpcMemorySmoke.Run();
 

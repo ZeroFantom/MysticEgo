@@ -24,6 +24,7 @@ builder.Services.AddSingleton<NativeDeploymentJobs>();
 builder.Services.AddSingleton<INativeDeploymentPlanService,NativeDeploymentPlanService>();
 builder.Services.AddHostedService(sp=>sp.GetRequiredService<NativeDeploymentJobs>());
 builder.Services.AddSoul();
+builder.Services.AddWorldSimulationHost(builder.Configuration);
 builder.Services.AddScoped<SoulMirrorReader>();
 builder.Services.AddSingleton(new WorldPresenceFeedReader(TimeProvider.System));
 builder.Services.AddHostedService<MessengerDiscoveryWorker>();

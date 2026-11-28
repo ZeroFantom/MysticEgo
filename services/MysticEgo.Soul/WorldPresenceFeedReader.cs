@@ -5,7 +5,11 @@ namespace MysticEgo.Soul;
 
 /// <summary>Local read-only interchange contract. OS permissions must restrict writes to
 /// a trusted simulation writer. Never accept a browser/upload path or reuse an old snapshot.</summary>
-public sealed record WorldPresenceFeed(DateTimeOffset PublishedUtc,SpiritualWorldSnapshot Snapshot);
+public sealed record WorldPresenceFeed(DateTimeOffset PublishedUtc,SpiritualWorldSnapshot Snapshot)
+{
+    // Logical simulation time, not wall-clock time. Legacy snapshots start at zero.
+    public long SimulationTick {get;init;}
+}
 public sealed record WorldPresenceRead(bool SnapshotAvailable,SpiritualPresenceView? Presence,int FreshForSeconds);
 
 public sealed class WorldPresenceFeedReader(TimeProvider clock)
