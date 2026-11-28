@@ -146,3 +146,7 @@ Console.WriteLine("QR challenge, comparison, approval, expiry, cancellation, rep
 var mobileModel=Models.Autorization.Services.SessionDevice.Describe("Android 15 Mobile MysticEgoAndroid/1 MysticModel/Google_Pixel_8");
 if(mobileModel.Model!="Google Pixel 8"||mobileModel.Client!="MysticEgo Mobile")throw new Exception("Mobile model metadata missing");
 if(Models.Autorization.Services.SessionDevice.Describe("Android 15 Mobile MysticModel/Fake").Model!=null)throw new Exception("Unmarked model accepted");
+
+var qrLimited=qrStore.Start(Models.Autorization.Services.DesktopPairing.Hash(qrVerifier),null,qrNow)!;
+for(var i=0;i<5;i++)if(qrStore.Approve(qrLimited.Id,"invalid",qrAccount,"source",qrPairing,qrNow))throw new Exception("Invalid comparison approved");
+if(qrStore.Inspect(qrLimited.Id,qrNow)!=null||qrStore.Approve(qrLimited.Id,qrLimited.Comparison,qrAccount,"source",qrPairing,qrNow))throw new Exception("QR attempt limit bypassed");

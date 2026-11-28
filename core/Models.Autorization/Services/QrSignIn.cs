@@ -5,7 +5,7 @@ namespace Models.Autorization.Services;
 public sealed class QrSignIn
 {
     public sealed record View(string Id,string Comparison,DateTimeOffset Expires,SessionDevice Device);
-    private sealed record Entry(View View,string Challenge,string? Grant=null);
+    private sealed record Entry(View View,string Challenge,string? Grant=null,int FailedComparisons=0);
     private readonly Dictionary<string,Entry> pending=new(StringComparer.Ordinal);
     private readonly object gate=new();
     private static string RandomSecret()=>Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
@@ -36,7 +36,8 @@ public sealed class QrSignIn
         lock(gate)
         {
             Prune(now);
-            if(!pending.TryGetValue(id!,out var e)||e.Grant is not null||e.View.Comparison!=comparison)return false;
+            if(!pending.TryGetValue(id!,out var e)||e.Grant is not null)return false;
+            if(e.View.Comparison!=comparison){if(e.FailedComparisons>=4)pending.Remove(id!);else pending[id!]=e with{FailedComparisons=e.FailedComparisons+1};return false;}
             var grant=pairing.Create(user,sourceHash,e.Challenge,now);
             if(grant is null)return false;
             pending[id!]=e with{Grant=grant};return true;

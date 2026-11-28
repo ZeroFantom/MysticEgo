@@ -8,7 +8,8 @@ import {ANDROID_ORIGIN} from './androidLaunch';
 import './qr-sign-in.css';
 
 export type SessionDevice={kind:string;os:string;version?:string;client:string;model?:string};
-type RequestView={id:string;comparison:string;expires:string;device:SessionDevice};
+type ApprovalView={id:string;expires:string;device:SessionDevice};
+type RequestView=ApprovalView&{comparison:string};
 const secret=/^[a-f0-9]{64}$/;
 const hex=(bytes:Uint8Array)=>Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
 const approvalPath='/audit-portal/account-security';
@@ -28,7 +29,7 @@ export function deviceLabel(device:SessionDevice|undefined,ua:string|undefined,t
  return [type,device.os!=='unknown'?device.os:'',device.version||'',device.model||'',device.client!=='unknown'?device.client:''].filter(Boolean).join(' · ');
 }
 export function QrReceive({session,authUrl,disabled,onLogin,onBusy}:{session:Session;authUrl:string;disabled:boolean;onLogin:(session:Session)=>void;onBusy:(busy:boolean)=>void}){
- const t=useLocale(),[view,setView]=useState<RequestView|null>(null),[message,setMessage]=useState(''),[busy,setBusy]=useState(false);
+ const t=useLocale(),[view,setView]=useState<RequestView|null>(null),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[exchanging,setExchanging]=useState(false);
  const active=useRef<{controller:AbortController;id?:string;verifier?:string}|null>(null);
  const eligible=location.origin===ANDROID_ORIGIN&&session.url.replace(/\/$/,'')===location.origin&&authUrl.replace(/\/$/,'')===location.origin;
  function stop(cancel=true){
@@ -52,11 +53,13 @@ export function QrReceive({session,authUrl,disabled,onLogin,onBusy}:{session:Ses
    setView(data);setMessage('Ожидаем подтверждение…');
    while(!controller.signal.aborted&&Date.now()<Date.parse(data.expires)){
     await new Promise<void>(resolve=>setTimeout(resolve,3500));if(controller.signal.aborted)break;
-    const redeem=await browserAuthRequest('qr/redeem',{id:data.id,verifier});
+    setExchanging(true);
+    let redeem:Response;
+    try{redeem=await browserAuthRequest('qr/redeem',{id:data.id,verifier})}finally{if(active.current===attempt)setExchanging(false)}
     if(redeem.status===202)continue;
     if(!redeem.ok)throw Error('expired');
     const result=await redeem.json();
-    if(controller.signal.aborted||active.current!==attempt){await browserAuthRequest('logout').catch(()=>{});return;}
+    if(controller.signal.aborted||active.current!==attempt)return;
     if(typeof result.accessToken!=='string'||!result.accessToken||typeof result.user?.login!=='string'||!result.user.login)throw Error('unavailable');
     stop(false);setView(null);onBusy(false);onLogin({...session,authUrl:location.origin,token:result.accessToken,refreshToken:undefined,browserSession:true,username:result.user.login});return;
    }
@@ -71,7 +74,7 @@ export function QrReceive({session,authUrl,disabled,onLogin,onBusy}:{session:Ses
     <p>{t('Откройте безопасность аккаунта на другом авторизованном устройстве и отсканируйте код или вставьте ссылку.')}</p>
     <strong>{t('Код сравнения')}: <span className="qr-comparison">{view.comparison}</span></strong>
     <label>{t('Скопируйте ссылку запроса')}<input readOnly value={requestLink(view.id)} onFocus={event=>event.target.select()}/></label>
-    <button className="btn secondary" type="button" onClick={()=>{stop();setView(null);setBusy(false);onBusy(false);setMessage('')}}>{t('Отмена')}</button>
+    <button className="btn secondary" type="button" disabled={exchanging} onClick={()=>{stop();setView(null);setBusy(false);onBusy(false);setMessage('')}}>{t('Отмена')}</button>
   </div>}
   {message&&<p role="status">{t(message)}</p>}
  </section>;
@@ -80,7 +83,7 @@ export function QrReceive({session,authUrl,disabled,onLogin,onBusy}:{session:Ses
 type Detector={detect(source:HTMLVideoElement):Promise<{rawValue:string}[]>};
 type DetectorCtor=new(options:{formats:string[]})=>Detector;
 export function QrApprove({session}:{session:Session}){
- const t=useLocale(),[raw,setRaw]=useState(fromHash),[view,setView]=useState<RequestView|null>(null),[comparison,setComparison]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[scanning,setScanning]=useState(false);
+ const t=useLocale(),[raw,setRaw]=useState(fromHash),[view,setView]=useState<ApprovalView|null>(null),[comparison,setComparison]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[scanning,setScanning]=useState(false);
  const video=useRef<HTMLVideoElement>(null),stream=useRef<MediaStream|null>(null),scanGeneration=useRef(0);
  const eligible=location.origin===ANDROID_ORIGIN&&session.authUrl.replace(/\/$/,'')===location.origin;
  function stopScan(){scanGeneration.current++;stream.current?.getTracks().forEach(track=>track.stop());stream.current=null;setScanning(false);}
@@ -92,7 +95,7 @@ export function QrApprove({session}:{session:Session}){
   try{const r=await post('inspect',{id},session.token);if(!r.ok)throw Error();setView(await r.json())}catch{setMessage('Запрос истёк или отклонён. Создайте новый QR-код.')}finally{setBusy(false)}
  }
  async function approve(){
-  if(!view||comparison!==view.comparison||busy)return;
+  if(!view||!/^\d{6}$/.test(comparison)||busy)return;
   setBusy(true);setMessage('');
   try{const r=await post('approve',{id:view.id,comparison},session.token);if(!r.ok)throw Error();setView(null);setRaw('');setComparison('');setMessage('Вход подтверждён.');if(location.hash.startsWith('#qr='))history.replaceState(history.state,'',location.pathname+location.search)}catch{setView(null);setMessage('Запрос истёк или отклонён. Создайте новый QR-код.')}finally{setBusy(false)}
  }
@@ -124,7 +127,7 @@ export function QrApprove({session}:{session:Session}){
   {scanning&&<video ref={video} muted playsInline autoPlay className="qr-camera"/>}
   {view&&<div className="qr-confirm"><p>{deviceLabel(view.device,undefined,t)}</p><p>{t('Тип устройства определяется по данным клиента.')}</p>
    <label>{t('Введите код сравнения')}<input value={comparison} onChange={e=>setComparison(e.target.value.replace(/\D/g,'').slice(0,6))} inputMode="numeric" maxLength={6} autoComplete="off"/></label>
-   <button className="btn" disabled={busy||comparison!==view.comparison} onClick={()=>void approve()}>{t('Разрешить вход')}</button>
+   <button className="btn" disabled={busy||!/^\d{6}$/.test(comparison)} onClick={()=>void approve()}>{t('Разрешить вход')}</button>
    <button className="btn secondary" disabled={busy} onClick={()=>{setView(null);setComparison('')}}>{t('Отмена')}</button>
   </div>}
   {message&&<p role="status">{t(message)}</p>}

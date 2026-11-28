@@ -31,7 +31,8 @@ public sealed class QrSignInController(QrSignIn qr,DesktopPairing pairing,IAuthS
     {
         if(!Account)return Unauthorized();
         var result=qr.Inspect(request.Id,DateTimeOffset.UtcNow);
-        return result is null?NotFound():Ok(result);
+        // The comparison code is only shown on the requesting device, not returned to the approver.
+        return result is null?NotFound():Ok(new{result.Id,result.Expires,result.Device});
     }
     [HttpPost("approve"),Authorize,RequestSizeLimit(4096)]
     public async Task<IActionResult> Approve(ApproveRequest request,CancellationToken ct)
