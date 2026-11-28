@@ -112,6 +112,10 @@ RESCUE_FILES = ("install-worker.sh","update-orchestra.py","mysticego-orchestra-u
 MAINTENANCE_HOME = Path("/opt/mysticego-infrastructure/local")
 MAINTENANCE_SOCKET = INBOX.parent / "local-setup.sock"
 MAINTENANCE_STATUS = Path("/var/lib/mysticego-infrastructure-status/status.json")
+DEPLOYMENT_LOCK = "/run/lock/mysticego-clouddesk-deploy.lock"
+INFRASTRUCTURE_LOCK = "/run/lock/mysticego-infrastructure.lock"
+RECONCILE_SERVICE = "mysticego-infrastructure-reconcile.service"
+pending_reconcile_release = None
 
 
 def trusted_file(path):
@@ -143,6 +147,8 @@ def maintenance_ready(source):
         for name in MAINTENANCE_FILES:
             if not trusted_file(MAINTENANCE_HOME / name) or (source / name).read_bytes() != (MAINTENANCE_HOME / name).read_bytes():
                 return False
+        if not system_ok("cat", RECONCILE_SERVICE):
+            return False
         return all(system_ok(operation, "--quiet", unit)
                    for operation in ("is-active", "is-enabled")
                    for unit in ("mysticego-local-setup.socket", "mysticego-infrastructure-reconcile.timer"))
@@ -180,6 +186,22 @@ def ensure_rescue(release):
         print("Independent maintenance recovery channel is not ready.",flush=True)
 
 
+def report_fresh():
+    try:
+        if MAINTENANCE_STATUS.stat().st_size > 131072 or time.time() - MAINTENANCE_STATUS.stat().st_mtime >= 120:
+            return False
+        report = json.loads(MAINTENANCE_STATUS.read_text())
+        return isinstance(report.get("components"), list) and bool(report["components"])
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
+def schedule_reconcile(release):
+    # Start after releasing the shared locks, otherwise the worker exits immediately.
+    global pending_reconcile_release
+    pending_reconcile_release = release
+
+
 def ensure_maintenance(release, force=False):
     source = APP / "ops/infrastructure"
     script = source / "install-local.sh"
@@ -188,11 +210,7 @@ def ensure_maintenance(release, force=False):
         return False
     if maintenance_ready(source) and not force:
         # A running timer alone does not prove the reconciler is publishing.
-        try:
-            fresh = time.time() - MAINTENANCE_STATUS.stat().st_mtime < 3300
-        except OSError:
-            fresh = False
-        if fresh:
+        if report_fresh():
             maintenance_record("ready", release)
             return True
         if system_ok("is-active", "--quiet", "mysticego-infrastructure-reconcile.service"):
@@ -202,10 +220,9 @@ def ensure_maintenance(release, force=False):
         prior = maintenance_state()
         if prior.get("release") == release and prior.get("retryAfter", 0) > time.time():
             return True
-        started = system_ok("start", "--no-block", "mysticego-infrastructure-reconcile.service")
-        maintenance_record("waiting" if started else "degraded", release,
-                           "" if started else "service-start-failed", time.time()+120)
-        return started
+        schedule_reconcile(release)
+        maintenance_record("waiting", release, retry_after=time.time()+120)
+        return True
     prior = maintenance_state()
     if not force and prior.get("release") == release and prior.get("retryAfter", 0) > time.time():
         return False
@@ -215,7 +232,8 @@ def ensure_maintenance(release, force=False):
         command("bash", str(script), timeout=90)
         if not maintenance_ready(source):
             raise RuntimeError("maintenance service validation failed")
-        maintenance_record("ready" if MAINTENANCE_STATUS.is_file() else "waiting", release)
+        schedule_reconcile(release)
+        maintenance_record("waiting", release, retry_after=time.time()+120)
         return True
     except (OSError, subprocess.SubprocessError, RuntimeError) as error:
         print("Orchestra Maintenance Service setup: " + type(error).__name__, flush=True)
@@ -496,13 +514,23 @@ def apply(candidate, installed, targets, target, recovery=False, intermediate=Fa
 
 
 def main():
-    # CloudDesk's SSH deployment and this timer share the local deployment lock.
-    with open("/run/lock/mysticego-clouddesk-deploy.lock", "a") as lock:
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            return
-        run_locked()
+    # Serialize with both CloudDesk and root infrastructure installers. Do not
+    # consume pending update requests while a component is being repaired.
+    global pending_reconcile_release
+    pending_reconcile_release = None
+    try:
+        with open(DEPLOYMENT_LOCK, "a") as deployment, open(INFRASTRUCTURE_LOCK, "a") as infrastructure:
+            try:
+                fcntl.flock(deployment, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(infrastructure, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return
+            run_locked()
+    finally:
+        release = pending_reconcile_release
+        pending_reconcile_release = None
+        if release and not system_ok("start", "--no-block", RECONCILE_SERVICE):
+            maintenance_record("degraded", release, "service-start-failed", time.time()+120)
 
 
 def automatic_enabled():
