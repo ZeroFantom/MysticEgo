@@ -131,3 +131,5 @@ await ProviderProofSmoke.Run();
 await ExternalOAuthSmoke.Run();
 
 await OAuthCallbackSmoke.Run();
+
+await ExternalAccountApiSmoke.Run();
