@@ -74,6 +74,9 @@ public static class Program
         builder.Services.AddSingleton<TelegramOAuthExchange>();
         builder.Services.AddSingleton<VkIdentityProof>();
         builder.Services.AddScoped<ExternalOAuthCallbacks>();
+        // The external service uses the existing AuthService issuance implementation.
+        builder.Services.AddScoped<AuthService>();
+        builder.Services.AddScoped<ExternalLoginService>();
         builder.Services.AddHealthChecks();
         builder.Services.AddTrafficProtection(builder.Configuration);
         builder.Services.AddRateLimiter(options=>
