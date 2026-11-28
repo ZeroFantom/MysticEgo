@@ -121,7 +121,10 @@ sealed partial class CloudDesk
             var binding=ReadBinding(approval.ServerId);
             if(binding!=null&&SameBinding(binding,approval.Host,"Orchestra",approval.Domain))SaveBinding(binding with {Phase="installed"});
             try{await SSH(args,"rm -rf -- "+remote,1);}catch{}
-            return new {role="Orchestra",domain=identity.Domain,release=release.Tag,node=newNode.ToString("D"),reset=true};
+            var maintenancePending=output.Split('\n').Any(line=>line.Trim()=="CLOUDDESK_MAINTENANCE_PENDING");
+            var maintenanceScheduled=output.Split('\n').Any(line=>line.Trim()=="CLOUDDESK_MAINTENANCE_SCHEDULED");
+            progress(maintenancePending?"Новый узел подтверждён; требуется восстановление обслуживания без сброса.":"Новый узел подтверждён; компоненты проверяются серверной службой.");
+            return new {role="Orchestra",domain=identity.Domain,release=release.Tag,node=newNode.ToString("D"),reset=true,maintenancePending,maintenanceScheduled};
         }catch(Exception e){throw new Exception(e.Message+"\nПовторный сброс автоматически не выполняется. Если staging создан, он находится в "+remote);}
         finally{Directory.Delete(temp,true);}
     }
