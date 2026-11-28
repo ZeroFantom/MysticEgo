@@ -122,7 +122,8 @@ public final class MainActivity extends Activity {
         bar.addView(title, new LinearLayout.LayoutParams(0, dp(52), 1));
         bar.addView(button("←", "Back", () -> { if (web.canGoBack()) web.goBack(); else web.loadUrl(MobileRoutes.HOME); }));
         bar.addView(button("⌂", "Home", () -> web.loadUrl(MobileRoutes.HOME)));
-        bar.addView(button("QR", "Scan sign-in QR", this::scanQr));
+        bar.addView(button("QR", "Scan sign-in or friend QR", this::scanQr));
+        bar.addView(button("AI", "Локальная модель", () -> startActivity(new Intent(this,LocalModelActivity.class))));
         bar.addView(button("↻", "Reload", () -> web.reload()));
         root.addView(bar);
 

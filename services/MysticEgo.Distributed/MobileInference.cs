@@ -39,7 +39,7 @@ internal static class MobileInference
             if(!acquired||!Budget())throw new AssistantApiException(429,"Лимит запросов сервера. Повторите позднее.");
             using var timeout=CancellationTokenSource.CreateLinkedTokenSource(ct);timeout.CancelAfter(TimeSpan.FromSeconds(55));
             return await action(timeout.Token);
-        }catch(Exception error) when(error is HttpRequestException or IOException or JsonException or InvalidOperationException||error is OperationCanceledException&&!ct.IsCancellationRequested)
+        }catch(Exception error) when(error is HttpRequestException or IOException or JsonException or InvalidOperationException or KeyNotFoundException or IndexOutOfRangeException||error is OperationCanceledException&&!ct.IsCancellationRequested)
         {throw new AssistantApiException(502,"Провайдер не вернул ответ.");}
         finally{if(acquired)Slots.Release();Active.TryRemove(account,out _);}
     }

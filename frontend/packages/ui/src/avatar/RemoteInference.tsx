@@ -7,7 +7,7 @@ export function RemoteInference(){
  const providers=useRemote(()=>supported?fetch('/api/v1/assistant/mobile/providers',{headers:{Authorization:'Bearer '+session.token},cache:'no-store',redirect:'error',credentials:'omit'}).then(async r=>r.ok?await r.json() as {cloud:boolean;speech:boolean}:null):Promise.resolve(null),[session.token,supported]);
  const [text,setText]=useState(''),[answer,setAnswer]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[recording,setRecording]=useState(false);
  const [cloudConsent,setCloudConsent]=useState(false),[speechConsent,setSpeechConsent]=useState(false);
- const stream=useRef<MediaStream|null>(null),recorder=useRef<MediaRecorder|null>(null),timer=useRef<number>(),epoch=useRef(0),request=useRef<AbortController|null>(null);
+ const stream=useRef<MediaStream|null>(null),recorder=useRef<MediaRecorder|null>(null),timer=useRef<number|undefined>(undefined),epoch=useRef(0),request=useRef<AbortController|null>(null);
  function cancel(){epoch.current++;request.current?.abort();window.clearTimeout(timer.current);if(recorder.current?.state==='recording'){recorder.current.onstop=null;recorder.current.stop()}stream.current?.getTracks().forEach(t=>t.stop());stream.current=null;recorder.current=null;setRecording(false);setBusy(false)}
  useEffect(()=>{const hide=()=>{if(document.hidden)cancel()};document.addEventListener('visibilitychange',hide);return()=>{document.removeEventListener('visibilitychange',hide);cancel()}},[session.token]);
  async function post(path:string,body:BodyInit,headers:Record<string,string>){
