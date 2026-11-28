@@ -18,6 +18,24 @@ public sealed class VkIdentityProof : IDisposable
     public VkIdentityProof(HttpMessageHandler handler) =>
         http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(15), MaxResponseContentBufferSize = 65536 };
 
+    public const string AuthorizationEndpoint = Origin + "/authorize";
+
+    public static Uri? AuthorizationUri(string clientId, Uri redirect, OAuthLinkStart start)
+    {
+        if (!TelegramIdentityProof.PositiveId(clientId) || redirect is not { IsAbsoluteUri: true } ||
+            redirect.Scheme != Uri.UriSchemeHttps || redirect.UserInfo.Length != 0 ||
+            redirect.Fragment.Length != 0 || !Pkce(start.State) || !Pkce(start.Challenge)) return null;
+        var fields = new Dictionary<string, string>
+        {
+            ["client_id"] = clientId, ["redirect_uri"] = redirect.AbsoluteUri,
+            ["response_type"] = "code", ["state"] = start.State,
+            ["code_challenge"] = start.Challenge, ["code_challenge_method"] = "s256",
+            ["scope"] = "vkid.personal_info"
+        };
+        return new Uri(AuthorizationEndpoint + "?" + string.Join("&", fields.Select(p =>
+            Uri.EscapeDataString(p.Key) + "=" + Uri.EscapeDataString(p.Value))));
+    }
+
     public async Task<ExternalIdentityKey?> Exchange(string clientId, Uri redirect, string expectedState,
         string callbackState, string verifier, string code, string deviceId, CancellationToken ct = default)
     {

@@ -37,7 +37,7 @@ var legacy = new System.Collections.Generic.Dictionary<string, string[]>
         "GET /metrics", "GET /api/v1/public/metrics-scrape", "GET /audit-portal/release-info.json", "GET /audit-portal/{**route}"],
     ["services/MysticEgo.Distributed/Bootstrap.cs"] = ["GET /api/v1/public/runtime"],
     ["services/Api.Capacity/Program.cs"] = ["POST /api/v1/stations/capacity", "GET /api/v1/capacity", "GET /health"],
-    ["services/MysticEgo.Distributed/BrowserSessionGateway.cs"] = ["GET /api/auth/browser/status", "GET /api/auth/browser/external/telegram/status", "POST /api/auth/browser/external/telegram/start", "GET /api/auth/browser/external/telegram/callback", "POST /api/auth/browser/ + action"],
+    ["services/MysticEgo.Distributed/BrowserSessionGateway.cs"] = ["GET /api/auth/browser/status", "GET /api/auth/browser/external/telegram/status", "POST /api/auth/browser/external/telegram/start", "GET /api/auth/browser/external/telegram/callback", "GET /api/auth/browser/external/vk/status", "POST /api/auth/browser/external/vk/start", "GET /api/auth/browser/external/vk/callback", "POST /api/auth/browser/ + action"],
     ["services/MysticEgo.Distributed/AuthGateway.cs"] = [
         "POST /api/auth/ + action", "GET /api/auth/credential-policy", "GET /api/auth/presentation", "POST /api/auth/presentation",
         "GET /api/auth/ + action", "POST /api/auth/ + action", "POST /api/auth/sessions/{id:guid}/revoke",

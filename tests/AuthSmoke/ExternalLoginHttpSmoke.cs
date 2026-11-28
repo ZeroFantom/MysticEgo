@@ -21,6 +21,18 @@ internal static class ExternalLoginHttpSmoke
         Check(ExternalLoginController.ReadConfiguration(c) is null,"HTTPS");
         c["ExternalIdentity:Telegram:LoginRedirectUri"]="https://example.invalid"+ExternalLoginController.CallbackPath+"?next=evil";
         Check(ExternalLoginController.ReadConfiguration(c) is null,"query rejected");
+        c["ExternalIdentity:Vk:ClientId"]="456";
+        c["ExternalIdentity:Vk:LoginRedirectUri"]="https://example.invalid/api/auth/browser/external/vk/callback";
+        Check(ExternalLoginController.ReadConfiguration(c,"vk") is null,"VK disabled default");
+        c["ExternalIdentity:Vk:LoginEnabled"]="true";
+        var vk=ExternalLoginController.ReadConfiguration(c,"vk");
+        Check(vk?.Provider=="vk"&&vk.ClientId=="456","VK config independent");
+        var url=Models.Autorization.Services.VkIdentityProof.AuthorizationUri("456",vk!.RedirectUri,
+            new(new string('s',43),new string('c',43),new string('n',43)));
+        Check(url?.Host=="id.vk.com"&&url.AbsolutePath=="/authorize"&&url.Query.Contains("code_challenge_method=s256"),"VK authorization");
+        c["ExternalIdentity:Vk:LoginRedirectUri"]="https://example.invalid/api/auth/browser/external/telegram/callback";
+        Check(ExternalLoginController.ReadConfiguration(c,"vk") is null,"cross-provider callback rejected");
+        Check(ExternalLoginController.ReadConfiguration(c,"other") is null,"unknown provider");
         Console.WriteLine("External login HTTP configuration and callback isolation checks passed");
     }
 }

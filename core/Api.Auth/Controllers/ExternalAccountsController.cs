@@ -26,6 +26,22 @@ public sealed class ExternalAccountsController(AuthDbContext db, IPasswordHasher
     public sealed record ConfirmRequest(string LinkCode, string Provider, string Realm, string Subject, string Password);
     public sealed record UnlinkRequest(string Provider, string Realm, string Subject, string Password);
 
+    private static string LinkCookie(string provider) => provider == "vk" ? "__Host-mystic-external-vk-link" : Cookie;
+    private static string Realm(ExternalCallbackConfiguration c) => (c.Provider == "vk" ? "oauth:" : "oidc:") + c.ClientId;
+
+    private ExternalCallbackConfiguration? Provider(string provider)
+    {
+        if (provider == "telegram") return Telegram();
+        if (provider != "vk" || !configuration.GetValue<bool>("ExternalIdentity:Vk:Enabled")) return null;
+        var id = configuration["ExternalIdentity:Vk:ClientId"];
+        if (!ulong.TryParse(id, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var n) ||
+            n == 0 || n.ToString(System.Globalization.CultureInfo.InvariantCulture) != id ||
+            !Uri.TryCreate(configuration["ExternalIdentity:Vk:RedirectUri"], UriKind.Absolute, out var redirect) ||
+            redirect.Scheme != Uri.UriSchemeHttps || redirect.UserInfo.Length != 0 ||
+            redirect.AbsolutePath != "/api/auth/external/vk/callback" || redirect.Query.Length != 0 || redirect.Fragment.Length != 0) return null;
+        return new("vk", id!, redirect);
+    }
+
     private ExternalCallbackConfiguration? Telegram()
     {
         if (!configuration.GetValue<bool>("ExternalIdentity:Telegram:Enabled")) return null;
@@ -63,7 +79,7 @@ public sealed class ExternalAccountsController(AuthDbContext db, IPasswordHasher
     private bool ManagementOrigin()
     {
         var configured = configuration["ExternalIdentity:ManagementOrigin"] ??
-            configuration["ExternalIdentity:Telegram:RedirectUri"];
+            configuration["ExternalIdentity:Telegram:RedirectUri"] ?? configuration["ExternalIdentity:Vk:RedirectUri"];
         return Uri.TryCreate(configured, UriKind.Absolute, out var uri) &&
             uri.Scheme == Uri.UriSchemeHttps && uri.UserInfo.Length == 0 &&
             Request.Headers.Origin.Count == 1 &&
@@ -91,14 +107,19 @@ public sealed class ExternalAccountsController(AuthDbContext db, IPasswordHasher
         if (actor is null) return Unauthorized();
         var rows = await db.ExternalIdentities.AsNoTracking().Where(x => x.UserId == actor.Value.User)
             .Select(x => new { x.Provider, x.Realm, x.Subject, x.LinkedUtc }).ToListAsync(ct);
-        return Ok(new { telegramLinkEnabled = Telegram() is not null, vkLinkEnabled = false, identities = rows });
+        return Ok(new { telegramLinkEnabled = Telegram() is not null, vkLinkEnabled = Provider("vk") is not null, identities = rows });
     }
 
     [HttpPost("telegram/start"), RequestSizeLimit(4096)]
-    public async Task<IActionResult> Start(StartRequest input, CancellationToken ct)
+    public Task<IActionResult> Start(StartRequest input, CancellationToken ct) => StartFor("telegram", input, ct);
+
+    [HttpPost("vk/start"), RequestSizeLimit(4096)]
+    public Task<IActionResult> VkStart(StartRequest input, CancellationToken ct) => StartFor("vk", input, ct);
+
+    private async Task<IActionResult> StartFor(string provider, StartRequest input, CancellationToken ct)
     {
         PrivateResponse();
-        var config = Telegram();
+        var config = Provider(provider);
         if (config is null) return NotFound();
         if (!SameOrigin(config)) return StatusCode(403);
         var actor = await Account(ct, input.Password, true);
@@ -106,61 +127,80 @@ public sealed class ExternalAccountsController(AuthDbContext db, IPasswordHasher
         // Bounded maintenance on this authenticated, throttled entry point; scheduled cleanup
         // and account-wide throttling remain rollout gates.
         await links.PurgeExpired(ct);
-        var code = await links.Start(actor.Value.User, actor.Value.Session, "telegram", "oidc:" + config.ClientId, ct);
+        var code = await links.Start(actor.Value.User, actor.Value.Session, provider, Realm(config), ct);
         if (code is null) return Conflict();
         var browser = Binding();
         var flow = await flows.Start(actor.Value.User, actor.Value.Session, code, browser,
-            "telegram", config.ClientId, config.RedirectUri, ct);
+            provider, config.ClientId, config.RedirectUri, ct);
         if (flow is null) return Conflict();
-        var url = TelegramOAuthExchange.AuthorizationUri(config.ClientId, config.RedirectUri, flow);
+        var url = provider == "telegram" ? TelegramOAuthExchange.AuthorizationUri(config.ClientId, config.RedirectUri, flow) :
+            VkIdentityProof.AuthorizationUri(config.ClientId, config.RedirectUri, flow);
         if (url is null) return Conflict();
-        Response.Cookies.Append(Cookie, browser, CookieSettings());
+        Response.Cookies.Append(LinkCookie(provider), browser, CookieSettings());
         return Ok(new { linkCode = code, authorizationUrl = url.AbsoluteUri, expiresInSeconds = 300 });
     }
 
     [HttpGet("telegram/callback"), AllowAnonymous]
-    public async Task<IActionResult> TelegramCallback(CancellationToken ct)
+    public Task<IActionResult> TelegramCallback(CancellationToken ct) => CallbackFor("telegram", ct);
+
+    [HttpGet("vk/callback"), AllowAnonymous]
+    public Task<IActionResult> VkCallback(CancellationToken ct) => CallbackFor("vk", ct);
+
+    private async Task<IActionResult> CallbackFor(string provider, CancellationToken ct)
     {
         PrivateResponse();
-        var config = Telegram();
+        var config = Provider(provider);
         if (config is null) return NotFound();
         // Reject repeated parameters, provider denial and absent browser correlation.
         if (Request.Query.ContainsKey("error") || Request.Query["state"].Count != 1 ||
-            Request.Query["code"].Count != 1 || !Request.Cookies.TryGetValue(Cookie, out var browser))
+            Request.Query["code"].Count != 1 || provider == "vk" && Request.Query["device_id"].Count != 1 ||
+            !Request.Cookies.TryGetValue(LinkCookie(provider), out var browser) ||
+            Request.Headers.Cookie.ToString().Split(';', StringSplitOptions.TrimEntries)
+                .Count(x => x.StartsWith(LinkCookie(provider) + "=", StringComparison.Ordinal)) != 1)
             return BadRequest();
         var ok = await callbacks.Complete(config, Request.Query["state"].ToString(), browser,
-            Request.Query["code"].ToString(), ct: ct);
+            Request.Query["code"].ToString(), provider == "vk" ? Request.Query["device_id"].ToString() : null, ct);
         if (!ok) return BadRequest();
-        Response.Cookies.Delete(Cookie, CookieSettings());
+        Response.Cookies.Delete(LinkCookie(provider), CookieSettings());
         // No code, state, subject, token, HTML script or dynamic redirect in the response.
-        return Content("Telegram verified. Return to the original Mystic Ego account screen to confirm the link.", "text/plain");
+        return Content("External account verified. Return to the original Mystic Ego account screen to confirm the link.", "text/plain");
     }
 
     [HttpPost("telegram/candidate"), RequestSizeLimit(4096)]
-    public async Task<IActionResult> Candidate(CandidateRequest input, CancellationToken ct)
+    public Task<IActionResult> Candidate(CandidateRequest input, CancellationToken ct) => CandidateFor("telegram", input, ct);
+
+    [HttpPost("vk/candidate"), RequestSizeLimit(4096)]
+    public Task<IActionResult> VkCandidate(CandidateRequest input, CancellationToken ct) => CandidateFor("vk", input, ct);
+
+    private async Task<IActionResult> CandidateFor(string provider, CandidateRequest input, CancellationToken ct)
     {
         PrivateResponse();
-        var config = Telegram();
+        var config = Provider(provider);
         if (config is null) return NotFound();
         if (!SameOrigin(config)) return StatusCode(403);
         var actor = await Account(ct);
         if (actor is null) return Unauthorized();
         var proof = await links.Candidate(actor.Value.User, actor.Value.Session, input.LinkCode, ct);
-        if (proof is null || proof.Provider != "telegram" || proof.Realm != "oidc:" + config.ClientId)
+        if (proof is null || proof.Provider != provider || proof.Realm != Realm(config))
             return NotFound();
         return Ok(proof);
     }
 
     [HttpPost("telegram/confirm"), RequestSizeLimit(8192)]
-    public async Task<IActionResult> Confirm(ConfirmRequest input, CancellationToken ct)
+    public Task<IActionResult> Confirm(ConfirmRequest input, CancellationToken ct) => ConfirmFor("telegram", input, ct);
+
+    [HttpPost("vk/confirm"), RequestSizeLimit(8192)]
+    public Task<IActionResult> VkConfirm(ConfirmRequest input, CancellationToken ct) => ConfirmFor("vk", input, ct);
+
+    private async Task<IActionResult> ConfirmFor(string provider, ConfirmRequest input, CancellationToken ct)
     {
         PrivateResponse();
-        var config = Telegram();
+        var config = Provider(provider);
         if (config is null) return NotFound();
         if (!SameOrigin(config)) return StatusCode(403);
         var actor = await Account(ct, input.Password, true);
         if (actor is null) return Unauthorized();
-        if (input.Provider != "telegram" || input.Realm != "oidc:" + config.ClientId)
+        if (input.Provider != provider || input.Realm != Realm(config))
             return Conflict();
         var result = await links.Confirm(actor.Value.User, actor.Value.Session, input.LinkCode,
             new(input.Provider, input.Realm, input.Subject), ct);
@@ -178,6 +218,7 @@ public sealed class ExternalAccountsController(AuthDbContext db, IPasswordHasher
             actor.Value.User, actor.Value.Session, new(input.Provider, input.Realm, input.Subject), input.Password, ct);
         if (result is null) return Conflict();
         Response.Cookies.Delete(Cookie, CookieSettings());
+        Response.Cookies.Delete(LinkCookie("vk"), CookieSettings());
         return Ok(new { reauthenticate = true, revokedSessions = result.RevokedSessions });
     }
 
