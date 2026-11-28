@@ -24,6 +24,8 @@ public sealed record SpiritualContact(string EntityId, string Name, SpiritualPar
 public sealed record SpiritualContactPage(Guid Revision, IReadOnlyList<SpiritualContact> Contacts);
 
 /// <summary>Caller is already authenticated; no client-supplied world/area/friendship or provider identity.</summary>
+public sealed record SpiritualHistoryItem(Guid MessageId,string Direction,string Text,DateTimeOffset CreatedUtc);
+public sealed record SpiritualNpcTurn(Guid MessageId,string NpcName,string Text);
 public sealed record SpiritualSendRequest(Guid RequestId, string RecipientId, string Text);
 public enum SpiritualSendStatus { Unavailable, Accepted }
 public sealed record SpiritualSendResult(SpiritualSendStatus Status, Guid? MessageId = null);
@@ -56,7 +58,7 @@ public sealed class SpiritualCommunicationGateway(TimeProvider clock, SpiritualM
     private readonly Dictionary<(Guid Account, Guid Request), Entry> requests = new();
     private readonly Queue<Entry> pending = new();
     private readonly Dictionary<Guid, SpiritualMessage> delivered = new();
-    private sealed record Entry(Guid Owner, Guid Request, SpiritualMessage Message);
+    private sealed record Entry(Guid Owner, Guid Request, SpiritualMessage Message, SpiritualParticipantKind RecipientKind, Guid? RecipientOwner);
     public Guid Revision { get { lock (gate) return presence.Version; } }
 
     /// <summary>
@@ -190,20 +192,22 @@ public sealed class SpiritualCommunicationGateway(TimeProvider clock, SpiritualM
             if (route is null) return new(SpiritualSendStatus.Unavailable);
             if (journal is not null)
                 return journal.Enqueue(account, request, new(Guid.NewGuid(), route.Value.Pair.Sender.EntityId,
-                    request.RecipientId, route.Value.Pair.Sender.WorldId, request.Text, clock.GetUtcNow()), MaxPending, MaxRecords);
+                    request.RecipientId, route.Value.Pair.Sender.WorldId, request.Text, clock.GetUtcNow()),
+                    route.Value.Pair.Recipient.Kind,route.Value.Pair.RecipientAccountId, MaxPending, MaxRecords);
             var key = (account, request.RequestId);
             if (requests.TryGetValue(key, out var previous))
                 return previous.Message.SenderId == route.Value.Pair.Sender.EntityId &&
                     previous.Message.RecipientId == request.RecipientId &&
                     previous.Message.WorldId == route.Value.Pair.Sender.WorldId &&
-                    previous.Message.Text == request.Text
+                    previous.Message.Text == request.Text && previous.RecipientKind==route.Value.Pair.Recipient.Kind &&
+                    previous.RecipientOwner==route.Value.Pair.RecipientAccountId
                     ? new(SpiritualSendStatus.Accepted, previous.Message.Id)
                     : new(SpiritualSendStatus.Unavailable);
             if (pending.Count >= MaxPending || requests.Count >= MaxRecords)
                 return new(SpiritualSendStatus.Unavailable);
             var message = new SpiritualMessage(Guid.NewGuid(), route.Value.Pair.Sender.EntityId,
                 request.RecipientId, route.Value.Pair.Sender.WorldId, request.Text, clock.GetUtcNow());
-            var entry = new Entry(account, request.RequestId, message);
+            var entry = new Entry(account, request.RequestId, message,route.Value.Pair.Recipient.Kind,route.Value.Pair.RecipientAccountId);
             requests.Add(key, entry);
             pending.Enqueue(entry);
             return new(SpiritualSendStatus.Accepted, message.Id);
@@ -226,13 +230,15 @@ public sealed class SpiritualCommunicationGateway(TimeProvider clock, SpiritualM
                 if (stored is null) return false;
                 var current = Resolve(stored.Owner, stored.Message.RecipientId);
                 var allowed = current is not null && current.Value.Pair.Sender.EntityId == stored.Message.SenderId &&
-                    current.Value.Pair.Sender.WorldId == stored.Message.WorldId;
+                    current.Value.Pair.Sender.WorldId == stored.Message.WorldId &&
+                    current.Value.Pair.Recipient.Kind==stored.RecipientKind && current.Value.Pair.RecipientAccountId==stored.RecipientOwner;
                 return journal.Finish(stored.Message.Id, allowed);
             }
             if (!pending.TryDequeue(out var entry)) return false;
             var route = Resolve(entry.Owner, entry.Message.RecipientId);
             if (route is not null && route.Value.Pair.Sender.EntityId == entry.Message.SenderId &&
-                route.Value.Pair.Sender.WorldId == entry.Message.WorldId)
+                route.Value.Pair.Sender.WorldId == entry.Message.WorldId &&
+                route.Value.Pair.Recipient.Kind==entry.RecipientKind && route.Value.Pair.RecipientAccountId==entry.RecipientOwner)
                 delivered.Add(entry.Message.Id, entry.Message);
             return true;
         }
@@ -242,6 +248,51 @@ public sealed class SpiritualCommunicationGateway(TimeProvider clock, SpiritualM
     public SpiritualMessage? Committed(Guid id)
     {
         lock (gate) return journal is null ? delivered.GetValueOrDefault(id) : journal.Committed(id);
+    }
+
+    /// <summary>Internal, owner-scoped history. Movement does not erase committed dialogue.
+    /// A trusted caller must verify the account and current world snapshot, not accept account IDs from clients.</summary>
+    public IReadOnlyList<SpiritualHistoryItem> History(Guid account,int limit=20)
+    {
+        lock(gate)
+        {
+            if(journal is null||limit is <1 or >50||!active.TryGetValue(account,out var entity)||
+                presence.OwnedPlacement(account,entity) is null)return [];
+            return journal.History(account,entity,limit);
+        }
+    }
+
+    private JournalEntry? NpcRoute(Guid account,Guid messageId)
+    {
+        if(journal is null||journal.HasReply(messageId)||journal.CommittedEntry(messageId) is not { } row||
+            row.Owner!=account||row.RecipientKind!=SpiritualParticipantKind.Npc||row.RecipientOwner is not null||
+            clock.GetUtcNow()-row.Message.AcceptedUtc>TimeSpan.FromMinutes(2))return null;
+        var route=Resolve(account,row.Message.RecipientId);
+        if(route is null||route.Value.Pair.Sender.EntityId!=row.Message.SenderId||
+            route.Value.Pair.Sender.WorldId!=row.Message.WorldId||route.Value.Pair.Recipient.Kind!=SpiritualParticipantKind.Npc||
+            route.Value.Decision!=SpiritualConnectionDecision.Local||
+            !permissions.Contains((row.Message.RecipientId,row.Message.SenderId)))return null;
+        return row;
+    }
+
+    /// <summary>Trusted worker only. Minimal NPC prompt context, no provider, account IDs or personal memories.</summary>
+    public SpiritualNpcTurn? BeginNpcTurn(Guid account,Guid messageId)
+    {
+        lock(gate)
+        {
+            var row=NpcRoute(account,messageId);
+            return row is not null&&labels.TryGetValue(row.Message.RecipientId,out var name)?
+                new(messageId,name,row.Message.Text):null;
+        }
+    }
+
+    /// <summary>Commit one response after rechecking both directions. Never holds the world lock
+    /// during inference. This is a reference inbox, not a network delivery guarantee.</summary>
+    public bool CommitNpcReply(Guid account,Guid messageId,string text)
+    {
+        if(string.IsNullOrWhiteSpace(text)||text.Length>4000||
+            text.Any(c=>char.IsControl(c)&&c!='\n'&&c!='\r'&&c!='\t'))return false;
+        lock(gate)return NpcRoute(account,messageId) is not null&&journal!.SaveReply(messageId,text,clock.GetUtcNow());
     }
 
     private (WorldPresencePair Pair, SpiritualConnectionDecision Decision)? Resolve(Guid account, string recipient)
