@@ -9,7 +9,7 @@ public sealed record SimulationBatchResult(bool Applied,long Revision);
 /// player event producer. Producers must authenticate/authorize events before Submit.
 /// Queue is bounded and volatile; accepted work is acknowledged only after durable CAS.
 /// Heartbeats never reanimate a stale or externally modified snapshot.</summary>
-public sealed class WorldSimulationHost(WorldAuthorityStore store,WorldSimulationCore core,TimeProvider clock)
+public sealed class WorldSimulationHost(WorldAuthorityStore store,WorldSimulationCore core,TimeProvider clock,NpcRoutinePlanner? routines=null)
     : BackgroundService
 {
     private sealed record Batch(long Expected,WorldSimulationEvent[] Events,TaskCompletionSource<SimulationBatchResult> Completion);
@@ -68,7 +68,21 @@ public sealed class WorldSimulationHost(WorldAuthorityStore store,WorldSimulatio
                 if(ActiveRevision<=0)continue;
                 try
                 {
-                    if(!store.TryTick(ActiveRevision))Interlocked.Exchange(ref activeRevision,0);
+                    if(stoppingToken.IsCancellationRequested)break;
+                    var expected=ActiveRevision;
+                    if(!store.TryTick(expected)){Interlocked.Exchange(ref activeRevision,0);continue;}
+                    if(routines is null)continue;
+                    var state=store.Current();
+                    if(state is null||state.Revision!=expected||
+                        state.Feed.PublishedUtc<=clock.GetUtcNow().AddSeconds(-15)||
+                        state.Feed.PublishedUtc>clock.GetUtcNow().AddSeconds(2))
+                    {Interlocked.Exchange(ref activeRevision,0);continue;}
+                    var moves=routines.Plan(state.Feed.Snapshot,state.Feed.SimulationTick);
+                    if(moves.Count>0)
+                    {
+                        if(core.Apply(expected,moves,out var next))Interlocked.Exchange(ref activeRevision,next);
+                        else Interlocked.Exchange(ref activeRevision,0);
+                    }
                 }
                 catch(Exception ex) when(ex is Microsoft.Data.Sqlite.SqliteException or IOException or
                     UnauthorizedAccessException or System.Text.Json.JsonException or ArgumentException or

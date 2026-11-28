@@ -16,10 +16,17 @@ public static class WorldSimulationRegistration
         var topology=cfg.GetSection("WorldSimulation:Areas").Get<SimulationArea[]>()??[];
         var passages=cfg.GetSection("WorldSimulation:Passages").Get<SimulationPassage[]>()??[];
         if(topology.Length==0)throw new InvalidOperationException("WorldSimulation requires trusted topology.");
+        NpcRoutinePlanner? routines=null;
+        if(cfg.GetValue<bool>("WorldSimulation:NpcRoutinesEnabled"))
+        {
+            var schedules=cfg.GetSection("WorldSimulation:NpcRoutines").Get<NpcRoutine[]>()??[];
+            if(schedules.Length==0)throw new InvalidOperationException("Enabled NPC routines require schedules.");
+            routines=new NpcRoutinePlanner(topology,passages,schedules);
+        }
         services.AddSingleton(sp=>new WorldAuthorityStore(path,TimeProvider.System));
         services.AddSingleton(sp=>new WorldSimulationCore(sp.GetRequiredService<WorldAuthorityStore>(),topology,passages));
         services.AddSingleton(sp=>new WorldSimulationHost(sp.GetRequiredService<WorldAuthorityStore>(),
-            sp.GetRequiredService<WorldSimulationCore>(),TimeProvider.System));
+            sp.GetRequiredService<WorldSimulationCore>(),TimeProvider.System,routines));
         services.AddHostedService(sp=>sp.GetRequiredService<WorldSimulationHost>());
         return services;
     }
