@@ -1,6 +1,7 @@
 package ru.isdarkline.mysticego;
 
-import android.app.Activity;
+import androidx.activity.ComponentActivity;
+import androidx.activity.OnBackPressedCallback;
 import android.graphics.Bitmap;
 import android.content.Intent;
 import android.graphics.Color;
@@ -35,7 +36,7 @@ import com.google.zxing.integration.android.IntentIntegrator;
 import com.google.zxing.integration.android.IntentResult;
 
 /** Minimal Android client. Auth remains inside the trusted first-party web application. */
-public final class MainActivity extends Activity {
+public final class MainActivity extends ComponentActivity {
     private WebView web;
     private static final String INIT_VERSION = "mobile-init-1";
     private static final int CAMERA_REQUEST = 310;
@@ -49,6 +50,12 @@ public final class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        getOnBackPressedDispatcher().addCallback(this,new OnBackPressedCallback(true){
+            @Override public void handleOnBackPressed(){
+                if(web!=null&&web.canGoBack())web.goBack();
+                else {setEnabled(false);try{getOnBackPressedDispatcher().onBackPressed();}finally{setEnabled(true);}}
+            }
+        });
         if (!initialized()) { showInitialization(); return; }
         showWorkspace();
     }
@@ -257,9 +264,6 @@ public final class MainActivity extends Activity {
         if(initialized()&&web!=null)openIntent(intent);
     }
 
-    @Override public void onBackPressed() {
-        if (web != null && web.canGoBack()) web.goBack(); else super.onBackPressed();
-    }
 
     @Override protected void onStop() {
         denyMediaPermission();

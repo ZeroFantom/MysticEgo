@@ -48,6 +48,11 @@ jobs:
       - name: Build preview and test routes
         working-directory: mobile/android
         run: gradle --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease
+      - name: Report Android lint details
+        if: always()
+        run: |
+          report=mobile/android/app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+          if test -f "$report"; then cat "$report"; fi
       - name: Preview debug APK only
         uses: actions/upload-artifact@v4
         with:
