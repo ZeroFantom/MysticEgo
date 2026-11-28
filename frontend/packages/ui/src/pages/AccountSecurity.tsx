@@ -1,9 +1,11 @@
 import {useEffect,useState} from 'react';
+import {Smartphone,Monitor,Tablet,HelpCircle} from 'lucide-react';
+import {QrApprove,deviceLabel,type SessionDevice} from '../app/QrSignIn';
 import {useApp,useRemote} from '../app/context';
 import {useLocale,usePresentation} from '../app/presentation';
 import {Header,Panel,ErrorBanner} from '../components/primitives';
 
-type SessionRow={id?:string;current:boolean;createdUtc:string;lastSeenUtc:string;expiresUtc:string;userAgent?:string;ip?:string;legacy:boolean};
+type SessionRow={id?:string;current:boolean;createdUtc:string;lastSeenUtc:string;expiresUtc:string;userAgent?:string;device?:SessionDevice;ip?:string;legacy:boolean};
 type Doc={version:string;url:string};
 type Grant={deviceId:string;grantId:string;scope:string;policyVersion:string;grantedUtc:string};
 type Consents={terms:Doc;privacy:Doc;license:Doc;permissionPolicyVersion:string;scopes:string[];enabledScopes:string[];accepted:boolean;grants:Grant[]};
@@ -32,17 +34,19 @@ export function AccountSecurity(){
  return <>
   <Header title={t('Безопасность аккаунта')} description={t('Сессии, документы и разрешения устройств')}/>
   <ErrorBanner text={problem}/>
+  <QrApprove session={session}/>
   <Panel title={t('Активные сессии')} aside={<button className="btn secondary" disabled={busy} onClick={()=>sessions.reload()}>{t('Обновить')}</button>}>
    <ErrorBanner text={sessions.error}/>
    <p>{t('Сессия считается активной до выхода, отзыва или истечения срока. Последняя активность — время обновления токена.')}</p>
    <div className="stack">
-   {sessions.value?.map((row,index)=><article className="panel" key={row.id??'legacy-'+index}>
+   {sessions.value?.map((row,index)=>{const device=row.device;const Icon=device?.kind==='mobile'?Smartphone:device?.kind==='tablet'?Tablet:device?.kind==='desktop'?Monitor:HelpCircle;return <article className="panel" key={row.id??'legacy-'+index}>
     <strong>{row.current?t('Текущая сессия'):row.legacy?t('Старая сессия'):t('Другая сессия')}</strong>
-    <p>{row.userAgent||t('Неизвестное устройство')}</p>
+    <div className="session-device"><Icon size={21} aria-hidden="true"/><span>{deviceLabel(device,row.userAgent,t)}</span></div>
+    {row.userAgent&&<details><summary>{t('Сведения о клиенте')}</summary><small className="session-agent">{row.userAgent}</small></details>}
     <p>{row.ip||'—'} · {t('Последняя активность')}: {date(row.lastSeenUtc)}</p>
     <small>{t('Создана')}: {date(row.createdUtc)} · {t('Истекает')}: {date(row.expiresUtc)}</small>
     {!row.current&&row.id&&<div><button className="btn secondary" disabled={busy} onClick={()=>setConfirm(row.id!)}>{t('Завершить сессию')}</button></div>}
-   </article>)}
+   </article>})}
    <button className="btn secondary" disabled={busy||!sessions.value?.some(x=>!x.current)} onClick={()=>setConfirm('others')}>{t('Завершить все остальные сессии')}</button>
    {confirm&&<div role="alert" className="panel"><p>{t(confirm==='others'?'Все остальные устройства выйдут из аккаунта. Текущая сессия сохранится.':'Подтвердите завершение выбранной сессии.')}</p><div className="actions"><button className="btn" disabled={busy} onClick={()=>void run(()=>request(confirm==='others'?'sessions/revoke-others':'sessions/'+confirm+'/revoke',{}))}>{t('Подтвердить')}</button><button className="btn secondary" disabled={busy} onClick={()=>setConfirm(null)}>{t('Отмена')}</button></div></div>}
    </div>

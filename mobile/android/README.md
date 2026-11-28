@@ -19,7 +19,7 @@ The shared browser panel offers a dismissible Android hint only on https://orche
 adb shell am start -a android.intent.action.VIEW -d mysticego://open/audit-assistant ru.isdarkline.mysticego.debug
 ```
 
-Private query strings, fragments, account/session tokens and arbitrary host URLs are not transferred. Unsupported routes go to the corresponding root. App sessions are independent of external browser sessions. The WebView does not expose a JavaScript bridge, native device actions, microphone/camera, file access or arbitrary external navigation. HTTPS and exact primary origin are required; SSL errors are cancelled. The server remains responsible for authorization. No Android runtime permission beyond INTERNET is requested.
+Private query strings, fragments, account/session tokens and arbitrary host URLs are not transferred. Unsupported routes go to the corresponding root. App sessions are independent of external browser sessions. The WebView does not expose a JavaScript bridge, native device actions, microphone/camera access from web content, file access or arbitrary external navigation. HTTPS and exact primary origin are required; SSL errors are cancelled. The server remains responsible for authorization. CAMERA is requested only for the explicitly opened native QR scanner; WebView camera and microphone permissions remain denied.
 
 ## Acceptance and distribution gates
 
@@ -31,3 +31,9 @@ Private query strings, fragments, account/session tokens and arbitrary host URLs
 - [ ] Validate edge-to-edge, keyboard, screen reader and localization on real devices.
 
 References: https://developer.android.com/build/releases/agp-8-13-0-release-notes and https://developer.chrome.com/docs/android/intents .
+
+## QR sign-in and mobile appearance
+
+The receiving screen generates a local verifier and a two-minute QR request. An existing signed-in account opens Account Security, scans the link using the native QR action or a supported browser scanner, or pastes the request link, checks the six-digit comparison code and explicitly approves. The receiver redeems exactly once through the same-origin browser cookie gateway. The existing Desktop grant machinery verifies that the approving refresh session remains active; a rotated source refresh token may require restarting the request. No credentials are encoded in the QR. Requests disappear after an Auth restart. Test expiry, source revocation, cancellation, replay, cross-account attempts and native camera permission on an isolated test deployment before release.
+
+Mobile design uses a crescent/orbit launcher mark, portal-inspired hero, rounded cards and bottom navigation. Generated raster artwork is a separate asset-import step; existing shared MysticEgo art is the fallback. No mock login methods or invented data are displayed.

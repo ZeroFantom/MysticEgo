@@ -26,7 +26,7 @@ function save(key:string,session:Session){
  }catch{/* Browsers may disable storage. */}
 }
 
-export async function browserAuthRequest(action:'login'|'refresh'|'logout',body:unknown={}){
+export async function browserAuthRequest(action:'login'|'refresh'|'logout'|'qr/redeem',body:unknown={}){
  const run=()=>fetch('/api/auth/browser/'+action,{method:'POST',credentials:'same-origin',redirect:'error',cache:'no-store',headers:{'Content-Type':'application/json','X-Mystic-Browser':'1'},body:JSON.stringify(body),signal:AbortSignal.timeout(15000)});
  return navigator.locks?navigator.locks.request('mysticego-browser-auth',run):run();
 }

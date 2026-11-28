@@ -18,4 +18,7 @@ android {
         release { isMinifyEnabled = false }
     }
 }
-dependencies { testImplementation("junit:junit:4.13.2") }
+dependencies {
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    testImplementation("junit:junit:4.13.2")
+}

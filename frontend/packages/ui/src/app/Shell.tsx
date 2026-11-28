@@ -1,4 +1,6 @@
 import {Capacity} from '../pages/Capacity';
+import {browserKind} from './browserPolicy';
+import './mobile-immersive.css';
 import {InterfaceControl} from './InterfaceControl';
 import './panel-surface.css';
 import {useAccountPresentation,useLocale} from './presentation';
@@ -198,9 +200,11 @@ function Workspace({logout}:{logout:()=>void}){
       if(menuTrigger.current?.getClientRects().length)menuTrigger.current.focus();
     };
   },[drawerOpen]);
+  const android=browserKind()==='android';
+  const mobileNav=[{to:'/',label:'Главная',icon:House},{to:'/assistant',label:'Ассистент',icon:Bot},{to:'/collective',label:'Коллектив',icon:UsersRound},{to:mode==='audit'?'/organizations':'/nodes',label:'Организации',icon:Building2},{to:'/profile',label:'Профиль',icon:UserRound}];
   const emblem=modes[mode].icon;
   const ModeIcon=emblem;
-  return <div className="app-shell mystic-workspace" data-workspace={mode} data-drawer-open={drawerOpen}>
+  return <div className="app-shell mystic-workspace" data-workspace={mode} data-mobile-app={android?'true':undefined} data-drawer-open={drawerOpen}>
     <aside id="workspace-navigation" ref={drawer} className={'sidebar '+(drawerOpen?'open':'')} inert={narrow&&!drawerOpen} role={drawerOpen?'dialog':undefined} aria-modal={drawerOpen?true:undefined} aria-label={t("Навигация MysticEgo")}>
       <button ref={closeDrawer} className="icon-btn drawer-close" type="button" aria-label={t("Закрыть меню")} onClick={()=>setMobile(false)}><X size={20}/></button>
       <Link to="/" className="brand" aria-label="MysticEgo" onClick={()=>setMobile(false)}><div className="brand-mark"><img src={"/mystic-mark.png"} alt=""/></div><strong>MysticEgo</strong></Link>
@@ -226,7 +230,7 @@ function Workspace({logout}:{logout:()=>void}){
         <div className="breadcrumb"><span>{t(modes[mode].name)}</span><ChevronRight size={14}/><strong>{t(current)}</strong></div>
         <div className="top-actions"><InterfaceControl/><MaintenanceNotices enabled={mode==='orchestra'&&developer.value?.owner===true}/><ThemeToggle scope={preferenceScope}/><AccountMenu logout={logout}/><NotificationsFloat/></div>
       </header>
-      <main className="content"><AnimatedArea><Routes>
+      <main className="content">{android&&pathname==='/'&&<section className="mobile-home-hero"><span>MYSTICEGO / MOBILE</span><h1>{t('Личное пространство')}</h1><p>{t('Ваши устройства, коллектив и персональный ассистент.')}</p><Link to="/assistant" className="btn"><Sparkles size={17}/>{t('Ассистент')}</Link></section>}<AnimatedArea><Routes>
         <Route path="/" element={mode==='orchestra'||mode==='global'||mode==='local'?<OrchestraOverview/>:mode==='audit'?<OrganizationRequests overview/>:<Overview/>}/>
         {['audit','orchestra'].includes(mode)&&<Route path="/development-team" element={<DevelopmentTeam/>}/>}
         {mode==='orchestra'&&<Route path="/development-workspace" element={cloudDownloads?<DevelopmentWorkspace/>:<p>{t('Development team access required.')}</p>}/>}
@@ -265,7 +269,8 @@ function Workspace({logout}:{logout:()=>void}){
         <Route path="/deploy-native" element={<Navigate to="/setup" replace/>}/>
         <Route path="*" element={<div className="empty"><p>{t("Страница не найдена")}</p><Link className="btn secondary" to="/">{t("К обзору")}</Link></div>}/>
       </Routes></AnimatedArea></main>
-      {(mode==='agent'||mode==='audit')&&pathname!=='/assistant'&&<AssistantCompanion/>}
+      {android&&<nav className="mobile-bottom-nav" aria-label={t('Главная навигация')}>{mobileNav.map(item=><NavLink key={item.to} to={item.to} end={item.to==='/'} className={({isActive})=>isActive?'active':''}><item.icon size={22} aria-hidden="true"/><span>{t(item.label)}</span></NavLink>)}</nav>}
+      {!android&&(mode==='agent'||mode==='audit')&&pathname!=='/assistant'&&<AssistantCompanion/>}
     </div>
   </div>;
 }

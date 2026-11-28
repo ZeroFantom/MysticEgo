@@ -23,6 +23,8 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import com.google.zxing.integration.android.IntentIntegrator;
+import com.google.zxing.integration.android.IntentResult;
 
 /** Minimal Android client. Auth remains inside the trusted first-party web application. */
 public final class MainActivity extends Activity {
@@ -55,6 +57,7 @@ public final class MainActivity extends Activity {
         bar.addView(title, new LinearLayout.LayoutParams(0, dp(52), 1));
         bar.addView(button("←", "Back", () -> { if (web.canGoBack()) web.goBack(); else web.loadUrl(MobileRoutes.HOME); }));
         bar.addView(button("⌂", "Home", () -> web.loadUrl(MobileRoutes.HOME)));
+        bar.addView(button("QR", "Scan sign-in QR", this::scanQr));
         bar.addView(button("↻", "Reload", () -> web.reload()));
         root.addView(bar);
 
@@ -118,6 +121,22 @@ public final class MainActivity extends Activity {
         result.setMinWidth(dp(48)); result.setMinimumWidth(dp(48));
         result.setOnClickListener(view -> action.run());
         return result;
+    }
+
+    private void scanQr() {
+        new IntentIntegrator(this).setDesiredBarcodeFormats(IntentIntegrator.QR_CODE)
+            .setPrompt("Scan a MysticEgo sign-in QR code").setBeepEnabled(false)
+            .setBarcodeImageEnabled(false).setOrientationLocked(false).initiateScan();
+    }
+
+    @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        IntentResult result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
+        if (result == null) { super.onActivityResult(requestCode, resultCode, data); return; }
+        String value = result.getContents();
+        if (value == null) return;
+        if (value.matches("https://orchestra\\.isdarkline\\.ru/audit-portal/account-security#qr=[a-f0-9]{64}")) {
+            web.loadUrl(value);
+        } else Toast.makeText(this, "Invalid MysticEgo sign-in QR", Toast.LENGTH_SHORT).show();
     }
 
     private void openReleasePage() {

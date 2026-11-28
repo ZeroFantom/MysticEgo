@@ -3,6 +3,7 @@ import {useLocale} from '../app/presentation';
 import {useState,type FormEvent} from 'react';
 import {browserKind,browserLabels} from '../app/browserPolicy';
 import {DesktopSignIn} from '../app/DesktopSignIn';
+import {QrReceive} from '../app/QrSignIn';
 import {ArrowRight,Boxes,Eye,EyeOff,KeyRound,Network,Shield,Sparkles,UserRound} from 'lucide-react';
 import type {Session} from '../app/context';
 import {useRemote} from '../app/context';
@@ -65,7 +66,7 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
   }catch(error){setError(error instanceof Error?error.message:String(error))}
   finally{setBusy(false)}
  }
- return <main className="auth-experience">
+ return <main className="auth-experience" data-mobile-app={browserKind()==='android'?'true':undefined}>
   <section className="auth-visual">
    <div className="auth-brand"><Boxes size={24}/> MysticEgo</div>
    <div className="auth-orbit" aria-hidden="true"><i/><i/><i/><span className="auth-emblem"><Shield size={48}/></span></div>
@@ -78,6 +79,7 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
     <small>{t('Браузер')}: {browserLabels[browserKind()]}</small>
     <h2>{guest?t("Гостевой сеанс"):register?t("Создать аккаунт"):t("Войти в MysticEgo")}</h2>
     {mode==='orchestra'&&<PanelLoginLinks/>}
+    {!register&&!guest&&<QrReceive session={session} authUrl={authUrl} disabled={busy||pairingBusy} onLogin={onLogin}/>}
     {browserKind()!=='android'&&<DesktopSignIn session={session} authUrl={authUrl} onLogin={onLogin} disabled={busy||register||guest} onBusy={setPairingBusy}/>}
     {mode==='audit'&&<div className="auth-tabs" role="group" aria-label={t("Режим авторизации")} data-register={register}>
       <button type="button" aria-pressed={!register} disabled={pairingBusy} onClick={()=>selectMode(false)}>{t("Вход")}</button>
