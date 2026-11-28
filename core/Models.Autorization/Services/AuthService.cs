@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
@@ -116,8 +117,31 @@ public sealed class AuthService : IAuthService
         return await BuildAuthResponseAsync(stored.User,ip,userAgent,ct);
     }
 
+    /// <summary>
+    /// Internal trusted proof path, reachable only after a one-use external login callback.
+    /// Resolve the linked account again within the session issuance transaction.
+    /// </summary>
+    internal async Task<AuthResponse?> IssueVerifiedExternalSessionAsync(ExternalIdentityKey proof,
+        DateTime flowStartedUtc, string? ip, string? userAgent, CancellationToken ct)
+    {
+        if (!proof.Valid) return null;
+        await using var tx = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        var account = await _db.ExternalIdentities.AsNoTracking()
+            .Where(i => i.Provider == proof.Provider && i.Realm == proof.Realm && i.Subject == proof.Subject &&
+                i.LinkedUtc <= flowStartedUtc)
+            .Select(i => (Guid?)i.UserId).SingleOrDefaultAsync(ct);
+        if (account is null) return null;
+        var user = await _db.Users.Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+            .SingleOrDefaultAsync(u => u.Id == account.Value && u.IsActive, ct);
+        if (user is null) return null;
+        user.LastLoginAt = DateTime.UtcNow;
+        var response = await BuildAuthResponseAsync(user, ip, userAgent, ct, externalProof: proof);
+        await tx.CommitAsync(ct);
+        return response;
+    }
+
     private async Task<AuthResponse> BuildAuthResponseAsync(
-        User user, string? ip, string? userAgent, CancellationToken ct, RefreshToken? existing = null)
+        User user, string? ip, string? userAgent, CancellationToken ct, RefreshToken? existing = null, ExternalIdentityKey? externalProof = null)
     {
         var roleCodes = user.UserRoles.Select(ur => ur.Role.Code).ToList();
 
@@ -135,6 +159,13 @@ public sealed class AuthService : IAuthService
         session.CreatedByIp = ip is { Length: >64 } ? ip[..64] : ip;
         session.UserAgent = userAgent is { Length: >500 } ? userAgent[..500] : userAgent;
         if (existing is null) _db.RefreshTokens.Add(session);
+        if (externalProof is not null)
+            _db.ExternalIdentityAudits.Add(new ExternalIdentityAudit
+            {
+                UserId = user.Id, SessionId = session.SessionId.Value,
+                Provider = externalProof.Provider, Realm = externalProof.Realm,
+                Action = "login", OccurredUtc = now
+            });
 
         await _db.SaveChangesAsync(ct);
 

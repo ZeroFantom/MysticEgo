@@ -35,7 +35,7 @@ public sealed class TelegramOAuthExchange : IDisposable
             Uri.EscapeDataString(p.Key) + "=" + Uri.EscapeDataString(p.Value))));
     }
 
-    public async Task<ExternalIdentityKey?> Exchange(OAuthLinkClaim claim, string clientSecret,
+    public async Task<ExternalIdentityKey?> Exchange(OAuthProviderClaim claim, string clientSecret,
         string code, CancellationToken ct = default)
     {
         if (claim.Provider != "telegram" || !TelegramIdentityProof.PositiveId(claim.ClientId) ||

@@ -39,6 +39,20 @@ public static class AccountSecuritySchema
         var timestamp=db.Database.IsNpgsql()?"timestamp with time zone":"TEXT";
         var boolean=db.Database.IsNpgsql()?"boolean":"INTEGER";
         var sql=$"""
+            CREATE TABLE IF NOT EXISTS external_login_flows (
+                "StateHash" varchar(64) NOT NULL PRIMARY KEY,
+                "BrowserHash" varchar(64) NOT NULL,
+                "Provider" varchar(16) NOT NULL,
+                "ClientId" varchar(20) NOT NULL,
+                "RedirectUri" varchar(2048) NOT NULL,
+                "ProtectedSecrets" varchar(4096) NOT NULL,
+                "StartedUtc" {timestamp} NOT NULL,
+                "ExpiresUtc" {timestamp} NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS "IX_external_login_flows_ExpiresUtc"
+                ON external_login_flows ("ExpiresUtc");
+            CREATE INDEX IF NOT EXISTS "IX_external_login_flows_BrowserHash"
+                ON external_login_flows ("BrowserHash");
             CREATE TABLE IF NOT EXISTS external_identity_audit (
                 "Id" {guid} NOT NULL PRIMARY KEY,
                 "UserId" {guid} NOT NULL REFERENCES users("Id") ON DELETE CASCADE,

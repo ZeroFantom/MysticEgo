@@ -135,3 +135,5 @@ await OAuthCallbackSmoke.Run();
 await ExternalAccountApiSmoke.Run();
 
 await ExternalRevocationSmoke.Run();
+
+await ExternalLoginSmoke.Run();

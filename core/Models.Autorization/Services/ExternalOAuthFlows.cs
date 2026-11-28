@@ -16,14 +16,18 @@ public sealed class OAuthLinkStart(string state, string challenge, string nonce)
 }
 
 /// <summary>Server-only data from a consumed callback. Never serialize to a client or log.</summary>
-public sealed class OAuthLinkClaim(string provider, string clientId, Uri redirectUri, string verifier,
-    string nonce, string linkCode)
+public class OAuthProviderClaim(string provider, string clientId, Uri redirectUri, string verifier, string nonce)
 {
     public string Provider { get; } = provider;
     public string ClientId { get; } = clientId;
     public Uri RedirectUri { get; } = redirectUri;
     public string Verifier { get; } = verifier;
     public string Nonce { get; } = nonce;
+}
+
+public sealed class OAuthLinkClaim(string provider, string clientId, Uri redirectUri, string verifier,
+    string nonce, string linkCode) : OAuthProviderClaim(provider, clientId, redirectUri, verifier, nonce)
+{
     internal string LinkCode { get; } = linkCode;
 }
 
