@@ -17,3 +17,7 @@
 - [ ] Проверить реальную модель LM Studio на изолированном стенде; модельные ошибки не должны блокировать статические квесты.
 - [ ] Сохранить R3.2.44 и совместимый резервный снимок состояния. Не делать автоматический сброс базы данных.
 - [ ] Отдельно согласовать публикацию полного набора проверенных артефактов и развёртывание; не выдавать текущий кандидат за действующий релиз.
+
+## Combined security candidate
+
+Includes #116: desktop and CloudDesk MCP lease revocation, focus checks and invalid JSON-RPC rejection. Individual checks #116 passed 12/12; previous candidate #115 passed 15/15. The combined SHA requires a fresh complete candidate run before distribution; no production change or publication.
