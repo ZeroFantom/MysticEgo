@@ -10,7 +10,7 @@ namespace Api.Auth.Controllers;
 
 /// <summary>Restricted internal transport. Public clients and generic devices are denied.
 /// Do not expose this prefix on the public reverse proxy.</summary>
-[ApiController, Authorize, SkipPermission, Models.Commands.SkipTool, Route("api/auth/messenger/internal/world")]
+[ApiController, Authorize, SkipPermission, Route("api/auth/messenger/internal/world")]
 [EnableRateLimiting("messenger-webhook")]
 [ResponseCache(NoStore=true,Location=ResponseCacheLocation.None)]
 public sealed class MessengerWorldTransportController(AuthDbContext db, MessengerWorldHandoff handoff,
@@ -30,7 +30,7 @@ public sealed class MessengerWorldTransportController(AuthDbContext db, Messenge
         return await db.ManagedIdentities.AsNoTracking().AnyAsync(d=>d.Id==id&&d.Enabled&&d.Kind=="orchestra",ct)?id:null;
     }
 
-    [HttpPost("claim"), RequestSizeLimit(1024)]
+    [HttpPost("claim"), Models.Commands.SkipTool, RequestSizeLimit(1024)]
     public async Task<IActionResult> Claim(CancellationToken ct)
     {
         Response.Headers.CacheControl="no-store";
@@ -47,7 +47,7 @@ public sealed class MessengerWorldTransportController(AuthDbContext db, Messenge
         return Ok(lease);
     }
 
-    [HttpPost("validate"), RequestSizeLimit(2048)]
+    [HttpPost("validate"), Models.Commands.SkipTool, RequestSizeLimit(2048)]
     public async Task<IActionResult> Validate(LeaseRequest input,CancellationToken ct)
     {
         var worker=await Worker(ct);
@@ -59,7 +59,7 @@ public sealed class MessengerWorldTransportController(AuthDbContext db, Messenge
         return await handoff.Validate(worker.Value,input.Id,input.LeaseId,ct)?NoContent():Conflict();
     }
 
-    [HttpPost("complete"), RequestSizeLimit(2048)]
+    [HttpPost("complete"), Models.Commands.SkipTool, RequestSizeLimit(2048)]
     public async Task<IActionResult> Complete(CompleteRequest input,CancellationToken ct)
     {
         var worker=await Worker(ct);
