@@ -78,7 +78,7 @@ export function SignIn({session,onLogin,mode='audit',onGuest}:{session:Session;o
     <small>{t('Браузер')}: {browserLabels[browserKind()]}</small>
     <h2>{guest?t("Гостевой сеанс"):register?t("Создать аккаунт"):t("Войти в MysticEgo")}</h2>
     {mode==='orchestra'&&<PanelLoginLinks/>}
-    <DesktopSignIn session={session} authUrl={authUrl} onLogin={onLogin} disabled={busy||register||guest} onBusy={setPairingBusy}/>
+    {browserKind()!=='android'&&<DesktopSignIn session={session} authUrl={authUrl} onLogin={onLogin} disabled={busy||register||guest} onBusy={setPairingBusy}/>}
     {mode==='audit'&&<div className="auth-tabs" role="group" aria-label={t("Режим авторизации")} data-register={register}>
       <button type="button" aria-pressed={!register} disabled={pairingBusy} onClick={()=>selectMode(false)}>{t("Вход")}</button>
       <button type="button" aria-pressed={register} disabled={pairingBusy} onClick={()=>selectMode(true)}>{t("Регистрация")}</button>

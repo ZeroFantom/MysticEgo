@@ -1,5 +1,14 @@
 // Source phrases are stable migration keys; unknown phrases stay visible until translated.
 export const catalog:Record<string,readonly [string,string,string,string?]>={
+  "Открыть MysticEgo Mobile": ["Open MysticEgo Mobile","打开 MysticEgo Mobile","MysticEgo Mobile 열기"],
+  "Приложение для Android": ["Android app","Android 应用","Android 앱"],
+  "Если приложение уже установлено, откройте его. Или продолжайте в браузере.": ["If the app is installed, open it. Or continue in your browser.","如果已安装应用，请打开它；也可以继续使用浏览器。","앱이 설치되어 있다면 열거나 브라우저에서 계속하세요."],
+  "Открыть приложение": ["Open app","打开应用","앱 열기"],
+  "Установка Android": ["Android installation","Android 安装","Android 설치"],
+  "Продолжить в браузере": ["Continue in browser","继续使用浏览器","브라우저에서 계속"],
+  "Android-клиент использует существующий личный кабинет и авторизацию MysticEgo.": ["The Android client uses the existing MysticEgo account and authentication.","Android 客户端使用现有 MysticEgo 账户与身份验证。","Android 클라이언트는 기존 MysticEgo 계정과 인증을 사용합니다."],
+  "Публичная подписанная APK пока не выпущена. Проверяйте официальные релизы.": ["A signed public APK has not been released yet. Check official releases.","签名的公开 APK 尚未发布，请查看官方版本。","공개 서명 APK는 아직 출시되지 않았습니다. 공식 릴리스를 확인하세요."],
+  "Официальные релизы": ["Official releases","官方版本","공식 릴리스"],
   "Язык": [
     "Language",
     "语言",

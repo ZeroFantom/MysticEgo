@@ -1,0 +1,54 @@
+name: MysticEgo Android preview
+on:
+  pull_request:
+    paths:
+      - 'mobile/android/**'
+      - 'frontend/packages/ui/src/app/MobileAppOffer.tsx'
+      - 'frontend/packages/ui/src/app/androidLaunch.ts'
+      - 'frontend/packages/ui/src/app/browserPolicy.ts'
+      - 'frontend/packages/ui/src/app/BrowserPreferences.tsx'
+      - 'frontend/scripts/android-launch.test.mjs'
+      - '.github/workflows/android-mobile.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  links:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node --test frontend/scripts/android-launch.test.mjs
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+          cache-read-only: true
+      - name: Install Android SDK
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Build preview and test routes
+        working-directory: mobile/android
+        run: gradle --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease
+      - name: Preview debug APK only
+        uses: actions/upload-artifact@v4
+        with:
+          name: MysticEgo-Mobile-Android-debug-preview
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7

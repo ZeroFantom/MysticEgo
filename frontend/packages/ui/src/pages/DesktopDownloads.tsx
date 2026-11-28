@@ -4,6 +4,7 @@ import {useEffect,useState} from 'react';
 import {ArrowLeft,CloudCog,Download,Laptop,Monitor,Server,ShieldCheck} from 'lucide-react';
 import {useApp,useRemote} from '../app/context';
 import './desktop-downloads.css';
+import {AndroidDownloadCard} from '../app/MobileAppOffer';
 
 type DownloadAsset={tag:string;url:string;fileName?:string;format?:'exe'|'run'|'zip'};
 type Downloads=Partial<Record<string,DownloadAsset>>;
@@ -79,7 +80,7 @@ export function PublicDesktopDownloads({scope=''}:{scope?:string}={}){
     <section id="applications" className="desktop-download-content" aria-labelledby="desktop-applications-title">
       <h2 id="desktop-applications-title">Скачивание приложений</h2>
       {error&&<p role="status">Не удалось получить актуальные ссылки GitHub. <button className="btn secondary" onClick={()=>retry(value=>value+1)}>Повторить</button></p>}
-      <div className="desktop-download-grid">{publicApps.map(app=><AppCard key={app.name} app={app} downloads={downloads} loading={!downloads&&!error}/>)}</div>
+      <div className="desktop-download-grid">{publicApps.map(app=><AppCard key={app.name} app={app} downloads={downloads} loading={!downloads&&!error}/>)}<AndroidDownloadCard/></div>
     </section>
     <footer className="desktop-download-footnote">Лицензия исходного кода <LicenseLink/>.</footer>
   </main>;
