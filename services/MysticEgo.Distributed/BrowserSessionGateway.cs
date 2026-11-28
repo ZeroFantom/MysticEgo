@@ -32,14 +32,13 @@ public static class BrowserSessionGateway
             External(c,clients,node.AuthUrl,origin,"status")).AllowAnonymous();
         app.MapPost("/api/auth/browser/external/telegram/start",(HttpContext c,IHttpClientFactory clients)=>
             External(c,clients,node.AuthUrl,origin,"start")).AllowAnonymous();
-        app.MapGet(ExternalCallback,(HttpContext c,IHttpClientFactory clients)=>
+        app.MapGet("/api/auth/browser/external/telegram/callback",(HttpContext c,IHttpClientFactory clients)=>
             External(c,clients,node.AuthUrl,origin,"callback")).AllowAnonymous();
         foreach(var action in new[]{"login","refresh","logout"})
             app.MapPost("/api/auth/browser/"+action,(HttpContext context,IHttpClientFactory clients)=>
                 Handle(context,clients,node.AuthUrl,origin,action)).AllowAnonymous();
     }
     private const string ExternalCookie = "__Host-mystic-external-login";
-    private const string ExternalCallback = "/api/auth/browser/external/telegram/callback";
     private static CookieOptions ExternalOptions()=>new(){Secure=true,HttpOnly=true,SameSite=SameSiteMode.Lax,Path="/",IsEssential=true,MaxAge=TimeSpan.FromMinutes(5)};
     private static bool ExternalBinding(string? value)=>value is {Length:43}&&value.All(c=>c is >= 'A' and <= 'Z' or >= 'a' and <= 'z' or >= '0' and <= '9' or '-' or '_');
 
