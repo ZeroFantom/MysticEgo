@@ -129,11 +129,14 @@ public=$(health "https://$domain/health/live") || die 'post-install HTTPS health
 echo CLOUDDESK_RESET_STEP:verify-storage
 # Health may precede initialization of the local SQLite stores. Allow a bounded
 # wait, then name the missing invariant instead of returning a silent exit 1.
-for ((i=0;i<30;i++)); do
+# A fresh VPS report showed node.db appearing almost five minutes after auth.db.
+# Wait up to six minutes, without requiring a user login or repeating deletion.
+for ((i=0;i<180;i++)); do
  [[ -f /var/lib/mysticego/auth.db && -f /var/lib/mysticego/orchestra/node.db ]] && break
- sleep 1
+ sleep 2
 done
 [[ -f /var/lib/mysticego/auth.db ]] || die 'post-install Auth SQLite store missing; do not repeat reset'
 [[ -f /var/lib/mysticego/orchestra/node.db ]] || die 'post-install Orchestra SQLite store missing; do not repeat reset'
+[[ $(health http://127.0.0.1:5500/health/live) == "$new" && $(health "https://$domain/health/live") == "$new" ]] || die 'identity changed during storage verification; do not repeat reset'
 echo CLOUDDESK_RESET_STEP:complete
 echo "FACTORY_RESET_OK $new"
