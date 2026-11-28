@@ -1,4 +1,7 @@
 import unittest
+import os
+import tempfile
+from pathlib import Path
 from unittest.mock import Mock, patch
 import reconcile
 
@@ -47,6 +50,43 @@ class MaintenanceTests(unittest.TestCase):
         repair.assert_not_called()
         self.assertEqual(publish.call_args.args[:2], ("postgres-service", "external"))
 
+class ModelHomeTests(unittest.TestCase):
+    def test_retained_account_recreates_deleted_home(self):
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp) / "lm-home"
+            uid, gid = os.getuid(), os.getgid()
+            entry = Mock(pw_uid=uid, pw_gid=gid, pw_dir=str(home))
+            with patch.object(reconcile.install, "LM_HOME", home), \
+                 patch.object(reconcile.install, "account", return_value=uid), \
+                 patch.object(reconcile.install.pwd, "getpwnam", return_value=entry), \
+                 patch.object(reconcile.install.os, "chown") as chown:
+                self.assertEqual(reconcile.install.ensure_lm_home(), uid)
+                self.assertTrue(home.is_dir())
+                self.assertEqual(home.stat().st_mode & 0o777, 0o700)
+                chown.assert_called_once_with(home, uid, gid)
+                (home / "model.gguf").write_text("cached")
+                reconcile.install.ensure_lm_home()
+                self.assertEqual((home / "model.gguf").read_text(), "cached")
+                chown.assert_called_once()
+
+    def test_symlink_home_is_rejected_without_touching_target(self):
+        with tempfile.TemporaryDirectory() as temp:
+            target = Path(temp) / "target"
+            target.mkdir()
+            home = Path(temp) / "lm-home"
+            home.symlink_to(target, target_is_directory=True)
+            uid = os.getuid()
+            entry = Mock(pw_uid=uid, pw_gid=os.getgid(), pw_dir=str(home))
+            with patch.object(reconcile.install, "LM_HOME", home), \
+                 patch.object(reconcile.install, "account", return_value=uid), \
+                 patch.object(reconcile.install.pwd, "getpwnam", return_value=entry), \
+                 patch.object(reconcile.install.os, "chown") as chown:
+                with self.assertRaises(ValueError):
+                    reconcile.install.ensure_lm_home()
+                chown.assert_not_called()
+                self.assertTrue(home.is_symlink())
+
+
 class ModelDependencyTests(unittest.TestCase):
     @patch.object(reconcile.install, "system_packages")
     @patch.object(reconcile.install.shutil, "which", return_value="/usr/bin/curl")
@@ -54,7 +94,7 @@ class ModelDependencyTests(unittest.TestCase):
     def test_missing_libatomic_is_installed(self, run, which, packages):
         run.return_value = Mock(returncode=1, stdout="")
         reconcile.install.lmstudio_dependencies()
-        packages.assert_called_once_with("libatomic1")
+        packages.assert_called_once_with("libatomic1", "libgomp1")
 
     @patch.object(reconcile.install, "system_packages")
     @patch.object(reconcile.install.shutil, "which", return_value="/usr/bin/curl")
@@ -70,7 +110,7 @@ class ModelDependencyTests(unittest.TestCase):
     def test_minimal_host_dependencies_installed_together(self, run, which, packages):
         run.return_value = Mock(returncode=1, stdout="")
         reconcile.install.lmstudio_dependencies()
-        packages.assert_called_once_with("libatomic1", "curl", "ca-certificates")
+        packages.assert_called_once_with("libatomic1", "libgomp1", "curl", "ca-certificates")
 
 
 class VoiceRecoveryTests(unittest.TestCase):
