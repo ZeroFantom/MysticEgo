@@ -7,9 +7,10 @@ import {Panel,ErrorBanner} from '../components/primitives';
 
 type Key={provider:string;realm:string;subject:string};
 type Identity=Key&{linkedUtc:string};
-type Data={telegramLinkEnabled:boolean;vkLinkEnabled:boolean;identities:Identity[]};
+type BotOption={provider:ExternalProvider;realm:string};
+type Data={telegramLinkEnabled:boolean;vkLinkEnabled:boolean;messengerLinks?:BotOption[];identities:Identity[]};
 type Audit={provider:string;realm:string;action:string;occurredUtc:string;revokedSessions:number};
-type Pending={provider:ExternalProvider;code:string;url:string;expires:number};
+type Pending={provider:ExternalProvider;code:string;url?:string;bot?:boolean;realm?:string;expires:number};
 const providerName=(p:string)=>p==='telegram'?'Telegram':p==='vk'?'VK ID':p;
 export function ExternalAccountsPanel(){
  const {session,preferenceScope,setSession}=useApp(),t=useLocale();
@@ -48,15 +49,20 @@ export function ExternalAccountsPanel(){
   if(!url||!/^[A-Za-z0-9_-]{43}$/.test(result.linkCode)||result.expiresInSeconds!==300)throw Error();
   if(id===epoch.current){setPending({provider,code:result.linkCode,url,expires:Date.now()+300000});setCandidate(null)}
  }
+ async function startBot(id:number,bot:BotOption){
+  const result=await request<{linkCode:string;expiresInSeconds:number}>('/bot/'+bot.provider+'/start',{password});
+  if(!/^[A-Za-z0-9_-]{43}$/.test(result.linkCode)||result.expiresInSeconds!==300)throw Error();
+  if(id===epoch.current){setPending({provider:bot.provider,bot:true,realm:bot.realm,code:result.linkCode,expires:Date.now()+300000});setCandidate(null)}
+ }
  async function inspect(id:number){
   if(!pending||pending.expires<=Date.now())throw Error();
-  const result=await request<Key>('/'+pending.provider+'/candidate',{linkCode:pending.code});
-  if(result.provider!==pending.provider||typeof result.realm!=='string'||typeof result.subject!=='string')throw Error();
+  const result=await request<Key>((pending.bot?'/bot/':'/')+pending.provider+'/candidate',{linkCode:pending.code});
+  if(result.provider!==pending.provider||typeof result.realm!=='string'||typeof result.subject!=='string'||pending.bot&&result.realm!==pending.realm)throw Error();
   if(id===epoch.current)setCandidate(result);
  }
  async function confirm(id:number){
   if(!pending||!candidate||pending.expires<=Date.now())throw Error();
-  await request('/'+pending.provider+'/confirm',{linkCode:pending.code,...candidate,password});
+  await request((pending.bot?'/bot/':'/')+pending.provider+'/confirm',{linkCode:pending.code,...candidate,password});
   if(id===epoch.current){setPending(null);setCandidate(null);await refresh(id)}
  }
  async function unlink(id:number){
@@ -67,19 +73,26 @@ export function ExternalAccountsPanel(){
   if(previous.browserSession)await browserAuthRequest('logout').catch(()=>{});
   if(id===epoch.current)setSession({...previous,token:'',refreshToken:undefined,browserSession:undefined,username:undefined});
  }
+ const bots=(data?.messengerLinks??[]).filter(b=>(b.provider==='telegram'||b.provider==='vk')&&/^bot:[1-9][0-9]{0,19}$/.test(b.realm)&&!data?.identities.some(x=>x.provider===b.provider&&x.realm===b.realm));
  const available=(['telegram','vk'] as const).filter(p=>(p==='telegram'?data?.telegramLinkEnabled:data?.vkLinkEnabled)&&!data?.identities.some(x=>x.provider===p&&x.realm.startsWith(p==='telegram'?'oidc:':'oauth:')));
  useEffect(()=>{if(!pending&&!available.includes(selected)&&available.length)setSelected(available[0])},[available.join(','),pending,selected]);
- if(!eligible||!data||!data.telegramLinkEnabled&&!data.vkLinkEnabled&&!data.identities.length&&!audit.length)return null;
+ if(!eligible||!data||!data.telegramLinkEnabled&&!data.vkLinkEnabled&&!bots.length&&!data.identities.length&&!audit.length)return null;
  return <Panel title={t('Подключённые аккаунты')}>
   <div className="stack">
    <ErrorBanner text={problem}/>
    <p>{t('Внешние аккаунты связаны с вашим существующим аккаунтом MysticEgo. Они не создают нового персонажа.')}</p>
    {data.identities.map(row=><article className="panel" key={JSON.stringify([row.provider,row.realm,row.subject])}><strong>{providerName(row.provider)}{row.realm.startsWith('bot:')?' · '+t('Чат-бот'):''}</strong><p>{row.subject}</p><small>{new Date(row.linkedUtc).toLocaleString()}</small><div><button className="btn secondary" disabled={busy||!!pending} onClick={()=>{setRemove(row);setPassword('')}}>{t('Отвязать')}</button></div></article>)}
+   {!remove&&!pending&&bots.length>0&&<section className="panel stack">
+    <strong>{t('Подключение чат-ботов')}</strong>
+    <p>{t('Привяжите чат-бот отдельно от внешнего входа. Используйте только официальный бот MysticEgo.')}</p>
+    <label>{t('Текущий пароль')}<input type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)}/></label>
+    {bots.map(bot=><button key={bot.provider+bot.realm} type="button" className="btn secondary" disabled={busy||!password} onClick={()=>void run(id=>startBot(id,bot))}>{t('Подключить чат-бот')} · {providerName(bot.provider)}</button>)}
+   </section>}
    {!remove&&(pending||available.length>0)&&<section className="panel stack">
-    <strong>{providerName(pending?.provider??selected)}</strong>
+    <strong>{providerName(pending?.provider??selected)}{pending?.bot?' · '+t('Чат-бот'):''}</strong>
     {!pending&&<label>{t('Провайдер')}<select value={selected} disabled={busy} onChange={e=>{setSelected(e.target.value as ExternalProvider);setPassword('')}}>{available.map(p=><option key={p} value={p}>{providerName(p)}</option>)}</select></label>}
     {!pending?<><label>{t('Текущий пароль')}<input type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)}/></label><button className="btn" disabled={busy||!password||!available.includes(selected)} onClick={()=>void run(start)}>{t('Начать привязку')}</button></>:<>
-     {!candidate?<><a className="btn secondary" href={pending.url} target="_blank" rel="noopener noreferrer">{t('Подтвердить у провайдера')}</a><button className="btn" disabled={busy} onClick={()=>void run(inspect)}>{t('Проверить подтверждение')}</button></>:<>
+     {!candidate?<>{pending.bot?<><p>{t('Отправьте эту одноразовую команду только в личный чат официального бота MysticEgo. Код действует пять минут.')}</p><code style={{overflowWrap:'anywhere'}}>/link {pending.code}</code></>:<a className="btn secondary" href={pending.url} target="_blank" rel="noopener noreferrer">{t('Подтвердить у провайдера')}</a>}<button className="btn" disabled={busy} onClick={()=>void run(inspect)}>{t('Проверить подтверждение')}</button></>:<>
       <p>{t('Проверенный идентификатор')}: <strong>{candidate.subject}</strong></p>
       <p>{t('Подтверждайте только свой аккаунт. Если не можете проверить идентификатор, отмените привязку.')}</p>
       <label>{t('Текущий пароль')}<input type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)}/></label>

@@ -79,6 +79,7 @@ public static class Program
         builder.Services.AddScoped<ExternalLoginService>();
         builder.Services.AddScoped<MessengerIdentityService>();
         builder.Services.AddScoped<MessengerIngress>();
+        builder.Services.AddSingleton<MessengerOutbound>();
         builder.Services.AddHealthChecks();
         builder.Services.AddTrafficProtection(builder.Configuration);
         builder.Services.AddRateLimiter(options=>

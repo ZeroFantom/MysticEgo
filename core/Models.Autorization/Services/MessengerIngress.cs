@@ -3,7 +3,7 @@ using Models.Autorization.Data;
 
 namespace Models.Autorization.Services;
 
-public enum MessengerIngressStatus { Ignored, Duplicate, LinkStaged, LinkUnavailable, Linked, Unlinked }
+public enum MessengerIngressStatus { Ignored, Duplicate, LinkStaged, LinkUnavailable, Linked, Unlinked, Help }
 
 /// <summary>
 /// Authenticated private ingress only. Receipt and staging of a link candidate commit together.
@@ -32,6 +32,7 @@ public sealed class MessengerIngress(AuthDbContext db, MessengerIdentityService 
             var code=text[(text.IndexOf(' ')+1)..];
             result=await identities.Observe(realm,message.Sender,code,ct)?MessengerIngressStatus.LinkStaged:MessengerIngressStatus.LinkUnavailable;
         }
+        else if(text is "/start" or "/help")result=MessengerIngressStatus.Help;
         else if(text=="/status")
             result=await identities.Resolve(realm,message.Sender,ct) is null?MessengerIngressStatus.Unlinked:MessengerIngressStatus.Linked;
         await tx.CommitAsync(ct);

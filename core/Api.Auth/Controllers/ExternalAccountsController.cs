@@ -107,7 +107,9 @@ public sealed class ExternalAccountsController(AuthDbContext db, IPasswordHasher
         if (actor is null) return Unauthorized();
         var rows = await db.ExternalIdentities.AsNoTracking().Where(x => x.UserId == actor.Value.User)
             .Select(x => new { x.Provider, x.Realm, x.Subject, x.LinkedUtc }).ToListAsync(ct);
-        return Ok(new { telegramLinkEnabled = Telegram() is not null, vkLinkEnabled = Provider("vk") is not null, identities = rows });
+        return Ok(new { telegramLinkEnabled = Telegram() is not null, vkLinkEnabled = Provider("vk") is not null,
+            messengerLinks = new[] { "telegram", "vk" }.Select(p => MessengerConfiguration.Read(configuration,p))
+                .Where(x => x.HasValue).Select(x => new { provider = x!.Value.Realm.Provider, realm = "bot:" + x.Value.Realm.BotId }).ToArray(), identities = rows });
     }
 
     [HttpPost("telegram/start"), RequestSizeLimit(4096)]
@@ -205,6 +207,50 @@ public sealed class ExternalAccountsController(AuthDbContext db, IPasswordHasher
         var result = await links.Confirm(actor.Value.User, actor.Value.Session, input.LinkCode,
             new(input.Provider, input.Realm, input.Subject), ct);
         return result == ExternalIdentityLinkResult.Unavailable ? Conflict() : NoContent();
+    }
+
+    [HttpPost("bot/{provider}/start"), RequestSizeLimit(4096)]
+    public async Task<IActionResult> BotStart(string provider, StartRequest input, CancellationToken ct)
+    {
+        PrivateResponse();
+        var config=MessengerConfiguration.Read(configuration,provider);
+        if(config is null)return NotFound();
+        if(!ManagementOrigin())return StatusCode(403);
+        var actor=await Account(ct);
+        if(actor is null)return Unauthorized();
+        await links.PurgeExpired(ct);
+        var code=await new MessengerIdentityService(db,TimeProvider.System,passwords)
+            .Start(actor.Value.User,actor.Value.Session,config.Value.Realm,input.Password,ct);
+        return code is null?Unauthorized():Ok(new { linkCode=code, expiresInSeconds=300 });
+    }
+
+    [HttpPost("bot/{provider}/candidate"), RequestSizeLimit(4096)]
+    public async Task<IActionResult> BotCandidate(string provider,CandidateRequest input,CancellationToken ct)
+    {
+        PrivateResponse();
+        var config=MessengerConfiguration.Read(configuration,provider);
+        if(config is null)return NotFound();
+        if(!ManagementOrigin())return StatusCode(403);
+        var actor=await Account(ct);
+        if(actor is null)return Unauthorized();
+        var proof=await new MessengerIdentityService(db,TimeProvider.System,passwords)
+            .Candidate(actor.Value.User,actor.Value.Session,config.Value.Realm,input.LinkCode,ct);
+        return proof is null?NotFound():Ok(proof);
+    }
+
+    [HttpPost("bot/{provider}/confirm"), RequestSizeLimit(8192)]
+    public async Task<IActionResult> BotConfirm(string provider,ConfirmRequest input,CancellationToken ct)
+    {
+        PrivateResponse();
+        var config=MessengerConfiguration.Read(configuration,provider);
+        if(config is null)return NotFound();
+        if(!ManagementOrigin())return StatusCode(403);
+        var actor=await Account(ct);
+        if(actor is null)return Unauthorized();
+        var result=await new MessengerIdentityService(db,TimeProvider.System,passwords)
+            .Confirm(actor.Value.User,actor.Value.Session,config.Value.Realm,input.LinkCode,
+                new(input.Provider,input.Realm,input.Subject),input.Password,ct);
+        return result==ExternalIdentityLinkResult.Unavailable?Conflict():NoContent();
     }
 
     [HttpPost("unlink"), RequestSizeLimit(8192)]

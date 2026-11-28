@@ -12,15 +12,20 @@ namespace Api.Auth.Controllers;
 [ApiController, AllowAnonymous, SkipPermission, Route("api/auth/messenger/webhook")]
 [EnableRateLimiting("messenger-webhook")]
 [ResponseCache(NoStore=true,Location=ResponseCacheLocation.None)]
-public sealed class MessengerWebhookController(IConfiguration configuration, MessengerIngress ingress, TimeProvider clock) : ControllerBase
+public sealed class MessengerWebhookController(IConfiguration configuration, MessengerIngress ingress, MessengerOutbound outbound, MessengerIdentityService identities, TimeProvider clock) : ControllerBase
 {
-    private (MessengerRealm Realm,string Secret)? Settings(string provider)
+    private (MessengerRealm Realm,string Secret)? Settings(string provider) => MessengerConfiguration.Read(configuration,provider);
+    private async Task Process(MessengerRealm realm,PrivateMessengerEvent message,CancellationToken ct)
     {
-        var prefix=provider=="telegram"?"Messenger:Telegram:":"Messenger:Vk:";
-        if(!configuration.GetValue<bool>(prefix+"Enabled"))return null;
-        var realm=new MessengerRealm(provider,configuration[prefix+"BotId"]??"");
-        var secret=configuration[prefix+"WebhookSecret"];
-        return realm.Valid&&MessengerWebhookProof.ValidSecret(secret)?(realm,secret!):null;
+        var result=await ingress.Process(realm,message,ct);
+        var token=MessengerConfiguration.ReplyToken(configuration,realm);
+        if(token is null||MessengerOutbound.ReplyText(result) is null)return;
+        // Re-read live binding before reporting linked status. No personal data in the reply.
+        if(result is MessengerIngressStatus.Linked or MessengerIngressStatus.Unlinked)
+            result=await identities.Resolve(realm,message.Sender,ct) is null?MessengerIngressStatus.Unlinked:MessengerIngressStatus.Linked;
+        // Receipt committed before network I/O. Duplicate callbacks never cause another send.
+        // A timeout is ambiguous; intentionally do not retry here.
+        await outbound.Reply(realm,message,result,token,ct);
     }
 
     [HttpPost("telegram"), RequestSizeLimit(65536)]
@@ -31,7 +36,7 @@ public sealed class MessengerWebhookController(IConfiguration configuration, Mes
         var header=Request.Headers["X-Telegram-Bot-Api-Secret-Token"];
         if(header.Count!=1||!MessengerWebhookProof.SecretMatches(config.Value.Secret,header.ToString()))return Unauthorized();
         var message=MessengerWebhookProof.Telegram(config.Value.Realm,config.Value.Secret,header.ToString(),update,clock.GetUtcNow());
-        if(message is not null)await ingress.Process(config.Value.Realm,message,ct);
+        if(message is not null)await Process(config.Value.Realm,message,ct);
         return Ok();
     }
 
@@ -48,7 +53,7 @@ public sealed class MessengerWebhookController(IConfiguration configuration, Mes
                 ?NotFound():Content(confirmation,"text/plain");
         }
         var message=MessengerWebhookProof.Vk(config.Value.Realm,config.Value.Secret,update,clock.GetUtcNow());
-        if(message is not null)await ingress.Process(config.Value.Realm,message,ct);
+        if(message is not null)await Process(config.Value.Realm,message,ct);
         return Content("ok","text/plain");
     }
 }
