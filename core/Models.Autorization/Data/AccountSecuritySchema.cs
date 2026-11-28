@@ -39,6 +39,24 @@ public static class AccountSecuritySchema
         var timestamp=db.Database.IsNpgsql()?"timestamp with time zone":"TEXT";
         var boolean=db.Database.IsNpgsql()?"boolean":"INTEGER";
         var sql=$"""
+            CREATE TABLE IF NOT EXISTS chat_rp_deliveries (
+                "Id" {guid} NOT NULL PRIMARY KEY,
+                "Provider" varchar(16) NOT NULL,
+                "BotId" varchar(20) NOT NULL,
+                "Peer" varchar(24) NOT NULL,
+                "EventId" varchar(128) NOT NULL,
+                "ActorId" varchar(20) NOT NULL,
+                "TargetId" varchar(20) NOT NULL,
+                "Caption" varchar(512) NOT NULL,
+                "Category" varchar(32) NOT NULL,
+                "Status" INTEGER NOT NULL,
+                "CreatedUtc" {timestamp} NOT NULL,
+                "ExpiresUtc" {timestamp} NOT NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_chat_rp_deliveries_Provider_BotId_EventId"
+                ON chat_rp_deliveries ("Provider","BotId","EventId");
+            CREATE INDEX IF NOT EXISTS "IX_chat_rp_deliveries_Status_ExpiresUtc"
+                ON chat_rp_deliveries ("Status","ExpiresUtc");
             CREATE TABLE IF NOT EXISTS messenger_world_commands (
                 "Id" {guid} NOT NULL PRIMARY KEY,
                 "UserId" {guid} NOT NULL REFERENCES users("Id") ON DELETE CASCADE,

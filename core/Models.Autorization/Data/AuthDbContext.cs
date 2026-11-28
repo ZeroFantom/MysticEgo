@@ -11,6 +11,7 @@ namespace Models.Autorization.Data
         public DbSet<AccountLicenseAcceptance> AccountLicenseAcceptances => Set<AccountLicenseAcceptance>();
         public DbSet<AccountFeatureConsent> AccountFeatureConsents => Set<AccountFeatureConsent>();
         public DbSet<AccountDeviceGrant> AccountDeviceGrants => Set<AccountDeviceGrant>();
+        public DbSet<ChatRpDelivery> ChatRpDeliveries => Set<ChatRpDelivery>();
         public DbSet<MessengerWorldCommand> MessengerWorldCommands => Set<MessengerWorldCommand>();
         public DbSet<MessengerEventReceipt> MessengerEventReceipts => Set<MessengerEventReceipt>();
         public DbSet<ExternalLoginFlow> ExternalLoginFlows => Set<ExternalLoginFlow>();
@@ -31,6 +32,22 @@ namespace Models.Autorization.Data
         {
             base.OnModelCreating(mb);
             mb.Entity<ManagedIdentity>(e => { e.ToTable("managed_identities"); e.HasKey(x=>x.Id); e.Property(x=>x.Name).HasMaxLength(160).IsRequired(); e.Property(x=>x.Kind).HasMaxLength(16).IsRequired(); e.Property(x=>x.SecretHash).HasMaxLength(200).IsRequired(); e.HasIndex(x=>x.Kind); });
+
+            mb.Entity<ChatRpDelivery>(e =>
+            {
+                e.ToTable("chat_rp_deliveries");
+                e.HasKey(x=>x.Id);
+                e.Property(x=>x.Provider).HasMaxLength(16).IsRequired();
+                e.Property(x=>x.BotId).HasMaxLength(20).IsRequired();
+                e.Property(x=>x.Peer).HasMaxLength(24).IsRequired();
+                e.Property(x=>x.EventId).HasMaxLength(128).IsRequired();
+                e.Property(x=>x.ActorId).HasMaxLength(20).IsRequired();
+                e.Property(x=>x.TargetId).HasMaxLength(20).IsRequired();
+                e.Property(x=>x.Caption).HasMaxLength(512).IsRequired();
+                e.Property(x=>x.Category).HasMaxLength(32).IsRequired();
+                e.HasIndex(x=>new{x.Provider,x.BotId,x.EventId}).IsUnique();
+                e.HasIndex(x=>new{x.Status,x.ExpiresUtc});
+            });
 
             mb.Entity<MessengerWorldCommand>(e =>
             {

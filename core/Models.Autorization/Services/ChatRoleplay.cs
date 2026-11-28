@@ -82,7 +82,8 @@ public static class ChatRpGroupProof
         if(!realm.Valid||realm.Provider!="telegram"||!MessengerWebhookProof.SecretMatches(secret,header)||
             !TelegramIdentityProof.UniqueObject(root)||!Obj(root,"message",out var m)||
             !Obj(m,"chat",out var chat)||Text(chat,"type") is not ("group" or "supergroup")||
-            Num(chat,"id") is not long peer||peer>=0||!Obj(m,"reply_to_message",out var reply)||
+            Num(chat,"id") is not long peer||peer>=0||m.TryGetProperty("message_thread_id",out _)||
+            m.TryGetProperty("is_topic_message",out _)||!Obj(m,"reply_to_message",out var reply)||
             !Obj(reply,"chat",out var targetChat)||Num(targetChat,"id")!=peer||
             m.TryGetProperty("forward_origin",out _)||m.TryGetProperty("via_bot",out _)||
             reply.TryGetProperty("forward_origin",out _)||
