@@ -13,7 +13,7 @@ ENV = Path("/etc/mysticego/orchestra.env")
 rows = {}
 attempts = {}
 history = []
-SAFE_REASONS = ("CalledProcessError", "TimeoutExpired", "OSError", "PermissionError", "FileNotFoundError", "ValueError", "RuntimeError", "OtherError")
+SAFE_REASONS = ("CalledProcessError", "TimeoutExpired", "OSError", "PermissionError", "FileNotFoundError", "ValueError", "RuntimeError", "ResourceDeferred", "ModelPortOccupied", "OtherError")
 RETRY_SECONDS = 900
 
 def checked(*args):
@@ -69,7 +69,11 @@ def repair(name, test, action, message):
         return
     if time.time() - attempts.get(name, 0) < RETRY_SECONDS:
         previous_reason = rows.get(name, {}).get("reason")
-        publish(name, "degraded", "Повторная попытка после паузы; проверьте журнал службы.", previous_reason if previous_reason in SAFE_REASONS else None)
+        message = {
+            "ResourceDeferred": "Недостаточно свободной памяти или диска. Установка отложена.",
+            "ModelPortOccupied": "Порт модели занят другим процессом. Автоматическое замещение запрещено.",
+        }.get(previous_reason, "Повторная попытка после паузы; проверьте журнал службы.")
+        publish(name, "degraded", message, previous_reason if previous_reason in SAFE_REASONS else None)
         return
     attempts[name] = time.time()
     publish(name, "repairing", "Автоматическое восстановление выполняется.")
@@ -84,7 +88,11 @@ def repair(name, test, action, message):
         reason = type(error).__name__
         if reason not in SAFE_REASONS:
             reason = "OtherError"
-        publish(name, "degraded", "Восстановление не завершилось. Проверьте журнал службы.", reason)
+        message = {
+            "ResourceDeferred": "Недостаточно свободной памяти или диска. Установка отложена.",
+            "ModelPortOccupied": "Порт модели занят другим процессом. Автоматическое замещение запрещено.",
+        }.get(reason, "Восстановление не завершилось. Проверьте журнал службы.")
+        publish(name, "degraded", message, reason)
 
 def lm_role():
     profile = install.ROOT / "lmstudio/role"
