@@ -26,14 +26,14 @@ printf '%s  %s\n' "$checksum" "$archive" | sha256sum -c -
 export DEBIAN_FRONTEND=noninteractive
 if [[ ${MYSTICEGO_INSTALL_PREREQS_READY:-} == 1 ]]; then
   # Factory reset has already installed all prerequisites before deleting state.
-  for package in ca-certificates caddy curl libicu74 libssl3t64 unzip gh; do
+  for package in ca-certificates caddy curl libicu74 libssl3t64 unzip gh libatomic1 libgomp1; do
     [[ $(dpkg-query -W -f='${Status}' "$package") == 'install ok installed' ]]
   done
 else
   echo 'CLOUDDESK_STEP:apt-update'
   apt-get update
   echo 'CLOUDDESK_STEP:apt-install'
-  apt-get install -y ca-certificates caddy curl libicu74 libssl3t64 unzip gh
+  apt-get install -y ca-certificates caddy curl libicu74 libssl3t64 unzip gh libatomic1 libgomp1
 fi
 echo 'CLOUDDESK_STEP:unpack'
 install -d -m 0755 /opt/mysticego /etc/mysticego
@@ -135,33 +135,66 @@ systemctl daemon-reload
 echo 'CLOUDDESK_STEP:start'
 systemctl enable --now mysticego-orchestra.service
 echo 'CLOUDDESK_STEP:local-health'
+health() {
+  curl -fs --max-time 5 "$1" | python3 -c 'import json,sys,uuid; h=json.load(sys.stdin); assert h["status"]=="alive" and h["kind"].lower()=="orchestra"; n=uuid.UUID(h["node"]); assert n.int; print(n)'
+}
+node=
 for ((i=0;i<60;i++)); do
-  if curl -fs --max-time 2 http://127.0.0.1:5500/health/live >/dev/null 2>&1; then
-    echo 'CLOUDDESK_STEP:https'
-    systemctl enable caddy.service
-    systemctl restart caddy.service
-    curl -fsS --retry 10 --retry-delay 5 --retry-all-errors --max-time 10 "https://$domain/health/live" >/dev/null
-    recovery=/opt/mysticego/app/ops/orchestra-updater/recover-maintenance.sh
-    if [[ -f $recovery ]]; then
-      node=$(curl -fsS --max-time 5 http://127.0.0.1:5500/health/live | python3 -c 'import json,sys;print(json.load(sys.stdin)["node"])')
-      if [[ "${MYSTICEGO_INSTALL_LOCK_FD:-}" == 9 ]]; then flock -u 9; fi
-      bash "$recovery" "$node" || { echo 'Orchestra работает, но установка службы обслуживания не завершена. Используйте восстановление в CloudDesk.' >&2; exit 1; }
-      echo "Orchestra ready: https://$domain/ (Audit: /audit-portal/)"
-      exit 0
-    fi
-    local_setup=/opt/mysticego/app/ops/infrastructure/install-local.sh
-    if [[ -f $local_setup ]]; then
-      bash "$local_setup" || echo 'Не удалось запустить локальный установщик.'
-    fi
-    default=/opt/mysticego/app/ops/panel-assistant/install-default-model.sh
-    if [[ -f $default ]]; then
-      bash "$default" || echo 'Запуск подготовки LM Studio не удался. Проверьте журнал mysticego-default-model.'
-    fi
-    echo "Orchestra ready: https://$domain/ (Audit: /audit-portal/)"
-    exit 0
-  fi
+  if node=$(health http://127.0.0.1:5500/health/live 2>/dev/null); then break; fi
   sleep 2
 done
-journalctl -u mysticego-orchestra -n 30 --no-pager >&2
-exit 1
-
+if [[ -z $node ]]; then
+  journalctl -u mysticego-orchestra -n 30 --no-pager >&2
+  echo 'Local Orchestra identity not ready; do not repeat installation.' >&2
+  exit 1
+fi
+echo 'CLOUDDESK_STEP:https'
+systemctl enable caddy.service
+systemctl restart caddy.service
+public=
+for ((i=0;i<20;i++)); do
+  if public=$(health "https://$domain/health/live" 2>/dev/null) && [[ $public == "$node" ]]; then break; fi
+  sleep 5
+done
+[[ $public == "$node" ]] || { echo 'HTTPS Orchestra identity does not match local node.' >&2; exit 1; }
+echo 'CLOUDDESK_STEP:verify-storage'
+if [[ $database == sqlite ]]; then
+  for ((i=0;i<180;i++)); do
+    [[ -s /var/lib/mysticego/auth.db && -s /var/lib/mysticego/orchestra/node.db ]] && break
+    sleep 2
+  done
+  [[ -s /var/lib/mysticego/auth.db && -s /var/lib/mysticego/orchestra/node.db ]] || { echo 'SQLite storage is not ready; preserve the installed node and diagnose.' >&2; exit 1; }
+fi
+echo 'CLOUDDESK_STEP:maintenance'
+recovery=/opt/mysticego/app/ops/orchestra-updater/recover-maintenance.sh
+maintenance_ready=false
+if [[ -f $recovery ]]; then
+  recovery_args=("$node")
+  if [[ "${MYSTICEGO_INSTALL_LOCK_FD:-}" == 9 ]]; then
+    if grep -Fq -- '--inherited-deploy-lock' "$recovery"; then
+      recovery_args+=(--inherited-deploy-lock)
+    else
+      # Compatibility with historical published archives, which take their own lock.
+      flock -u 9
+    fi
+  fi
+  # Only retry the non-destructive maintenance setup, never the installation.
+  for attempt in 1 2; do
+    [[ $(health http://127.0.0.1:5500/health/live) == "$node" ]] || break
+    if bash "$recovery" "${recovery_args[@]}"; then maintenance_ready=true; break; fi
+    [[ $attempt == 2 ]] || sleep 5
+  done
+else
+  local_setup=/opt/mysticego/app/ops/infrastructure/install-local.sh
+  if [[ -f $local_setup ]] && bash "$local_setup"; then maintenance_ready=true; fi
+fi
+[[ $(health http://127.0.0.1:5500/health/live) == "$node" && $(health "https://$domain/health/live") == "$node" ]] || { echo 'Orchestra identity changed during maintenance setup.' >&2; exit 1; }
+if [[ $maintenance_ready == true ]]; then
+  echo CLOUDDESK_MAINTENANCE_SCHEDULED
+else
+  echo CLOUDDESK_MAINTENANCE_PENDING
+  echo 'Orchestra is installed; maintenance setup is incomplete. Use non-destructive recovery, not reset.'
+fi
+echo 'CLOUDDESK_STEP:complete'
+echo "Orchestra ready: https://$domain/ (Audit: /audit-portal/)"
+echo "ORCHESTRA_INSTALL_OK $node"
