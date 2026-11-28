@@ -4,7 +4,7 @@ All five panel roles share the frontend build and motion styles. The current dir
 
 ## Public previews
 
-- The root, /share and known SPA routes of each panel carry role-only Open Graph and Twitter metadata in the initial HTML, before JavaScript. Private query parameters and identifiers never enter the preview.
+- The root, /share and known SPA routes of each panel carry role-only Open Graph and Twitter metadata in the initial HTML, before JavaScript. Private query parameters and identifiers never enter the preview. The legacy /social and /directory aliases share the same generic card as /collective.
 - Orchestra's /studio, /developer and /desktop-downloads have their own titles and descriptions. Embedded Audit uses /audit-portal/ and /audit-portal/share.
 - C# resolves absolute URLs using the trusted Node:PublicUrl configuration, not request Host or forwarded headers. Set this to the actual HTTPS public origin when deploying; local-only nodes remain private and won't be previewable by external crawlers.
 - The five 1200x630 PNG files are checked at build time, copied to each role's /og/ directory, and served without login. No account, live status, node ID, IP, token, telemetry or organization data appears in the metadata.

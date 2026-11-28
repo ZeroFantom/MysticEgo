@@ -107,7 +107,7 @@ try
         client.DefaultRequestHeaders.UserAgent.ParseAdd("TelegramBot (like TwitterBot)");
         client.DefaultRequestHeaders.Host="untrusted.example";
         client.DefaultRequestHeaders.TryAddWithoutValidation("X-Forwarded-Host","untrusted.example");
-        foreach(var route in new[]{"/","/share","/assistant?token=must-not-appear","/settings"})
+        foreach(var route in new[]{"/","/share","/assistant?token=must-not-appear","/settings","/social","/directory?contact=must-not-appear"})
         {
             using var response=await client.GetAsync(route);
             var html=await response.Content.ReadAsStringAsync();
@@ -124,9 +124,9 @@ try
         using(var api=await client.GetAsync("/api/private"))SocialCheck((int)api.StatusCode==401,role+" private API untouched");
         if(kind==NodeKind.Orchestra)
         {
-            using var audit=await client.GetAsync("/audit-portal/settings");
+            using var audit=await client.GetAsync("/audit-portal/directory?contact=must-not-appear");
             var html=await audit.Content.ReadAsStringAsync();
-            SocialCheck(audit.IsSuccessStatusCode&&html.Contains("https://orchestra.example.test/audit-portal/og/audit.png"),"embedded Audit nested route");
+            SocialCheck(audit.IsSuccessStatusCode&&html.Contains("https://orchestra.example.test/audit-portal/og/audit.png")&&!html.Contains("must-not-appear"),"embedded Audit nested route");
             using var cover=await client.GetAsync("/audit-portal/og/audit.png");
             SocialCheck(cover.IsSuccessStatusCode&&cover.Content.Headers.ContentType?.MediaType=="image/png","embedded Audit public image");
         }

@@ -15,7 +15,7 @@ public static class PanelSocialPreviews
     // query parameters, cookies, forwarded headers, or arbitrary request paths.
     private static readonly HashSet<string> PanelRoutes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "/profile", "/account-security", "/collective", "/organizations", "/nodes",
+        "/profile", "/account-security", "/collective", "/social", "/directory", "/organizations", "/nodes",
         "/setup", "/commands", "/automation", "/faq", "/audit", "/diagnostics",
         "/settings", "/notifications", "/agents", "/assistant", "/avatars",
         "/system", "/software", "/identities", "/users", "/updates", "/presets",
