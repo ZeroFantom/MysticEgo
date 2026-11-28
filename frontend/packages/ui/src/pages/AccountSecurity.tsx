@@ -1,6 +1,7 @@
 import {useEffect,useState} from 'react';
 import {Smartphone,Monitor,Tablet,HelpCircle} from 'lucide-react';
 import {QrApprove,deviceLabel,type SessionDevice} from '../app/QrSignIn';
+import {DeviceActions} from '../app/DeviceActions';
 import {useApp,useRemote} from '../app/context';
 import {useLocale,usePresentation} from '../app/presentation';
 import {Header,Panel,ErrorBanner} from '../components/primitives';
@@ -35,6 +36,7 @@ export function AccountSecurity(){
   <Header title={t('Безопасность аккаунта')} description={t('Сессии, документы и разрешения устройств')}/>
   <ErrorBanner text={problem}/>
   <QrApprove session={session}/>
+  <DeviceActions/>
   <Panel title={t('Активные сессии')} aside={<button className="btn secondary" disabled={busy} onClick={()=>sessions.reload()}>{t('Обновить')}</button>}>
    <ErrorBanner text={sessions.error}/>
    <p>{t('Тип устройства определяется по данным клиента.')}</p>

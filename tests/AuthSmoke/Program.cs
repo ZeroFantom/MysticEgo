@@ -150,3 +150,11 @@ if(Models.Autorization.Services.SessionDevice.Describe("Android 15 Mobile Mystic
 var qrLimited=qrStore.Start(Models.Autorization.Services.DesktopPairing.Hash(qrVerifier),null,qrNow)!;
 for(var i=0;i<5;i++)if(qrStore.Approve(qrLimited.Id,"invalid",qrAccount,"source",qrPairing,qrNow))throw new Exception("Invalid comparison approved");
 if(qrStore.Inspect(qrLimited.Id,qrNow)!=null||qrStore.Approve(qrLimited.Id,qrLimited.Comparison,qrAccount,"source",qrPairing,qrNow))throw new Exception("QR attempt limit bypassed");
+
+var deviceQueue=new Models.Autorization.Services.DeviceActionQueue();
+var deviceOwner=Guid.NewGuid();var deviceSource=Guid.NewGuid();var deviceTarget=Guid.NewGuid();var deviceNow=DateTimeOffset.UtcNow;
+var deviceRequest=deviceQueue.Request(deviceOwner,deviceSource,deviceTarget,"open-assistant",deviceNow)??throw new Exception("Device request failed");
+if(deviceQueue.Request(deviceOwner,deviceSource,deviceTarget,"shell",deviceNow)!=null||deviceQueue.List(Guid.NewGuid(),deviceTarget,deviceNow).Length!=0||deviceQueue.Decide(deviceOwner,deviceSource,deviceRequest.Id,true,deviceNow)!=null)throw new Exception("Device isolation failure");
+if(deviceQueue.Decide(deviceOwner,deviceTarget,deviceRequest.Id,true,deviceNow)?.State!="approved"||deviceQueue.Decide(deviceOwner,deviceTarget,deviceRequest.Id,true,deviceNow)!=null)throw new Exception("Device replay failure");
+if(deviceQueue.List(deviceOwner,deviceTarget,deviceNow.AddMinutes(3)).Length!=0)throw new Exception("Device request expiry failure");
+Console.WriteLine("Device request allowlist, account isolation, target approval and replay checks passed");
