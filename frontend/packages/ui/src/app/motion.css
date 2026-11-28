@@ -47,6 +47,18 @@
 :root[data-interface] :is(.sticker-picker,.emoji-menu,.chat-action-menu,.chat-compose-context,.chat-forward,.voice-draft,.auth-field-new){
   animation:var(--mystic-reveal) var(--mystic-time) var(--mystic-ease) backwards;transform-origin:bottom left
 }
+/* Let the message actions follow the menu entrance in a short cascade. */
+@media(prefers-reduced-motion:no-preference){
+  :root[data-interface][data-ui-motion=normal] .chat-action-menu>button {
+    animation:mystic-chat-action-in 150ms var(--mystic-ease) backwards;
+  }
+  :root[data-interface][data-ui-motion=normal] .chat-action-menu>button:nth-child(2) {animation-delay:var(--motion-step)}
+  :root[data-interface][data-ui-motion=normal] .chat-action-menu>button:nth-child(3) {animation-delay:calc(2 * var(--motion-step))}
+  :root[data-interface][data-ui-motion=normal] .chat-action-menu>button:nth-child(4) {animation-delay:calc(3 * var(--motion-step))}
+}
+@keyframes mystic-chat-action-in {
+  from {opacity:0;translate:0 4px}
+}
 :root[data-interface] .cinematic-preview video{animation:var(--mystic-reveal) var(--mystic-page-time) var(--mystic-ease) backwards}
 /* Artwork remains static: no large background repaints or autoplay video. */
 .cinematic-preview>.cinematic-media{display:grid;place-items:center;aspect-ratio:16/9;min-width:0;width:100%;max-height:440px;background:var(--mystic-bg);border-radius:12px;overflow:hidden}
