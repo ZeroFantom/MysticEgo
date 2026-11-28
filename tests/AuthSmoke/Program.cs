@@ -147,3 +147,5 @@ await MessengerIngressSmoke.Run();
 await MessengerOutboundSmoke.Run();
 
 await MessengerWorldHandoffSmoke.Run();
+
+await ChatRpSmoke.Run();
