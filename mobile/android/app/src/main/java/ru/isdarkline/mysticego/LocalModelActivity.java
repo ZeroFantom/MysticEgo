@@ -66,7 +66,7 @@ public final class LocalModelActivity extends Activity {
         if(!send.isEnabled())return;
         final int p;try{p=Integer.parseInt(port.getText().toString());if(p<1024||p>65535)throw new NumberFormatException();}catch(NumberFormatException e){answer.setText("Введите порт 1024–65535.");return;}
         final String id=model.getText().toString().trim(),secret=key.getText().toString(),text=prompt.getText().toString().trim();
-        if(id.isEmpty()||id.length()>200||secret.isBlank()||secret.length()>500||secret.indexOf('\r')>=0||secret.indexOf('\n')>=0||text.isEmpty()||text.length()>4000){answer.setText("Нужны ID модели, ключ и текст до 4000 символов.");return;}
+        if(id.isEmpty()||id.length()>200||secret.trim().isEmpty()||secret.length()>500||secret.indexOf('\r')>=0||secret.indexOf('\n')>=0||text.isEmpty()||text.length()>4000){answer.setText("Нужны ID модели, ключ и текст до 4000 символов.");return;}
         final int ticket=++generation;send.setEnabled(false);answer.setText("Локальная модель отвечает…");
         executor.execute(()->{
             HttpURLConnection http=null;String result;

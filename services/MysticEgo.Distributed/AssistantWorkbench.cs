@@ -69,7 +69,7 @@ public sealed class AssistantWorkbenchController(ILocalAssistantService assistan
     private bool MobileAccount => node.Kind==NodeKind.Orchestra && Actor is not null && Account!=Guid.Empty && !User.HasClaim("token_use","device") && Guid.TryParse(User.FindFirst("mystic_session")?.Value,out _);
 
     [HttpGet("mobile/providers")]
-    public IActionResult MobileProviders([FromServices] Microsoft.Extensions.Configuration.IConfiguration config) => MobileAccount ? Ok(new{cloud=MobileInference.ChatConfigured(config),speech=MobileInference.SpeechConfigured(config)}) : Forbid();
+    public IActionResult MobileProviders([FromServices] Microsoft.Extensions.Configuration.IConfiguration config) => MobileAccount ? Ok(new{cloud=MobileInference.ChatConfigured(config),speech=MobileInference.SpeechConfigured(config),cloudName=config["MobileCloud:ProviderName"],speechName=config["VoiceTranscription:ProviderName"]}) : Forbid();
 
     public sealed record MobilePrompt(string Text,bool Consent);
     [HttpPost("mobile/cloud"),RequestSizeLimit(16384)]

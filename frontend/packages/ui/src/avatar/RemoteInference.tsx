@@ -4,7 +4,7 @@ import {ANDROID_ORIGIN} from '../app/androidLaunch';
 export function RemoteInference(){
  const {session}=useApp();
  const supported=location.origin===ANDROID_ORIGIN&&session.url.replace(/\/$/,'')===location.origin;
- const providers=useRemote(()=>supported?fetch('/api/v1/assistant/mobile/providers',{headers:{Authorization:'Bearer '+session.token},cache:'no-store',redirect:'error',credentials:'omit'}).then(async r=>r.ok?await r.json() as {cloud:boolean;speech:boolean}:null):Promise.resolve(null),[session.token,supported]);
+ const providers=useRemote(()=>supported?fetch('/api/v1/assistant/mobile/providers',{headers:{Authorization:'Bearer '+session.token},cache:'no-store',redirect:'error',credentials:'omit'}).then(async r=>r.ok?await r.json() as {cloud:boolean;speech:boolean;cloudName?:string;speechName?:string}:null):Promise.resolve(null),[session.token,supported]);
  const [text,setText]=useState(''),[answer,setAnswer]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[recording,setRecording]=useState(false);
  const [cloudConsent,setCloudConsent]=useState(false),[speechConsent,setSpeechConsent]=useState(false);
  const stream=useRef<MediaStream|null>(null),recorder=useRef<MediaRecorder|null>(null),timer=useRef<number|undefined>(undefined),epoch=useRef(0),request=useRef<AbortController|null>(null);
@@ -26,7 +26,7 @@ export function RemoteInference(){
  }
  if(!supported)return null;
  return <section className="panel stack"><h2>Вычисления на сервере / в облаке</h2><p>Обычный чат MysticEgo использует модель серверного узла. Дополнительный внешний провайдер выбирается явно; история диалога, файлы и инструменты устройств не отправляются.</p>
- <p>Облачная модель: {providers.value?.cloud?'настроена':'не настроена'} · Речь: {providers.value?.speech?'настроена':'не настроена'}</p>
+ <p>Облачная модель: {providers.value?.cloud?providers.value.cloudName:'не настроена'} · Речь: {providers.value?.speech?providers.value.speechName:'не настроена'}</p>
  <label><input type="checkbox" checked={cloudConsent} onChange={e=>setCloudConsent(e.target.checked)}/> Разрешаю передачу введённого текста настроенному внешнему провайдеру</label>
  <textarea maxLength={4000} value={text} onChange={e=>setText(e.target.value)} placeholder="Сообщение или распознанный текст"/>
  <button className="btn" disabled={!providers.value?.cloud||!cloudConsent||busy||!text.trim()} onClick={()=>void chat()}>Отправить облачной модели</button>

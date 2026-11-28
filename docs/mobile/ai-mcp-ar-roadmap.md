@@ -23,3 +23,5 @@ References:
 
 ## Release gate
 Build/lint/negative tests; real phone test; signed APK; provider disclosure/legal review; no production/registry publication before complete.
+
+External providers additionally require the human-readable MobileCloud:ProviderName and VoiceTranscription:ProviderName. Missing disclosure disables their respective new endpoints. Publish provider-specific privacy notices before production.

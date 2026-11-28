@@ -41,6 +41,8 @@ jobs:
           gradle-version: '8.13'
           cache-read-only: true
       - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
       - name: Install Android SDK
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
       - name: Build preview and test routes

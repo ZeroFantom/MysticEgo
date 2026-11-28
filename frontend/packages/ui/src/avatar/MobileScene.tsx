@@ -3,7 +3,7 @@ import {AvatarStage,type AvatarMotion} from './AvatarStage';
 import {usePersonalAvatar,useAvatarMedia,defaultAppearance,accountAvatar} from './PersonalAvatar';
 import {useApp} from '../app/context';
 import './mobile-scene.css';
-const motions:AvatarMotion[]=['idle','wave','nod','dance','sit','walk'];
+const motions=['idle','wave','nod','dance','sit','walk'] as const satisfies readonly AvatarMotion[];
 export function MobileScene(){
  const {mode}=useApp();
  const library=usePersonalAvatar(mode==='audit');

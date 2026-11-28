@@ -43,9 +43,10 @@ internal static class MobileInference
         {throw new AssistantApiException(502,"Провайдер не вернул ответ.");}
         finally{if(acquired)Slots.Release();Active.TryRemove(account,out _);}
     }
-    public static bool ChatConfigured(IConfiguration config)=>Uri.TryCreate(config["MobileCloud:Endpoint"],UriKind.Absolute,out var uri)&&uri.Scheme=="https"&&!string.IsNullOrWhiteSpace(config["MobileCloud:Model"]);
-    public static bool SpeechConfigured(IConfiguration config)=>!string.IsNullOrWhiteSpace(config["VoiceTranscription:Endpoint"]);
+    public static bool ChatConfigured(IConfiguration config)=>Uri.TryCreate(config["MobileCloud:Endpoint"],UriKind.Absolute,out var uri)&&uri.Scheme=="https"&&!string.IsNullOrWhiteSpace(config["MobileCloud:Model"])&&!string.IsNullOrWhiteSpace(config["MobileCloud:ProviderName"]);
+    public static bool SpeechConfigured(IConfiguration config)=>!string.IsNullOrWhiteSpace(config["VoiceTranscription:Endpoint"])&&!string.IsNullOrWhiteSpace(config["VoiceTranscription:ProviderName"]);
     public static Task<string> Chat(Guid account,string text,IConfiguration config,CancellationToken ct)=>Run(account,async token=>{
+        if(!ChatConfigured(config))throw new AssistantApiException(503,"Провайдер не настроен.");
         var endpoint=Endpoint(config,"MobileCloud");var model=config["MobileCloud:Model"];
         if(string.IsNullOrWhiteSpace(model))throw new AssistantApiException(503,"Облачная модель не настроена.");
         using var request=new HttpRequestMessage(HttpMethod.Post,endpoint);
@@ -59,6 +60,7 @@ internal static class MobileInference
         return answer[..Math.Min(8000,answer.Length)];
     },ct);
     public static Task<string> Speech(Guid account,Stream source,IConfiguration config,CancellationToken ct)=>Run(account,async token=>{
+        if(!SpeechConfigured(config))throw new AssistantApiException(503,"Провайдер не настроен.");
         var endpoint=Endpoint(config,"VoiceTranscription",true);
         using var audio=new MemoryStream();var buffer=new byte[8192];int count;
         while((count=await source.ReadAsync(buffer,token))>0){if(audio.Length+count>5*1024*1024)throw new AssistantApiException(413,"Аудио до 5 МиБ.");audio.Write(buffer,0,count);}
