@@ -65,6 +65,6 @@ public sealed class WorldAiJobsController(WorldAiJobQueue queue) : ControllerBas
     public async Task<IActionResult> Get(string id, CancellationToken ct)
     {
         var job = await queue.Find(id, ct);
-        return job is null ? NotFound() : Ok(job);
+        return job is null || job.QuestDraft is not null ? NotFound() : Ok(job);
     }
 }
