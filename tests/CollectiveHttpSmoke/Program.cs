@@ -23,6 +23,7 @@ using Microsoft.Data.Sqlite;
 
 SpiritualConnectionSmoke.Run();
 WorldPresenceSmoke.Run();
+SpiritualCommunicationSmoke.Run();
 
 var tmp=Directory.CreateTempSubdirectory("collective-http-").FullName;
 void Check(bool ok,string message){if(!ok)throw new Exception(message);}
