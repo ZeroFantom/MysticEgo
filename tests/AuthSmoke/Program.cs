@@ -121,3 +121,43 @@ code=grants.Create(account,"source-proof",challenge,instant)!;
 if(grants.Consume(code,verifier,instant.AddSeconds(61))!=null)throw new Exception("Expired pairing accepted");
 if(grants.Create(account,"source-proof","bad",instant)!=null)throw new Exception("Invalid challenge accepted");
 Console.WriteLine("Desktop pairing proof, expiry and replay tests passed");
+
+await ExternalIdentitySmoke.Run();
+
+await ExternalLinkSmoke.Run();
+
+await ProviderProofSmoke.Run();
+
+await ExternalOAuthSmoke.Run();
+
+await OAuthCallbackSmoke.Run();
+
+await ExternalAccountApiSmoke.Run();
+
+await ExternalRevocationSmoke.Run();
+
+await ExternalLoginSmoke.Run();
+
+ExternalLoginHttpSmoke.Run();
+
+await MessengerIdentitySmoke.Run();
+
+await MessengerIngressSmoke.Run();
+
+await MessengerOutboundSmoke.Run();
+
+await MessengerWorldHandoffSmoke.Run();
+
+await ChatRpSmoke.Run();
+
+await ChatRpRuntimeSmoke.Run();
+
+await ChatRpConsentSmoke.Run();
+
+await ChatRpManagementSmoke.Run();
+
+await ChatRpCustomSmoke.Run();
+
+await ChatRpVkCallbackSmoke.Run();
+
+await TelegramMiniSmoke.Run();

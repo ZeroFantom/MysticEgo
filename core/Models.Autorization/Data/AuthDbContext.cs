@@ -11,6 +11,17 @@ namespace Models.Autorization.Data
         public DbSet<AccountLicenseAcceptance> AccountLicenseAcceptances => Set<AccountLicenseAcceptance>();
         public DbSet<AccountFeatureConsent> AccountFeatureConsents => Set<AccountFeatureConsent>();
         public DbSet<AccountDeviceGrant> AccountDeviceGrants => Set<AccountDeviceGrant>();
+        public DbSet<TelegramMiniSession> TelegramMiniSessions => Set<TelegramMiniSession>();
+        public DbSet<ChatRpPreference> ChatRpPreferences => Set<ChatRpPreference>();
+        public DbSet<ChatRpConsent> ChatRpConsents => Set<ChatRpConsent>();
+        public DbSet<ChatRpDelivery> ChatRpDeliveries => Set<ChatRpDelivery>();
+        public DbSet<MessengerWorldCommand> MessengerWorldCommands => Set<MessengerWorldCommand>();
+        public DbSet<MessengerEventReceipt> MessengerEventReceipts => Set<MessengerEventReceipt>();
+        public DbSet<ExternalLoginFlow> ExternalLoginFlows => Set<ExternalLoginFlow>();
+        public DbSet<ExternalIdentityAudit> ExternalIdentityAudits => Set<ExternalIdentityAudit>();
+        public DbSet<ExternalOAuthFlow> ExternalOAuthFlows => Set<ExternalOAuthFlow>();
+        public DbSet<ExternalLinkIntent> ExternalLinkIntents => Set<ExternalLinkIntent>();
+        public DbSet<ExternalIdentity> ExternalIdentities => Set<ExternalIdentity>();
         public DbSet<User> Users => Set<User>();
         public DbSet<Role> Roles => Set<Role>();
         public DbSet<Permission> Permissions => Set<Permission>();
@@ -24,6 +35,152 @@ namespace Models.Autorization.Data
         {
             base.OnModelCreating(mb);
             mb.Entity<ManagedIdentity>(e => { e.ToTable("managed_identities"); e.HasKey(x=>x.Id); e.Property(x=>x.Name).HasMaxLength(160).IsRequired(); e.Property(x=>x.Kind).HasMaxLength(16).IsRequired(); e.Property(x=>x.SecretHash).HasMaxLength(200).IsRequired(); e.HasIndex(x=>x.Kind); });
+
+            mb.Entity<TelegramMiniSession>(e =>
+            {
+                e.ToTable("telegram_mini_sessions");
+                e.HasKey(x=>x.ProofKey);
+                e.Property(x=>x.ProofKey).HasMaxLength(64);
+                e.Property(x=>x.TokenHash).HasMaxLength(64);
+                e.Property(x=>x.BotId).HasMaxLength(20);
+                e.Property(x=>x.Subject).HasMaxLength(20);
+                e.HasIndex(x=>x.TokenHash).IsUnique();
+                e.HasIndex(x=>x.RetainUntilUtc);
+                e.HasIndex(x=>x.UserId);
+                e.HasOne<User>().WithMany().HasForeignKey(x=>x.UserId).OnDelete(DeleteBehavior.Cascade);
+            });
+
+            mb.Entity<ChatRpPreference>(e =>
+            {
+                e.ToTable("chat_rp_preferences");
+                e.HasKey(x=>new{x.Provider,x.BotId,x.Peer,x.Subject});
+                e.Property(x=>x.Provider).HasMaxLength(16);
+                e.Property(x=>x.BotId).HasMaxLength(20);
+                e.Property(x=>x.Peer).HasMaxLength(24);
+                e.Property(x=>x.Subject).HasMaxLength(20);
+            });
+
+            mb.Entity<ChatRpConsent>(e =>
+            {
+                e.ToTable("chat_rp_consents");
+                e.HasKey(x=>x.Id);
+                e.Property(x=>x.Provider).HasMaxLength(16);
+                e.Property(x=>x.BotId).HasMaxLength(20);
+                e.Property(x=>x.Peer).HasMaxLength(24);
+                e.Property(x=>x.EventId).HasMaxLength(128);
+                e.Property(x=>x.ActorId).HasMaxLength(20);
+                e.Property(x=>x.TargetId).HasMaxLength(20);
+                e.Property(x=>x.ActorName).HasMaxLength(64);
+                e.Property(x=>x.TargetName).HasMaxLength(64);
+                e.HasIndex(x=>new{x.Provider,x.BotId,x.EventId}).IsUnique();
+                e.HasIndex(x=>x.ExpiresUtc);
+            });
+
+            mb.Entity<ChatRpDelivery>(e =>
+            {
+                e.ToTable("chat_rp_deliveries");
+                e.HasKey(x=>x.Id);
+                e.Property(x=>x.Provider).HasMaxLength(16).IsRequired();
+                e.Property(x=>x.BotId).HasMaxLength(20).IsRequired();
+                e.Property(x=>x.Peer).HasMaxLength(24).IsRequired();
+                e.Property(x=>x.EventId).HasMaxLength(128).IsRequired();
+                e.Property(x=>x.ActorId).HasMaxLength(20).IsRequired();
+                e.Property(x=>x.TargetId).HasMaxLength(20).IsRequired();
+                e.Property(x=>x.Caption).HasMaxLength(512).IsRequired();
+                e.Property(x=>x.Category).HasMaxLength(32).IsRequired();
+                e.HasIndex(x=>new{x.Provider,x.BotId,x.EventId}).IsUnique();
+                e.HasIndex(x=>new{x.Status,x.ExpiresUtc});
+            });
+
+            mb.Entity<MessengerWorldCommand>(e =>
+            {
+                e.ToTable("messenger_world_commands");
+                e.HasKey(x => x.Id);
+                e.Property(x => x.Provider).HasMaxLength(16).IsRequired();
+                e.Property(x => x.BotId).HasMaxLength(20).IsRequired();
+                e.Property(x => x.Subject).HasMaxLength(128).IsRequired();
+                e.Property(x => x.EventId).HasMaxLength(128).IsRequired();
+                e.Property(x => x.Command).HasMaxLength(4000).IsRequired();
+                e.HasIndex(x => new { x.Provider, x.BotId, x.EventId }).IsUnique();
+                e.HasIndex(x => new { x.Status, x.ReceivedUtc });
+                e.HasIndex(x => x.ExpiresUtc);
+                e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            });
+
+            mb.Entity<MessengerEventReceipt>(e =>
+            {
+                e.ToTable("messenger_event_receipts");
+                e.HasKey(x => new { x.Provider, x.BotId, x.EventId });
+                e.Property(x => x.Provider).HasMaxLength(16);
+                e.Property(x => x.BotId).HasMaxLength(20);
+                e.Property(x => x.EventId).HasMaxLength(128);
+                e.HasIndex(x => x.ReceivedUtc);
+            });
+
+            mb.Entity<ExternalLoginFlow>(e =>
+            {
+                e.ToTable("external_login_flows");
+                e.HasKey(x => x.StateHash);
+                e.Property(x => x.StateHash).HasMaxLength(64);
+                e.Property(x => x.BrowserHash).HasMaxLength(64).IsRequired();
+                e.Property(x => x.Provider).HasMaxLength(16).IsRequired();
+                e.Property(x => x.ClientId).HasMaxLength(20).IsRequired();
+                e.Property(x => x.RedirectUri).HasMaxLength(2048).IsRequired();
+                e.Property(x => x.ProtectedSecrets).HasMaxLength(4096).IsRequired();
+                e.HasIndex(x => x.ExpiresUtc);
+                e.HasIndex(x => x.BrowserHash);
+            });
+
+            mb.Entity<ExternalIdentityAudit>(e =>
+            {
+                e.ToTable("external_identity_audit");
+                e.HasKey(x => x.Id);
+                e.Property(x => x.Provider).HasMaxLength(16).IsRequired();
+                e.Property(x => x.Realm).HasMaxLength(128).IsRequired();
+                e.Property(x => x.Action).HasMaxLength(16).IsRequired();
+                e.HasIndex(x => new { x.UserId, x.OccurredUtc });
+                e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            });
+
+            mb.Entity<ExternalOAuthFlow>(e =>
+            {
+                e.ToTable("external_oauth_flows");
+                e.HasKey(x => x.StateHash);
+                e.Property(x => x.StateHash).HasMaxLength(64);
+                e.Property(x => x.BrowserHash).HasMaxLength(64).IsRequired();
+                e.Property(x => x.LinkHash).HasMaxLength(64).IsRequired();
+                e.Property(x => x.Provider).HasMaxLength(16).IsRequired();
+                e.Property(x => x.ClientId).HasMaxLength(20).IsRequired();
+                e.Property(x => x.RedirectUri).HasMaxLength(2048).IsRequired();
+                e.Property(x => x.ProtectedSecrets).HasMaxLength(4096).IsRequired();
+                e.HasIndex(x => x.LinkHash).IsUnique();
+                e.HasIndex(x => x.ExpiresUtc);
+                e.HasOne<ExternalLinkIntent>().WithMany().HasForeignKey(x => x.LinkHash).OnDelete(DeleteBehavior.Cascade);
+            });
+
+            mb.Entity<ExternalLinkIntent>(e =>
+            {
+                e.ToTable("external_link_intents");
+                e.HasKey(x => x.CodeHash);
+                e.Property(x => x.CodeHash).HasMaxLength(64);
+                e.Property(x => x.Provider).HasMaxLength(16).IsRequired();
+                e.Property(x => x.Realm).HasMaxLength(128).IsRequired();
+                e.Property(x => x.VerifiedSubject).HasMaxLength(128);
+                e.HasIndex(x => x.ExpiresUtc);
+                e.HasIndex(x => x.UserId);
+                e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            });
+
+            mb.Entity<ExternalIdentity>(e =>
+            {
+                e.ToTable("external_identities");
+                e.HasKey(x => new { x.Provider, x.Realm, x.Subject });
+                e.Property(x => x.Provider).HasMaxLength(16).IsRequired();
+                e.Property(x => x.Realm).HasMaxLength(128).IsRequired();
+                e.Property(x => x.Subject).HasMaxLength(128).IsRequired();
+                e.HasIndex(x => new { x.UserId, x.Provider, x.Realm }).IsUnique();
+                e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            });
 
             mb.Entity<User>(e =>
             {

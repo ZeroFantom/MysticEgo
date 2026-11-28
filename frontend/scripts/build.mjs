@@ -29,6 +29,10 @@ try{
     await mkdir(join(dist,'social'),{recursive:true});
     for(const page of ['share',...(role==='orchestra'?Object.keys(publicPages):[])])
       await writeFile(join(dist,'social',page+'.html'),panelHtml(template,role,page));
+    if(role==='orchestra'){
+      await build({root:join(root,'telegram-mini'),base:'/telegram-mini/',plugins:[react()],publicDir:false,
+        build:{outDir:join(dist,'telegram-mini'),emptyOutDir:true}});
+    }
     if(role==='audit')for(const page of ['root','share'])
       await writeFile(join(dist,'social','audit-caddy-'+page+'.html'),auditCaddyHtml(template,page));
   }

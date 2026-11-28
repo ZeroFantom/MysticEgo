@@ -6,6 +6,8 @@ using System.Text.Json.Serialization;
 using Api.Auth.Middleware;
 using Models.Autorization.Extensions;
 using Models.Autorization.Security;
+using Models.Autorization.Services;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace Api.Auth;
 
@@ -64,6 +66,28 @@ public static class Program
         });
 
         builder.Services.AddSingleton<Api.Auth.Controllers.AccountPresentationStore>();
+        // External account linking is configuration-gated; no provider credentials in defaults.
+        builder.Services.AddDataProtection().SetApplicationName("MysticEgo.Auth");
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddScoped<ExternalLinkIntents>();
+        builder.Services.AddScoped<ExternalOAuthFlows>();
+        builder.Services.AddSingleton<TelegramOAuthExchange>();
+        builder.Services.AddSingleton<VkIdentityProof>();
+        builder.Services.AddScoped<ExternalOAuthCallbacks>();
+        // The external service uses the existing AuthService issuance implementation.
+        builder.Services.AddScoped<AuthService>();
+        builder.Services.AddScoped<ExternalLoginService>();
+        builder.Services.AddScoped<MessengerIdentityService>();
+        builder.Services.AddScoped<TelegramMiniSessions>();
+        builder.Services.AddScoped<MessengerIngress>();
+        builder.Services.AddScoped<MessengerWorldHandoff>();
+        builder.Services.AddSingleton<MessengerOutbound>();
+        builder.Services.AddScoped<ChatRpRuntime>();
+        builder.Services.AddScoped<ChatRpConsentService>();
+        builder.Services.AddScoped<ChatRpPreferences>();
+        builder.Services.AddSingleton<ChatRpMembership>();
+        builder.Services.AddSingleton<ChatRpOutbound>();
+        builder.Services.AddScoped<Api.Auth.Controllers.ChatRpGroupDispatch>();
         builder.Services.AddHealthChecks();
         builder.Services.AddTrafficProtection(builder.Configuration);
         builder.Services.AddRateLimiter(options=>
@@ -72,6 +96,12 @@ public static class Program
             options.AddPolicy("auth-sensitive",ctx=>RateLimitPartition.GetFixedWindowLimiter(
                 ctx.Connection.RemoteIpAddress?.ToString()??"unknown",_=>new FixedWindowRateLimiterOptions
                 {PermitLimit=120,Window=TimeSpan.FromMinutes(1),QueueLimit=0,AutoReplenishment=true}));
+            options.AddPolicy("messenger-webhook",ctx=>RateLimitPartition.GetFixedWindowLimiter(
+                ctx.Connection.RemoteIpAddress?.ToString()??"unknown",_=>new FixedWindowRateLimiterOptions
+                {PermitLimit=120,Window=TimeSpan.FromMinutes(1),QueueLimit=0,AutoReplenishment=true}));
+            options.AddPolicy("external-link",ctx=>RateLimitPartition.GetFixedWindowLimiter(
+                ctx.Connection.RemoteIpAddress?.ToString()??"unknown",_=>new FixedWindowRateLimiterOptions
+                {PermitLimit=12,Window=TimeSpan.FromMinutes(1),QueueLimit=0,AutoReplenishment=true}));
             options.AddPolicy("audit-signup",ctx=>RateLimitPartition.GetFixedWindowLimiter(
                 ctx.Connection.RemoteIpAddress?.ToString()??"unknown",_=>new FixedWindowRateLimiterOptions
                 {PermitLimit=3,Window=TimeSpan.FromMinutes(15),QueueLimit=0,AutoReplenishment=true}));
