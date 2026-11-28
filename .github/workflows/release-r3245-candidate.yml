@@ -1,13 +1,7 @@
 name: MysticEgo R3.2.45 candidate validation
 on:
   pull_request:
-    paths:
-      - '.github/workflows/release-r3245-candidate.yml'
-      - 'frontend/apps/**/public/release-info.json'
-      - 'services/MysticEgo.WorldAI/**'
-      - 'services/Api.Orchestra/**'
-      - 'tests/WorldAiQueueSmoke/**'
-      - 'tests/CollectiveHttpSmoke/**'
+    paths: [.github/workflows/release-r3245-candidate.yml]
   workflow_dispatch:
 
 permissions:
@@ -282,7 +276,7 @@ jobs:
                   assert (app / "ops/infrastructure" / script).is_file(), script
               for script in ("recover-maintenance.sh", "rescue-request.py", "install-worker.sh", "update-orchestra.py", "mysticego-maintenance-rescue.path", "mysticego-maintenance-rescue.service"):
                   assert (app / "ops/orchestra-updater" / script).is_file(), script
-              for name in ("MysticEgo.Distributed.dll","MysticEgo.Capacity.dll"):
+              for name in ("MysticEgo.Distributed.dll","MysticEgo.Capacity.dll","Api.Orchestra.dll","MysticEgo.WorldAI.dll"):
                   assert (app / "runtime/app/bin" / name).read_bytes() == (app / "ops/orchestra-updater/payload" / name).read_bytes()
               for host in ("Api.Orchestra","Api.Auth","Api.Capacity"):
                   for extension in ("dll","deps.json","runtimeconfig.json"):
