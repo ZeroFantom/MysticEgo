@@ -24,6 +24,7 @@ public sealed class ExternalAccountsController(AuthDbContext db, IPasswordHasher
     public sealed record StartRequest(string Password);
     public sealed record CandidateRequest(string LinkCode);
     public sealed record ConfirmRequest(string LinkCode, string Provider, string Realm, string Subject, string Password);
+    public sealed record UnlinkRequest(string Provider, string Realm, string Subject, string Password);
 
     private ExternalCallbackConfiguration? Telegram()
     {
@@ -57,6 +58,17 @@ public sealed class ExternalAccountsController(AuthDbContext db, IPasswordHasher
     private bool SameOrigin(ExternalCallbackConfiguration config) =>
         Request.Headers.Origin.Count == 1 &&
         string.Equals(Request.Headers.Origin.ToString(), config.RedirectUri.GetLeftPart(UriPartial.Authority), StringComparison.Ordinal);
+    // Unlink must remain available if the provider is disabled or its credentials are removed.
+    // This is a separate trusted deployment setting, falling back to the configured callback origin.
+    private bool ManagementOrigin()
+    {
+        var configured = configuration["ExternalIdentity:ManagementOrigin"] ??
+            configuration["ExternalIdentity:Telegram:RedirectUri"];
+        return Uri.TryCreate(configured, UriKind.Absolute, out var uri) &&
+            uri.Scheme == Uri.UriSchemeHttps && uri.UserInfo.Length == 0 &&
+            Request.Headers.Origin.Count == 1 &&
+            string.Equals(Request.Headers.Origin.ToString(), uri.GetLeftPart(UriPartial.Authority), StringComparison.Ordinal);
+    }
     private void PrivateResponse()
     {
         Response.Headers.CacheControl = "no-store";
@@ -153,5 +165,32 @@ public sealed class ExternalAccountsController(AuthDbContext db, IPasswordHasher
         var result = await links.Confirm(actor.Value.User, actor.Value.Session, input.LinkCode,
             new(input.Provider, input.Realm, input.Subject), ct);
         return result == ExternalIdentityLinkResult.Unavailable ? Conflict() : NoContent();
+    }
+
+    [HttpPost("unlink"), RequestSizeLimit(8192)]
+    public async Task<IActionResult> Unlink(UnlinkRequest input, CancellationToken ct)
+    {
+        PrivateResponse();
+        if (!ManagementOrigin()) return StatusCode(403);
+        var actor = await Account(ct);
+        if (actor is null) return Unauthorized();
+        var result = await new ExternalIdentityRevocation(db, passwords, TimeProvider.System).Unlink(
+            actor.Value.User, actor.Value.Session, new(input.Provider, input.Realm, input.Subject), input.Password, ct);
+        if (result is null) return Conflict();
+        Response.Cookies.Delete(Cookie, CookieSettings());
+        return Ok(new { reauthenticate = true, revokedSessions = result.RevokedSessions });
+    }
+
+    [HttpGet("audit")]
+    public async Task<IActionResult> Audit(CancellationToken ct)
+    {
+        PrivateResponse();
+        var actor = await Account(ct);
+        if (actor is null) return Unauthorized();
+        var events = await db.ExternalIdentityAudits.AsNoTracking()
+            .Where(x => x.UserId == actor.Value.User).OrderByDescending(x => x.OccurredUtc)
+            .ThenByDescending(x => x.Id).Take(100)
+            .Select(x => new { x.Provider, x.Realm, x.Action, x.OccurredUtc, x.RevokedSessions }).ToListAsync(ct);
+        return Ok(events);
     }
 }

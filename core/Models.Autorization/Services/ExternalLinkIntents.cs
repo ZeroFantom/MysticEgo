@@ -87,6 +87,15 @@ public sealed class ExternalLinkIntents(AuthDbContext db, TimeProvider clock)
             .ExecuteDeleteAsync(ct);
         if (claimed != 1) return ExternalIdentityLinkResult.Unavailable;
         var result = await new ExternalIdentityStore(db).RecordVerifiedLink(account, displayed, ct);
+        if (result == ExternalIdentityLinkResult.Linked)
+        {
+            db.ExternalIdentityAudits.Add(new ExternalIdentityAudit
+            {
+                UserId = account, SessionId = session, Provider = displayed.Provider, Realm = displayed.Realm,
+                Action = "linked", OccurredUtc = Now
+            });
+            await db.SaveChangesAsync(ct);
+        }
         // An ordinary ownership conflict consumes the intent without linking. A database failure
         // rolls back the transaction, so neither consumption nor association is committed.
         await tx.CommitAsync(ct);

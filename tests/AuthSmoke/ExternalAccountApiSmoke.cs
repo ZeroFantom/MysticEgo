@@ -85,6 +85,22 @@ internal static class ExternalAccountApiSmoke
         Check(await controller.Confirm(new(code, proof.Provider, proof.Realm, proof.Subject, "password"), default) is ConflictResult, "replay");
         Check(await new ExternalIdentityStore(db).ResolveLinkedAccount(proof) == a.Id, "account ownership");
         Check(await controller.List(default) is OkObjectResult, "own list");
-        Console.WriteLine("External account controller configuration, session, origin and confirmation checks passed");
+        Check(await controller.Audit(default) is OkObjectResult, "own audit");
+        config["ExternalIdentity:Telegram:Enabled"] = "false";
+        Context(a.Id, sa, "https://wrong.invalid");
+        Check(await controller.Unlink(new(proof.Provider, proof.Realm, proof.Subject, "password"), default)
+            is StatusCodeResult { StatusCode: 403 }, "unlink origin");
+        Context(b.Id, sb);
+        Check(await controller.Unlink(new(proof.Provider, proof.Realm, proof.Subject, "other"), default)
+            is ConflictResult, "unlink cross-account denied");
+        Context(a.Id, sa);
+        Check(await controller.Unlink(new(proof.Provider, proof.Realm, proof.Subject, "wrong"), default)
+            is ConflictResult, "unlink password");
+        Check(await controller.Unlink(new(proof.Provider, proof.Realm, proof.Subject, "password"), default)
+            is OkObjectResult, "unlink works with provider disabled");
+        Check(await controller.List(default) is UnauthorizedResult, "current session revoked");
+        Check(await db.ExternalIdentityAudits.CountAsync(x => x.UserId == a.Id) == 2, "link and unlink audit");
+        Check(await db.RefreshTokens.AnyAsync(t => t.SessionId == sb), "unrelated session preserved");
+        Console.WriteLine("External account controller configuration, session, origin, confirmation and unlink checks passed");
     }
 }

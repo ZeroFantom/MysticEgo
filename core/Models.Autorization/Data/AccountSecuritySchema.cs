@@ -39,6 +39,18 @@ public static class AccountSecuritySchema
         var timestamp=db.Database.IsNpgsql()?"timestamp with time zone":"TEXT";
         var boolean=db.Database.IsNpgsql()?"boolean":"INTEGER";
         var sql=$"""
+            CREATE TABLE IF NOT EXISTS external_identity_audit (
+                "Id" {guid} NOT NULL PRIMARY KEY,
+                "UserId" {guid} NOT NULL REFERENCES users("Id") ON DELETE CASCADE,
+                "SessionId" {guid} NOT NULL,
+                "Provider" varchar(16) NOT NULL,
+                "Realm" varchar(128) NOT NULL,
+                "Action" varchar(16) NOT NULL,
+                "OccurredUtc" {timestamp} NOT NULL,
+                "RevokedSessions" INTEGER NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS "IX_external_identity_audit_UserId_OccurredUtc"
+                ON external_identity_audit ("UserId","OccurredUtc");
             CREATE TABLE IF NOT EXISTS external_link_intents (
                 "CodeHash" varchar(64) NOT NULL PRIMARY KEY,
                 "UserId" {guid} NOT NULL REFERENCES users("Id") ON DELETE CASCADE,
