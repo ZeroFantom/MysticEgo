@@ -19,7 +19,7 @@ const actions:Record<string,string>={launch_application:'Запустить пр
 const time=new Intl.DateTimeFormat('ru-RU',{hour:'2-digit',minute:'2-digit'});
 
 export function AssistantChat({status,compact=false,patrol=false}:{status?:AssistantStatus|null;compact?:boolean;patrol?:boolean}){
-  const {api,mode,portal}=useApp();
+  const {api,mode,portal,preferenceScope}=useApp();
   const localHandoff=(mode==='agent'||mode==='audit')&&!portal&&['127.0.0.1','localhost','[::1]'].includes(location.hostname);
   const hasAvatar=mode==='audit'||mode==='agent';
   const library=usePersonalAvatar(hasAvatar);
@@ -36,7 +36,8 @@ export function AssistantChat({status,compact=false,patrol=false}:{status?:Assis
   const [error,setError]=useState(''),[proposals,setProposals]=useState<Proposal[]>([]),[result,setResult]=useState('');
   const [manualMotion,setManualMotion]=useState<AvatarMotion>(),[expression,setExpression]=useState('');
   const [importedAvatar,setImportedAvatar]=useState<Snapshot|null>(null);
-  useIncomingAvatar('chat',value=>{setImportedAvatar(value);setManualMotion(value.motion)});
+  useEffect(()=>{setImportedAvatar(null);setManualMotion(undefined)},[preferenceScope]);
+  useIncomingAvatar('chat',value=>{setImportedAvatar(value);setManualMotion(value.motion)},!compact&&hasAvatar);
   const voice=useAvatarVoice(),music=useMusicBeat();
   const [handoff,setHandoff]=useState<Handoff|null>(null),[handoffBusy,setHandoffBusy]=useState(false),[onDesktop,setOnDesktop]=useState(false);
   const scene=useRef<HTMLDivElement>(null);
@@ -116,7 +117,7 @@ export function AssistantChat({status,compact=false,patrol=false}:{status?:Assis
       <button type="button" className="icon-btn" aria-label="Очистить историю" disabled={busy||!messages.length} onClick={()=>setClearing(value=>!value)}><Trash2 size={17}/></button>
     </div>
     {visible&&!onDesktop&&<div className="assistant-scene" ref={scene}>
-      <AvatarStage url={media.model?.url} mime={media.model?.mime} motion={moving} mood={expression?inferVisualMood(expression):importedAvatar?.mood??'neutral'} initialPhase={importedAvatar?.phaseSeconds??0} play={importedAvatar?1:0} onPlayback={(motion,seconds)=>{playback.current={motion,seconds}}}
+      <AvatarStage key={importedAvatar?'handoff-'+importedAvatar.motion+'-'+importedAvatar.phaseSeconds:'default'} url={media.model?.url} mime={media.model?.mime} motion={moving} mood={expression?inferVisualMood(expression):importedAvatar?.mood??'neutral'} initialPhase={importedAvatar?.phaseSeconds??0} play={importedAvatar?1:0} onPlayback={(motion,seconds)=>{playback.current={motion,seconds}}}
         speech={view.animateReplies?voice.speech:0} viseme={voice.viseme} beat={music.beat} animations={media.clips}
         appearance={view} intensity={intensityByStyle[selection?.motionStyle??'calm']}/>
       <div className="assistant-scene-tools"><Link to="/avatars" className="btn secondary tiny">Студия VRM</Link>

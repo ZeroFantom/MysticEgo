@@ -12,9 +12,9 @@ export function stageAvatar(scope:string,destination:Destination,value:unknown){
  if(!validSnapshot(value))return false;
  pending={scope,destination,snapshot:{motion:value.motion,mood:value.mood,phaseSeconds:value.phaseSeconds},expires:Date.now()+15000};return true;
 }
-export function useIncomingAvatar(destination:Destination,apply:(snapshot:Snapshot)=>void){
+export function useIncomingAvatar(destination:Destination,apply:(snapshot:Snapshot)=>void,enabled=true){
  const {preferenceScope}=useApp(),callback=useRef(apply);callback.current=apply;
- useEffect(()=>{if(!pending)return;if(pending.expires<=Date.now()||pending.scope!==preferenceScope){pending=undefined;return}
+ useEffect(()=>{if(!enabled||!pending)return;if(pending.expires<=Date.now()||pending.scope!==preferenceScope){pending=undefined;return}
   if(pending.destination===destination){const value=pending.snapshot;pending=undefined;callback.current(value)}
- },[destination,preferenceScope]);
+ },[destination,preferenceScope,enabled]);
 }

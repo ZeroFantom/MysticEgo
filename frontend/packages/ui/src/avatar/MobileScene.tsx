@@ -7,12 +7,13 @@ import {AvatarTransfer} from './AvatarTransfer';
 import {useIncomingAvatar,type Snapshot} from './avatarTransferState';
 const motions=['idle','wave','nod','dance','sit','walk'] as const satisfies readonly AvatarMotion[];
 export function MobileScene(){
- const {mode}=useApp();
+ const {mode,preferenceScope}=useApp();
  const library=usePersonalAvatar(mode==='audit');
  const selection=library.value?.selection;
  const media=useAvatarMedia(selection?.assetId??'bundled',selection?.motions,library.value?.assets,(library.value?.path??accountAvatar)+'/asset/',undefined,!library.loading);
  const [active,setActive]=useState(false),[motion,setMotion]=useState<AvatarMotion>('idle'),[play,setPlay]=useState(0),[error,setError]=useState('');
  const [imported,setImported]=useState<Snapshot|null>(null);
+ useEffect(()=>{setImported(null);setMotion('idle')},[preferenceScope]);
  useIncomingAvatar('ar',value=>{setImported(value);setMotion(value.motion);setPlay(x=>x+1)});
  const playback=useRef(0);
  const [position,setPosition]=useState({x:50,y:52}),[scale,setScale]=useState(1);
@@ -25,7 +26,7 @@ export function MobileScene(){
  <div className="mobile-ar" onPointerDown={e=>{const r=e.currentTarget.getBoundingClientRect();setPosition({x:Math.max(15,Math.min(85,(e.clientX-r.left)/r.width*100)),y:Math.max(20,Math.min(80,(e.clientY-r.top)/r.height*100))})}}>
  <video ref={video} playsInline muted autoPlay/><div className="mobile-ar-avatar" style={{left:position.x+'%',top:position.y+'%',width:Math.round(68*scale)+'%',height:Math.round(86*scale)+'%'}}><AvatarStage url={media.model?.url} mime={media.model?.mime} motion={motion} mood={imported?.mood??'neutral'} initialPhase={imported?.phaseSeconds??0} onPlayback={(_,seconds)=>{playback.current=seconds}} play={play} appearance={{...defaultAppearance,...selection?.appearance}} animations={media.clips}/></div>
  </div><label>Размер персонажа<input type="range" min={0.5} max={1.2} step={0.1} value={scale} onChange={e=>setScale(Number(e.target.value))}/></label>
- <div className="actions">{motions.map(m=><button className="btn secondary" key={m} aria-pressed={motion===m} onClick={()=>{setMotion(m);setPlay(x=>x+1)}}>{{idle:'Стоять',wave:'Приветствие',nod:'Кивок',dance:'Танец',sit:'Сесть',walk:'Шаги'}[m]}</button>)}</div><button className="btn secondary" onClick={stop}>Закрыть камеру</button></>}
+ <div className="actions">{motions.map(m=><button className="btn secondary" key={m} aria-pressed={motion===m} onClick={()=>{setImported(null);setMotion(m);setPlay(x=>x+1)}}>{{idle:'Стоять',wave:'Приветствие',nod:'Кивок',dance:'Танец',sit:'Сесть',walk:'Шаги'}[m]}</button>)}</div><button className="btn secondary" onClick={stop}>Закрыть камеру</button></>}
  {!active&&<AvatarTransfer snapshot={()=>({motion:motion as Snapshot['motion'],mood:imported?.mood??'neutral',phaseSeconds:Math.min(3600,playback.current)})}/>}
  {error&&<p role="alert">{error}</p>}</section>;
 }

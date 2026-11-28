@@ -18,7 +18,7 @@ export function AvatarTransfer({snapshot}:{snapshot:()=>Snapshot}){
  }
  async function run(work:(id:number)=>Promise<void>){const id=epoch.current;setBusy(true);setError('');try{await work(id)}catch{if(id===epoch.current)setError('Запрос недоступен или истёк.')}finally{if(id===epoch.current)setBusy(false)}}
  if(!eligible)return null;
- return <section className="panel stack"><h3>Перенести аватар</h3><p>На другом устройстве откройте безопасность аккаунта и включите связь устройств. Передаются только движение, эмоция и фаза анимации. История доступна отдельно в том же серверном аккаунте.</p>
+ return <section className="panel stack"><h3>Перенести аватар</h3><p>На другом устройстве откройте личную панель Audit, затем безопасность аккаунта и включите связь устройств. Передаются только движение, эмоция и фаза анимации. История доступна отдельно в том же серверном аккаунте.</p>
  <button className="btn secondary" disabled={busy} onClick={()=>void run(async id=>{const rows=await mcp('device.list',{});if(id===epoch.current){setTargets(rows);setTarget('')}})}>Найти принимающие устройства</button>
  {targets&&<><label>Устройство<select value={target} onChange={e=>setTarget(e.target.value)}><option value="">Выберите устройство</option>{targets.map(row=><option key={row.id} value={row.id} disabled={!row.ready}>{deviceLabel(row.device,undefined,t)} · {row.ready?'Принимает':'Недоступно'}</option>)}</select></label>
  <button className="btn" disabled={busy||!targets.some(row=>row.id===target&&row.ready)} onClick={()=>void run(async id=>{const value=snapshot();if(!validSnapshot(value))throw Error();const result=await mcp('avatar.handoff',{targetId:target,...value});if(id===epoch.current)setOffer(result)})}>Предложить перенос VRM</button></>}
