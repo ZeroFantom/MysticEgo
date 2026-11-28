@@ -11,6 +11,7 @@ namespace Models.Autorization.Data
         public DbSet<AccountLicenseAcceptance> AccountLicenseAcceptances => Set<AccountLicenseAcceptance>();
         public DbSet<AccountFeatureConsent> AccountFeatureConsents => Set<AccountFeatureConsent>();
         public DbSet<AccountDeviceGrant> AccountDeviceGrants => Set<AccountDeviceGrant>();
+        public DbSet<AccountMobileAgent> AccountMobileAgents => Set<AccountMobileAgent>();
         public DbSet<User> Users => Set<User>();
         public DbSet<Role> Roles => Set<Role>();
         public DbSet<Permission> Permissions => Set<Permission>();
@@ -62,6 +63,15 @@ namespace Models.Autorization.Data
                 e.ToTable("account_feature_consents"); e.HasKey(x=>new{x.UserId,x.Scope});
                 e.Property(x=>x.Scope).HasMaxLength(40).IsRequired();
                 e.Property(x=>x.PolicyVersion).HasMaxLength(40).IsRequired();
+                e.HasOne<User>().WithMany().HasForeignKey(x=>x.UserId).OnDelete(DeleteBehavior.Cascade);
+            });
+            mb.Entity<AccountMobileAgent>(e =>
+            {
+                e.ToTable("account_mobile_agents");e.HasKey(x=>x.Id);
+                e.Property(x=>x.SecretHash).HasMaxLength(64).IsRequired();
+                e.Property(x=>x.Name).HasMaxLength(100).IsRequired();
+                e.Property(x=>x.Os).HasMaxLength(40).IsRequired();
+                e.HasIndex(x=>x.UserId);
                 e.HasOne<User>().WithMany().HasForeignKey(x=>x.UserId).OnDelete(DeleteBehavior.Cascade);
             });
             mb.Entity<AccountDeviceGrant>(e =>

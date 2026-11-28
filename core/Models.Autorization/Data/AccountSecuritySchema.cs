@@ -53,6 +53,17 @@ public static class AccountSecuritySchema
                 "UpdatedUtc" {timestamp} NOT NULL,
                 PRIMARY KEY ("UserId","Scope")
             );
+            CREATE TABLE IF NOT EXISTS account_mobile_agents (
+                "Id" {guid} NOT NULL PRIMARY KEY,
+                "UserId" {guid} NOT NULL REFERENCES users("Id") ON DELETE CASCADE,
+                "SecretHash" varchar(64) NOT NULL,
+                "Name" varchar(100) NOT NULL,
+                "Os" varchar(40) NOT NULL,
+                "CreatedUtc" {timestamp} NOT NULL,
+                "LastSeenUtc" {timestamp} NULL,
+                "RevokedUtc" {timestamp} NULL
+            );
+            CREATE INDEX IF NOT EXISTS "IX_account_mobile_agents_UserId" ON account_mobile_agents ("UserId");
             CREATE TABLE IF NOT EXISTS account_device_grants (
                 "UserId" {guid} NOT NULL REFERENCES users("Id") ON DELETE CASCADE,
                 "DeviceId" {guid} NOT NULL,

@@ -10,7 +10,7 @@ internal static class AuthGateway
 {
     public static void MapAuthGateway(this WebApplication app, NodeOptions node)
     {
-        foreach (var action in new[] { "login", "refresh", "logout", "desktop/approve", "desktop/redeem", "qr/start", "qr/cancel" })
+        foreach (var action in new[] { "login", "refresh", "logout", "desktop/approve", "desktop/redeem", "qr/start", "qr/cancel", "mobile-agent/enroll", "mobile-agent/poll", "mobile-agent/decide", "mobile-agent/complete" })
             app.MapPost("/api/auth/" + action, (HttpContext context, IHttpClientFactory clients) =>
                 Forward(context, clients, node.AuthUrl, action)).AllowAnonymous();
         app.MapGet("/api/auth/credential-policy", (HttpContext context, IHttpClientFactory clients) =>
@@ -19,10 +19,10 @@ internal static class AuthGateway
             Forward(context, clients, node.AuthUrl, "presentation")).RequireAuthorization();
         app.MapPost("/api/auth/presentation", (HttpContext context, IHttpClientFactory clients) =>
             Forward(context, clients, node.AuthUrl, "presentation")).RequireAuthorization();
-        foreach (var action in new[] { "sessions", "sessions/current", "consents", "device-actions" })
+        foreach (var action in new[] { "sessions", "sessions/current", "consents", "device-actions", "mobile-agent/devices" })
             app.MapGet("/api/auth/" + action, (HttpContext context, IHttpClientFactory clients) =>
                 Forward(context, clients, node.AuthUrl, action)).RequireAuthorization();
-        foreach (var action in new[] { "sessions/revoke-others", "consents", "device-grants/revoke", "device-grants/approve", "qr/inspect", "qr/approve", "device-actions/mcp", "device-actions/decide", "device-actions/presence", "device-actions/cancel" })
+        foreach (var action in new[] { "sessions/revoke-others", "consents", "device-grants/revoke", "device-grants/approve", "qr/inspect", "qr/approve", "device-actions/mcp", "device-actions/decide", "device-actions/presence", "device-actions/cancel", "mobile-agent/ticket", "mobile-agent/revoke", "mobile-agent/mcp" })
             app.MapPost("/api/auth/" + action, (HttpContext context, IHttpClientFactory clients) =>
                 Forward(context, clients, node.AuthUrl, action)).RequireAuthorization();
         app.MapPost("/api/auth/sessions/{id:guid}/revoke", (Guid id, HttpContext context, IHttpClientFactory clients) =>
@@ -46,8 +46,13 @@ internal static class AuthGateway
             request.Headers.TryAddWithoutValidation("User-Agent", agent.Length > 500 ? agent[..500] : agent);
         if (context.Connection.RemoteIpAddress is { } caller)
             request.Headers.TryAddWithoutValidation("X-Forwarded-For", caller.ToString());
-        if ((action == "presentation" || action.StartsWith("sessions",StringComparison.Ordinal) || action == "consents" || action.StartsWith("device-grants/",StringComparison.Ordinal) || action.StartsWith("device-actions",StringComparison.Ordinal) || action is "qr/inspect" or "qr/approve") && AuthenticationHeaderValue.TryParse(context.Request.Headers.Authorization.ToString(),out var authorization) && authorization.Scheme == "Bearer")
+        if ((action == "presentation" || action.StartsWith("sessions",StringComparison.Ordinal) || action == "consents" || action.StartsWith("device-grants/",StringComparison.Ordinal) || action.StartsWith("device-actions",StringComparison.Ordinal) || action.StartsWith("mobile-agent/",StringComparison.Ordinal) || action is "qr/inspect" or "qr/approve") && AuthenticationHeaderValue.TryParse(context.Request.Headers.Authorization.ToString(),out var authorization) && authorization.Scheme == "Bearer")
             request.Headers.Authorization = authorization;
+        if (action is "mobile-agent/poll" or "mobile-agent/decide" or "mobile-agent/complete")
+        {
+            if(context.Request.Headers.TryGetValue("X-Mystic-Agent-Key",out var secret)&&secret.Count==1&&secret[0]?.Length==64)
+                request.Headers.TryAddWithoutValidation("X-Mystic-Agent-Key",secret[0]);
+        }
         if (HttpMethods.IsPost(context.Request.Method))
         {
             request.Content = new StreamContent(context.Request.Body);
