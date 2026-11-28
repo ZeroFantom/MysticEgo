@@ -14,6 +14,7 @@ rows = {}
 attempts = {}
 history = []
 SAFE_REASONS = ("CalledProcessError", "TimeoutExpired", "OSError", "PermissionError", "FileNotFoundError", "ValueError", "RuntimeError", "OtherError")
+RETRY_SECONDS = 900
 
 def checked(*args):
     try:
@@ -38,21 +39,35 @@ def configured(*keys):
         return False
 
 def publish(name, state, message, reason=None):
+    previous = rows.get(name, {})
     rows[name] = dict(name=name, state=state, message=message,
                       checkedAt=datetime.now(timezone.utc).isoformat())
     if reason is not None:
         rows[name]["reason"] = reason
-    history.append(rows[name])
-    del history[:-120]
+    if name in attempts and state in ("degraded", "repairing"):
+        rows[name]["lastAttemptAt"] = datetime.fromtimestamp(attempts[name], timezone.utc).isoformat()
+        rows[name]["nextRetryAt"] = datetime.fromtimestamp(attempts[name] + RETRY_SECONDS, timezone.utc).isoformat()
+    # Keep fresh heartbeats, but only persist state transitions in history.
+    fields = ("state", "message", "reason", "lastAttemptAt", "nextRetryAt")
+    if any(previous.get(key) != rows[name].get(key) for key in fields):
+        history.append(rows[name])
+        del history[:-120]
     install.atomic(STATUS / "status.json", json.dumps({"components": list(rows.values()), "history": history}), 0o644)
     install.atomic(STATUS / "attempts.json", json.dumps(attempts))
 
 def repair(name, test, action, message):
-    if test():
+    try:
+        healthy = test()
+    except Exception as error:
+        # An inconclusive probe is not permission to mutate a component.
+        reason = type(error).__name__
+        publish(name, "degraded", "Не удалось выполнить проверку компонента.", reason if reason in SAFE_REASONS else "OtherError")
+        return
+    if healthy:
         attempts.pop(name, None)
         publish(name, "available", message)
         return
-    if time.time() - attempts.get(name, 0) < 900:
+    if time.time() - attempts.get(name, 0) < RETRY_SECONDS:
         previous_reason = rows.get(name, {}).get("reason")
         publish(name, "degraded", "Повторная попытка после паузы; проверьте журнал службы.", previous_reason if previous_reason in SAFE_REASONS else None)
         return
@@ -71,24 +86,53 @@ def repair(name, test, action, message):
             reason = "OtherError"
         publish(name, "degraded", "Восстановление не завершилось. Проверьте журнал службы.", reason)
 
+def lm_role():
+    profile = install.ROOT / "lmstudio/role"
+    role = profile.read_text().strip() if profile.is_file() else "panel-data"
+    if role not in install.MODELS:
+        raise ValueError("Unknown managed LM Studio profile.")
+    return role
+
+
 def lm_ready():
-    # A compatibility catalog can list downloaded but unloaded models.
+    # A downloaded model, embedding, or unrelated loaded LLM is not our worker.
+    try:
+        alias = install.MODELS[lm_role()][1]
+    except (OSError, ValueError):
+        return False
     native = probe("http://127.0.0.1:1234/api/v1/models")
     if isinstance(native, dict) and isinstance(native.get("models"), list):
-        return any(model.get("type") == "llm" and model.get("loaded_instances")
+        return any(model.get("type") == "llm" and
+                   any(isinstance(instance, dict) and instance.get("id") == alias
+                       for instance in (model.get("loaded_instances") or []))
                    for model in native["models"] if isinstance(model, dict))
     legacy = probe("http://127.0.0.1:1234/api/v0/models")
     if isinstance(legacy, dict) and isinstance(legacy.get("data"), list):
         return any(model.get("state") == "loaded" and model.get("type") in ("llm", "vlm")
+                   and model.get("id") == alias
                    for model in legacy["data"] if isinstance(model, dict))
     return False
 
+
 def lm_repair():
     profile = install.ROOT / "lmstudio/role"
-    if profile.is_file() and Path("/etc/systemd/system/mysticego-lmstudio.service").is_file():
-        install.run("systemctl", "restart", "mysticego-lmstudio.service", timeout=320)
+    role = lm_role()
+    unit = Path("/etc/systemd/system/mysticego-lmstudio.service")
+    cli = install.LM_HOME / ".lmstudio/bin/lms"
+    if unit.is_symlink():
+        raise ValueError("Unexpected LM Studio unit symlink.")
+    # Validate/recreate the service home before either restart or installation.
+    install.ensure_lm_home()
+    install.lmstudio_dependencies()
+    if profile.is_file() and unit.is_file() and cli.is_file() and install.lm_cache_present(install.MODELS[role][0]):
+        install.run("systemctl", "reset-failed", unit.name, timeout=10)
+        install.run("systemctl", "restart", unit.name, timeout=320)
     else:
-        install.lmstudio({"role": profile.read_text().strip() if profile.is_file() else "panel-data"})
+        # Missing executable/model/definition requires provisioning, not a restart loop.
+        if unit.is_file():
+            install.run("systemctl", "stop", unit.name, timeout=120)
+        install.lmstudio({"role": role})
+
 
 def postgres():
     method = install.ROOT / "postgres/method"
