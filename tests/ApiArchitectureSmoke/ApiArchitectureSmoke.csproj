@@ -7,5 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../services/MysticEgo.Distributed/AvatarHandoffQueue.cs" Link="AvatarHandoffQueue.cs" />
+    <Compile Include="../../services/MysticEgo.Distributed/MobilePcPolicy.cs" Link="MobilePcPolicy.cs" />
   </ItemGroup>
 </Project>

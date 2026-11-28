@@ -77,3 +77,15 @@ Check(!queue.Complete("other", handoff.Id, new(claim.Proof, true)), "Reject wron
 Check(queue.Complete("owner", handoff.Id, new(claim.Proof, true)), "Accept valid handoff completion");
 Check(queue.Status("owner", handoff.Id)?.Status == "started", "Started state visible to owner");
 Check(!queue.Complete("owner", handoff.Id, new(claim.Proof, true)), "No replay of completion");
+
+var pcOwner=Guid.NewGuid();var pcTarget=Guid.NewGuid();
+Check(MysticEgo.Distributed.MobilePcPolicy.OwnerAllowed(pcOwner,pcOwner.ToString())&&!MysticEgo.Distributed.MobilePcPolicy.OwnerAllowed(Guid.NewGuid(),pcOwner.ToString())&&!MysticEgo.Distributed.MobilePcPolicy.OwnerAllowed(pcOwner,null),"PC diagnostics owner opt-in");
+Check(MysticEgo.Distributed.MobilePcPolicy.Targets(pcTarget+";bad;"+Guid.Empty).SetEquals(new[]{pcTarget}),"PC diagnostics fixed targets");
+Check(MysticEgo.Distributed.MobilePcPolicy.ActionAllowed("system.health")&&!MysticEgo.Distributed.MobilePcPolicy.ActionAllowed("app.launch")&&!MysticEgo.Distributed.MobilePcPolicy.ActionAllowed("shell"),"PC diagnostics read-only allowlist");
+using(var pcData=System.Text.Json.JsonDocument.Parse("""{"uptimeMs":42,"agentThreads":3,"host":"private-host","token":"private-token","agentWorkingSetBytes":"invalid"}"""))
+{
+    var safe=MysticEgo.Distributed.MobilePcPolicy.Filter("system.health",pcData.RootElement);
+    Check(safe.Count==2&&safe.ContainsKey("uptimeMs")&&safe.ContainsKey("agentThreads"),"PC diagnostics filtered numeric output");
+}
+using(var pcIntegrations=System.Text.Json.JsonDocument.Parse("""{"lmStudioApi":true,"openRgb":false,"note":"private","nvidia":123}"""))
+    Check(MysticEgo.Distributed.MobilePcPolicy.Filter("integrations.status",pcIntegrations.RootElement).Count==2,"PC diagnostics filtered boolean output");
