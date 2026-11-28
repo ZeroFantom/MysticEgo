@@ -17,6 +17,8 @@ using MysticEgo.Distributed;
 using MysticEgo.Soul;
 using MysticEgo.Api.Orchestra.Controllers;
 using Models.Data;
+using MysticEgo.Api.Orchestra;
+using MysticEgo.WorldAI;
 using Microsoft.Data.Sqlite;
 
 var tmp=Directory.CreateTempSubdirectory("collective-http-").FullName;
@@ -28,7 +30,14 @@ builder.Configuration["Soul:StoragePath"]=Path.Combine(tmp,"souls");
 builder.Services.AddSingleton(new NodeOptions{NodeId="test",DataPath=Path.Combine(tmp,"node.db")});
 builder.Services.AddSingleton<NodeState>();builder.Services.AddSocial();builder.Services.AddSoul();
 builder.Services.AddHttpClient();builder.Services.AddScoped<CollectiveVoice>();
-builder.Services.AddControllers().AddApplicationPart(typeof(CollectiveController).Assembly);
+builder.Configuration["WorldAI:StoragePath"] = Path.Combine(tmp, "world-ai");
+builder.Services.AddSingleton<WorldAiJobQueue>();
+builder.Services.AddSingleton<WorldAiCluster>();
+builder.Services.AddSingleton<DevelopmentTeam>();
+var provider = new QuestFixtureProvider();
+builder.Services.AddHttpClient("world-ai").ConfigurePrimaryHttpMessageHandler(() => provider);
+builder.Services.AddControllers().AddApplicationPart(typeof(CollectiveController).Assembly)
+    .AddApplicationPart(typeof(WorldAiController).Assembly);
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o=>{
     o.TokenValidationParameters=new(){ValidateIssuer=true,ValidIssuer="test",ValidateAudience=true,ValidAudience="test",
         ValidateIssuerSigningKey=true,IssuerSigningKey=new SymmetricSecurityKey(key),ValidateLifetime=true};
@@ -41,8 +50,8 @@ try{
  var origin=app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
  using var http=new HttpClient{BaseAddress=new Uri(origin)};
  var actor=Guid.NewGuid();var other=Guid.NewGuid();
- string Token(string id)=>new JwtSecurityTokenHandler().WriteToken(new JwtSecurityToken("test","test",
-    [new Claim(ClaimTypes.NameIdentifier,id),new Claim(ClaimTypes.Name,"smoke-user")],expires:DateTime.UtcNow.AddMinutes(5),
+ string Token(string id, string role = "audit", string kind = "account")=>new JwtSecurityTokenHandler().WriteToken(new JwtSecurityToken("test","test",
+    [new Claim(ClaimTypes.NameIdentifier,id),new Claim(ClaimTypes.Name,"smoke-user"), new Claim(ClaimTypes.Role,role), new Claim("token_use",kind)],expires:DateTime.UtcNow.AddMinutes(5),
     signingCredentials:new SigningCredentials(new SymmetricSecurityKey(key),SecurityAlgorithms.HmacSha256)));
  http.DefaultRequestHeaders.Authorization=new AuthenticationHeaderValue("Bearer",Token(actor.ToString()));
  const string route="/api/v1/collective/";
@@ -69,5 +78,7 @@ try{
  Check((await Read("profile")).GetProperty("id").GetGuid()==actor,"basic profile independent from game file");
  http.DefaultRequestHeaders.Authorization=new AuthenticationHeaderValue("Bearer",Token("not-a-guid"));
  using(var invalid=await http.GetAsync(route+"notifications"))Check((int)invalid.StatusCode==401,"invalid account identity must not produce 500");
+ builder.Configuration["DevelopmentTeam:OwnerId"] = actor.ToString();
+ await QuestProposalSmoke.Run(http, app.Services, provider, actor, other, Token);
  Console.WriteLine("Collective HTTP, notifications isolation, read-only schemas and legacy profile recovery passed");
 }finally{await app.StopAsync();SqliteConnection.ClearAllPools();Directory.Delete(tmp,true);}

@@ -5,6 +5,8 @@ on:
       - 'services/Api.Orchestra/**'
       - 'services/MysticEgo.Distributed/**'
       - 'services/MysticEgo.Soul/**'
+      - 'services/MysticEgo.WorldAI/**'
+      - 'tests/WorldAiQueueSmoke/**'
       - 'core/Models.Data/**'
       - 'frontend/**'
       - 'tests/CollectiveHttpSmoke/**'
@@ -22,3 +24,4 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - run: dotnet run --project tests/CollectiveHttpSmoke/CollectiveHttpSmoke.csproj -c Release
+      - run: dotnet run --project tests/WorldAiQueueSmoke/WorldAiQueueSmoke.csproj -c Release

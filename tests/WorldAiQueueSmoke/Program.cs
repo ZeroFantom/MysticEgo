@@ -21,6 +21,21 @@ try
     var recovered=new WorldAiJobQueue(config);
     var resumed=await recovered.Take(CancellationToken.None);
     if(resumed?.Id!=first.Id||resumed.Attempts!=2)throw new Exception("In-flight task not recovered");
+    // Simulate a journal destination that cannot be atomically replaced.
+    var journal = Path.Combine(temp, "jobs.json");
+    var backup = Path.Combine(temp, "before-fault.json");
+    File.Move(journal, backup);
+    Directory.CreateDirectory(journal);
+    try
+    {
+        await recovered.Finish(first.Id, "Reply", "worker-a", null, CancellationToken.None);
+        throw new Exception("Rejected write reported success");
+    }
+    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+    var inMemory = await recovered.Find(first.Id, CancellationToken.None);
+    if (inMemory is not { State: "running", Result: null }) throw new Exception("Uncommitted result visible");
+    Directory.Delete(journal);
+    File.Move(backup, journal);
     await recovered.Finish(first.Id,"Reply","worker-a",null,CancellationToken.None);
     var result=await new WorldAiJobQueue(config).Find(first.Id,CancellationToken.None);
     if(result?.State!="completed"||result.Result!="Reply")throw new Exception("Completed result not durable");

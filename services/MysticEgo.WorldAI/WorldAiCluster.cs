@@ -137,10 +137,10 @@ public sealed class WorldAiCluster
             _circuit[id]=(n,DateTimeOffset.UtcNow+cooldown);
         }finally{_mutex.Release();}
     }
-    public async Task<object> Chat(ChatRequest request,CancellationToken ct)
+    public async Task<object> Chat(ChatRequest request,CancellationToken ct, bool includeSharedMemory = true)
     {
         if(!SupportsRole(request.Role) ||request.Prompt.Length is <1 or >5000 ||request.MaxTokens is <1 or >1200||request.ContextFacts?.Length>50)throw new ArgumentException("Invalid inference request");
-        var context=string.Join("\n",Memory().Where(x=>x.Kind is "world" or "lore").TakeLast(20).Select(x=>x.Content));
+        var context=includeSharedMemory ? string.Join("\n",Memory().Where(x=>x.Kind is "world" or "lore").TakeLast(20).Select(x=>x.Content)) : "";
         // Canonical facts are known to operators only. This API is restricted to the developer team.
         var system=request.Role=="panel-data"
             ? "Process only the data supplied in the request. Describe findings and uncertainty. Do not issue commands or claim to have changed records."
