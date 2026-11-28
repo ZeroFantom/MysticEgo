@@ -25,7 +25,7 @@ export function RemoteInference(){
   }catch(e){if(id===epoch.current){cancel();setError('Не удалось записать звук: '+String(e))}}
  }
  if(!supported)return null;
- return <section className="panel stack"><h2>Вычисления на сервере / в облаке</h2><p>Обычный чат MysticEgo использует модель серверного узла. Дополнительный внешний провайдер выбирается явно; история диалога, файлы и инструменты устройств не отправляются.</p>
+ return <section className="panel stack"><h2>Вычисления на сервере / в облаке</h2><p>В Android выберите AI → Встроенная модель для автономного режима или AI → Локальный API для отдельного сервера на телефоне. Между режимами нет автоматической передачи диалога.</p><p>Обычный чат MysticEgo использует модель серверного узла. Дополнительный внешний провайдер выбирается явно; история диалога, файлы и инструменты устройств не отправляются.</p>
  <p>Облачная модель: {providers.value?.cloud?providers.value.cloudName:'не настроена'} · Речь: {providers.value?.speech?providers.value.speechName:'не настроена'}</p>
  <label><input type="checkbox" checked={cloudConsent} onChange={e=>setCloudConsent(e.target.checked)}/> Разрешаю передачу введённого текста настроенному внешнему провайдеру</label>
  <textarea maxLength={4000} value={text} onChange={e=>setText(e.target.value)} placeholder="Сообщение или распознанный текст"/>

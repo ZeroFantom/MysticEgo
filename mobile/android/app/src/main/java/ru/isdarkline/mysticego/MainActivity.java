@@ -131,7 +131,7 @@ public final class MainActivity extends ComponentActivity {
         bar.addView(button("←", "Back", () -> { if (web.canGoBack()) web.goBack(); else web.loadUrl(MobileRoutes.HOME); }));
         bar.addView(button("⌂", "Home", () -> web.loadUrl(MobileRoutes.HOME)));
         bar.addView(button("QR", "Scan sign-in or friend QR", this::scanQr));
-        bar.addView(button("AI", "Локальная модель", () -> startActivity(new Intent(this,LocalModelActivity.class))));
+        bar.addView(button("AI", "Выбор вычислений ИИ", this::chooseInference));
         bar.addView(button("MCP", "Mobile Agent", () -> startActivity(new Intent(this,MobileAgentActivity.class))));
         bar.addView(button("↻", "Reload", () -> web.reload()));
         android.widget.HorizontalScrollView actionScroll=new android.widget.HorizontalScrollView(this);
@@ -224,6 +224,24 @@ public final class MainActivity extends ComponentActivity {
     private String safeModel() {
         String model=(Build.MANUFACTURER+" "+Build.MODEL).replaceAll("[^A-Za-z0-9._ -]", "_").trim().replace(' ', '_');
         return model.substring(0,Math.min(80,model.length()));
+    }
+
+    private void chooseInference() {
+        android.app.ActivityManager.MemoryInfo memory=new android.app.ActivityManager.MemoryInfo();
+        ((android.app.ActivityManager)getSystemService(ACTIVITY_SERVICE)).getMemoryInfo(memory);
+        android.os.BatteryManager battery=(android.os.BatteryManager)getSystemService(BATTERY_SERVICE);
+        int level=battery==null?-1:battery.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY);
+        int thermal=android.os.Build.VERSION.SDK_INT>=29?((android.os.PowerManager)getSystemService(POWER_SERVICE)).getCurrentThermalStatus():-1;
+        String warning=LocalInferencePolicy.block(1,memory.availMem,memory.lowMemory,level,thermal);
+        String[] choices={"Встроенная модель"+(warning==null?"":" · рекомендуется сервер"),"Локальный API (PocketPal / llama.cpp)","Сервер MysticEgo","Облачная модель и речь"};
+        new android.app.AlertDialog.Builder(this).setTitle("MysticEgo · Вычисления ИИ").setItems(choices,(dialog,index)->{
+            switch(index){
+                case 0:startActivity(new Intent(this,EmbeddedModelActivity.class));break;
+                case 1:startActivity(new Intent(this,LocalModelActivity.class));break;
+                case 2:web.loadUrl(MobileRoutes.ORIGIN+"/audit-portal/assistant");break;
+                case 3:web.loadUrl(MobileRoutes.ORIGIN+"/audit-portal/assistant?tab=compute");break;
+            }
+        }).setNegativeButton("Отмена",null).show();
     }
 
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
