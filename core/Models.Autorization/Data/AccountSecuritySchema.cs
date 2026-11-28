@@ -64,6 +64,20 @@ public static class AccountSecuritySchema
                 "RevokedUtc" {timestamp} NULL
             );
             CREATE INDEX IF NOT EXISTS "IX_account_mobile_agents_UserId" ON account_mobile_agents ("UserId");
+            CREATE TABLE IF NOT EXISTS mobile_agent_actions (
+                "Id" {guid} NOT NULL PRIMARY KEY,
+                "UserId" {guid} NOT NULL REFERENCES users("Id") ON DELETE CASCADE,
+                "Source" {guid} NOT NULL,
+                "Target" {guid} NOT NULL,
+                "Action" varchar(32) NOT NULL,
+                "State" varchar(32) NOT NULL,
+                "Result" varchar(8) NULL,
+                "CreatedUtc" {timestamp} NOT NULL,
+                "UpdatedUtc" {timestamp} NOT NULL,
+                "ExpiresUtc" {timestamp} NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS "IX_mobile_agent_actions_UserId_CreatedUtc" ON mobile_agent_actions ("UserId","CreatedUtc");
+            CREATE INDEX IF NOT EXISTS "IX_mobile_agent_actions_Target_ExpiresUtc" ON mobile_agent_actions ("Target","ExpiresUtc");
             CREATE TABLE IF NOT EXISTS account_device_grants (
                 "UserId" {guid} NOT NULL REFERENCES users("Id") ON DELETE CASCADE,
                 "DeviceId" {guid} NOT NULL,

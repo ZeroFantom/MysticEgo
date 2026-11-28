@@ -4,9 +4,9 @@ import {ANDROID_ORIGIN} from './androidLaunch';
 import {Panel,ErrorBanner} from '../components/primitives';
 
 type Device={id:string;name:string;os:string;createdUtc:string;lastSeenUtc?:string;revokedUtc?:string;ready:boolean};
-type Item={id:string;target:string;action:string;state:string;result?:string;expires:string};
+type Item={id:string;target:string;action:string;state:string;result?:string;expires:string;createdUtc:string;updatedUtc:string};
 const actions={'battery-status':'Уровень батареи','vibrate':'Короткая вибрация','open-assistant':'Открыть ассистента'} as const;
-const states:Record<string,string>={pending:'Ожидает подтверждения',accepted:'Принят, результат ещё не получен',declined:'Отклонён','reported-success':'Устройство сообщило об успехе','reported-failure':'Устройство сообщило об ошибке'};
+const states:Record<string,string>={pending:'Ожидает подтверждения',accepted:'Принят, результат ещё не получен',declined:'Отклонён',revoked:'Отозван',expired:'Истёк','result-unknown':'Результат не получен','reported-success':'Устройство сообщило об успехе','reported-failure':'Устройство сообщило об ошибке'};
 export function MobileAgentPanel(){
  const {session,preferenceScope}=useApp();
  const eligible=location.origin===ANDROID_ORIGIN&&session.authUrl.replace(/\/$/,'')===location.origin;
@@ -22,7 +22,7 @@ export function MobileAgentPanel(){
   return JSON.parse(r.result.content[0].text);
  }
  const devices=useRemote<Device[]>(()=>eligible?call('devices'):Promise.resolve([]),[eligible,preferenceScope,session.token],15000);
- const jobs=useRemote<Item[]>(()=>eligible?mcp('mobile.status'):Promise.resolve([]),[eligible,preferenceScope,session.token],10000);
+ const jobs=useRemote<Item[]>(()=>eligible?call('history'):Promise.resolve([]),[eligible,preferenceScope,session.token],10000);
  useEffect(()=>{generation.current++;setEnrollmentConsent(false);setTicket('');setTarget('');setRevoke('');setError('');setBusy(false);return()=>{generation.current++}},[preferenceScope,session.token]);
  useEffect(()=>{if(!ticket)return;const timer=window.setTimeout(()=>setTicket(''),120000);return()=>window.clearTimeout(timer)},[ticket]);
  async function run(work:()=>Promise<void>){const current=generation.current;setBusy(true);setError('');try{await work();if(current===generation.current){devices.reload();jobs.reload()}}catch(e){if(current===generation.current)setError(String(e))}finally{if(current===generation.current)setBusy(false)}}
@@ -38,7 +38,7 @@ export function MobileAgentPanel(){
   <div className="stack"><label>Телефон<select value={target} onChange={e=>setTarget(e.target.value)}><option value="">Выберите устройство</option>{devices.value?.filter(d=>!d.revokedUtc).map(d=><option key={d.id} value={d.id} disabled={!d.ready}>{d.name} · {d.os}</option>)}</select></label>
   <label>Действие<select value={action} onChange={e=>setAction(e.target.value as keyof typeof actions)}>{Object.entries(actions).map(([id,title])=><option value={id} key={id}>{title}</option>)}</select></label>
   <button className="btn" disabled={busy||!devices.value?.some(d=>d.id===target&&d.ready&&!d.revokedUtc)} onClick={()=>void run(async()=>{await mcp('mobile.request',{targetId:target,action})})}>Отправить запрос на телефон</button></div>
-  {jobs.value?.map(j=><article className="panel" key={j.id}><strong>{actions[j.action as keyof typeof actions]??'Запрос'}</strong><p>{states[j.state]??j.state}{j.action==='battery-status'&&j.result?' · '+j.result+'%':''}</p></article>)}
-  <small>Результаты доступны до истечения двухминутного запроса. Это сообщения самого клиента, а не независимое доказательство исполнения.</small>
+  <h3>Журнал действий телефона</h3>{jobs.value?.map(j=><article className="panel" key={j.id}><strong>{actions[j.action as keyof typeof actions]??'Запрос'}</strong><p>{states[j.state]??j.state}{j.action==='battery-status'&&j.result?' · '+j.result+'%':''}</p><small>{new Date(j.createdUtc).toLocaleString()} · {devices.value?.find(d=>d.id===j.target)?.name??j.target}</small></article>)}
+  <small>Запрос выполняется только в течение двух минут. В журнале — до 50 последних запросов аккаунта; записи старше 30 дней очищаются при обращении. Результаты сообщены самим клиентом.</small>
  </Panel>;
 }

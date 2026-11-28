@@ -19,7 +19,7 @@ internal static class AuthGateway
             Forward(context, clients, node.AuthUrl, "presentation")).RequireAuthorization();
         app.MapPost("/api/auth/presentation", (HttpContext context, IHttpClientFactory clients) =>
             Forward(context, clients, node.AuthUrl, "presentation")).RequireAuthorization();
-        foreach (var action in new[] { "sessions", "sessions/current", "consents", "device-actions", "mobile-agent/devices" })
+        foreach (var action in new[] { "sessions", "sessions/current", "consents", "device-actions", "mobile-agent/devices", "mobile-agent/history" })
             app.MapGet("/api/auth/" + action, (HttpContext context, IHttpClientFactory clients) =>
                 Forward(context, clients, node.AuthUrl, action)).RequireAuthorization();
         foreach (var action in new[] { "sessions/revoke-others", "consents", "device-grants/revoke", "device-grants/approve", "qr/inspect", "qr/approve", "device-actions/mcp", "device-actions/decide", "device-actions/presence", "device-actions/cancel", "mobile-agent/ticket", "mobile-agent/revoke", "mobile-agent/mcp" })

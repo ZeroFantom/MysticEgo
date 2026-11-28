@@ -75,6 +75,28 @@ await using(var db=new AuthDbContext(dbOptions))
     var enrolled=new AccountMobileAgent{Id=Guid.NewGuid(),UserId=owner.Id,Name="Test Android",Os="Android 15",SecretHash=new string('A',64),CreatedUtc=DateTime.UtcNow};
     db.AccountMobileAgents.Add(enrolled);await db.SaveChangesAsync();
     if(await db.AccountMobileAgents.CountAsync(x=>x.UserId==other.Id)!=0)throw new Exception("Mobile Agent account isolation");
+    var now=DateTime.UtcNow;
+    await db.AccountMobileAgents.Where(x=>x.Id==enrolled.Id).ExecuteUpdateAsync(x=>x.SetProperty(a=>a.LastSeenUtc,now));
+    var history=new Models.Autorization.Services.MobileAgentHistory(db);
+    var job=await history.Request(owner.Id,current,enrolled.Id,"battery-status",now,default)??throw new Exception("Mobile history admission");
+    if(await history.Request(owner.Id,current,enrolled.Id,"shell",now,default)!=null||
+        (await history.Pending(other.Id,enrolled.Id,now,default)).Count!=0||
+        await history.Decide(owner.Id,Guid.NewGuid(),job.Id,true,now,default)!=null||
+        await history.Complete(owner.Id,enrolled.Id,job.Id,true,"50",now,default)!=null)throw new Exception("Mobile history isolation");
+    if((await history.Decide(owner.Id,enrolled.Id,job.Id,true,now,default))?.State!="accepted"||
+        await history.Decide(owner.Id,enrolled.Id,job.Id,true,now,default)!=null||
+        await history.Complete(owner.Id,enrolled.Id,job.Id,true,"999",now,default)!=null||
+        (await history.Complete(owner.Id,enrolled.Id,job.Id,true,"52",now,default))?.State!="reported-success"||
+        await history.Complete(owner.Id,enrolled.Id,job.Id,true,"52",now,default)!=null)throw new Exception("Mobile transition replay");
+    db.ChangeTracker.Clear();
+    var persisted=await new Models.Autorization.Services.MobileAgentHistory(db).Read(owner.Id,null,now.AddMinutes(3),default);
+    if(persisted.Single().Result!="52"||(await history.Read(other.Id,null,now,default)).Count!=0)throw new Exception("Mobile durable history");
+    var job2=await history.Request(owner.Id,current,enrolled.Id,"vibrate",now,default)??throw new Exception("Mobile second job");
+    await history.Revoke(owner.Id,enrolled.Id,now,default);
+    if(await history.Decide(owner.Id,enrolled.Id,job2.Id,true,now,default)!=null||
+        (await history.Read(owner.Id,null,now,default)).Single(x=>x.Id==job2.Id).State!="revoked")throw new Exception("Mobile revoke ledger");
+    await history.Cleanup(owner.Id,now.AddDays(31),default);
+    if((await history.Read(owner.Id,null,now.AddDays(31),default)).Count!=0)throw new Exception("Mobile history retention");
     var grant=new AccountDeviceGrant{UserId=owner.Id,DeviceId=Guid.NewGuid(),GrantId=Guid.NewGuid(),Scope="avatar-desktop",PolicyVersion="1",GrantedUtc=DateTime.UtcNow};
     db.AccountDeviceGrants.Add(grant);await db.SaveChangesAsync();
     var revoked=await db.AccountDeviceGrants.Where(x=>x.UserId==other.Id&&x.DeviceId==grant.DeviceId).ExecuteUpdateAsync(s=>s.SetProperty(x=>x.RevokedUtc,DateTime.UtcNow));
@@ -177,8 +199,4 @@ var expiredTicket=nativeQueue.Issue(nativeOwner,nativeSession,nativeNow)!;
 if(nativeQueue.Consume(expiredTicket,nativeNow.AddMinutes(3))!=null)throw new Exception("Native pairing expiry");
 var nativeSecret=Models.Autorization.Services.MobileAgentRequests.Secret();
 if(!Models.Autorization.Services.MobileAgentRequests.Match(Models.Autorization.Services.MobileAgentRequests.Hash(nativeSecret),nativeSecret)||Models.Autorization.Services.MobileAgentRequests.Match(Models.Autorization.Services.MobileAgentRequests.Hash(nativeSecret),new string('b',64)))throw new Exception("Native secret comparison");
-var nativeJob=nativeQueue.Request(nativeOwner,nativeSession,nativeTarget,"battery-status",nativeNow)!;
-if(nativeQueue.Request(nativeOwner,nativeSession,nativeTarget,"shell",nativeNow)!=null||nativeQueue.ForTarget(Guid.NewGuid(),nativeTarget,nativeNow).Length!=0||nativeQueue.Decide(nativeOwner,Guid.NewGuid(),nativeJob.Id,true,nativeNow)!=null||nativeQueue.Complete(nativeOwner,nativeTarget,nativeJob.Id,true,"99",nativeNow)!=null)throw new Exception("Native action isolation");
-if(nativeQueue.Decide(nativeOwner,nativeTarget,nativeJob.Id,true,nativeNow)?.State!="accepted"||nativeQueue.Decide(nativeOwner,nativeTarget,nativeJob.Id,true,nativeNow)!=null||nativeQueue.Complete(nativeOwner,nativeTarget,nativeJob.Id,true,"999",nativeNow)!=null||nativeQueue.Complete(nativeOwner,nativeTarget,nativeJob.Id,true,"52",nativeNow)?.State!="reported-success")throw new Exception("Native result validation");
-nativeQueue.Revoke(nativeOwner,nativeTarget);if(nativeQueue.ForSource(nativeOwner,nativeSession,nativeNow).Length!=0)throw new Exception("Native revocation");
-Console.WriteLine("Mobile Agent ticket, target approval, action allowlist, results and revocation passed");
+Console.WriteLine("Mobile Agent pairing ticket and secret validation passed");

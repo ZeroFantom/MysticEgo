@@ -14,6 +14,7 @@ namespace Api.Auth.Controllers;
 [ResponseCache(NoStore=true,Location=ResponseCacheLocation.None)]
 public sealed class MobileAgentController(AuthDbContext db,MobileAgentRequests queue):BaseApiController
 {
+    private readonly MobileAgentHistory history=new(db);
     private Guid? Sid=>Guid.TryParse(User.FindFirst("mystic_session")?.Value,out var id)?id:null;
     private bool Account=>CurrentUserId.HasValue&&Sid.HasValue&&!User.HasClaim("token_use","device");
     private Task<bool> Active(Guid owner,Guid session,CancellationToken ct)=>db.RefreshTokens.AsNoTracking().AnyAsync(x=>x.UserId==owner&&x.SessionId==session&&x.ExpiresAt>DateTime.UtcNow&&x.User!.IsActive,ct);
@@ -55,19 +56,15 @@ public sealed class MobileAgentController(AuthDbContext db,MobileAgentRequests q
         var agent=await Agent(input.Id,AgentSecret(),ct);if(agent is null)return Unauthorized();
         var updated=await db.AccountMobileAgents.Where(x=>x.Id==agent.Id&&x.RevokedUtc==null).ExecuteUpdateAsync(s=>s.SetProperty(x=>x.LastSeenUtc,DateTime.UtcNow),ct);
         if(updated!=1)return Unauthorized();
-        var requests=queue.ForTarget(agent.UserId,agent.Id,DateTimeOffset.UtcNow);
-        return Ok(requests.Select(x=>new{x.Id,x.Action,x.Expires}));
+        var requests=await history.Pending(agent.UserId,agent.Id,DateTime.UtcNow,ct);
+        return Ok(requests.Select(x=>new{x.Id,x.Action,expires=x.ExpiresUtc}));
     }
     public sealed record Decision(Guid Id,Guid RequestId,bool Approve);
     [AllowAnonymous,HttpPost("decide"),RequestSizeLimit(2048)]
     public async Task<IActionResult> Decide(Decision input,CancellationToken ct)
     {
         var agent=await Agent(input.Id,AgentSecret(),ct);if(agent is null)return Unauthorized();
-        var now=DateTimeOffset.UtcNow;
-        var item=queue.ForTarget(agent.UserId,agent.Id,now).FirstOrDefault(x=>x.Id==input.RequestId);
-        if(item is null)return Conflict();
-        if(input.Approve&&!await Active(agent.UserId,item.Source,ct))return Conflict();
-        var result=queue.Decide(agent.UserId,agent.Id,input.RequestId,input.Approve,DateTimeOffset.UtcNow);
+        var result=await history.Decide(agent.UserId,agent.Id,input.RequestId,input.Approve,DateTime.UtcNow,ct);
         return result is null?Conflict():Ok(new{result.Id,result.Action,result.State});
     }
     public sealed record Completion(Guid Id,Guid RequestId,bool Success,string? Result);
@@ -76,7 +73,7 @@ public sealed class MobileAgentController(AuthDbContext db,MobileAgentRequests q
     {
         var agent=await Agent(input.Id,AgentSecret(),ct);if(agent is null)return Unauthorized();
         if(input.Result?.Length>8)return BadRequest();
-        var item=queue.Complete(agent.UserId,agent.Id,input.RequestId,input.Success,input.Result,DateTimeOffset.UtcNow);
+        var item=await history.Complete(agent.UserId,agent.Id,input.RequestId,input.Success,input.Result,DateTime.UtcNow,ct);
         return item is null?Conflict():Ok(new{item.Id,item.State});
     }
 
@@ -93,8 +90,18 @@ public sealed class MobileAgentController(AuthDbContext db,MobileAgentRequests q
     {
         if(!await AccountActive(ct))return Unauthorized();
         var owner=CurrentUserId!.Value;
-        var count=await db.AccountMobileAgents.Where(x=>x.UserId==owner&&x.Id==input.Id&&x.RevokedUtc==null).ExecuteUpdateAsync(s=>s.SetProperty(x=>x.RevokedUtc,DateTime.UtcNow),ct);
-        if(count!=1)return NotFound();queue.Revoke(owner,input.Id);return NoContent();
+        var now=DateTime.UtcNow;
+        await using var transaction=await db.Database.BeginTransactionAsync(ct);
+        var count=await db.AccountMobileAgents.Where(x=>x.UserId==owner&&x.Id==input.Id&&x.RevokedUtc==null).ExecuteUpdateAsync(s=>s.SetProperty(x=>x.RevokedUtc,now),ct);
+        if(count!=1)return NotFound();await history.Revoke(owner,input.Id,now,ct);await transaction.CommitAsync(ct);return NoContent();
+    }
+    private static object View(MobileAgentAction row,DateTime now)=>new{row.Id,row.Target,row.Action,state=MobileAgentHistory.DisplayState(row,now),row.Result,row.CreatedUtc,row.UpdatedUtc,expires=row.ExpiresUtc};
+    [Authorize,HttpGet("history")]
+    public async Task<IActionResult> History(CancellationToken ct)
+    {
+        if(!await AccountActive(ct))return Unauthorized();
+        var now=DateTime.UtcNow;
+        return Ok((await history.Read(CurrentUserId!.Value,null,now,ct)).Select(x=>View(x,now)));
     }
     [Authorize,HttpPost("mcp"),RequestSizeLimit(4096)]
     public async Task<IActionResult> Mcp(JsonElement q,CancellationToken ct)
@@ -113,7 +120,7 @@ public sealed class MobileAgentController(AuthDbContext db,MobileAgentRequests q
         if(method=="tools/list")return Result(new{tools=new object[]{
             new{name="mobile.list",description="List registered, non-revoked Android agents of this account. Readiness is a recent heartbeat, not proof of connectivity.",inputSchema=Schema(new(),[])},
             new{name="mobile.request",description="Ask a registered Android agent for a locally confirmed fixed action. No arbitrary arguments or OS commands.",inputSchema=Schema(new(){["targetId"]=uuid,["action"]=new{type="string",@enum=MobileAgentRequests.Actions}},["targetId","action"])},
-            new{name="mobile.status",description="List unexpired requests from this account session with device-reported results.",inputSchema=Schema(new(),[])}
+            new{name="mobile.status",description="List the latest requests from this account session with device-reported results.",inputSchema=Schema(new(),[])}
         }});
         if(method!="tools/call")return Error(-32601,"Method not found");
         if(!q.TryGetProperty("params",out var p)||p.ValueKind!=JsonValueKind.Object||!p.TryGetProperty("name",out var n)||n.ValueKind!=JsonValueKind.String||!p.TryGetProperty("arguments",out var a)||a.ValueKind!=JsonValueKind.Object)return Error(-32602,"Invalid arguments");
@@ -123,10 +130,10 @@ public sealed class MobileAgentController(AuthDbContext db,MobileAgentRequests q
             var agents=await db.AccountMobileAgents.AsNoTracking().Where(x=>x.UserId==owner&&x.RevokedUtc==null).Take(40).Select(x=>new{x.Id,x.Name,x.Os,x.LastSeenUtc}).ToListAsync(ct);
             return Content(agents.Select(x=>new{x.Id,x.Name,x.Os,x.LastSeenUtc,ready=x.LastSeenUtc>now.UtcDateTime.AddSeconds(-35)}));
         }
-        if(n.GetString()=="mobile.status"&&a.EnumerateObject().Count()==0)return Content(queue.ForSource(owner,sid,now).Select(x=>new{x.Id,x.Target,x.Action,x.State,x.Result,x.Expires}));
+        if(n.GetString()=="mobile.status"&&a.EnumerateObject().Count()==0)return Content((await history.Read(owner,sid,now.UtcDateTime,ct)).Select(x=>View(x,now.UtcDateTime)));
         if(n.GetString()!="mobile.request"||a.EnumerateObject().Count()!=2||!a.TryGetProperty("targetId",out var t)||t.ValueKind!=JsonValueKind.String||!t.TryGetGuid(out var target)||!a.TryGetProperty("action",out var action)||action.ValueKind!=JsonValueKind.String)return Error(-32602,"Invalid arguments");
         if(!await db.AccountMobileAgents.AsNoTracking().AnyAsync(x=>x.Id==target&&x.UserId==owner&&x.RevokedUtc==null&&x.LastSeenUtc>now.UtcDateTime.AddSeconds(-35),ct))return Error(-32602,"Agent unavailable");
-        var item=queue.Request(owner,sid,target,action.GetString()!,now);
-        return item is null?Error(-32602,"Action unavailable or queue full"):Content(new{item.Id,item.State,item.Expires});
+        var item=await history.Request(owner,sid,target,action.GetString()!,now.UtcDateTime,ct);
+        return item is null?Error(-32602,"Action unavailable or queue full"):Content(new{item.Id,item.State,expires=item.ExpiresUtc});
     }
 }
