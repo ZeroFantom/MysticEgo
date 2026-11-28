@@ -66,6 +66,20 @@ public sealed class AssistantWorkbenchController(ILocalAssistantService assistan
         Пользователь сначала увидит черновик и сможет изменить его перед сохранением. /no_think
         """;
 
+    private bool MobileAccount => node.Kind==NodeKind.Orchestra && Actor is not null && Account!=Guid.Empty && !User.HasClaim("token_use","device") && Guid.TryParse(User.FindFirst("mystic_session")?.Value,out _);
+
+    [HttpGet("mobile/providers")]
+    public IActionResult MobileProviders([FromServices] Microsoft.Extensions.Configuration.IConfiguration config) => MobileAccount ? Ok(new{cloud=MobileInference.ChatConfigured(config),speech=MobileInference.SpeechConfigured(config)}) : Forbid();
+
+    public sealed record MobilePrompt(string Text,bool Consent);
+    [HttpPost("mobile/cloud"),RequestSizeLimit(16384)]
+    public Task<IActionResult> MobileCloud(MobilePrompt input,[FromServices] Microsoft.Extensions.Configuration.IConfiguration config,CancellationToken ct) =>
+        !MobileAccount||!input.Consent?Task.FromResult<IActionResult>(Forbid()):Run(async()=>{Validate(input.Text,4000);return new{text=await MobileInference.Chat(Account,input.Text.Trim(),config,ct)};});
+
+    [HttpPost("mobile/speech"),RequestSizeLimit(5*1024*1024)]
+    public Task<IActionResult> MobileSpeech([FromServices] Microsoft.Extensions.Configuration.IConfiguration config,CancellationToken ct) =>
+        !MobileAccount||Request.Headers["X-Mystic-Speech-Consent"].ToString()!="1"?Task.FromResult<IActionResult>(Forbid()):Run(async()=>new{text=await MobileInference.Speech(Account,Request.Body,config,ct)});
+
     [HttpGet("workbench")]
     public async Task<IActionResult> Status(CancellationToken ct) => Actor is { } actor ?
         Ok(new { service = await assistant.StatusAsync(ct), character = await personas.Read(actor, ct),

@@ -1,3 +1,6 @@
+import {MobileScene} from '../avatar/MobileScene';
+import {RemoteInference} from '../avatar/RemoteInference';
+import {browserKind} from '../app/browserPolicy';
 import {useState,type FormEvent} from 'react';
 import {ArrowUpRight,Bot,Braces,MessageSquare,Send,Server,Sparkles,AudioLines,Monitor,Workflow,UserRound} from 'lucide-react';
 import {Link,useSearchParams} from 'react-router-dom';
@@ -69,6 +72,7 @@ export function AssistantPage(){
     ...(access.value?.developer?[{id:'developer',label:'Разработка',icon:Braces}]:[]),
     ...(access.value?.owner?[{id:'models',label:'Модели',icon:Server}]:[]),
     {id:'persona',label:'Характер',icon:Sparkles},
+    ...(browserKind()==='android'?[{id:'ar',label:'AR',icon:Sparkles},{id:'compute',label:'Модели и речь',icon:Server}]:[]),
   ];
   const requested=params.get('tab');
   const active=tabs.some(tab=>tab.id===requested)?requested:'chat';
@@ -120,6 +124,8 @@ export function AssistantPage(){
     </div>}
     {access.value?.developer&&<div hidden={active!=='developer'}><DeveloperChat/></div>}
     {active==='models'&&access.value?.owner&&<ModelWorkers/>}
+    {active==='ar'&&<MobileScene/>}
+    {active==='compute'&&<RemoteInference/>}
     {active==='persona'&&<div className="assistant-persona">
       <Panel title="Характер ассистента" aside={<Sparkles size={18}/>}>
         <div className="stack">

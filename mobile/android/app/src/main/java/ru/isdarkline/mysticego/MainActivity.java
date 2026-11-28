@@ -42,6 +42,9 @@ public final class MainActivity extends Activity {
     private CheckBox initAcceptance;
     private Button initCamera;
     private boolean cameraReviewed;
+    private PermissionRequest mediaRequest;
+    private String mediaResource;
+    private static final int MEDIA_REQUEST=311;
     private static final String RELEASES = "https://github.com/ZeroFantom/MysticEgo/releases";
 
     @Override public void onCreate(Bundle state) {
@@ -89,6 +92,7 @@ public final class MainActivity extends Activity {
 
     @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] results) {
         super.onRequestPermissionsResult(requestCode,permissions,results);
+        if(requestCode==MEDIA_REQUEST){finishMediaPermission();return;}
         if(requestCode==CAMERA_REQUEST && initCamera!=null){cameraReviewed=true;initCamera.setText(checkSelfPermission(Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED?"Камера: разрешена":"Камера: не разрешена");}
     }
 
@@ -161,7 +165,12 @@ public final class MainActivity extends Activity {
             }
         });
         web.setWebChromeClient(new WebChromeClient() {
-            @Override public void onPermissionRequest(PermissionRequest request) { request.deny(); }
+            @Override public void onPermissionRequest(PermissionRequest request) {
+                runOnUiThread(()->askMediaPermission(request));
+            }
+            @Override public void onPermissionRequestCanceled(PermissionRequest request) {
+                if(mediaRequest==request){mediaRequest=null;mediaResource=null;}
+            }
             @Override public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
                 callback.invoke(origin, false, false);
             }
@@ -174,6 +183,30 @@ public final class MainActivity extends Activity {
         root.requestApplyInsets();
         openIntent(getIntent());
     }
+
+    private void askMediaPermission(PermissionRequest request) {
+        String[] resources=request.getResources();
+        if(web==null||!hasWindowFocus()||!MobileRoutes.trustedPage(web.getUrl())||
+            !MobileRoutes.trustedPage(request.getOrigin().toString())||resources.length!=1||mediaRequest!=null){
+            request.deny();return;
+        }
+        String resource=resources[0];
+        String permission=PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)?Manifest.permission.CAMERA:
+            PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)?Manifest.permission.RECORD_AUDIO:null;
+        if(permission==null){request.deny();return;}
+        mediaRequest=request;mediaResource=resource;
+        new android.app.AlertDialog.Builder(this).setTitle("MysticEgo · Разрешение")
+            .setMessage(permission.equals(Manifest.permission.CAMERA)?"Разрешить камеру для текущей AR-сцены?":"Разрешить запись голоса для текущего запроса?")
+            .setPositiveButton("Разрешить",(d,w)->{if(mediaRequest!=request)return;if(checkSelfPermission(permission)==PackageManager.PERMISSION_GRANTED)finishMediaPermission();else requestPermissions(new String[]{permission},MEDIA_REQUEST);})
+            .setNegativeButton("Отмена",(d,w)->denyMediaPermission()).setOnCancelListener(d->denyMediaPermission()).show();
+    }
+    private void finishMediaPermission(){
+        PermissionRequest request=mediaRequest;String resource=mediaResource;
+        mediaRequest=null;mediaResource=null;if(request==null||resource==null)return;
+        String permission=PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)?Manifest.permission.CAMERA:Manifest.permission.RECORD_AUDIO;
+        if(web!=null&&MobileRoutes.trustedPage(web.getUrl())&&MobileRoutes.trustedPage(request.getOrigin().toString())&&checkSelfPermission(permission)==PackageManager.PERMISSION_GRANTED)request.grant(new String[]{resource});else request.deny();
+    }
+    private void denyMediaPermission(){if(mediaRequest!=null){mediaRequest.deny();mediaRequest=null;mediaResource=null;}}
 
     private String safeModel() {
         String model=(Build.MANUFACTURER+" "+Build.MODEL).replaceAll("[^A-Za-z0-9._ -]", "_").trim().replace(' ', '_');
@@ -228,11 +261,13 @@ public final class MainActivity extends Activity {
     }
 
     @Override protected void onStop() {
+        denyMediaPermission();
         if(web!=null)CookieManager.getInstance().flush();
         super.onStop();
     }
 
     @Override protected void onDestroy() {
+        denyMediaPermission();
         if (web != null) {
             web.stopLoading();
             if (web.getParent() instanceof android.view.ViewGroup) ((android.view.ViewGroup) web.getParent()).removeView(web);
