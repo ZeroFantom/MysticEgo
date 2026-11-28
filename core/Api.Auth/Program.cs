@@ -83,6 +83,8 @@ public static class Program
         builder.Services.AddSingleton<MessengerOutbound>();
         builder.Services.AddScoped<ChatRpRuntime>();
         builder.Services.AddScoped<ChatRpConsentService>();
+        builder.Services.AddScoped<ChatRpPreferences>();
+        builder.Services.AddSingleton<ChatRpMembership>();
         builder.Services.AddSingleton<ChatRpOutbound>();
         builder.Services.AddScoped<Api.Auth.Controllers.ChatRpGroupDispatch>();
         builder.Services.AddHealthChecks();

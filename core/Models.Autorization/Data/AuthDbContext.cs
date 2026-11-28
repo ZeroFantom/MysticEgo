@@ -11,6 +11,7 @@ namespace Models.Autorization.Data
         public DbSet<AccountLicenseAcceptance> AccountLicenseAcceptances => Set<AccountLicenseAcceptance>();
         public DbSet<AccountFeatureConsent> AccountFeatureConsents => Set<AccountFeatureConsent>();
         public DbSet<AccountDeviceGrant> AccountDeviceGrants => Set<AccountDeviceGrant>();
+        public DbSet<ChatRpPreference> ChatRpPreferences => Set<ChatRpPreference>();
         public DbSet<ChatRpConsent> ChatRpConsents => Set<ChatRpConsent>();
         public DbSet<ChatRpDelivery> ChatRpDeliveries => Set<ChatRpDelivery>();
         public DbSet<MessengerWorldCommand> MessengerWorldCommands => Set<MessengerWorldCommand>();
@@ -33,6 +34,16 @@ namespace Models.Autorization.Data
         {
             base.OnModelCreating(mb);
             mb.Entity<ManagedIdentity>(e => { e.ToTable("managed_identities"); e.HasKey(x=>x.Id); e.Property(x=>x.Name).HasMaxLength(160).IsRequired(); e.Property(x=>x.Kind).HasMaxLength(16).IsRequired(); e.Property(x=>x.SecretHash).HasMaxLength(200).IsRequired(); e.HasIndex(x=>x.Kind); });
+
+            mb.Entity<ChatRpPreference>(e =>
+            {
+                e.ToTable("chat_rp_preferences");
+                e.HasKey(x=>new{x.Provider,x.BotId,x.Peer,x.Subject});
+                e.Property(x=>x.Provider).HasMaxLength(16);
+                e.Property(x=>x.BotId).HasMaxLength(20);
+                e.Property(x=>x.Peer).HasMaxLength(24);
+                e.Property(x=>x.Subject).HasMaxLength(20);
+            });
 
             mb.Entity<ChatRpConsent>(e =>
             {

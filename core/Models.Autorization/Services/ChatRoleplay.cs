@@ -77,6 +77,31 @@ public static class ChatRpGroupProof
         return MessengerWebhookProof.Fresh(at,now)?at:null;
     }
     private static bool EventId(string? value)=>value is {Length:>0 and <=128}&&value.All(c=>c is >= '!' and <= '~');
+    private static ChatRpControl? Control(string? text)=>text switch
+    {
+        "/rp_enable"=>ChatRpControl.GroupEnable,"/rp_disable"=>ChatRpControl.GroupDisable,
+        "/rp_on"=>ChatRpControl.MemberOn,"/rp_off"=>ChatRpControl.MemberOff,_=>null
+    };
+    public static ChatRpControlEvent? TelegramControl(MessengerRealm realm,string secret,string? header,JsonElement root,DateTimeOffset now)
+    {
+        if(!realm.Valid||realm.Provider!="telegram"||!MessengerWebhookProof.SecretMatches(secret,header)||
+            !TelegramIdentityProof.UniqueObject(root)||!Obj(root,"message",out var m)||
+            !Obj(m,"chat",out var chat)||Text(chat,"type") is not ("group" or "supergroup")||
+            Num(chat,"id") is not long peer||peer>=0||m.TryGetProperty("message_thread_id",out _)||
+            m.TryGetProperty("is_topic_message",out _)||m.TryGetProperty("forward_origin",out _)||
+            m.TryGetProperty("via_bot",out _)||TgActor(m) is not { } sender||Id(root,"update_id") is null||
+            Date(m,now) is not { } at||Control(Text(m,"text")) is not { } command)return null;
+        return new(realm,peer.ToString(CultureInfo.InvariantCulture),sender.Id,at,command);
+    }
+    public static ChatRpControlEvent? VkControl(MessengerRealm realm,string secret,JsonElement root,DateTimeOffset now)
+    {
+        if(!MessengerWebhookProof.VkEnvelope(realm,secret,root)||Text(root,"type")!="message_new"||
+            !Obj(root,"object",out var obj)||!Obj(obj,"message",out var m)||Num(m,"out")!=0||
+            Num(m,"peer_id") is not long peer||peer<2000000001||Id(m,"from_id") is not string sender||
+            Date(m,now) is not { } at||!EventId(Text(root,"event_id"))||Control(Text(m,"text")) is not { } command)return null;
+        return new(realm,peer.ToString(CultureInfo.InvariantCulture),sender,at,command);
+    }
+
     private static ChatRpDecision? Decision(MessengerRealm realm,string peer,string sender,string? command,string? callback=null)
     {
         if(command is null||command.Length!=37||!(command.StartsWith("rp:a:",StringComparison.Ordinal)||

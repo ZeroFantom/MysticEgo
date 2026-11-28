@@ -4,10 +4,9 @@ using Models.Autorization.Services;
 namespace Api.Auth.Controllers;
 
 /// <summary>Explicit deployment allowlist only. No automatic group registration from messages.</summary>
-public sealed class ChatRpGroupDispatch(IConfiguration configuration,ChatRpRuntime runtime,ChatRpOutbound outbound,ChatRpConsentService consent)
+public sealed class ChatRpGroupDispatch(IConfiguration configuration,ChatRpRuntime runtime,ChatRpOutbound outbound,ChatRpConsentService consent,ChatRpPreferences preferences,ChatRpMembership membership)
 {
-    private ChatRpGroupPolicy? Policy(ChatRpEvent e)=>Policy(e.Realm,e.Peer);
-    private ChatRpGroupPolicy? Policy(MessengerRealm realm,string peer)
+    private ChatRpGroupPolicy? Baseline(MessengerRealm realm,string peer)
     {
         if(!configuration.GetValue<bool>("Messenger:GroupRp:Enabled"))return null;
         var current=MessengerConfiguration.Read(configuration,realm.Provider);
@@ -20,17 +19,46 @@ public sealed class ChatRpGroupDispatch(IConfiguration configuration,ChatRpRunti
         return new(realm,peer,true,ids.ToHashSet(StringComparer.Ordinal));
     }
 
+    private async Task<ChatRpGroupPolicy?> Policy(MessengerRealm realm,string peer,CancellationToken ct)
+    {
+        var baseline=Baseline(realm,peer);
+        return baseline is null?null:await preferences.Effective(baseline,ct);
+    }
+    private Task<ChatRpGroupPolicy?> Policy(ChatRpEvent e,CancellationToken ct)=>Policy(e.Realm,e.Peer,ct);
+
+    public async Task Control(ChatRpControlEvent e,CancellationToken ct)
+    {
+        var baseline=Baseline(e.Realm,e.Peer);
+        if(baseline is null)return;
+        var token=MessengerConfiguration.ReplyToken(configuration,e.Realm);
+        if(string.IsNullOrEmpty(token))return;
+        var role=e.Control==ChatRpControl.MemberOff?ChatRpMemberRole.Unknown:
+            await membership.Role(e.Realm,e.Peer,e.SenderId,token,ct);
+        // Telegram getChatMember for other users is guaranteed only for admin bots.
+        if(e.Control is ChatRpControl.GroupEnable or ChatRpControl.GroupDisable && e.Realm.Provider=="telegram"&&
+            await membership.Role(e.Realm,e.Peer,e.Realm.BotId,token,ct)!=ChatRpMemberRole.Admin)return;
+        if(await preferences.Apply(e,baseline,role,ct))
+            await outbound.ControlReply(e,token,ct);
+    }
+
+    private async Task<bool> Present(ChatRpEvent e,string token,CancellationToken ct)
+    {
+        var roles=await Task.WhenAll(membership.Role(e.Realm,e.Peer,e.Actor.Id,token,ct),
+            membership.Role(e.Realm,e.Peer,e.Target.Id,token,ct));
+        return roles.All(r=>r is ChatRpMemberRole.Admin or ChatRpMemberRole.Member);
+    }
+
     public async Task Process(ChatRpEvent e,CancellationToken ct)
     {
-        var policy=Policy(e);
+        var policy=await Policy(e,ct);
         if(policy is null)return;
         // Media and outbound are separately enabled. A disabled reply path queues nothing.
         var token=MessengerConfiguration.ReplyToken(configuration,e.Realm);
-        if(string.IsNullOrEmpty(token))return;
+        if(string.IsNullOrEmpty(token)||!policy.Allows(e)||!await Present(e,token,ct))return;
         if(ChatRpCatalog.Find(e.Action) is {RequiresConsent:true})
         {
             var invite=await consent.Propose(e,policy,ct);
-            var live=Policy(e);token=MessengerConfiguration.ReplyToken(configuration,e.Realm);
+            var live=await Policy(e,ct);token=MessengerConfiguration.ReplyToken(configuration,e.Realm);
             if(invite is not null&&live is not null&&live.Allows(e)&&!string.IsNullOrEmpty(token))
                 await outbound.Invite(e,invite,token,ct);
             return;
@@ -43,7 +71,7 @@ public sealed class ChatRpGroupDispatch(IConfiguration configuration,ChatRpRunti
     {
         var token=MessengerConfiguration.ReplyToken(configuration,d.Realm);
         if(d.CallbackId is string callback)await outbound.Acknowledge(d.Realm,callback,token,ct);
-        var policy=Policy(d.Realm,d.Peer);
+        var policy=await Policy(d.Realm,d.Peer,ct);
         if(policy is null||string.IsNullOrEmpty(token))return;
         var result=await consent.Decide(d,policy,ct);
         if(result is not null)await Deliver(result.Event,result.DeliveryId,policy,ct);
@@ -51,7 +79,7 @@ public sealed class ChatRpGroupDispatch(IConfiguration configuration,ChatRpRunti
 
     private async Task Deliver(ChatRpEvent e,Guid id,ChatRpGroupPolicy policy,CancellationToken ct)
     {
-        var current=Policy(e)??policy with {Enabled=false};
+        var current=await Policy(e,ct)??policy with {Enabled=false};
         var row=await runtime.Claim(id,current,ct);
         if(row is null)return;
         ChatRpMedia? media=null;
@@ -74,9 +102,9 @@ public sealed class ChatRpGroupDispatch(IConfiguration configuration,ChatRpRunti
         }
         var vk=configuration["Messenger:GroupRp:VkAttachments:"+category];
         // Recheck live group opt-in and bot configuration immediately before sending.
-        current=Policy(e);
+        current=await Policy(e,ct);
         var token=MessengerConfiguration.ReplyToken(configuration,e.Realm);
-        if(current is null||!current.Allows(e)||string.IsNullOrEmpty(token))
+        if(current is null||!current.Allows(e)||string.IsNullOrEmpty(token)||!await Present(e,token,ct))
         {await runtime.Finish(id,ChatRpDeliveryState.Rejected,ct);return;}
         var sent=await outbound.Send(row,token,media,vk,ct);
         await runtime.Finish(id,sent?ChatRpDeliveryState.Sent:ChatRpDeliveryState.Uncertain,ct);

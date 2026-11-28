@@ -25,11 +25,25 @@ public sealed class ChatRpOutbound : IDisposable
         SendCore(new ChatRpDelivery{Id=invitation.Id,Provider=e.Realm.Provider,BotId=e.Realm.BotId,Peer=e.Peer,
             Caption=invitation.Text,Category="consent"},token,null,null,invitation.Id,ct);
 
+    public Task<bool> ControlReply(ChatRpControlEvent e,string? token,CancellationToken ct=default)
+    {
+        var text=e.Control switch
+        {
+            ChatRpControl.GroupEnable=>"RP в беседе включён.",
+            ChatRpControl.GroupDisable=>"RP в беседе отключён.",
+            ChatRpControl.MemberOn=>"Ваше участие в RP включено.",
+            ChatRpControl.MemberOff=>"Ваше участие в RP отключено.",
+            _=>""
+        };
+        return SendCore(new ChatRpDelivery{Id=Guid.NewGuid(),Provider=e.Realm.Provider,BotId=e.Realm.BotId,
+            Peer=e.Peer,Caption=text,Category="control"},token,null,null,null,ct);
+    }
+
     private async Task<bool> SendCore(ChatRpDelivery row,string? token,ChatRpMedia? media,string? vkAttachment,Guid? invite,CancellationToken ct)
     {
         var realm=new MessengerRealm(row.Provider,row.BotId);
         if(!ChatRpDestination.Valid(realm,row.Peer)||row.Caption is not {Length:>0 and <=512}||
-            (invite is null&&!ChatRpCatalog.All.Any(x=>x.Category==row.Category))||
+            (invite is null&&row.Category!="control"&&!ChatRpCatalog.All.Any(x=>x.Category==row.Category))||
             token is not {Length:>=16 and <=512})return false;
         var fields=new Dictionary<string,string>();
         string endpoint;

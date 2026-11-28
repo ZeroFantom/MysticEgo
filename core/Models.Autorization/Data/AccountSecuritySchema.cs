@@ -39,6 +39,15 @@ public static class AccountSecuritySchema
         var timestamp=db.Database.IsNpgsql()?"timestamp with time zone":"TEXT";
         var boolean=db.Database.IsNpgsql()?"boolean":"INTEGER";
         var sql=$"""
+            CREATE TABLE IF NOT EXISTS chat_rp_preferences (
+                "Provider" varchar(16) NOT NULL,
+                "BotId" varchar(20) NOT NULL,
+                "Peer" varchar(24) NOT NULL,
+                "Subject" varchar(20) NOT NULL,
+                "Enabled" {boolean} NOT NULL,
+                "ChangedUtc" {timestamp} NOT NULL,
+                PRIMARY KEY ("Provider","BotId","Peer","Subject")
+            );
             CREATE TABLE IF NOT EXISTS chat_rp_consents (
                 "Id" {guid} NOT NULL PRIMARY KEY,
                 "Provider" varchar(16) NOT NULL,

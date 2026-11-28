@@ -153,3 +153,5 @@ await ChatRpSmoke.Run();
 await ChatRpRuntimeSmoke.Run();
 
 await ChatRpConsentSmoke.Run();
+
+await ChatRpManagementSmoke.Run();

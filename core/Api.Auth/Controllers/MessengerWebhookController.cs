@@ -38,6 +38,8 @@ public sealed class MessengerWebhookController(IConfiguration configuration, Mes
         if(header.Count!=1||!MessengerWebhookProof.SecretMatches(config.Value.Secret,header.ToString()))return Unauthorized();
         var message=MessengerWebhookProof.Telegram(config.Value.Realm,config.Value.Secret,header.ToString(),update,clock.GetUtcNow());
         if(message is not null)await Process(config.Value.Realm,message,ct);
+        else if(ChatRpGroupProof.TelegramControl(config.Value.Realm,config.Value.Secret,header.ToString(),update,clock.GetUtcNow()) is { } control)
+            await groupRp.Control(control,ct);
         else if(ChatRpGroupProof.TelegramDecision(config.Value.Realm,config.Value.Secret,header.ToString(),update,clock.GetUtcNow()) is { } decision)
             await groupRp.Decide(decision,ct);
         else if(ChatRpGroupProof.Telegram(config.Value.Realm,config.Value.Secret,header.ToString(),update,clock.GetUtcNow()) is { } rp)
@@ -59,6 +61,8 @@ public sealed class MessengerWebhookController(IConfiguration configuration, Mes
         }
         var message=MessengerWebhookProof.Vk(config.Value.Realm,config.Value.Secret,update,clock.GetUtcNow());
         if(message is not null)await Process(config.Value.Realm,message,ct);
+        else if(ChatRpGroupProof.VkControl(config.Value.Realm,config.Value.Secret,update,clock.GetUtcNow()) is { } control)
+            await groupRp.Control(control,ct);
         else if(ChatRpGroupProof.VkDecision(config.Value.Realm,config.Value.Secret,update,clock.GetUtcNow()) is { } decision)
             await groupRp.Decide(decision,ct);
         else if(ChatRpGroupProof.Vk(config.Value.Realm,config.Value.Secret,update,clock.GetUtcNow()) is { } rp)
