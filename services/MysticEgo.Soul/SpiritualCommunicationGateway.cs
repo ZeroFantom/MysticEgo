@@ -22,16 +22,17 @@ public sealed record SpiritualMessage(Guid Id, string SenderId, string Recipient
 
 /// <summary>
 /// Bounded, single-process reference application service. Not registered in HTTP/MCP or DI.
-/// All world updates and inbox commits share one gate. No durable queue, real world writer,
+/// All world updates and inbox commits share one gate. Optional local SQLite journal; no real world writer,
 /// identity revocation resolver, external delivery or NPC worker is supplied by this prototype.
 /// A trusted caller must authenticate the account on each invocation. Only player-originated
 /// messages are accepted here; NPC initiative requires its own trusted world entry point.
 /// </summary>
-public sealed class SpiritualCommunicationGateway(TimeProvider clock)
+public sealed class SpiritualCommunicationGateway(TimeProvider clock, SpiritualMessageJournal? journal = null)
 {
     private const int MaxPending = 1024;
     private const int MaxRecords = 8192;
     private readonly object gate = new();
+    private bool snapshotReady;
     private readonly WorldPresenceRegistry presence = new();
     private Dictionary<Guid, string> active = new();
     private HashSet<(string Sender, string Recipient)> permissions = new();
@@ -81,6 +82,7 @@ public sealed class SpiritualCommunicationGateway(TimeProvider clock)
         {
             if (!presence.TryReplace(expected, placements, out revision)) return false;
             active = nextActive; permissions = nextPermissions; friends = nextFriends;
+            snapshotReady = true;
             return true;
         }
     }
@@ -105,6 +107,9 @@ public sealed class SpiritualCommunicationGateway(TimeProvider clock)
         {
             var route = Resolve(account, request.RecipientId);
             if (route is null) return new(SpiritualSendStatus.Unavailable);
+            if (journal is not null)
+                return journal.Enqueue(account, request, new(Guid.NewGuid(), route.Value.Pair.Sender.EntityId,
+                    request.RecipientId, route.Value.Pair.Sender.WorldId, request.Text, clock.GetUtcNow()), MaxPending, MaxRecords);
             var key = (account, request.RequestId);
             if (requests.TryGetValue(key, out var previous))
                 return previous.Message.SenderId == route.Value.Pair.Sender.EntityId &&
@@ -133,6 +138,16 @@ public sealed class SpiritualCommunicationGateway(TimeProvider clock)
     {
         lock (gate)
         {
+            if (journal is not null)
+            {
+                if (!snapshotReady) return false;
+                var stored = journal.Next();
+                if (stored is null) return false;
+                var current = Resolve(stored.Owner, stored.Message.RecipientId);
+                var allowed = current is not null && current.Value.Pair.Sender.EntityId == stored.Message.SenderId &&
+                    current.Value.Pair.Sender.WorldId == stored.Message.WorldId;
+                return journal.Finish(stored.Message.Id, allowed);
+            }
             if (!pending.TryDequeue(out var entry)) return false;
             var route = Resolve(entry.Owner, entry.Message.RecipientId);
             if (route is not null && route.Value.Pair.Sender.EntityId == entry.Message.SenderId &&
@@ -145,7 +160,7 @@ public sealed class SpiritualCommunicationGateway(TimeProvider clock)
     /// <summary>Trusted world-inbox observation for tests/internal integration; not a player history endpoint.</summary>
     public SpiritualMessage? Committed(Guid id)
     {
-        lock (gate) return delivered.GetValueOrDefault(id);
+        lock (gate) return journal is null ? delivered.GetValueOrDefault(id) : journal.Committed(id);
     }
 
     private (WorldPresencePair Pair, SpiritualConnectionDecision Decision)? Resolve(Guid account, string recipient)

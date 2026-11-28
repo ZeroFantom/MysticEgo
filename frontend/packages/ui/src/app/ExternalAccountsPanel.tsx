@@ -67,14 +67,14 @@ export function ExternalAccountsPanel(){
   if(previous.browserSession)await browserAuthRequest('logout').catch(()=>{});
   if(id===epoch.current)setSession({...previous,token:'',refreshToken:undefined,browserSession:undefined,username:undefined});
  }
- const available=(['telegram','vk'] as const).filter(p=>(p==='telegram'?data?.telegramLinkEnabled:data?.vkLinkEnabled)&&!data?.identities.some(x=>x.provider===p));
+ const available=(['telegram','vk'] as const).filter(p=>(p==='telegram'?data?.telegramLinkEnabled:data?.vkLinkEnabled)&&!data?.identities.some(x=>x.provider===p&&x.realm.startsWith(p==='telegram'?'oidc:':'oauth:')));
  useEffect(()=>{if(!pending&&!available.includes(selected)&&available.length)setSelected(available[0])},[available.join(','),pending,selected]);
  if(!eligible||!data||!data.telegramLinkEnabled&&!data.vkLinkEnabled&&!data.identities.length&&!audit.length)return null;
  return <Panel title={t('Подключённые аккаунты')}>
   <div className="stack">
    <ErrorBanner text={problem}/>
    <p>{t('Внешние аккаунты связаны с вашим существующим аккаунтом MysticEgo. Они не создают нового персонажа.')}</p>
-   {data.identities.map(row=><article className="panel" key={JSON.stringify([row.provider,row.realm,row.subject])}><strong>{providerName(row.provider)}</strong><p>{row.subject}</p><small>{new Date(row.linkedUtc).toLocaleString()}</small><div><button className="btn secondary" disabled={busy||!!pending} onClick={()=>{setRemove(row);setPassword('')}}>{t('Отвязать')}</button></div></article>)}
+   {data.identities.map(row=><article className="panel" key={JSON.stringify([row.provider,row.realm,row.subject])}><strong>{providerName(row.provider)}{row.realm.startsWith('bot:')?' · '+t('Чат-бот'):''}</strong><p>{row.subject}</p><small>{new Date(row.linkedUtc).toLocaleString()}</small><div><button className="btn secondary" disabled={busy||!!pending} onClick={()=>{setRemove(row);setPassword('')}}>{t('Отвязать')}</button></div></article>)}
    {!remove&&(pending||available.length>0)&&<section className="panel stack">
     <strong>{providerName(pending?.provider??selected)}</strong>
     {!pending&&<label>{t('Провайдер')}<select value={selected} disabled={busy} onChange={e=>{setSelected(e.target.value as ExternalProvider);setPassword('')}}>{available.map(p=><option key={p} value={p}>{providerName(p)}</option>)}</select></label>}

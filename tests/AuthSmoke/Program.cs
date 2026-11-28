@@ -139,3 +139,5 @@ await ExternalRevocationSmoke.Run();
 await ExternalLoginSmoke.Run();
 
 ExternalLoginHttpSmoke.Run();
+
+await MessengerIdentitySmoke.Run();
