@@ -17,7 +17,8 @@ public sealed class MessengerWebhookController(IConfiguration configuration, Mes
     private (MessengerRealm Realm,string Secret)? Settings(string provider) => MessengerConfiguration.Read(configuration,provider);
     private async Task Process(MessengerRealm realm,PrivateMessengerEvent message,CancellationToken ct)
     {
-        var result=await ingress.Process(realm,message,ct);
+        var result=await ingress.Process(realm,message,ct,
+            configuration.GetValue<bool>("Messenger:WorldTransport:Enabled"));
         var token=MessengerConfiguration.ReplyToken(configuration,realm);
         if(token is null||MessengerOutbound.ReplyText(result) is null)return;
         // Re-read live binding before reporting linked status. No personal data in the reply.

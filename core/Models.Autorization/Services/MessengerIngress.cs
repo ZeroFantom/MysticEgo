@@ -3,7 +3,7 @@ using Models.Autorization.Data;
 
 namespace Models.Autorization.Services;
 
-public enum MessengerIngressStatus { Ignored, Duplicate, LinkStaged, LinkUnavailable, Linked, Unlinked, Help }
+public enum MessengerIngressStatus { Ignored, Duplicate, LinkStaged, LinkUnavailable, Linked, Unlinked, Help, WorldQueued, WorldUnavailable }
 
 /// <summary>
 /// Authenticated private ingress only. Receipt and staging of a link candidate commit together.
@@ -12,7 +12,7 @@ public enum MessengerIngressStatus { Ignored, Duplicate, LinkStaged, LinkUnavail
 /// </summary>
 public sealed class MessengerIngress(AuthDbContext db, MessengerIdentityService identities, TimeProvider clock)
 {
-    public async Task<MessengerIngressStatus> Process(MessengerRealm realm, PrivateMessengerEvent message, CancellationToken ct=default)
+    public async Task<MessengerIngressStatus> Process(MessengerRealm realm, PrivateMessengerEvent message, CancellationToken ct=default, bool queueWorld=false)
     {
         if (!realm.Valid || message.Sender.Provider!=realm.Provider || message.Sender.BotId!=realm.BotId ||
             !message.Sender.PrivateHumanChat || !MessengerWebhookProof.Fresh(message.Occurred,clock.GetUtcNow()))
@@ -35,6 +35,9 @@ public sealed class MessengerIngress(AuthDbContext db, MessengerIdentityService 
         else if(text is "/start" or "/help")result=MessengerIngressStatus.Help;
         else if(text=="/status")
             result=await identities.Resolve(realm,message.Sender,ct) is null?MessengerIngressStatus.Unlinked:MessengerIngressStatus.Linked;
+        else if(queueWorld&&MessengerWorldHandoff.IsWorldCommand(text))
+            result=await new MessengerWorldHandoff(db,clock).Enqueue(realm,message,ct)
+                ?MessengerIngressStatus.WorldQueued:MessengerIngressStatus.WorldUnavailable;
         await tx.CommitAsync(ct);
         return result;
     }

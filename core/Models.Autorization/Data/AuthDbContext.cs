@@ -11,6 +11,7 @@ namespace Models.Autorization.Data
         public DbSet<AccountLicenseAcceptance> AccountLicenseAcceptances => Set<AccountLicenseAcceptance>();
         public DbSet<AccountFeatureConsent> AccountFeatureConsents => Set<AccountFeatureConsent>();
         public DbSet<AccountDeviceGrant> AccountDeviceGrants => Set<AccountDeviceGrant>();
+        public DbSet<MessengerWorldCommand> MessengerWorldCommands => Set<MessengerWorldCommand>();
         public DbSet<MessengerEventReceipt> MessengerEventReceipts => Set<MessengerEventReceipt>();
         public DbSet<ExternalLoginFlow> ExternalLoginFlows => Set<ExternalLoginFlow>();
         public DbSet<ExternalIdentityAudit> ExternalIdentityAudits => Set<ExternalIdentityAudit>();
@@ -30,6 +31,21 @@ namespace Models.Autorization.Data
         {
             base.OnModelCreating(mb);
             mb.Entity<ManagedIdentity>(e => { e.ToTable("managed_identities"); e.HasKey(x=>x.Id); e.Property(x=>x.Name).HasMaxLength(160).IsRequired(); e.Property(x=>x.Kind).HasMaxLength(16).IsRequired(); e.Property(x=>x.SecretHash).HasMaxLength(200).IsRequired(); e.HasIndex(x=>x.Kind); });
+
+            mb.Entity<MessengerWorldCommand>(e =>
+            {
+                e.ToTable("messenger_world_commands");
+                e.HasKey(x => x.Id);
+                e.Property(x => x.Provider).HasMaxLength(16).IsRequired();
+                e.Property(x => x.BotId).HasMaxLength(20).IsRequired();
+                e.Property(x => x.Subject).HasMaxLength(128).IsRequired();
+                e.Property(x => x.EventId).HasMaxLength(128).IsRequired();
+                e.Property(x => x.Command).HasMaxLength(4000).IsRequired();
+                e.HasIndex(x => new { x.Provider, x.BotId, x.EventId }).IsUnique();
+                e.HasIndex(x => new { x.Status, x.ReceivedUtc });
+                e.HasIndex(x => x.ExpiresUtc);
+                e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            });
 
             mb.Entity<MessengerEventReceipt>(e =>
             {

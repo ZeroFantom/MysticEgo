@@ -39,6 +39,32 @@ public static class AccountSecuritySchema
         var timestamp=db.Database.IsNpgsql()?"timestamp with time zone":"TEXT";
         var boolean=db.Database.IsNpgsql()?"boolean":"INTEGER";
         var sql=$"""
+            CREATE TABLE IF NOT EXISTS messenger_world_commands (
+                "Id" {guid} NOT NULL PRIMARY KEY,
+                "UserId" {guid} NOT NULL REFERENCES users("Id") ON DELETE CASCADE,
+                "Provider" varchar(16) NOT NULL,
+                "BotId" varchar(20) NOT NULL,
+                "Subject" varchar(128) NOT NULL,
+                "EventId" varchar(128) NOT NULL,
+                "Command" varchar(4000) NOT NULL,
+                "LinkedUtc" {timestamp} NOT NULL,
+                "OccurredUtc" {timestamp} NOT NULL,
+                "ReceivedUtc" {timestamp} NOT NULL,
+                "ExpiresUtc" {timestamp} NOT NULL,
+                "Status" INTEGER NOT NULL,
+                "LeaseId" {guid} NULL,
+                "LeaseOwner" {guid} NULL,
+                "LeaseUntilUtc" {timestamp} NULL,
+                "Attempts" INTEGER NOT NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_messenger_world_commands_Provider_BotId_EventId"
+                ON messenger_world_commands ("Provider","BotId","EventId");
+            CREATE INDEX IF NOT EXISTS "IX_messenger_world_commands_Status_ReceivedUtc"
+                ON messenger_world_commands ("Status","ReceivedUtc");
+            CREATE INDEX IF NOT EXISTS "IX_messenger_world_commands_ExpiresUtc"
+                ON messenger_world_commands ("ExpiresUtc");
+            CREATE INDEX IF NOT EXISTS "IX_messenger_world_commands_UserId"
+                ON messenger_world_commands ("UserId");
             CREATE TABLE IF NOT EXISTS messenger_event_receipts (
                 "Provider" varchar(16) NOT NULL,
                 "BotId" varchar(20) NOT NULL,
