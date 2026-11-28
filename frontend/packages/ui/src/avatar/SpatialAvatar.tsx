@@ -57,7 +57,8 @@ export function SpatialAvatar(){
   return dispose;
  },[support,media.model?.url]);
  async function start(){
-  const r=runtime.current;if(!r||r.dead||r.starting||r.session||!navigator.xr||!overlay.current)return;
+  const current=runtime.current;if(!current||current.dead||current.starting||current.session||!navigator.xr||!overlay.current)return;
+  const r:Runtime=current;
   r.starting=true;setError('');setNotice('');setPlaced(false);setTracking('searching');choosePlacement('place');setRunning(true);
   let session:XRSession|undefined;
   try{
