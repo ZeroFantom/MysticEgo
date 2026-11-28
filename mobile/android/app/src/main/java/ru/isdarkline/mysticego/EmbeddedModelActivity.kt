@@ -74,7 +74,7 @@ class EmbeddedModelActivity : Activity() {
             val digest = checksum.text.toString().trim()
             if (!LocalInferencePolicy.validDigest(digest)) {status.text="Введите SHA-256 из доверенного источника.";return@button}
             expected = digest.lowercase(java.util.Locale.ROOT)
-            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type="application/octet-stream" }
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type="*/*" }
             try { startActivityForResult(intent,100) } catch (_:Exception) { status.text="Системный выбор файла недоступен." }
         }
         prompt = field("Сообщение (до 800 символов)")
@@ -123,6 +123,8 @@ class EmbeddedModelActivity : Activity() {
         worker.execute {
             var message="Импорт отклонён: файл повреждён, превышает лимит или не совпадает SHA-256."
             try {
+                val displayName=contentResolver.query(uri,arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),null,null,null)?.use { cursor -> if(cursor.moveToFirst())cursor.getString(0) else null }
+                if(displayName==null||!displayName.endsWith(".litertlm",ignoreCase=true))throw java.io.IOException("Expected LiteRT-LM model")
                 val hash=MessageDigest.getInstance("SHA-256")
                 val space=StatFs(directory.absolutePath).availableBytes
                 var count=0L
@@ -164,7 +166,7 @@ class EmbeddedModelActivity : Activity() {
                 Engine(EngineConfig(modelPath=model.absolutePath,backend=Backend.CPU(),maxNumTokens=2048,cacheDir=cache.absolutePath)).use { engine ->
                     engine.initialize()
                     engine.createConversation(ConversationConfig(automaticToolCalling=false,maxOutputToken=512)).use { conversation ->
-                        result=conversation.sendMessage(text).text.take(8000)
+                        result=conversation.sendMessage(text).text.orEmpty().take(8000).ifBlank { "Модель не вернула текст." }
                     }
                 }
             }catch(_:Exception){}catch(_:LinkageError){}finally{running.set(false)}
@@ -173,7 +175,7 @@ class EmbeddedModelActivity : Activity() {
         }
     }
     // A synchronous native inference cannot be promised to cancel instantly. Terminate only this dedicated process.
-    private fun terminate(){finishAndRemoveTask();Process.killProcess(Process.myPid())}
+    private fun terminate(){finish();Process.killProcess(Process.myPid())}
     override fun onStart(){super.onStart();visible=true}
     override fun onStop(){visible=false;if(running.get())terminate();super.onStop()}
     override fun onDestroy(){worker.shutdownNow();super.onDestroy()}
