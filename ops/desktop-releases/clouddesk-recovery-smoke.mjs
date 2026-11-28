@@ -48,6 +48,7 @@ const install=read('tools/MysticEgo.CloudDesk/profiles/orchestra-r3.sh');
 const recovery=read('ops/orchestra-updater/recover-maintenance.sh');
 assert(backend.includes('role=="Orchestra"?await LatestResetRelease()'),'Fresh Orchestra must not use the historical bundle');
 assert(backend.includes('MYSTICEGO_INSTALL_LOCK_FD=9')&&recovery.includes('--inherited-deploy-lock'),'Deployment must not reacquire its own lock');
+assert(recovery.includes('readlink "/proc/$$/fd/9"'),'Inherited lock must identify the actual shell process');
 assert(install.includes('libatomic1 libgomp1')&&resetScript.includes('libatomic1 libgomp1'));
 assert(resetScript.indexOf('flock -n 8')<resetScript.indexOf('CLOUDDESK_RESET_STEP:stop'),'Local provisioning lock must be checked before stopping services');
 assert(install.indexOf('CLOUDDESK_STEP:verify-storage')<install.indexOf('CLOUDDESK_STEP:maintenance'));

@@ -91,10 +91,10 @@ exec 9>/run/lock/mysticego-clouddesk-deploy.lock
 flock -n 9 || die 'deployment busy'
 preflight
 export DEBIAN_FRONTEND=noninteractive
-apt-get update
-# Refuse a busy local provisioning job before stopping any running service.
+# Refuse a busy local provisioning job before any package/service mutation.
 exec 8>/run/lock/mysticego-infrastructure.lock
 flock -n 8 || die 'infrastructure setup busy; no deletion performed'
+apt-get update
 apt-get install -y ca-certificates caddy curl libicu74 libssl3t64 unzip gh libatomic1 libgomp1
 preflight
 echo CLOUDDESK_RESET_STEP:stop
@@ -122,7 +122,7 @@ rm -rf --one-file-system -- "${paths[@]}"
 systemctl daemon-reload
 flock -u 8
 echo CLOUDDESK_RESET_STEP:install
-# The standard installer now holds the inherited lock until it reaches maintenance recovery.
+# The standard installer borrows the deployment lock; compatible recovery keeps it held.
 MYSTICEGO_INSTALL_LOCK_FD=9 MYSTICEGO_INSTALL_PREREQS_READY=1 bash install.sh "$PWD/r3.zip" "$domain" '' "$digest" native sqlite
 # Installer readiness is not factory-reset completion. Never repeat deletion here.
 echo CLOUDDESK_RESET_STEP:verify-identity

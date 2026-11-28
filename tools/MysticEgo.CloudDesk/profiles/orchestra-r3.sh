@@ -186,7 +186,12 @@ if [[ -f $recovery ]]; then
   done
 else
   local_setup=/opt/mysticego/app/ops/infrastructure/install-local.sh
-  if [[ -f $local_setup ]] && bash "$local_setup"; then maintenance_ready=true; fi
+  if [[ -f $local_setup ]] && bash "$local_setup" &&
+     systemctl is-active --quiet mysticego-orchestra-updater.timer &&
+     systemctl is-active --quiet mysticego-infrastructure-reconcile.timer &&
+     systemctl is-active --quiet mysticego-local-setup.socket; then
+    maintenance_ready=true
+  fi
 fi
 [[ $(health http://127.0.0.1:5500/health/live) == "$node" && $(health "https://$domain/health/live") == "$node" ]] || { echo 'Orchestra identity changed during maintenance setup.' >&2; exit 1; }
 if [[ $maintenance_ready == true ]]; then

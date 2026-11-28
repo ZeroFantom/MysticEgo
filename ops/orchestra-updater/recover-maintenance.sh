@@ -19,7 +19,7 @@ health() {
 stage='deployment-lock'
 inherited=false
 if [[ ${2:-} == --inherited-deploy-lock ]]; then
-  [[ $(readlink "/proc/$/fd/9") == /run/lock/mysticego-clouddesk-deploy.lock ]]
+  [[ $(readlink "/proc/$$/fd/9") == /run/lock/mysticego-clouddesk-deploy.lock ]]
   flock -n 9
   inherited=true
 else
