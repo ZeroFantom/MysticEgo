@@ -2,6 +2,7 @@ import {useEffect,useState} from 'react';
 import {useApp,useRemote} from '../app/context';
 import {useLocale,usePresentation} from '../app/presentation';
 import {Header,Panel,ErrorBanner} from '../components/primitives';
+import {ExternalAccountsPanel} from '../app/ExternalAccountsPanel';
 
 type SessionRow={id?:string;current:boolean;createdUtc:string;lastSeenUtc:string;expiresUtc:string;userAgent?:string;ip?:string;legacy:boolean};
 type Doc={version:string;url:string};
@@ -47,6 +48,7 @@ export function AccountSecurity(){
    {confirm&&<div role="alert" className="panel"><p>{t(confirm==='others'?'Все остальные устройства выйдут из аккаунта. Текущая сессия сохранится.':'Подтвердите завершение выбранной сессии.')}</p><div className="actions"><button className="btn" disabled={busy} onClick={()=>void run(()=>request(confirm==='others'?'sessions/revoke-others':'sessions/'+confirm+'/revoke',{}))}>{t('Подтвердить')}</button><button className="btn secondary" disabled={busy} onClick={()=>setConfirm(null)}>{t('Отмена')}</button></div></div>}
    </div>
   </Panel>
+  <ExternalAccountsPanel/>
   <Panel title={t('Документы и разрешения аккаунта')}>
    <ErrorBanner text={consent.error}/>
    {consent.value&&<div className="stack">
