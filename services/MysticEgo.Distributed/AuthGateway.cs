@@ -10,7 +10,7 @@ internal static class AuthGateway
 {
     public static void MapAuthGateway(this WebApplication app, NodeOptions node)
     {
-        foreach (var action in new[] { "login", "refresh", "logout", "desktop/approve", "desktop/redeem" })
+        foreach (var action in new[] { "login", "refresh", "logout", "desktop/approve", "desktop/redeem", "qr/start", "qr/cancel" })
             app.MapPost("/api/auth/" + action, (HttpContext context, IHttpClientFactory clients) =>
                 Forward(context, clients, node.AuthUrl, action)).AllowAnonymous();
         app.MapGet("/api/auth/credential-policy", (HttpContext context, IHttpClientFactory clients) =>
@@ -22,7 +22,7 @@ internal static class AuthGateway
         foreach (var action in new[] { "sessions", "sessions/current", "consents" })
             app.MapGet("/api/auth/" + action, (HttpContext context, IHttpClientFactory clients) =>
                 Forward(context, clients, node.AuthUrl, action)).RequireAuthorization();
-        foreach (var action in new[] { "sessions/revoke-others", "consents", "device-grants/revoke", "device-grants/approve" })
+        foreach (var action in new[] { "sessions/revoke-others", "consents", "device-grants/revoke", "device-grants/approve", "qr/inspect", "qr/approve" })
             app.MapPost("/api/auth/" + action, (HttpContext context, IHttpClientFactory clients) =>
                 Forward(context, clients, node.AuthUrl, action)).RequireAuthorization();
         app.MapPost("/api/auth/sessions/{id:guid}/revoke", (Guid id, HttpContext context, IHttpClientFactory clients) =>
@@ -42,11 +42,11 @@ internal static class AuthGateway
             limit.MaxRequestBodySize = 16_384;
         using var client = factory.CreateClient("mysticego-logged-api");
         using var request = new HttpRequestMessage(new HttpMethod(context.Request.Method), auth.TrimEnd('/') + "/api/auth/" + action);
-        if ((action == "login" || action == "refresh") && context.Request.Headers.UserAgent.ToString() is { Length: >0 } agent)
+        if ((action is "login" or "refresh" or "desktop/redeem" or "qr/start") && context.Request.Headers.UserAgent.ToString() is { Length: >0 } agent)
             request.Headers.TryAddWithoutValidation("User-Agent", agent.Length > 500 ? agent[..500] : agent);
         if (context.Connection.RemoteIpAddress is { } caller)
             request.Headers.TryAddWithoutValidation("X-Forwarded-For", caller.ToString());
-        if ((action == "presentation" || action.StartsWith("sessions",StringComparison.Ordinal) || action == "consents" || action.StartsWith("device-grants/",StringComparison.Ordinal)) && AuthenticationHeaderValue.TryParse(context.Request.Headers.Authorization.ToString(),out var authorization) && authorization.Scheme == "Bearer")
+        if ((action == "presentation" || action.StartsWith("sessions",StringComparison.Ordinal) || action == "consents" || action.StartsWith("device-grants/",StringComparison.Ordinal) || action is "qr/inspect" or "qr/approve") && AuthenticationHeaderValue.TryParse(context.Request.Headers.Authorization.ToString(),out var authorization) && authorization.Scheme == "Bearer")
             request.Headers.Authorization = authorization;
         if (HttpMethods.IsPost(context.Request.Method))
         {

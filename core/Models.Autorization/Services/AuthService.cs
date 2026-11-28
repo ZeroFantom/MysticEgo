@@ -133,7 +133,8 @@ public sealed class AuthService : IAuthService
         session.ExpiresAt = now.AddDays(_opt.Jwt.RefreshTokenDays);
         session.LastSeenUtc = now;
         session.CreatedByIp = ip is { Length: >64 } ? ip[..64] : ip;
-        session.UserAgent = userAgent is { Length: >500 } ? userAgent[..500] : userAgent;
+        // Preserve known device metadata when an intermediate client omits User-Agent on refresh.
+        if (!string.IsNullOrWhiteSpace(userAgent)) session.UserAgent = userAgent.Length > 500 ? userAgent[..500] : userAgent;
         if (existing is null) _db.RefreshTokens.Add(session);
 
         await _db.SaveChangesAsync(ct);

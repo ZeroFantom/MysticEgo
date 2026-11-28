@@ -64,6 +64,7 @@ public static class Program
         });
 
         builder.Services.AddSingleton<Api.Auth.Controllers.AccountPresentationStore>();
+        builder.Services.AddSingleton<Models.Autorization.Services.QrSignIn>();
         builder.Services.AddHealthChecks();
         builder.Services.AddTrafficProtection(builder.Configuration);
         builder.Services.AddRateLimiter(options=>
