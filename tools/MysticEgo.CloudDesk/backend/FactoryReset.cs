@@ -178,13 +178,29 @@ sealed partial class CloudDesk
             var binding=ReadBinding(approval.ServerId);
             if(binding!=null&&SameBinding(binding,approval.Host,"Orchestra",approval.Domain))SaveBinding(binding with {Phase="installed"});
             try{await SSH(args,"rm -rf -- "+remote,1);}catch{}
-            var maintenancePending=output.Split('\n').Any(line=>line.Trim()=="CLOUDDESK_RESET_MAINTENANCE_PENDING"||line.Trim()=="CLOUDDESK_MAINTENANCE_PENDING");
-            var maintenanceScheduled=!maintenancePending&&output.Split('\n').Any(line=>line.Trim()=="CLOUDDESK_RESET_MAINTENANCE_SCHEDULED");
-            progress(maintenancePending?"Новый узел подтверждён; требуется восстановление обслуживания без сброса.":"Новый узел подтверждён; компоненты проверяются серверной службой.");
-            return new {role="Orchestra",domain=identity.Domain,release=release.Tag,node=newNode.ToString("D"),reset=true,maintenancePending,maintenanceScheduled};
+            var maintenance = ResetMaintenanceStatus(output);
+            progress(maintenance switch
+            {
+                "pending" => "Новый узел подтверждён. Требуется восстановление службы обслуживания.",
+                "scheduled" => "Новый узел подтверждён. Сервер запланировал проверку компонентов.",
+                _ => "Новый узел подтверждён. Ожидается отчёт о состоянии компонентов."
+            });
+            return new {role="Orchestra", domain=identity.Domain, release=release.Tag, node=newNode.ToString("D"),
+                host=approval.Host, serverId=approval.ServerId, reset=true,
+                maintenancePending=maintenance=="pending", maintenanceScheduled=maintenance=="scheduled"};
         }catch(Exception e){throw new Exception(e.Message+"\nПовторный сброс автоматически не выполняется. Если staging создан, он находится в "+remote);}
         finally{Directory.Delete(temp,true);}
     }
+    // The reset verifier runs after the installer and observes the final systemd state.
+    static string ResetMaintenanceStatus(string output)
+    {
+        var markers = output.Split('\n').Select(line => line.Trim()).ToHashSet(StringComparer.Ordinal);
+        var scheduled = markers.Contains("CLOUDDESK_RESET_MAINTENANCE_SCHEDULED");
+        var pending = markers.Contains("CLOUDDESK_RESET_MAINTENANCE_PENDING");
+        if (scheduled == pending) return "unknown";
+        return scheduled ? "scheduled" : "pending";
+    }
+
     static object FactoryResetSelftest()
     {
         var rows=JsonNode.Parse("""[{"tagName":"v1.0.0-beta.7-r3.2.9","isDraft":false,"publishedAt":"2026-01-01T00:00:00Z"},{"tagName":"v1.0.0-beta.7-r3.2.40","isDraft":false,"publishedAt":"2026-01-01T00:00:00Z"},{"tagName":"v1.0.0-beta.7-r3.2.41","isDraft":true,"publishedAt":null}]""")!.AsArray();
@@ -202,6 +218,11 @@ sealed partial class CloudDesk
             DeploymentStepMessage("CLOUDDESK_RESET_STEP:verify-storage")==null||
             DeploymentStepMessage("unstructured output")!=null)
             throw new Exception("Installation evidence or progress mapping regression.");
-        return new {passed=11};
+        if (ResetMaintenanceStatus("CLOUDDESK_MAINTENANCE_PENDING\nCLOUDDESK_RESET_MAINTENANCE_SCHEDULED\r\n") != "scheduled" ||
+            ResetMaintenanceStatus("CLOUDDESK_MAINTENANCE_SCHEDULED\nCLOUDDESK_RESET_MAINTENANCE_PENDING") != "pending" ||
+            ResetMaintenanceStatus("CLOUDDESK_MAINTENANCE_SCHEDULED") != "unknown" ||
+            ResetMaintenanceStatus("CLOUDDESK_RESET_MAINTENANCE_PENDING\nCLOUDDESK_RESET_MAINTENANCE_SCHEDULED") != "unknown")
+            throw new Exception("Final maintenance evidence regression.");
+        return new {passed=15};
     }
 }
