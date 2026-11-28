@@ -11,7 +11,12 @@ public sealed record SpiritualWorldSnapshot(IReadOnlyList<WorldPlacement> Placem
 {
     // Optional trusted in-world labels. Unnamed entities are not exposed in discovery.
     public IReadOnlyList<SpiritualContactLabel> ContactLabels { get; init; } = [];
+    public IReadOnlyList<SpiritualAreaLabel> AreaLabels { get; init; } = [];
 }
+public sealed record SpiritualAreaLabel(string WorldId,string AreaId,string Name);
+public sealed record SpiritualPublicContact(string Name,string Kind,string Reachability);
+public sealed record SpiritualPresenceView(string? Embodiment,string? Area,IReadOnlyList<SpiritualPublicContact> Nearby,
+    IReadOnlyList<SpiritualPublicContact> Friends);
 public sealed record SpiritualContactLabel(string EntityId, string Name);
 public enum SpiritualContactFilter { Nearby, Friends }
 public sealed record SpiritualContact(string EntityId, string Name, SpiritualParticipantKind Kind,
@@ -47,6 +52,7 @@ public sealed class SpiritualCommunicationGateway(TimeProvider clock, SpiritualM
     private HashSet<(string Sender, string Recipient)> permissions = new();
     private HashSet<(string First, string Second)> friends = new();
     private Dictionary<string, string> labels = new(StringComparer.Ordinal);
+    private Dictionary<(string World,string Area),string> areas=new();
     private readonly Dictionary<(Guid Account, Guid Request), Entry> requests = new();
     private readonly Queue<Entry> pending = new();
     private readonly Dictionary<Guid, SpiritualMessage> delivered = new();
@@ -96,10 +102,17 @@ public sealed class SpiritualCommunicationGateway(TimeProvider clock, SpiritualM
                 !nextLabels.TryAdd(label.EntityId, label.Name))
                 throw new ArgumentException("Invalid contact label.");
         }
+        var nextAreas=new Dictionary<(string,string),string>();
+        var knownAreas=placements.Select(p=>(p.Presence.WorldId,p.Presence.AreaId)).ToHashSet();
+        foreach(var area in snapshot.AreaLabels)
+            if(!knownAreas.Contains((area.WorldId,area.AreaId))||string.IsNullOrWhiteSpace(area.Name)||
+                area.Name.Length>80||area.Name!=area.Name.Trim()||area.Name.Any(char.IsControl)||
+                !nextAreas.TryAdd((area.WorldId,area.AreaId),area.Name))
+                throw new ArgumentException("Invalid area label.");
         lock (gate)
         {
             if (!presence.TryReplace(expected, placements, out revision)) return false;
-            active = nextActive; permissions = nextPermissions; friends = nextFriends; labels = nextLabels;
+            active = nextActive; permissions = nextPermissions; friends = nextFriends; labels = nextLabels; areas=nextAreas;
             snapshotReady = true;
             return true;
         }
@@ -132,6 +145,22 @@ public sealed class SpiritualCommunicationGateway(TimeProvider clock, SpiritualM
                 if (result.Count >= limit) break;
             }
             return new(presence.Version, result);
+        }
+    }
+
+    /// <summary>Same coherent revision, no raw entity/world/account IDs. Missing labels are not guessed.
+    /// Caller must verify snapshot freshness and account authorization.</summary>
+    public SpiritualPresenceView? ReadPresence(Guid account)
+    {
+        lock(gate)
+        {
+            if(!snapshotReady||!active.TryGetValue(account,out var entity)||
+                presence.OwnedPlacement(account,entity) is not { } placement)return null;
+            static SpiritualPublicContact[] Public(SpiritualContactPage page)=>page.Contacts.Select(c=>
+                new SpiritualPublicContact(c.Name,c.Kind==SpiritualParticipantKind.Npc?"npc":"player",
+                    c.Reachability==SpiritualConnectionDecision.Local?"local":"friend")).ToArray();
+            return new(labels.GetValueOrDefault(entity),areas.GetValueOrDefault((placement.WorldId,placement.AreaId)),
+                Public(Discover(account,SpiritualContactFilter.Nearby)),Public(Discover(account,SpiritualContactFilter.Friends)));
         }
     }
 

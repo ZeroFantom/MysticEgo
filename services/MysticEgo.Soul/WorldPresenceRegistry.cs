@@ -67,6 +67,13 @@ public sealed class WorldPresenceRegistry
         }
     }
 
+    internal SpiritualPresence? OwnedPlacement(Guid account,string entity)
+    {
+        lock(_gate)
+            return _placements.TryGetValue(entity,out var row)&&row.AccountId==account&&
+                row.Presence.Kind==SpiritualParticipantKind.Player?row.Presence:null;
+    }
+
     /// <summary>Advisory freshness check only; a delivery transaction must close the check/write race.</summary>
     public bool IsCurrent(Guid version) { lock (_gate) return _version == version; }
 
