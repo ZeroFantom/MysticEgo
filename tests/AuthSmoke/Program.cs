@@ -200,3 +200,16 @@ if(nativeQueue.Consume(expiredTicket,nativeNow.AddMinutes(3))!=null)throw new Ex
 var nativeSecret=Models.Autorization.Services.MobileAgentRequests.Secret();
 if(!Models.Autorization.Services.MobileAgentRequests.Match(Models.Autorization.Services.MobileAgentRequests.Hash(nativeSecret),nativeSecret)||Models.Autorization.Services.MobileAgentRequests.Match(Models.Autorization.Services.MobileAgentRequests.Hash(nativeSecret),new string('b',64)))throw new Exception("Native secret comparison");
 Console.WriteLine("Mobile Agent pairing ticket and secret validation passed");
+
+var avatarQueue=new Models.Autorization.Services.DeviceActionQueue();
+var avatarState=new Models.Autorization.Services.DeviceActionQueue.AvatarSnapshot("wave","happy",1.25);
+if(avatarQueue.Handoff(deviceOwner,deviceSource,deviceTarget,avatarState,deviceNow)!=null)throw new Exception("Avatar handoff without readiness");
+avatarQueue.Presence(deviceOwner,deviceTarget,true,deviceNow);
+if(avatarQueue.Handoff(deviceOwner,deviceSource,deviceTarget,avatarState with{PhaseSeconds=double.NaN},deviceNow)!=null||
+    avatarQueue.Handoff(deviceOwner,deviceSource,deviceTarget,avatarState with{Motion="shell"},deviceNow)!=null)throw new Exception("Invalid avatar state accepted");
+var avatarOffer=avatarQueue.Handoff(deviceOwner,deviceSource,deviceTarget,avatarState,deviceNow)??throw new Exception("Avatar handoff missing");
+if(avatarQueue.List(Guid.NewGuid(),deviceTarget,deviceNow).Length!=0||avatarQueue.Decide(deviceOwner,deviceSource,avatarOffer.Id,true,deviceNow)!=null)throw new Exception("Avatar isolation");
+if(avatarQueue.Decide(deviceOwner,deviceTarget,avatarOffer.Id,true,deviceNow)?.Avatar!=avatarState||avatarQueue.Decide(deviceOwner,deviceTarget,avatarOffer.Id,true,deviceNow)!=null)throw new Exception("Avatar one-shot decision");
+var avatarStale=avatarQueue.Handoff(deviceOwner,deviceSource,deviceTarget,avatarState,deviceNow)!;
+avatarQueue.Presence(deviceOwner,deviceTarget,false,deviceNow);
+if(avatarQueue.Decide(deviceOwner,deviceTarget,avatarStale.Id,true,deviceNow)!=null)throw new Exception("Avatar readiness revoked");

@@ -5,6 +5,8 @@ import {VRMLoaderPlugin,VRMUtils,type VRM} from '@pixiv/three-vrm';
 import {accountAvatar,usePersonalAvatar,useAvatarMedia} from './PersonalAvatar';
 import './spatial-avatar.css';
 import {walkDistance,walkProgress} from './spatialMotion';
+import {AvatarTransfer} from './AvatarTransfer';
+import {useIncomingAvatar} from './avatarTransferState';
 
 type Motion='idle'|'wave'|'nod';
 type SessionAnchor={anchorSpace:XRSpace;delete:()=>void};
@@ -19,6 +21,7 @@ export function SpatialAvatar(){
  const host=useRef<HTMLDivElement>(null),overlay=useRef<HTMLDivElement>(null),runtime=useRef<Runtime|null>(null);
  const motion=useRef<Motion>('idle'),phase=useRef(0);
  const [support,setSupport]=useState(false),[ready,setReady]=useState(false),[running,setRunning]=useState(false),[error,setError]=useState(''),[selected,setSelected]=useState<Motion>('idle');
+ useIncomingAvatar('spatial',snapshot=>{motion.current=snapshot.motion==='wave'||snapshot.motion==='nod'?snapshot.motion:'idle';phase.current=snapshot.phaseSeconds;setSelected(motion.current)});
  const [placed,setPlaced]=useState(false),[tracking,setTracking]=useState<'searching'|'local'|'anchored'|'lost'>('searching');
  const placement=useRef<PlacementMode>('place'),[placementMode,setPlacementMode]=useState<PlacementMode>('place');
  const [notice,setNotice]=useState('');
@@ -149,6 +152,7 @@ export function SpatialAvatar(){
  return <section className="panel stack"><h2>VRM · Пространственный AR</h2>
   <p>Экспериментальный WebXR-режим. Наведите камеру на горизонтальную поверхность, дождитесь кольца и коснитесь сцены для размещения персонажа. Держите телефон в безопасном положении.</p>
   {!support&&<p role="status">Immersive AR недоступен в этом браузере. Нужны совместимый Android, Chrome и Google Play Services for AR.</p>}
+  {!running&&<AvatarTransfer snapshot={()=>({motion:motion.current,mood:'neutral',phaseSeconds:Math.min(3600,phase.current)})}/>}
   <div className="spatial-render-host" ref={host}/>
   <button className="btn" disabled={!support||!ready||running} onClick={()=>void start()}>Запустить пространственный AR</button>
   <div ref={overlay} className="spatial-overlay">

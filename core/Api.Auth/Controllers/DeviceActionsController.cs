@@ -22,7 +22,7 @@ public sealed class DeviceActionsController(AuthDbContext db,DeviceActionQueue q
     public async Task<IActionResult> List(CancellationToken ct)
     {
         if(!Account||!await Active(CurrentUserId!.Value,Sid!.Value,ct))return Unauthorized();
-        return Ok(queue.List(CurrentUserId.Value,Sid.Value,DateTimeOffset.UtcNow).Select(x=>new{x.Id,x.Source,x.Target,x.Action,x.Expires,x.State,incoming=x.Target==Sid.Value}));
+        return Ok(queue.List(CurrentUserId.Value,Sid.Value,DateTimeOffset.UtcNow).Select(x=>new{x.Id,x.Source,x.Target,x.Action,x.Expires,x.State,x.Avatar,incoming=x.Target==Sid.Value}));
     }
 
     public sealed record ReceiveState(bool Enabled);
@@ -52,7 +52,7 @@ public sealed class DeviceActionsController(AuthDbContext db,DeviceActionQueue q
         if(pending is null)return NotFound();
         if(input.Approve&&(!queue.Ready(owner,DateTimeOffset.UtcNow).Contains(session)||!await Active(owner,pending.Source,ct)))return Conflict();
         var result=queue.Decide(owner,session,input.Id,input.Approve,DateTimeOffset.UtcNow);
-        return result is null?Conflict():Ok(new{result.Id,result.Action,result.State});
+        return result is null?Conflict():Ok(new{result.Id,result.Action,result.State,avatar=input.Approve?result.Avatar:null});
     }
 
     // A narrowly scoped authenticated MCP endpoint. No shell, file, sensor, or arbitrary URI actions.
@@ -75,6 +75,7 @@ public sealed class DeviceActionsController(AuthDbContext db,DeviceActionQueue q
         if(name=="tools/list")return Result(new{tools=new object[]{
             new{name="device.list",description="List other active sessions belonging to the authenticated account and their foreground receive readiness.",inputSchema=Schema(new(),[])},
             new{name="device.request",description="Request a visible navigation action in another receiving session. Requires confirmation there.",inputSchema=Schema(new(){["targetId"]=idSchema,["action"]=new{type="string",@enum=DeviceActionQueue.Allowed}},["targetId","action"])},
+            new{name="avatar.handoff",description="Offer bounded visual avatar state to another receiving session. Requires confirmation there.",inputSchema=Schema(new(){["targetId"]=idSchema,["motion"]=new{type="string",@enum=new[]{"idle","wave","nod","walk","sit","dance"}},["mood"]=new{type="string",@enum=new[]{"neutral","happy","sad","angry","surprised"}},["phaseSeconds"]=new{type="number",minimum=0,maximum=3600}},["targetId","motion","mood","phaseSeconds"])},
             new{name="device.status",description="Read status of an unexpired request belonging to this session. Approved means accepted, not verified execution.",inputSchema=Schema(new(){["requestId"]=idSchema},["requestId"])},
             new{name="device.cancel",description="Cancel a pending request created by the current session.",inputSchema=Schema(new(){["requestId"]=idSchema},["requestId"])}
         }});
@@ -95,6 +96,17 @@ public sealed class DeviceActionsController(AuthDbContext db,DeviceActionQueue q
             if(args.EnumerateObject().Count()!=1||!args.TryGetProperty("requestId",out var requestId)||requestId.ValueKind!=JsonValueKind.String||!requestId.TryGetGuid(out var rid))return Error(-32602,"Invalid request ID");
             var value=tool.GetString()=="device.cancel"?queue.Cancel(owner,source,rid,now):queue.List(owner,source,now).FirstOrDefault(x=>x.Id==rid);
             return value is null?Error(-32602,"Request unavailable"):Content(new{value.Id,value.State,value.Expires,value.Action});
+        }
+        if(tool.GetString()=="avatar.handoff")
+        {
+            if(args.EnumerateObject().Count()!=4||!args.TryGetProperty("targetId",out var dest)||dest.ValueKind!=JsonValueKind.String||!dest.TryGetGuid(out var destination)||
+                !args.TryGetProperty("motion",out var motion)||motion.ValueKind!=JsonValueKind.String||
+                !args.TryGetProperty("mood",out var mood)||mood.ValueKind!=JsonValueKind.String||
+                !args.TryGetProperty("phaseSeconds",out var phase)||phase.ValueKind!=JsonValueKind.Number||!phase.TryGetDouble(out var seconds))return Error(-32602,"Invalid avatar state");
+            var snapshot=new DeviceActionQueue.AvatarSnapshot(motion.GetString()!,mood.GetString()!,seconds);
+            if(!snapshot.Valid()||destination==source||!await Active(owner,destination,ct))return Error(-32602,"Avatar or target unavailable");
+            var offered=queue.Handoff(owner,source,destination,snapshot,DateTimeOffset.UtcNow);
+            return offered is null?Error(-32602,"Target unavailable or queue full"):Content(new{offered.Id,offered.State,offered.Expires});
         }
         if(tool.GetString()!="device.request"||!args.TryGetProperty("targetId",out var target)||target.ValueKind!=JsonValueKind.String||!target.TryGetGuid(out var targetId)||
             !args.TryGetProperty("action",out var action)||action.ValueKind!=JsonValueKind.String||args.EnumerateObject().Count()!=2)return Error(-32602,"Invalid tool arguments");
