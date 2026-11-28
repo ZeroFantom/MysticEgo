@@ -15,16 +15,16 @@ public sealed record ChatRpCard(string Text,string Category,bool RequiresConsent
 public static class ChatRpCatalog
 {
     private static readonly ChatRpDefinition[] definitions=[
-        new(ChatRpAction.Hug,"обнять","hug","обнимает",false),
-        new(ChatRpAction.Pat,"погладить","pat","гладит по голове",false),
-        new(ChatRpAction.HighFive,"дать пять","highfive","даёт пять",false),
-        new(ChatRpAction.Handshake,"пожать руку","handshake","пожимает руку",false),
-        new(ChatRpAction.Wave,"помахать","wave","машет рукой",false),
-        new(ChatRpAction.Dance,"танцевать","dance","танцует вместе с",false),
-        new(ChatRpAction.Poke,"тыкнуть","poke","легонько тыкает",false),
-        new(ChatRpAction.Cuddle,"прижаться","cuddle","прижимается к",true),
-        new(ChatRpAction.Kiss,"поцеловать","kiss","целует",true),
-        new(ChatRpAction.Slap,"дать пощёчину","slap","даёт пощёчину",true)
+        new(ChatRpAction.Hug,"обнять","hug","обнимает участника",false),
+        new(ChatRpAction.Pat,"погладить","pat","гладит по голове участника",false),
+        new(ChatRpAction.HighFive,"дать пять","highfive","даёт пять участнику",false),
+        new(ChatRpAction.Handshake,"пожать руку","handshake","пожимает руку участнику",false),
+        new(ChatRpAction.Wave,"помахать","wave","машет рукой участнику",false),
+        new(ChatRpAction.Dance,"танцевать","dance","танцует вместе с участником",false),
+        new(ChatRpAction.Poke,"тыкнуть","poke","легонько тыкает участника",false),
+        new(ChatRpAction.Cuddle,"прижаться","cuddle","прижимается к участнику",true),
+        new(ChatRpAction.Kiss,"поцеловать","kiss","целует участника",true),
+        new(ChatRpAction.Slap,"дать пощёчину","slap","даёт пощёчину участнику",true)
     ];
     public static IReadOnlyList<ChatRpDefinition> All=>Array.AsReadOnly(definitions);
     public static ChatRpDefinition? Parse(string? text)
@@ -152,11 +152,11 @@ public sealed class ChatRpRenderer(IChatRpMediaSource media)
             ChatRpCatalog.Find(e.Action) is not { } action)return null;
         var actor=ChatRpCatalog.Name(e.Actor.Name);var target=ChatRpCatalog.Name(e.Target.Name);
         if(action.RequiresConsent&&!targetAccepted)
-            return new($"{actor} предлагает действие «{action.Command}» для {target}. Ожидается согласие.",action.Category,true);
+            return new($"{actor} предлагает действие «{action.Command}» для участника «{target}». Ожидается согласие.",action.Category,true);
         ChatRpMedia? image=null;
         try{image=await media.Find(action.Category,ct);}
         catch(Exception ex) when(ex is HttpRequestException or JsonException or InvalidOperationException ||
             ex is OperationCanceledException&&!ct.IsCancellationRequested){}
-        return new($"{actor} {action.Verb} {target}.",action.Category,false,image);
+        return new($"{actor} {action.Verb} «{target}».",action.Category,false,image);
     }
 }

@@ -59,6 +59,7 @@ internal static class MessengerWorldHandoffSmoke
         var revoke=(await queue.Claim(worker))!;
         await db.ExternalIdentities.Where(i=>i.Provider==key.Provider&&i.Realm==key.Realm&&i.Subject==key.Subject).ExecuteDeleteAsync();
         Check(!await queue.Validate(worker,revoke.Id,revoke.LeaseId),"revoked link");
+        db.ChangeTracker.Clear(); // ExecuteDelete bypasses EF tracking; emulate a fresh request unit of work.
         await new ExternalIdentityStore(db).RecordVerifiedLink(user.Id,key);
         Check(!await queue.Validate(worker,revoke.Id,revoke.LeaseId),"relinked identity");
         await queue.Cleanup();

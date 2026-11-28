@@ -41,7 +41,7 @@ internal static class ChatRpSmoke
         Check(await renderer.Render(e,false,true,false) is null,"group opt-in");
         Check(await renderer.Render(e,true,false,false) is null,"blocked pair");
         var card=(await renderer.Render(e,true,true,false))!;
-        Check(card.Text=="Алиса обнимает Боб."&&card.Media?.Url.Host=="media.example.invalid","render and image");
+        Check(card.Text=="Алиса обнимает участника «Боб»."&&card.Media?.Url.Host=="media.example.invalid","render and image");
         var kiss=e with {Action=ChatRpAction.Kiss};
         Check((await renderer.Render(kiss,true,true,false)) is {RequiresConsent:true,Media:null},"consent pending");
         Check((await renderer.Render(kiss,true,true,true)) is {RequiresConsent:false,Media:null},"text fallback");
