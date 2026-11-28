@@ -58,6 +58,8 @@ public sealed class WorldAuthorityStore
         return feed is null?null:new(rows.GetInt64(0),feed);
     }
 
+    internal WorldAuthorityRevision? Current()=>ReadCurrent(path);
+
     private sealed record Lifetime(string World,int Kind,string? Owner,bool Retired);
 
     /// <summary>Atomic compare-and-swap. The simulation supplies complete placements, active
