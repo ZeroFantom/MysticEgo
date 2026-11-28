@@ -159,3 +159,5 @@ await ChatRpManagementSmoke.Run();
 await ChatRpCustomSmoke.Run();
 
 await ChatRpVkCallbackSmoke.Run();
+
+await TelegramMiniSmoke.Run();

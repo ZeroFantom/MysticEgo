@@ -11,6 +11,7 @@ namespace Models.Autorization.Data
         public DbSet<AccountLicenseAcceptance> AccountLicenseAcceptances => Set<AccountLicenseAcceptance>();
         public DbSet<AccountFeatureConsent> AccountFeatureConsents => Set<AccountFeatureConsent>();
         public DbSet<AccountDeviceGrant> AccountDeviceGrants => Set<AccountDeviceGrant>();
+        public DbSet<TelegramMiniSession> TelegramMiniSessions => Set<TelegramMiniSession>();
         public DbSet<ChatRpPreference> ChatRpPreferences => Set<ChatRpPreference>();
         public DbSet<ChatRpConsent> ChatRpConsents => Set<ChatRpConsent>();
         public DbSet<ChatRpDelivery> ChatRpDeliveries => Set<ChatRpDelivery>();
@@ -34,6 +35,20 @@ namespace Models.Autorization.Data
         {
             base.OnModelCreating(mb);
             mb.Entity<ManagedIdentity>(e => { e.ToTable("managed_identities"); e.HasKey(x=>x.Id); e.Property(x=>x.Name).HasMaxLength(160).IsRequired(); e.Property(x=>x.Kind).HasMaxLength(16).IsRequired(); e.Property(x=>x.SecretHash).HasMaxLength(200).IsRequired(); e.HasIndex(x=>x.Kind); });
+
+            mb.Entity<TelegramMiniSession>(e =>
+            {
+                e.ToTable("telegram_mini_sessions");
+                e.HasKey(x=>x.ProofKey);
+                e.Property(x=>x.ProofKey).HasMaxLength(64);
+                e.Property(x=>x.TokenHash).HasMaxLength(64);
+                e.Property(x=>x.BotId).HasMaxLength(20);
+                e.Property(x=>x.Subject).HasMaxLength(20);
+                e.HasIndex(x=>x.TokenHash).IsUnique();
+                e.HasIndex(x=>x.RetainUntilUtc);
+                e.HasIndex(x=>x.UserId);
+                e.HasOne<User>().WithMany().HasForeignKey(x=>x.UserId).OnDelete(DeleteBehavior.Cascade);
+            });
 
             mb.Entity<ChatRpPreference>(e =>
             {

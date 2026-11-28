@@ -39,6 +39,20 @@ public static class AccountSecuritySchema
         var timestamp=db.Database.IsNpgsql()?"timestamp with time zone":"TEXT";
         var boolean=db.Database.IsNpgsql()?"boolean":"INTEGER";
         var sql=$"""
+            CREATE TABLE IF NOT EXISTS telegram_mini_sessions (
+                "ProofKey" varchar(64) NOT NULL PRIMARY KEY,
+                "TokenHash" varchar(64) NOT NULL,
+                "BotId" varchar(20) NOT NULL,
+                "Subject" varchar(20) NOT NULL,
+                "UserId" {guid} NOT NULL REFERENCES users("Id") ON DELETE CASCADE,
+                "LinkedUtc" {timestamp} NOT NULL,
+                "ExpiresUtc" {timestamp} NOT NULL,
+                "RetainUntilUtc" {timestamp} NOT NULL,
+                "Revoked" {boolean} NOT NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_telegram_mini_sessions_TokenHash" ON telegram_mini_sessions ("TokenHash");
+            CREATE INDEX IF NOT EXISTS "IX_telegram_mini_sessions_RetainUntilUtc" ON telegram_mini_sessions ("RetainUntilUtc");
+            CREATE INDEX IF NOT EXISTS "IX_telegram_mini_sessions_UserId" ON telegram_mini_sessions ("UserId");
             CREATE TABLE IF NOT EXISTS chat_rp_preferences (
                 "Provider" varchar(16) NOT NULL,
                 "BotId" varchar(20) NOT NULL,
