@@ -153,6 +153,7 @@ public final class MainActivity extends ComponentActivity {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 if (!request.isForMainFrame()) return false;
                 String url = request.getUrl().toString();
+                if (request.hasGesture() && "mysticego://spatial".equals(url)) { openSpatialBrowser(); return true; }
                 if (MobileRoutes.trustedPage(url)) return false;
                 if (request.hasGesture() && RELEASES.equals(url)) openReleasePage();
                 else Toast.makeText(MainActivity.this, "External navigation blocked", Toast.LENGTH_SHORT).show();
@@ -244,6 +245,17 @@ public final class MainActivity extends ComponentActivity {
         String target=MobileQr.resolve(value);
         if (target != null && web != null) web.loadUrl(target);
         else Toast.makeText(this, "Некорректный QR MysticEgo", Toast.LENGTH_SHORT).show();
+    }
+
+    private void openSpatialBrowser() {
+        new android.app.AlertDialog.Builder(this).setTitle("MysticEgo · Пространственный AR")
+            .setMessage("Открыть защищённую страницу в Chrome? Вход в браузере отдельный; токены приложения не передаются.")
+            .setPositiveButton("Открыть",(dialog,which)->{
+                Intent external=new Intent(Intent.ACTION_VIEW,Uri.parse(MobileRoutes.ORIGIN+"/audit-portal/assistant?tab=spatial"));
+                external.setPackage("com.android.chrome");
+                try{startActivity(external);}
+                catch(android.content.ActivityNotFoundException ex){Toast.makeText(this,"Для пространственного AR установите Google Chrome.",Toast.LENGTH_LONG).show();}
+            }).setNegativeButton("Отмена",null).show();
     }
 
     private void openReleasePage() {

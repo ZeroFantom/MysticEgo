@@ -25,3 +25,6 @@ References:
 Build/lint/negative tests; real phone test; signed APK; provider disclosure/legal review; no production/registry publication before complete.
 
 External providers additionally require the human-readable MobileCloud:ProviderName and VoiceTranscription:ProviderName. Missing disclosure disables their respective new endpoints. Publish provider-specific privacy notices before production.
+
+## Spatial WebXR prototype
+The AR preview now explicitly offers a fixed Chrome URL, with independent browser sign-in. Android browser Assistant → Spatial AR loads the existing VRM, checks immersive-ar, starts a user-initiated WebXR session with hit-test, allows horizontal surface placement with a reticle and local-space pose, and supports idle/wave/nod. No persistent XRAnchor, depth occlusion, room mapping upload, or native ARCore renderer yet. The optional DOM overlay supplies motion controls; without it, system exit remains available. Verify with an ARCore-supported phone; CI typecheck cannot prove physical tracking. Reference: https://developers.google.com/ar/develop/webxr/hello-webxr .
