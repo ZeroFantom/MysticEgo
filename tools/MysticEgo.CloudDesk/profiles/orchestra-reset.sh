@@ -99,7 +99,12 @@ for u in "${units[@]}"; do
  if [[ $u == *@.service ]]; then continue; fi
  if [[ $(systemctl show "$u" -p LoadState --value) != not-found ]]; then
    systemctl stop "$u"
-   if systemctl is-enabled --quiet "$u"; then systemctl disable "$u"; fi
+   # is-enabled returns zero for some static/indirect units too. Only remove
+   # installation symlinks for explicitly enabled units; activation helpers are stopped above.
+   case "$(systemctl is-enabled "$u" 2>/dev/null || true)" in
+     enabled) systemctl disable "$u" ;;
+     enabled-runtime) systemctl disable --runtime "$u" ;;
+   esac
  fi
 done
 active_setups=$(systemctl list-units 'mysticego-local-setup@*.service' --state=active,activating,deactivating --no-legend --plain)
@@ -115,7 +120,20 @@ systemctl daemon-reload
 echo CLOUDDESK_RESET_STEP:install
 # The standard installer now holds the inherited lock until it reaches maintenance recovery.
 MYSTICEGO_INSTALL_LOCK_FD=9 MYSTICEGO_INSTALL_PREREQS_READY=1 bash install.sh "$PWD/r3.zip" "$domain" '' "$digest" native sqlite
-new=$(health http://127.0.0.1:5500/health/live)
-[[ $new =~ ^[a-f0-9-]{36}$ && $new != "$expected" && $(health "https://$domain/health/live") == "$new" ]] || die 'new identity not verified'
-[[ -f /var/lib/mysticego/auth.db && -f /var/lib/mysticego/orchestra/node.db ]]
+# Installer readiness is not factory-reset completion. Never repeat deletion here.
+echo CLOUDDESK_RESET_STEP:verify-identity
+new=$(health http://127.0.0.1:5500/health/live) || die 'post-install local health check failed; do not repeat reset'
+[[ $new =~ ^[a-f0-9-]{36}$ && $new != "$expected" ]] || die 'new local identity not verified; do not repeat reset'
+public=$(health "https://$domain/health/live") || die 'post-install HTTPS health check failed; do not repeat reset'
+[[ $public == "$new" ]] || die 'local and HTTPS identities differ; do not repeat reset'
+echo CLOUDDESK_RESET_STEP:verify-storage
+# Health may precede initialization of the local SQLite stores. Allow a bounded
+# wait, then name the missing invariant instead of returning a silent exit 1.
+for ((i=0;i<30;i++)); do
+ [[ -f /var/lib/mysticego/auth.db && -f /var/lib/mysticego/orchestra/node.db ]] && break
+ sleep 1
+done
+[[ -f /var/lib/mysticego/auth.db ]] || die 'post-install Auth SQLite store missing; do not repeat reset'
+[[ -f /var/lib/mysticego/orchestra/node.db ]] || die 'post-install Orchestra SQLite store missing; do not repeat reset'
+echo CLOUDDESK_RESET_STEP:complete
 echo "FACTORY_RESET_OK $new"
