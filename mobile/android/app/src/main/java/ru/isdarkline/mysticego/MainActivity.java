@@ -20,6 +20,14 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.ScrollView;
+import android.content.pm.PackageManager;
+import android.Manifest;
+import android.app.ActivityManager;
+import android.os.StatFs;
+import android.util.DisplayMetrics;
+import java.util.Locale;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -29,10 +37,63 @@ import com.google.zxing.integration.android.IntentResult;
 /** Minimal Android client. Auth remains inside the trusted first-party web application. */
 public final class MainActivity extends Activity {
     private WebView web;
+    private static final String INIT_VERSION = "mobile-init-1";
+    private static final int CAMERA_REQUEST = 310;
+    private CheckBox initAcceptance;
+    private Button initCamera;
+    private boolean cameraReviewed;
     private static final String RELEASES = "https://github.com/ZeroFantom/MysticEgo/releases";
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        if (!initialized()) { showInitialization(); return; }
+        showWorkspace();
+    }
+
+    private boolean initialized() {
+        return INIT_VERSION.equals(getPreferences(MODE_PRIVATE).getString("initialization_version", ""));
+    }
+
+    private String deviceReport() {
+        DisplayMetrics screen = getResources().getDisplayMetrics();
+        ActivityManager.MemoryInfo memory = new ActivityManager.MemoryInfo();
+        ((ActivityManager)getSystemService(ACTIVITY_SERVICE)).getMemoryInfo(memory);
+        StatFs storage = new StatFs(getFilesDir().getAbsolutePath());
+        return "Устройство: " + Build.MANUFACTURER + " " + Build.MODEL + "\nAndroid: " + Build.VERSION.RELEASE + " (API " + Build.VERSION.SDK_INT + ")\nПатч безопасности: " + Build.VERSION.SECURITY_PATCH + "\nCPU ABI: " + String.join(", ", Build.SUPPORTED_ABIS) + "\nЭкран: " + screen.widthPixels + " × " + screen.heightPixels + " px, " + screen.densityDpi + " dpi\nПамять: " + memory.totalMem / 1048576 + " МиБ\nДоступно для приложения: " + storage.getAvailableBytes() / 1048576 + " МиБ\nЯзык: " + Locale.getDefault().toLanguageTag() + "\nВерсия приложения: " + appVersion();
+    }
+
+    private String appVersion() {
+        try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionName; }
+        catch (PackageManager.NameNotFoundException ex) { return "unknown"; }
+    }
+
+    private void showInitialization() {
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(Color.rgb(23, 19, 39));
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(dp(24), dp(48), dp(24), dp(36));
+        TextView title = new TextView(this);title.setText("MysticEgo Mobile\nПервая инициализация");title.setTextSize(26);title.setTextColor(Color.WHITE);layout.addView(title);
+        TextView description = new TextView(this);description.setText("Проверьте профиль устройства и условия. Техническая диагностика ниже остаётся на телефоне; серверу при входе передаются тип клиента, версия Android и название модели из User-Agent. Камера нужна только для QR; отказаться можно без потери обычного входа. Другие разрешения не запрашиваются, пока соответствующие функции не реализованы. Системные разрешения можно отозвать в настройках Android.\n\n" + deviceReport());description.setTextColor(Color.rgb(224,218,244));description.setTextSize(15);description.setPadding(0,dp(20),0,dp(20));layout.addView(description);
+        initAcceptance = new CheckBox(this);initAcceptance.setText("Я ознакомился с назначением технических данных и разрешений приложения. При регистрации отдельно принимаются условия сервиса, политика обработки данных и лицензия.");initAcceptance.setTextColor(Color.WHITE);layout.addView(initAcceptance);
+        cameraReviewed = checkSelfPermission(Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED;
+        initCamera = button(cameraReviewed?"Камера: разрешена":"Разрешить камеру для QR", "Camera permission", () -> requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_REQUEST));layout.addView(initCamera);
+        Button skip=button("Без камеры", "Skip optional camera", () -> {cameraReviewed=true;initCamera.setText("Камера: выбор сделан");});layout.addView(skip);
+        Button proceed=button("Завершить инициализацию", "Complete initialization", () -> {
+            if(!initAcceptance.isChecked()||!cameraReviewed){Toast.makeText(this,"Подтвердите ознакомление и выберите доступ к камере.",Toast.LENGTH_LONG).show();return;}
+            getPreferences(MODE_PRIVATE).edit().putString("initialization_version",INIT_VERSION).putLong("initialization_accepted_at",System.currentTimeMillis()).apply();
+            showWorkspace();
+        });layout.addView(proceed);scroll.addView(layout);setContentView(scroll);
+    }
+
+    @Override public void onRequestPermissionsResult(int requestCode,String[] permissions,int[] results) {
+        super.onRequestPermissionsResult(requestCode,permissions,results);
+        if(requestCode==CAMERA_REQUEST && initCamera!=null){cameraReviewed=true;initCamera.setText(checkSelfPermission(Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED?"Камера: разрешена":"Камера: не разрешена");}
+    }
+
+    private void showWorkspace() {
+        initCamera=null;initAcceptance=null;
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Color.rgb(23, 19, 39));
@@ -73,7 +134,7 @@ public final class MainActivity extends Activity {
         settings.setSupportMultipleWindows(false);
         settings.setGeolocationEnabled(false);
         settings.setSafeBrowsingEnabled(true);
-        settings.setUserAgentString(settings.getUserAgentString() + " MysticEgoAndroid/1");
+        settings.setUserAgentString(settings.getUserAgentString() + " MysticEgoAndroid/1 MysticModel/" + safeModel());
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, false);
         web.setWebViewClient(new WebViewClient() {
@@ -114,6 +175,11 @@ public final class MainActivity extends Activity {
         openIntent(getIntent());
     }
 
+    private String safeModel() {
+        String model=(Build.MANUFACTURER+" "+Build.MODEL).replaceAll("[^A-Za-z0-9._ -]", "_").trim().replace(' ', '_');
+        return model.substring(0,Math.min(80,model.length()));
+    }
+
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
     private Button button(String text, String description, Runnable action) {
         Button result = new Button(this);
@@ -125,7 +191,7 @@ public final class MainActivity extends Activity {
 
     private void scanQr() {
         new IntentIntegrator(this).setDesiredBarcodeFormats(IntentIntegrator.QR_CODE)
-            .setPrompt("Scan a MysticEgo sign-in QR code").setBeepEnabled(false)
+            .setPrompt("Отсканируйте QR входа или друга MysticEgo").setBeepEnabled(false)
             .setBarcodeImageEnabled(false).setOrientationLocked(false).initiateScan();
     }
 
@@ -134,9 +200,9 @@ public final class MainActivity extends Activity {
         if (result == null) { super.onActivityResult(requestCode, resultCode, data); return; }
         String value = result.getContents();
         if (value == null) return;
-        if (value.matches("https://orchestra\\.isdarkline\\.ru/audit-portal/account-security#qr=[a-f0-9]{64}")) {
-            web.loadUrl(value);
-        } else Toast.makeText(this, "Invalid MysticEgo sign-in QR", Toast.LENGTH_SHORT).show();
+        String target=MobileQr.resolve(value);
+        if (target != null && web != null) web.loadUrl(target);
+        else Toast.makeText(this, "Некорректный QR MysticEgo", Toast.LENGTH_SHORT).show();
     }
 
     private void openReleasePage() {
@@ -154,7 +220,7 @@ public final class MainActivity extends Activity {
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        openIntent(intent);
+        if(initialized()&&web!=null)openIntent(intent);
     }
 
     @Override public void onBackPressed() {
@@ -162,7 +228,7 @@ public final class MainActivity extends Activity {
     }
 
     @Override protected void onStop() {
-        CookieManager.getInstance().flush();
+        if(web!=null)CookieManager.getInstance().flush();
         super.onStop();
     }
 

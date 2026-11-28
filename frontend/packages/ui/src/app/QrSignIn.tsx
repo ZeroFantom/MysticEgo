@@ -7,7 +7,7 @@ import {browserAuthRequest} from './browserSession';
 import {ANDROID_ORIGIN} from './androidLaunch';
 import './qr-sign-in.css';
 
-export type SessionDevice={kind:string;os:string;version?:string;client:string};
+export type SessionDevice={kind:string;os:string;version?:string;client:string;model?:string};
 type RequestView={id:string;comparison:string;expires:string;device:SessionDevice};
 const secret=/^[a-f0-9]{64}$/;
 const hex=(bytes:Uint8Array)=>Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
@@ -25,9 +25,9 @@ export function deviceLabel(device:SessionDevice|undefined,ua:string|undefined,t
  if(!device&&ua){const android=/Android/i.test(ua),ios=/iPhone|iPad|iPod/i.test(ua);if(android||ios)device={kind:/iPad/i.test(ua)||android&&!/Mobile/i.test(ua)?'tablet':'mobile',os:android?'Android':'iOS',client:/MysticEgoAndroid\//.test(ua)?'MysticEgo Mobile':/Firefox|FxiOS/i.test(ua)?'Firefox':/Chrome|CriOS/i.test(ua)?'Chrome':'unknown'};}
  if(!device||device.kind==='unknown')return t('Неизвестное устройство');
  const type=t(device.kind==='mobile'?'Мобильное устройство':device.kind==='tablet'?'Планшет':'Компьютер');
- return [type,device.os!=='unknown'?device.os:'',device.version||'',device.client!=='unknown'?device.client:''].filter(Boolean).join(' · ');
+ return [type,device.os!=='unknown'?device.os:'',device.version||'',device.model||'',device.client!=='unknown'?device.client:''].filter(Boolean).join(' · ');
 }
-export function QrReceive({session,authUrl,disabled,onLogin}:{session:Session;authUrl:string;disabled:boolean;onLogin:(session:Session)=>void}){
+export function QrReceive({session,authUrl,disabled,onLogin,onBusy}:{session:Session;authUrl:string;disabled:boolean;onLogin:(session:Session)=>void;onBusy:(busy:boolean)=>void}){
  const t=useLocale(),[view,setView]=useState<RequestView|null>(null),[message,setMessage]=useState(''),[busy,setBusy]=useState(false);
  const active=useRef<{controller:AbortController;id?:string;verifier?:string}|null>(null);
  const eligible=location.origin===ANDROID_ORIGIN&&session.url.replace(/\/$/,'')===location.origin&&authUrl.replace(/\/$/,'')===location.origin;
@@ -35,11 +35,11 @@ export function QrReceive({session,authUrl,disabled,onLogin}:{session:Session;au
   const current=active.current;active.current=null;current?.controller.abort();
   if(cancel&&current?.id&&current.verifier)void post('cancel',{id:current.id,verifier:current.verifier}).catch(()=>{});
  }
- useEffect(()=>()=>stop(),[]);
- useEffect(()=>{if(!eligible){stop();setView(null);setBusy(false)}},[eligible]);
+ useEffect(()=>()=>{stop();onBusy(false)},[]);
+ useEffect(()=>{if(!eligible){stop();setView(null);setBusy(false);onBusy(false)}},[eligible]);
  async function start(){
   if(!eligible||active.current||disabled)return;
-  const controller=new AbortController(),attempt:{controller:AbortController;id?:string;verifier?:string}={controller};active.current=attempt;setBusy(true);setView(null);setMessage('');
+  const controller=new AbortController(),attempt:{controller:AbortController;id?:string;verifier?:string}={controller};active.current=attempt;setBusy(true);onBusy(true);setView(null);setMessage('');
   try{
    const status=await fetch('/api/auth/browser/status',{credentials:'same-origin',cache:'no-store',redirect:'error',signal:AbortSignal.any([controller.signal,AbortSignal.timeout(8000)])});
    if(!status.ok||(await status.json()).enabled!==true)throw Error('unavailable');
@@ -58,11 +58,11 @@ export function QrReceive({session,authUrl,disabled,onLogin}:{session:Session;au
     const result=await redeem.json();
     if(controller.signal.aborted||active.current!==attempt){await browserAuthRequest('logout').catch(()=>{});return;}
     if(typeof result.accessToken!=='string'||!result.accessToken||typeof result.user?.login!=='string'||!result.user.login)throw Error('unavailable');
-    stop(false);setView(null);onLogin({...session,authUrl:location.origin,token:result.accessToken,refreshToken:undefined,browserSession:true,username:result.user.login});return;
+    stop(false);setView(null);onBusy(false);onLogin({...session,authUrl:location.origin,token:result.accessToken,refreshToken:undefined,browserSession:true,username:result.user.login});return;
    }
    if(!controller.signal.aborted)throw Error('expired');
   }catch(error){if(!controller.signal.aborted)setMessage(error instanceof Error&&error.message==='expired'?'Запрос истёк или отклонён. Создайте новый QR-код.':'QR-вход недоступен. Используйте обычный вход.')}
-  finally{if(active.current===attempt){stop();setBusy(false);setView(null)}}
+  finally{if(active.current===attempt){stop();setBusy(false);onBusy(false);setView(null)}}
  }
  if(!eligible)return null;
  return <section className="qr-sign-in" aria-label={t('Вход по QR-коду')}>
@@ -71,7 +71,7 @@ export function QrReceive({session,authUrl,disabled,onLogin}:{session:Session;au
     <p>{t('Откройте безопасность аккаунта на другом авторизованном устройстве и отсканируйте код или вставьте ссылку.')}</p>
     <strong>{t('Код сравнения')}: <span className="qr-comparison">{view.comparison}</span></strong>
     <label>{t('Скопируйте ссылку запроса')}<input readOnly value={requestLink(view.id)} onFocus={event=>event.target.select()}/></label>
-    <button className="btn secondary" type="button" onClick={()=>{stop();setView(null);setBusy(false);setMessage('')}}>{t('Отмена')}</button>
+    <button className="btn secondary" type="button" onClick={()=>{stop();setView(null);setBusy(false);onBusy(false);setMessage('')}}>{t('Отмена')}</button>
   </div>}
   {message&&<p role="status">{t(message)}</p>}
  </section>;
