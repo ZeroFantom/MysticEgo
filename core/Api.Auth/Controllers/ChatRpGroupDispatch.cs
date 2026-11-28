@@ -11,7 +11,7 @@ public sealed class ChatRpGroupDispatch(IConfiguration configuration,ChatRpRunti
     {
         if(!configuration.GetValue<bool>("Messenger:GroupRp:Enabled"))return null;
         var current=MessengerConfiguration.Read(configuration,realm.Provider);
-        if(current is null||current.Valurealm!=realm)return null;
+        if(current is null||current.Value.Realm!=realm)return null;
         var section=configuration.GetSection("Messenger:GroupRp:Groups")
             .GetChildren().Take(257).Where(s=>s["Provider"]==realm.Provider&&s["BotId"]==realm.BotId&&s["Peer"]==peer).ToArray();
         if(section.Length!=1||!section[0].GetValue<bool>("Enabled"))return null;
