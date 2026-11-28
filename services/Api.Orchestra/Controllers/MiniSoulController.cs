@@ -50,7 +50,7 @@ public sealed class MiniSoulController(IConfiguration configuration,MiniSoulIden
         var principal=await identity.Resolve(token,ct);
         if(principal.UserId is not Guid account)return principal.Denied?Unauthorized():StatusCode(503);
         var started=System.Diagnostics.Stopwatch.StartNew();
-        var view=await presence.Read(configuration["MiniApp:PresenceFeedPath"],account,ct);
+        var view=await presence.ReadConfigured(configuration["WorldAuthority:DatabasePath"],configuration["MiniApp:PresenceFeedPath"],account,ct);
         var live=await identity.Resolve(token,ct);
         if(live.UserId!=account)return live.Denied?Unauthorized():StatusCode(503);
         var remaining=view.FreshForSeconds-(int)Math.Ceiling(started.Elapsed.TotalSeconds);

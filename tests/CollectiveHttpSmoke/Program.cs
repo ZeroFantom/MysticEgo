@@ -28,6 +28,7 @@ SpiritualJournalSmoke.Run();
 await MessengerWorldBridgeSmoke.Run();
 await SoulMirrorSmoke.Run();
 await WorldPresenceFeedSmoke.Run();
+await WorldAuthoritySmoke.Run();
 SpiritualDialogueSmoke.Run();
 SpiritualNpcMemorySmoke.Run();
 

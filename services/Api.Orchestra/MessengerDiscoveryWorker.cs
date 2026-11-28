@@ -62,7 +62,7 @@ public sealed class MessengerDiscoveryWorker(IConfiguration configuration,NodeOp
         if(verified.StatusCode!=HttpStatusCode.NoContent)return;
         var start=DateTimeOffset.UtcNow;
         var view=lease.Command is "/nearby" or "/friends"?
-            await reader.Read(configuration["MiniApp:PresenceFeedPath"],lease.UserId,ct):new WorldPresenceRead(false,null,0);
+            await reader.ReadConfigured(configuration["WorldAuthority:DatabasePath"],configuration["MiniApp:PresenceFeedPath"],lease.UserId,ct):new WorldPresenceRead(false,null,0);
         var until=start.AddSeconds(view.FreshForSeconds);
         var available=view.SnapshotAvailable&&until>DateTimeOffset.UtcNow;
         IReadOnlyList<SpiritualPublicContact> contacts=available?

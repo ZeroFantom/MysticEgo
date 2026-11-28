@@ -10,12 +10,12 @@ public sealed record WorldPresenceRead(bool SnapshotAvailable,SpiritualPresenceV
 
 public sealed class WorldPresenceFeedReader(TimeProvider clock)
 {
-    private static readonly JsonSerializerOptions Json=new(JsonSerializerDefaults.Web)
+    internal static readonly JsonSerializerOptions Json=new(JsonSerializerDefaults.Web)
     {
         MaxDepth=16,UnmappedMemberHandling=JsonUnmappedMemberHandling.Disallow,
         AllowDuplicateProperties=false
     };
-    private const int MaxBytes=1024*1024;
+    internal const int MaxBytes=1024*1024;
     private static WorldPresenceRead Unavailable()=>new(false,null,0);
     public async Task<WorldPresenceRead> Read(string? path,Guid account,CancellationToken ct=default)
     {
@@ -29,23 +29,50 @@ public sealed class WorldPresenceFeedReader(TimeProvider clock)
             var bytes=new byte[(int)file.Length];
             await file.ReadExactlyAsync(bytes,ct);
             if(file.ReadByte()!=-1)return Unavailable();
-            var feed=JsonSerializer.Deserialize<WorldPresenceFeed>(bytes,Json);
-            if(feed?.Snapshot is not { } snapshot||!Fresh(feed.PublishedUtc)||
-                snapshot.Placements is null||snapshot.ActiveEmbodiments is null||snapshot.Permissions is null||
-                snapshot.Friendships is null||snapshot.ContactLabels is null||snapshot.AreaLabels is null||snapshot.NpcProfiles is null||
-                snapshot.Placements.Count>2048||snapshot.ActiveEmbodiments.Count>1024||
-                snapshot.Permissions.Count>8192||snapshot.Friendships.Count>8192||
-                snapshot.ContactLabels.Count>2048||snapshot.AreaLabels.Count>2048)return Unavailable();
-            var gateway=new SpiritualCommunicationGateway(clock);
-            if(!gateway.TryPublish(gateway.Revision,snapshot,out _))return Unavailable();
-            var result=gateway.ReadPresence(account);
-            if(!Fresh(feed.PublishedUtc))return Unavailable();
-            var remaining=(int)Math.Floor((feed.PublishedUtc.AddSeconds(15)-clock.GetUtcNow()).TotalSeconds);
-            return remaining>0?new(true,result,Math.Min(remaining,15)):Unavailable();
+            return Project(JsonSerializer.Deserialize<WorldPresenceFeed>(bytes,Json),account);
         }
         catch(Exception ex) when(ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException or
             InvalidOperationException or NullReferenceException or NotSupportedException){return Unavailable();}
     }
+    internal static SpiritualCommunicationGateway? Validate(SpiritualWorldSnapshot? snapshot,TimeProvider clock)
+    {
+        if(snapshot is null||snapshot.Placements is null||snapshot.ActiveEmbodiments is null||
+            snapshot.Permissions is null||snapshot.Friendships is null||snapshot.ContactLabels is null||
+            snapshot.AreaLabels is null||snapshot.NpcProfiles is null||
+            snapshot.Placements.Count>2048||snapshot.ActiveEmbodiments.Count>1024||
+            snapshot.Permissions.Count>8192||snapshot.Friendships.Count>8192||
+            snapshot.ContactLabels.Count>2048||snapshot.AreaLabels.Count>2048||
+            snapshot.NpcProfiles.Count>2048)return null;
+        var gateway=new SpiritualCommunicationGateway(clock);
+        return gateway.TryPublish(gateway.Revision,snapshot,out _)?gateway:null;
+    }
+
+    internal WorldPresenceRead Project(WorldPresenceFeed? feed,Guid account)
+    {
+        if(account==Guid.Empty||feed is null||!Fresh(feed.PublishedUtc)||
+            Validate(feed.Snapshot,clock) is not { } gateway)return Unavailable();
+        var result=gateway.ReadPresence(account);
+        if(!Fresh(feed.PublishedUtc))return Unavailable();
+        var remaining=(int)Math.Floor((feed.PublishedUtc.AddSeconds(15)-clock.GetUtcNow()).TotalSeconds);
+        return remaining>0?new(true,result,Math.Min(remaining,15)):Unavailable();
+    }
+
+    // Explicit authority DB selection never falls back to the legacy file on error.
+    public async Task<WorldPresenceRead> ReadConfigured(string? authorityPath,string? legacyPath,Guid account,CancellationToken ct=default)
+    {
+        if(authorityPath is null)return await Read(legacyPath,account,ct);
+        if(account==Guid.Empty||!Path.IsPathFullyQualified(authorityPath))return Unavailable();
+        try
+        {
+            ct.ThrowIfCancellationRequested();
+            var feed=WorldAuthorityStore.ReadCurrent(authorityPath);
+            return Project(feed?.Feed,account);
+        }
+        catch(Exception ex) when(ex is Microsoft.Data.Sqlite.SqliteException or IOException or UnauthorizedAccessException or
+            JsonException or ArgumentException or InvalidOperationException or NullReferenceException or NotSupportedException)
+        {return Unavailable();}
+    }
+
     private bool Fresh(DateTimeOffset published)
     {
         var now=clock.GetUtcNow();
