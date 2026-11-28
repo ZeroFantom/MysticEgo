@@ -7,7 +7,16 @@ public sealed record SpiritualPermission(string SenderId, string RecipientId);
 public sealed record SpiritualFriendship(string FirstId, string SecondId);
 public sealed record SpiritualWorldSnapshot(IReadOnlyList<WorldPlacement> Placements,
     IReadOnlyList<ActiveEmbodiment> ActiveEmbodiments, IReadOnlyList<SpiritualPermission> Permissions,
-    IReadOnlyList<SpiritualFriendship> Friendships);
+    IReadOnlyList<SpiritualFriendship> Friendships)
+{
+    // Optional trusted in-world labels. Unnamed entities are not exposed in discovery.
+    public IReadOnlyList<SpiritualContactLabel> ContactLabels { get; init; } = [];
+}
+public sealed record SpiritualContactLabel(string EntityId, string Name);
+public enum SpiritualContactFilter { Nearby, Friends }
+public sealed record SpiritualContact(string EntityId, string Name, SpiritualParticipantKind Kind,
+    SpiritualConnectionDecision Reachability);
+public sealed record SpiritualContactPage(Guid Revision, IReadOnlyList<SpiritualContact> Contacts);
 
 /// <summary>Caller is already authenticated; no client-supplied world/area/friendship or provider identity.</summary>
 public sealed record SpiritualSendRequest(Guid RequestId, string RecipientId, string Text);
@@ -37,6 +46,7 @@ public sealed class SpiritualCommunicationGateway(TimeProvider clock, SpiritualM
     private Dictionary<Guid, string> active = new();
     private HashSet<(string Sender, string Recipient)> permissions = new();
     private HashSet<(string First, string Second)> friends = new();
+    private Dictionary<string, string> labels = new(StringComparer.Ordinal);
     private readonly Dictionary<(Guid Account, Guid Request), Entry> requests = new();
     private readonly Queue<Entry> pending = new();
     private readonly Dictionary<Guid, SpiritualMessage> delivered = new();
@@ -78,10 +88,18 @@ public sealed class SpiritualCommunicationGateway(TimeProvider clock, SpiritualM
                 first.AccountId == second.AccountId) throw new ArgumentException("Invalid player friendship.");
             nextFriends.Add(FriendPair(item.FirstId, item.SecondId));
         }
+        var nextLabels = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var label in snapshot.ContactLabels)
+        {
+            if (!entities.ContainsKey(label.EntityId) || string.IsNullOrWhiteSpace(label.Name) ||
+                label.Name.Length > 80 || label.Name != label.Name.Trim() || label.Name.Any(char.IsControl) ||
+                !nextLabels.TryAdd(label.EntityId, label.Name))
+                throw new ArgumentException("Invalid contact label.");
+        }
         lock (gate)
         {
             if (!presence.TryReplace(expected, placements, out revision)) return false;
-            active = nextActive; permissions = nextPermissions; friends = nextFriends;
+            active = nextActive; permissions = nextPermissions; friends = nextFriends; labels = nextLabels;
             snapshotReady = true;
             return true;
         }
@@ -91,6 +109,40 @@ public sealed class SpiritualCommunicationGateway(TimeProvider clock, SpiritualM
     public SpiritualConnectionDecision Reachability(Guid account, string recipient)
     {
         lock (gate) return Resolve(account, recipient)?.Decision ?? SpiritualConnectionDecision.Unavailable;
+    }
+
+    /// <summary>Only currently reachable named entities. No provider/account/area metadata.
+    /// This coherent revision is advisory until checked atomically by SendAtRevision.</summary>
+    public SpiritualContactPage Discover(Guid account, SpiritualContactFilter filter, int limit = 20)
+    {
+        lock (gate)
+        {
+            if (!active.TryGetValue(account, out var sender) || limit is < 1 or > 32 ||
+                filter is not (SpiritualContactFilter.Nearby or SpiritualContactFilter.Friends))
+                return new(presence.Version, []);
+            var result = new List<SpiritualContact>();
+            foreach (var id in labels.Keys.OrderBy(x => x, StringComparer.Ordinal))
+            {
+                var route = Resolve(account, id);
+                if (route is null) continue;
+                if (filter == SpiritualContactFilter.Nearby && route.Value.Decision != SpiritualConnectionDecision.Local ||
+                    filter == SpiritualContactFilter.Friends &&
+                        !friends.Contains(FriendPair(sender,id))) continue;
+                result.Add(new(id, labels[id], route.Value.Pair.Recipient.Kind, route.Value.Decision));
+                if (result.Count >= limit) break;
+            }
+            return new(presence.Version, result);
+        }
+    }
+
+    /// <summary>Reject stale selections under the same lock as publication and enqueue.</summary>
+    public SpiritualSendResult SendAtRevision(Guid account, Guid revision, SpiritualSendRequest request)
+    {
+        lock (gate)
+        {
+            if (revision != presence.Version) return new(SpiritualSendStatus.Unavailable);
+            return Send(account, request);
+        }
     }
 
     /// <summary>
