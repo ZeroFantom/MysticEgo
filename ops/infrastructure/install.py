@@ -9,6 +9,7 @@ import pwd
 import re
 import secrets
 import shutil
+import socket
 import subprocess
 import tempfile
 import time
@@ -54,6 +55,24 @@ def account(user, home):
         run("useradd", "--system", "--user-group", "--create-home", "--home-dir", str(home),
             "--shell", "/usr/sbin/nologin", user)
         return pwd.getpwnam(user).pw_uid
+
+
+def ensure_lm_home():
+    # Factory reset removes LM_HOME but intentionally keeps the system account.
+    uid = account("mysticego-lm", LM_HOME)
+    entry = pwd.getpwnam("mysticego-lm")
+    if entry.pw_uid != uid or Path(entry.pw_dir) != LM_HOME:
+        raise ValueError("Unexpected LM Studio service account home.")
+    if LM_HOME.is_symlink():
+        raise ValueError("LM Studio home must not be a symbolic link.")
+    try:
+        LM_HOME.mkdir(mode=0o700)
+    except FileExistsError:
+        if not LM_HOME.is_dir() or LM_HOME.stat().st_uid != uid:
+            raise ValueError("Unexpected LM Studio home ownership or type.")
+    else:
+        os.chown(LM_HOME, uid, entry.pw_gid)
+    return uid
 
 
 def system_packages(*packages):
@@ -322,11 +341,12 @@ def prepare_postgres(data):
 
 def lmstudio_dependencies():
     """Install the required llmster runtime dependency before running its installer."""
-    result = subprocess.run(("dpkg-query", "-W", "-f=${Status}", "libatomic1"),
-                            capture_output=True, text=True, timeout=10)
     missing = []
-    if result.returncode != 0 or result.stdout.strip() != "install ok installed":
-        missing.append("libatomic1")
+    for package in ("libatomic1", "libgomp1"):
+        result = subprocess.run(("dpkg-query", "-W", "-f=${Status}", package),
+                                capture_output=True, text=True, timeout=10)
+        if result.returncode != 0 or result.stdout.strip() != "install ok installed":
+            missing.append(package)
     if not shutil.which("curl"):
         missing.extend(("curl", "ca-certificates"))
     if missing:
@@ -334,12 +354,44 @@ def lmstudio_dependencies():
         system_packages(*missing)
 
 
+class ResourceDeferred(RuntimeError):
+    pass
+
+
+class ModelPortOccupied(RuntimeError):
+    pass
+
+
+def lm_port_occupied():
+    # Any listener, including a non-LM HTTP service, is a conflict.
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as connection:
+        connection.settimeout(2)
+        return connection.connect_ex(("127.0.0.1", 1234)) == 0
+
+
+def lm_provisioning_capacity(role):
+    # Conservative headroom for unpack/download, not a guarantee of model fit.
+    # Do not configure swap, kill another service or change the selected model.
+    fields = dict(line.split(":", 1) for line in Path("/proc/meminfo").read_text().splitlines() if ":" in line)
+    available = int(fields["MemAvailable"].split()[0]) * 1024
+    required_disk = (5 if role == "world" else 3) * 1024**3
+    if available < 2 * 1024**3 or shutil.disk_usage(LM_HOME).free < required_disk:
+        raise ResourceDeferred("Insufficient memory or disk for model provisioning.")
+
+
+def lm_cache_present(model):
+    family = model.split("/", 1)[1]
+    model_folder = LM_HOME / ".lmstudio/models"
+    return any(path.is_file() and path.stat().st_size > 0 and family in path.parent.name.lower()
+               and "q4_k_m" in path.name.lower() for path in model_folder.glob("*/*/*.gguf"))
+
+
 def lmstudio(data):
     role = data.get("role") or "panel-data"
     if role not in MODELS:
         raise ValueError("Выберите профиль модели: world или panel-data.")
     model, alias, context = MODELS[role]
-    uid = account("mysticego-lm", LM_HOME)
+    uid = ensure_lm_home()
     state = ROOT / "lmstudio"
     state.mkdir(parents=True, exist_ok=True)
     profile = state / "role"
@@ -347,6 +399,11 @@ def lmstudio(data):
         raise ValueError("Этот сервер уже использует другой профиль LM Studio.")
     command = ("runuser", "-u", "mysticego-lm", "--", "env", f"HOME={LM_HOME}")
     cli = LM_HOME / ".lmstudio/bin/lms"
+    cached = lm_cache_present(model)
+    if not cli.is_file() or not cached:
+        lm_provisioning_capacity(role)
+    if (not profile.exists() or not cached) and lm_port_occupied():
+        raise ModelPortOccupied("LM Studio port 1234 is occupied.")
     lmstudio_dependencies()
     if not cli.is_file():
         say("Устанавливаем LM Studio llmster под отдельным пользователем")
@@ -355,19 +412,10 @@ def lmstudio(data):
                 "-o", install.name, "https://lmstudio.ai/install.sh")
             os.chown(install.name, uid, -1)
             run(*command, "bash", install.name, stdin=subprocess.DEVNULL)
-    if not profile.exists():
-        try:
-            request("http://127.0.0.1:1234/v1/models")
-        except OSError:
-            pass
-        else:
-            raise ValueError("Порт 1234 уже занят сервером моделей.")
+    if not profile.exists() or not cached:
+        # A retained role file is not proof the model survived a partial deletion.
         run(*command, str(cli), "daemon", "up")
         try:
-            family = model.split("/", 1)[1]
-            model_folder = LM_HOME / ".lmstudio/models"
-            cached = any(path.is_file() and family in path.parent.name.lower()
-                         and "q4_k_m" in path.name.lower() for path in model_folder.glob("*/*/*.gguf"))
             if not cached:
                 say(f"Скачиваем модель {model}")
                 run(*command, str(cli), "get", model + "@q4_k_m", "--gguf", "--yes", stdin=subprocess.DEVNULL)
@@ -466,7 +514,7 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except ValueError as error:
+    except (ValueError, ResourceDeferred, ModelPortOccupied) as error:
         say(str(error))
         raise SystemExit(1)
     except (OSError, subprocess.SubprocessError):

@@ -2,7 +2,7 @@ import {useEffect,useRef} from 'react';
 import {useApp,useRemote} from '../app/context';
 import {useNoticeFeed} from '../app/notifications';
 
-export type Maintenance={installed:boolean;workerState?:string;source?:string;socketAvailable?:boolean;components:{name:string;state:string;message:string;checkedAt:string}[]};
+export type Maintenance={installed:boolean;workerState?:string;source?:string;socketAvailable?:boolean;components:{name:string;state:string;message:string;checkedAt:string;reason?:string;lastAttemptAt?:string;nextRetryAt?:string}[]};
 const endpoint='/managed/infrastructure-maintenance';
 export const names:Record<string,string>={worker:'Служба обслуживания Orchestra',orchestra:'Orchestra',docker:'Docker / Compose',lmstudio:'LM Studio',voice:'Распознавание речи','postgres-service':'Служба PostgreSQL',database:'Текущая база'};
 export const labels:Record<string,string>={checking:'Проверяется',available:'Готово',repairing:'Восстановление',degraded:'Требует внимания',external:'Заданная конфигурация',disabled:'Отключено'};

@@ -155,7 +155,7 @@ try{
         await page.route('**/*.js',route=>route.abort());
         await check(page,role+'-cold-start-no-social-flash',async()=>{
           await page.goto(origin+'/',{waitUntil:'domcontentloaded'});
-          await visible(page.locator('.mystic-panel-boot'));
+          await visible(page.locator('.mystic-entry-boot'));
           assert.equal(await page.locator('#root h1').count(),0);
           assert.equal(await page.locator('meta[property="og:title"]').count(),1);
           assert.equal(await page.locator('meta[property="og:description"]').count(),1);

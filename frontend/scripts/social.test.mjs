@@ -11,14 +11,18 @@ for(const role of Object.keys(roles)){
     assert.equal((html.match(/property="og:image"/g)||[]).length,1);
     assert(html.includes('<!-- mysticego-social-start -->'));
     assert(html.includes('<h1>')&&html.includes('<meta name="description"'),'Initial HTML must contain text without JavaScript');
-    if(role==='orchestra'&&Object.hasOwn(publicPages,page)){assert(html.includes('<h1>'));assert(html.includes('index,follow,max-image-preview:large'));assert(html.includes('href="/desktop-downloads"'));}
-    else {
-      assert(html.includes('noindex,follow'));
-      assert.match(html,/<div id="root"><div class="mystic-panel-boot"[^>]*><span[^>]*><\/span><\/div><\/div><noscript>/);
-      assert.match(html,/<noscript>[\s\S]*?<h1>[\s\S]*?<\/noscript>/);
-      assert(!html.split('<noscript>')[0].includes('<h1>'),'No visible social text before JavaScript');
+    if(page==='root'){
+      assert(html.includes('class="mystic-entry-boot"'));
+      assert(html.includes('id="mystic-entry-style"'));
+      const browserHtml=html.replace(/<noscript>[\s\S]*?<\/noscript>/g,'');
+      assert(!browserHtml.includes('<h1>')&&!browserHtml.includes('<main>'),role+' must not paint marketing fallback with JS enabled');
+      assert(html.includes('<noscript>')&&html.includes('</noscript>'));
       assert(html.includes('prefers-reduced-motion:reduce'));
+    }else{
+      assert(!html.includes('class="mystic-entry-boot"'),'Public pages retain their visible initial text');
     }
+    if(role==='orchestra'&&Object.hasOwn(publicPages,page)){assert(html.includes('<h1>'));assert(html.includes('index,follow,max-image-preview:large'));assert(html.includes('href="/desktop-downloads"'));}
+    else assert(html.includes('noindex,follow'));
     assert(html.includes('content="1200"')&&html.includes('content="630"'));
   }
   const actual=await readFile(new URL('./social-art/'+role+'.png',import.meta.url));

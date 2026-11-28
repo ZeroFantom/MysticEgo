@@ -67,24 +67,25 @@ CADDY
  active_setups=$(systemctl list-units 'mysticego-local-setup@*.service' --state=active,activating,deactivating --no-legend --plain)
  [[ -z $active_setups ]] || die 'local setup busy'
 }
-# Read-only post-install verification. No cleanup or second destructive attempt.
+# Read-only verification shared by normal completion and SSH reconnect.
 verify_postinstall(){
- local wanted=$1 state_root=$2 app_root=$3 new='' remote='' installed='' i
- echo CLOUDDESK_RESET_STEP:verify
+ local wanted=$1 state_root=$2 app_root=$3 new='' public='' installed='' i
+ echo CLOUDDESK_RESET_STEP:verify-identity
  for ((i=0;i<12;i++)); do
    new=$(health http://127.0.0.1:5500/health/live 2>/dev/null) || new=''
-   remote=$(health "https://$domain/health/live" 2>/dev/null) || remote=''
-   if [[ $new =~ ^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$ && $new != "$expected" && $remote == "$new" ]]; then break; fi
+   public=$(health "https://$domain/health/live" 2>/dev/null) || public=''
+   if [[ $new =~ ^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$ && $new != "$expected" && $public == "$new" ]]; then break; fi
    sleep 2
  done
  [[ $new =~ ^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$ ]] || die 'post-install: local Orchestra health or node ID unavailable'
  [[ $new != 00000000-0000-0000-0000-000000000000 ]] || die 'post-install: empty node ID'
  [[ $new != "$expected" ]] || die 'post-install: old node identity still returned'
- [[ $remote == "$new" ]] || die 'post-install: HTTPS and local node identities differ'
+ [[ $public == "$new" ]] || die 'post-install: HTTPS and local node identities differ'
  [[ -s "$state_root/center-id.txt" ]] || die 'post-install: center-id.txt missing'
  [[ $(cat "$state_root/center-id.txt") == "$new" ]] || die 'post-install: persisted center identity differs'
- [[ -s "$state_root/auth.db" ]] || die 'post-install: Auth SQLite file missing or empty'
- [[ -s "$state_root/orchestra/node.db" ]] || die 'post-install: Orchestra SQLite file missing or empty'
+ echo CLOUDDESK_RESET_STEP:verify-storage
+ [[ -s "$state_root/auth.db" ]] || die 'post-install Auth SQLite store missing or empty'
+ [[ -s "$state_root/orchestra/node.db" ]] || die 'post-install Orchestra SQLite store missing or empty'
  installed=$(python3 - "$app_root/runtime/app/web/orchestra/release-info.json" <<'PY'
 import json,sys
 print(json.load(open(sys.argv[1]))["installed"])
@@ -93,12 +94,22 @@ PY
  [[ $installed == "$wanted" ]] || die 'post-install: installed release differs from approved release'
  systemctl is-active --quiet mysticego-orchestra.service || die 'post-install: Orchestra service is not active'
  systemctl is-active --quiet caddy.service || die 'post-install: Caddy service is not active'
- systemctl is-active --quiet mysticego-orchestra-updater.timer || die 'post-install: updater timer is not active'
- systemctl is-active --quiet mysticego-local-setup.socket || die 'post-install: local setup socket is not active'
+ # A separate pending status preserves the R3.2.43 non-destructive repair policy.
+ if systemctl is-active --quiet mysticego-orchestra-updater.timer &&
+    systemctl is-active --quiet mysticego-local-setup.socket &&
+    systemctl is-active --quiet mysticego-infrastructure-reconcile.timer; then
+   echo CLOUDDESK_RESET_MAINTENANCE_SCHEDULED
+ else
+   echo CLOUDDESK_RESET_MAINTENANCE_PENDING
+ fi
+ echo CLOUDDESK_RESET_STEP:complete
  echo "FACTORY_RESET_OK $new"
 }
 if [[ $mode == verify ]]; then
  [[ ${4:-} =~ ^v1\.0\.0-beta\.7-r[0-9]+\.[0-9]+\.[0-9]+$ ]] || die 'invalid verification release'
+ # Refuse to certify a half-completed installation; no mutation except the lock file.
+ exec 9>/run/lock/mysticego-clouddesk-deploy.lock
+ flock -w 60 9 || die 'deployment still busy; verify later, do not repeat reset'
  verify_postinstall "$4" /var/lib/mysticego /opt/mysticego/app
  exit 0
 fi
@@ -126,16 +137,23 @@ exec 9>/run/lock/mysticego-clouddesk-deploy.lock
 flock -n 9 || die 'deployment busy'
 preflight
 export DEBIAN_FRONTEND=noninteractive
+# Refuse a busy local provisioning job before any package/service mutation.
+exec 8>/run/lock/mysticego-infrastructure.lock
+flock -n 8 || die 'infrastructure setup busy; no deletion performed'
 apt-get update
-apt-get install -y ca-certificates caddy curl libicu74 libssl3t64 unzip gh
+apt-get install -y ca-certificates caddy curl libicu74 libssl3t64 unzip gh libatomic1 libgomp1
 preflight
 echo CLOUDDESK_RESET_STEP:stop
 for u in "${units[@]}"; do
  if [[ $u == *@.service ]]; then continue; fi
  if [[ $(systemctl show "$u" -p LoadState --value) != not-found ]]; then
    systemctl stop "$u"
-   enabled_state=$(systemctl is-enabled "$u" 2>/dev/null || true)
-   case "$enabled_state" in enabled|enabled-runtime|linked|linked-runtime) systemctl disable "$u";; esac
+   # is-enabled returns zero for some static/indirect units too. Only remove
+   # installation symlinks for explicitly enabled units; activation helpers are stopped above.
+   case "$(systemctl is-enabled "$u" 2>/dev/null || true)" in
+     enabled) systemctl disable "$u" ;;
+     enabled-runtime) systemctl disable --runtime "$u" ;;
+   esac
  fi
 done
 active_setups=$(systemctl list-units 'mysticego-local-setup@*.service' --state=active,activating,deactivating --no-legend --plain)
@@ -148,7 +166,10 @@ for u in "${units[@]}"; do rm -f -- "/etc/systemd/system/$u"; done
 rm -f -- /etc/caddy/Caddyfile
 rm -rf --one-file-system -- "${paths[@]}"
 systemctl daemon-reload
+flock -u 8
 echo CLOUDDESK_RESET_STEP:install
-# The standard installer now holds the inherited lock until it reaches maintenance recovery.
-MYSTICEGO_INSTALL_LOCK_FD=9 MYSTICEGO_INSTALL_PREREQS_READY=1 bash install.sh "$PWD/r3.zip" "$domain" '' "$digest" native sqlite || die 'post-install: installer returned a failure; verify existing state before any retry'
+# The standard installer borrows the deployment lock; compatible recovery keeps it held.
+MYSTICEGO_INSTALL_LOCK_FD=9 MYSTICEGO_INSTALL_PREREQS_READY=1 bash install.sh "$PWD/r3.zip" "$domain" '' "$digest" native sqlite
+# The installer already waits for SQLite. Final verification adds persisted identity,
+# approved release and active core services, without retrying deletion.
 verify_postinstall "$tag" /var/lib/mysticego /opt/mysticego/app

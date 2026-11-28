@@ -35,11 +35,18 @@ reject(){
 # Each negative test runs in its own subshell; no real systemctl or network.
 check_old(){ local local_id=$expected remote_id=$expected; verify_postinstall "$tag" "$state" "$app"; }
 check_mismatch(){ local remote_id=$expected; verify_postinstall "$tag" "$state" "$app"; }
-check_service(){ local failed_unit=mysticego-local-setup.socket; verify_postinstall "$tag" "$state" "$app"; }
+check_service(){ local failed_unit=caddy.service; verify_postinstall "$tag" "$state" "$app"; }
+check_pending(){ local failed_unit=mysticego-local-setup.socket; verify_postinstall "$tag" "$state" "$app"; }
+check_persisted(){ printf '%s\n' "$expected" > "$state/center-id.txt"; verify_postinstall "$tag" "$state" "$app"; }
 reject 'old node identity still returned' check_old
 reject 'HTTPS and local node identities differ' check_mismatch
 reject 'installed release differs from approved release' verify_postinstall v1.0.0-beta.7-r3.2.43 "$state" "$app"
-reject 'local setup socket is not active' check_service
+reject 'Caddy service is not active' check_service
+pending=$(check_pending)
+grep -Fxq "FACTORY_RESET_OK $fresh" <<< "$pending"
+grep -Fxq CLOUDDESK_RESET_MAINTENANCE_PENDING <<< "$pending"
+reject 'persisted center identity differs' check_persisted
+printf '%s\n' "$fresh" > "$state/center-id.txt"
 rm "$state/auth.db"
-reject 'Auth SQLite file missing or empty' verify_postinstall "$tag" "$state" "$app"
+reject 'Auth SQLite store missing or empty' verify_postinstall "$tag" "$state" "$app"
 echo 'PASS factory reset read-only postconditions: healthy, old identity, HTTPS mismatch, release mismatch, inactive service, missing SQLite'
