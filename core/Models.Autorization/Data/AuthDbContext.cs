@@ -11,6 +11,7 @@ namespace Models.Autorization.Data
         public DbSet<AccountLicenseAcceptance> AccountLicenseAcceptances => Set<AccountLicenseAcceptance>();
         public DbSet<AccountFeatureConsent> AccountFeatureConsents => Set<AccountFeatureConsent>();
         public DbSet<AccountDeviceGrant> AccountDeviceGrants => Set<AccountDeviceGrant>();
+        public DbSet<ExternalOAuthFlow> ExternalOAuthFlows => Set<ExternalOAuthFlow>();
         public DbSet<ExternalLinkIntent> ExternalLinkIntents => Set<ExternalLinkIntent>();
         public DbSet<ExternalIdentity> ExternalIdentities => Set<ExternalIdentity>();
         public DbSet<User> Users => Set<User>();
@@ -26,6 +27,22 @@ namespace Models.Autorization.Data
         {
             base.OnModelCreating(mb);
             mb.Entity<ManagedIdentity>(e => { e.ToTable("managed_identities"); e.HasKey(x=>x.Id); e.Property(x=>x.Name).HasMaxLength(160).IsRequired(); e.Property(x=>x.Kind).HasMaxLength(16).IsRequired(); e.Property(x=>x.SecretHash).HasMaxLength(200).IsRequired(); e.HasIndex(x=>x.Kind); });
+
+            mb.Entity<ExternalOAuthFlow>(e =>
+            {
+                e.ToTable("external_oauth_flows");
+                e.HasKey(x => x.StateHash);
+                e.Property(x => x.StateHash).HasMaxLength(64);
+                e.Property(x => x.BrowserHash).HasMaxLength(64).IsRequired();
+                e.Property(x => x.LinkHash).HasMaxLength(64).IsRequired();
+                e.Property(x => x.Provider).HasMaxLength(16).IsRequired();
+                e.Property(x => x.ClientId).HasMaxLength(20).IsRequired();
+                e.Property(x => x.RedirectUri).HasMaxLength(2048).IsRequired();
+                e.Property(x => x.ProtectedSecrets).HasMaxLength(4096).IsRequired();
+                e.HasIndex(x => x.LinkHash).IsUnique();
+                e.HasIndex(x => x.ExpiresUtc);
+                e.HasOne<ExternalLinkIntent>().WithMany().HasForeignKey(x => x.LinkHash).OnDelete(DeleteBehavior.Cascade);
+            });
 
             mb.Entity<ExternalLinkIntent>(e =>
             {

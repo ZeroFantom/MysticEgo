@@ -52,6 +52,20 @@ public static class AccountSecuritySchema
                 ON external_link_intents ("ExpiresUtc");
             CREATE INDEX IF NOT EXISTS "IX_external_link_intents_UserId"
                 ON external_link_intents ("UserId");
+            CREATE TABLE IF NOT EXISTS external_oauth_flows (
+                "StateHash" varchar(64) NOT NULL PRIMARY KEY,
+                "BrowserHash" varchar(64) NOT NULL,
+                "LinkHash" varchar(64) NOT NULL REFERENCES external_link_intents("CodeHash") ON DELETE CASCADE,
+                "Provider" varchar(16) NOT NULL,
+                "ClientId" varchar(20) NOT NULL,
+                "RedirectUri" varchar(2048) NOT NULL,
+                "ProtectedSecrets" varchar(4096) NOT NULL,
+                "ExpiresUtc" {timestamp} NOT NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_external_oauth_flows_LinkHash"
+                ON external_oauth_flows ("LinkHash");
+            CREATE INDEX IF NOT EXISTS "IX_external_oauth_flows_ExpiresUtc"
+                ON external_oauth_flows ("ExpiresUtc");
             CREATE TABLE IF NOT EXISTS external_identities (
                 "Provider" varchar(16) NOT NULL,
                 "Realm" varchar(128) NOT NULL,

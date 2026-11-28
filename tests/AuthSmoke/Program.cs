@@ -127,3 +127,5 @@ await ExternalIdentitySmoke.Run();
 await ExternalLinkSmoke.Run();
 
 await ProviderProofSmoke.Run();
+
+await ExternalOAuthSmoke.Run();
